@@ -6,6 +6,7 @@ Four research threads, conducted 2026-07-16 via parallel subagents, informing SE
 - [`agent-tool-access-control.md`](agent-tool-access-control.md) — state of the art for scoping which tools an LLM agent can call (MCP gateways, Agent IAM vendors, multi-agent framework enforcement, OAuth2 scope conventions).
 - [`tailscale-identity-mechanisms.md`](tailscale-identity-mechanisms.md) — whether Tailscale's own Grants/WhoIs/tsnet primitives can supply per-agent identity instead of a custom auth layer.
 - [`needle-identity-model.md`](needle-identity-model.md) — what identity/credential concept NEEDLE (the agent worker fleet) currently gives to spawned agent sessions (spoiler: none).
+- [`version-migration-precedent.md`](version-migration-precedent.md) — how Kubernetes, Stripe, and the relevant HTTP RFCs handle evolving an API contract without breaking clients that never predictably reconnect — informs SEAM's version migration policy in `docs/notes/versioning.md`.
 
 ## Combined recommendation
 

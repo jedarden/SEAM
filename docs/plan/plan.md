@@ -43,6 +43,13 @@ Near-future requirement (see `docs/notes/objective.md`): configure specifically 
 3. **Enforcement:** every SEAM route is tagged with its required scope(s) (`x-required-scope` in the route fragment); the gateway checks the caller's Grant-supplied scopes against them, default-deny. Never rely on the calling agent's own tool list as the boundary — client-side restriction is UX, not security (OWASP Agentic Top 10 consensus, and a live AutoGen cross-agent-tool-leak issue found in research).
 4. **Gap to close first:** NEEDLE currently mints no identity/credential for spawned agents at all (`docs/research/needle-identity-model.md`). This needs new NEEDLE-side work in `run_process` (`~/NEEDLE/src/dispatch/mod.rs:703`) — provision a per-worker `tsnet` identity, inject it via the existing `adapter.environment` passthrough (or a new template variable) — before SEAM-side scoping can be enforced against anything real.
 
+## Version Migration Strategy
+
+NEEDLE workers run perpetually-live sessions — a session may learn the API contract once (fetch `/openapi.json` early) and keep calling routes on that understanding for hours, with no guarantee it ever restarts or refetches the spec. Full design in `docs/notes/versioning.md`; precedent research in `docs/research/version-migration-precedent.md`. Two distinct problems:
+
+1. **Gateway process deploys** (SEAM's own code changes, contract unchanged) — standard Kubernetes rolling-update mechanics: ≥2 replicas, `PodDisruptionBudget minAvailable: 1`, readiness-gated rollout, graceful `SIGTERM` draining. Solved by ordinary deployment hygiene, not a SEAM-specific feature.
+2. **Route contract versioning** (a route's params/response/injection shape changes in a breaking way) — borrows Kubernetes' API deprecation policy (old and new versions coexist as long as anything calls the old one — this falls out of the existing ConfigMap-per-fragment model for free, a breaking change just ships as a new fragment rather than an in-place edit) and Stripe's adapter model (implement the route once against the newest contract, add a thin request/response adapter per older version still being served, rather than N parallel full implementations). Deprecated fragments emit `Deprecation`/`Sunset` headers (advisory only) and are retired when a per-route-version request-count metric has read zero for a quiet window — usage-gated, never calendar-gated.
+
 ## Implementation Phases
 
 - [ ] Phase 1: Gateway core — OpenAPI merge from a static local directory, `/docs` + `/openapi.json`, request validation with structured error responses. No secret injection or k8s yet — provable standalone.
@@ -52,6 +59,7 @@ Near-future requirement (see `docs/notes/objective.md`): configure specifically 
 - [ ] Phase 5: Onboard kubectl-proxy endpoints for additional clusters, adding a Tailscale Connector per cluster as needed.
 - [ ] Phase 6: Deploy to rs-manager via declarative-config; cut agents over from hand-documented CLAUDE.md proxy instructions to SEAM routes.
 - [ ] Phase 7: Per-agent tool scoping — NEEDLE-side per-worker `tsnet` identity provisioning, `x-required-scope` route tagging, Grant-based scope enforcement at the gateway (see Future section above). Depends on Phases 1–3 at minimum.
+- [ ] Phase 8: Version migration tooling — `Deprecation`/`Sunset` header emission for fragments marked `deprecated: true`, per-route-version request-count metric, usage-gated retirement workflow (see Version Migration Strategy above). Depends on Phase 1 (route fragment loading) at minimum; the per-caller breakdown enhancement depends on Phase 7.
 
 ## Open Questions
 
@@ -61,3 +69,5 @@ Near-future requirement (see `docs/notes/objective.md`): configure specifically 
 - How gradual should the migration off CLAUDE.md-documented proxy instructions be, and when do the old hand-rolled proxies get retired?
 - Does the Phase 7 scope-claim design need a full `service:action` taxonomy defined up front, or can it grow route-by-route as fragments are added?
 - For non-tailnet-native callers that need the header-based scope fallback (per Future section, point 2) — which callers, if any, actually fall into this bucket once NEEDLE workers have `tsnet` identities? May turn out to be zero in practice.
+- Should SEAM eventually adopt Stripe-style per-caller version pinning (each identity locked to whatever spec version was live at its first call) once Phase 7 identity exists? Stronger guarantee than usage-gated retirement, but more machinery — not required for an MVP.
+- What's the right length for the "quiet window" before a deprecated fragment is actually removed (7 days was used as an illustrative default in `docs/notes/versioning.md`, not a decided value)?
