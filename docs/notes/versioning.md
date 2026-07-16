@@ -23,6 +23,15 @@ Concretely, in SEAM's ConfigMap-per-route-fragment model:
 - **Retirement is usage-gated, not calendar-gated:** SEAM exports a per-route-version request-count metric (mirroring Kubernetes' `apiserver_requested_deprecated_apis` gauge). A deprecated fragment is only removed once that counter has been zero for a quiet window (e.g. 7 days) — never on a fixed date, since perpetually-live workers make any calendar guess unsafe.
 - Once per-worker identity exists ([[project_seam_gateway|Phase 7]], `tsnet`), the same metric can be broken down by caller, so a stuck worker on a deprecated route can be identified and drained individually instead of just waiting out the aggregate.
 
+## C. Passive drift signaling (adopted 2026-07-16)
+
+Neither `Deprecation`/`Sunset` headers nor hoping agents refetch `/openapi.json` gives a perpetually-live worker an actionable path to *catch up* mid-session. Two additions close that gap:
+
+- Every response carries `X-SEAM-Spec-Version` — a hash of the currently-served merged spec. A worker that cached the contract hours ago sees the version change on a call it was already making, at no extra request cost.
+- `/changes?since=<version>` returns a compact machine-readable diff (routes added / removed / changed) between that version and the current spec, backed by a ring buffer of the last N merged specs. An unknown or evicted version gets a pointer to the full spec instead.
+
+Advisory headers and usage-gated retirement (section B) are unchanged — this adds the catch-up mechanism they lacked.
+
 ## Open question
 
 Should SEAM eventually adopt Stripe's per-caller version pinning (each identity locked to whatever spec version was live at its first call, transformed transparently) once per-worker identity exists? Stronger guarantee than "don't break routes that still see traffic," but meaningfully more machinery and depends on Phase 7. Not required for an MVP.
