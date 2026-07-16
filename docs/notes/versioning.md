@@ -28,10 +28,15 @@ Concretely, in SEAM's ConfigMap-per-route-fragment model:
 Neither `Deprecation`/`Sunset` headers nor hoping agents refetch `/openapi.json` gives a perpetually-live worker an actionable path to *catch up* mid-session. Two additions close that gap:
 
 - Every response carries `X-SEAM-Spec-Version` — a hash of the currently-served merged spec. A worker that cached the contract hours ago sees the version change on a call it was already making, at no extra request cost.
-- `/changes?since=<version>` returns a compact machine-readable diff (routes added / removed / changed) between that version and the current spec, backed by a ring buffer of the last N merged specs. An unknown or evicted version gets a pointer to the full spec instead.
+- The catch-up diff is **progressively discoverable** (decided 2026-07-16 — full schema diffs are the most useful form but token-expensive, so they're layered):
+  - **Level 1:** `/changes?since=<version>` — token-cheap route-level list: path, verb, change kind (added / removed / params-changed / response-changed / deprecated), a one-line summary, and a drill-down link per route.
+  - **Level 2:** `/changes?since=<version>&route=<path>` — the full field-level schema diff for that single route (changed fields only, before/after).
+  - **Level 3:** `/openapi.json?version=<v>` — any archived full spec, for total reconstruction.
+  - Agent workflow: notice the header change → pull level 1 → drill into only the routes it actually uses. An unknown or evicted `since` version gets a pointer to the full current spec instead.
+- Backed by a ring buffer of the last N merged specs.
 
 Advisory headers and usage-gated retirement (section B) are unchanged — this adds the catch-up mechanism they lacked.
 
-## Open question
+## Parked: per-caller version pinning
 
-Should SEAM eventually adopt Stripe's per-caller version pinning (each identity locked to whatever spec version was live at its first call, transformed transparently) once per-worker identity exists? Stronger guarantee than "don't break routes that still see traffic," but meaningfully more machinery and depends on Phase 7. Not required for an MVP.
+Stripe-style per-caller version pinning (each identity locked to whatever spec version was live at its first call) is parked as a future feature — see `docs/notes/per-caller-version-pinning.md` (2026-07-16). The quiet-window length for usage-gated retirement is compared as multiple candidate designs in `docs/notes/quiet-window-options.md`, pending review.
