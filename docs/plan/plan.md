@@ -26,7 +26,7 @@ Today, each backend service (ArgoCD read-only proxy, per-cluster kubectl-proxy, 
 
 ## Components
 
-- **Gateway service** — HTTP server: OpenAPI merge/validation, secret injection, `/docs` + `/openapi.json`.
+- **Gateway service** — HTTP server, written in **Go** (decided 2026-07-20, ADR-001 below): OpenAPI merge/validation (pb33f `libopenapi`/`libopenapi-validator`), secret injection, `/docs` + `/openapi.json`.
 - **Route fragments** — per-service ConfigMaps, each an OpenAPI fragment + injection metadata, authored alongside the service they describe.
 - **Tailscale Connectors** — per-cluster egress, added incrementally as new upstreams are onboarded.
 - **`seam` CLI** — the gateway's merge/validation engine packaged as a command-line tool for CI and fragment authoring (`lint`, `diff`, `import`); see Fragment Toolchain below.
@@ -106,7 +106,7 @@ The config surface is YAML fragments authored largely by agents and merged at ru
 
 ## Implementation Phases
 
-- [ ] Phase 1: Gateway core — OpenAPI merge from a static local directory, `/docs` + `/openapi.json`, request validation with structured error responses. Includes per-fragment quarantine + `/config/status`, and the `X-SEAM-Spec-Version` response header (hash of the merged spec). No secret injection or k8s yet — provable standalone.
+- [ ] Phase 1: Gateway core (Go, ADR-001) — OpenAPI merge from a static local directory, `/docs` + `/openapi.json`, request validation with structured error responses. Includes per-fragment quarantine + `/config/status`, and the `X-SEAM-Spec-Version` response header (hash of the merged spec). No secret injection or k8s yet — provable standalone.
 - [ ] Phase 2: Secret injection — OpenBao client, `x-vault-path`/`x-inject-as` extension handling, inject-then-proxy.
 - [ ] Phase 3: ConfigMap-mounted route fragments — projected volume, in-process file-watch hot reload with atomic route-table swap (see Architecture), first fragment (pilot: migrate the existing hand-rolled ArgoCD read-only proxy).
 - [ ] Phase 4: Onboard z.ai/GLM proxy and twitterapi.io proxy fragments (no new Tailscale Connector needed).
@@ -122,9 +122,35 @@ The config surface is YAML fragments authored largely by agents and merged at ru
 
 ## Open Questions
 
-(Resolved questions are folded into their sections above with "decided 2026-07-16" markers; per-caller version pinning is parked in `docs/notes/per-caller-version-pinning.md`, quiet-window options are compared in `docs/notes/quiet-window-options.md`.)
+(Resolved questions are folded into their sections above with "decided 2026-07-16" markers; per-caller version pinning is parked in `docs/notes/per-caller-version-pinning.md`, quiet-window options are compared in `docs/notes/quiet-window-options.md`. Language/runtime choice resolved 2026-07-20 — see ADR-001 below.)
 
 - Exact route-fragment schema (OpenAPI fragment shape + extension fields) — not yet designed. High-stakes: once fragments exist across declarative-config, a schema change ripples through every onboarded service's ConfigMap — SEAM's own versioning problem, with no adapter layer to hide behind. Design once, before the first fragment; the `x-seam-schema` version marker (see Data Models) is the escape hatch if evolution is needed anyway.
-- Language/runtime choice — options researched and compared in `docs/research/language-runtime-choice.md`; decision pending review.
 - Fan-out (`_all`) partial-failure semantics — pending decision between fail-closed (any instance error fails the whole request), fail-open 200 with per-instance error entries plus hard-to-miss summary counts, or 207-style multi-status. See discussion of consequences in the 2026-07-16 review.
 - Loop-guard keying before Phase 7: with callers indistinguishable behind shared egress, guards key on (route, request-hash) only — are per-route thresholds still safe to enable, or should `x-loop-guard` wait for identity? (Not yet reviewed.)
+
+## ADR-001: 2026-07-20 — Ratify Go as the SEAM Gateway Implementation Language
+
+### Context
+
+Phase 1 (gateway core) has been blocked since the repo was scaffolded on 2026-07-15 — as of this writing (2026-07-20) the repo contains only `docs/`, zero implementation code. `docs/research/language-runtime-choice.md` (2026-07-16) benchmarked Go, Rust, TypeScript/Node, and Python against SEAM's seven hard requirements (3.1 fragment merge, genuine 3.1 request validation with structured field-level errors, reverse-proxy with streaming/WebSocket passthrough, OpenBao client, Tailscale WhoIs/tsnet, file-watch hot reload with atomic swap, small-footprint k8s container), with library-version and 3.1-conformance claims checked against actual registries/repos/changelogs rather than recalled from memory, and the Python findings additionally executed live on this host. The plan's Open Questions section has carried "decision pending review" since that research landed, and every phase from 1 onward depends on it. This ADR closes that gap.
+
+### Decision
+
+Adopt **Go** as the SEAM gateway's implementation language, per the research's primary recommendation.
+
+1. **The validator is the product.** SEAM's differentiating feature is schema-validated, structured, field-level 400 responses. pb33f `libopenapi` + `libopenapi-validator` is the only mature, off-the-shelf OpenAPI 3.1 request validator found across all four languages surveyed, and its error model (JSON pointer + spec line/col + `HowToFix`) maps directly onto SEAM's structured-error feature — it is better than what we would hand-design. Every other language means either building this by hand (Rust) or accepting a wiring/bus-factor risk on SEAM's core value proposition (Python, Node).
+2. **Tailscale support is first-party and production-grade in Go alone.** `tsnet` (embedded node) and `client/local` (WhoIs against a sidecar) are maintained by Tailscale itself, directly relevant to the pilot phases and to Phase 7's per-agent Grant-based scoping. The Rust equivalent (`tailscale-rs`) is explicitly experimental with no WhoIs API as of this research.
+3. **The proxy layer's security posture comes free.** stdlib `httputil.ReverseProxy`'s `Rewrite` hook strips hop-by-hop and client-spoofable `X-Forwarded-*` headers before user code runs, by design — closing the exact secret/header-injection pitfall flagged in `docs/research/secret-injection-gateways.md`, rather than requiring SEAM to reimplement that hardening itself.
+4. **The cost is real but bounded and one-time.** Go is a new toolchain in a shop whose CI is otherwise Rust-centric (`rust-verify` on iad-ci), but that cost is paid once at setup, not per-route the way a hand-rolled validator's maintenance would recur.
+
+### Alternatives Considered
+
+- **Rust** (the shop's primary language; `rust-verify` remote CI already exists) — clears six of seven requirements with best-in-class parts (axum/hyper/tower proxy stack maps cleanly onto validate→strip→inject→forward; `jsonschema` 0.48 is the most actively maintained 2020-12 engine surveyed; best footprint at ~10-25MB). The one gap is the product's core feature: no mature off-the-shelf 3.1 request validator exists (the sole candidate is a 45-star crate with no crates.io release). Building one is a scoped, bounded effort (~1-2k LOC, 1-2 weeks, per the research) — a defensible runner-up if "no new language in this shop" is weighted above "don't own the validator," but it puts SEAM's differentiator on our own maintenance budget instead of an actively-maintained upstream's. Kept as the fallback (see Consequences).
+- **Python** — every requirement clears, and uniquely among the four candidates was verified by live execution on this host (openapi-core 0.23.1: 0.59ms/request validation, 16ms full spec rebuild; a real WhoIs call over `tailscaled`'s Unix socket). Ruled out on footprint (170-200MB image vs. Go's 15-30MB) and on openapi-core being a single-maintainer dependency with a documented history of breaking 0.x API churn — a bus-factor risk on the validator, the same category of risk this decision is trying to avoid.
+- **TypeScript/Node** — Ajv2020 is the most battle-tested 2020-12 schema engine surveyed, but every library wrapping it for OpenAPI made an overstated 3.1 claim under inspection (openapi-backend silently runs draft-07-mode Ajv despite its README's 3.1 checkbox; express-openapi-validator is Express-bound and drags in `multer`). WebSocket proxy support across the viable options is self-described "partial" (first subprotocol only). No footprint advantage over Go to compensate.
+
+### Consequences
+
+- Phase 1 (gateway core) is unblocked and can start as a Go scaffold; `seam lint`/`seam diff`/`seam import` (Phase 9, Fragment Toolchain) are Go CLI tools by the same extension.
+- SEAM becomes the second language in this shop's container fleet alongside Rust. The existing `cargo`/`cargo-remote` CI-offload path (`~/.local/bin/cargo`, iad-ci `rust-verify`) does not apply; a Go build path is needed once code exists — tracked as a follow-on bead (see beads filed alongside this ADR), not a blocker to starting Phase 1, since SEAM ships as a plain container per the Hosting section regardless of build tooling.
+- The validator boundary is narrow (parse + merge + validate, per the comparison matrix in `docs/research/language-runtime-choice.md`) — if Go proves to be the wrong call in practice, replacing that one component (or, worst case, the whole gateway in Rust per the runner-up analysis) is a bounded rewrite, not a redesign of SEAM's architecture.
