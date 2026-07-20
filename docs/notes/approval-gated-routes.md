@@ -4,7 +4,7 @@ Status: accepted as a future feature 2026-07-16 — deliberately **not** in `doc
 
 ## What
 
-A route fragment may declare `x-requires-approval: true`. SEAM holds such a request instead of proxying it, pushes the fully rendered call (route, params, body, caller identity — never the secret) to a human approval channel, and only injects + proxies on an explicit approve. The calling agent receives a structured 202 with an approval ID and polls `/approvals/{id}` (pending / approved+result / denied / expired).
+A route fragment may declare `x-requires-approval: true`. SEAM holds such a request instead of proxying it, pushes the fully rendered call (route, params, body, caller identity — never the secret) to a human approval channel, and only injects + proxies on an explicit approve. The calling agent receives a structured 202 with an approval ID and polls **`/_seam/approvals/{id}`** (pending / approved+result / denied / expired). **The endpoint moved under `/_seam/` on 2026-07-20** — it was written here as a bare `/approvals/{id}`, but `docs/plan/plan.md`'s reserved control-plane namespace closes the grandfathered top-level enumeration as of that date, and every control-plane endpoint conceived afterwards lives under `/_seam/` with no exceptions. The bare `/approvals/` prefix stays reserved anyway, as a squat guard rather than a served surface: a fragment occupying the obvious name for an approval verdict would be a forgeable-approval surface, so denying the near-miss name closes the hole in both directions.
 
 ## Why
 

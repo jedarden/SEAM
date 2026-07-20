@@ -1,6 +1,8 @@
 # Quiet-Window Options for Deprecated-Fragment Retirement
 
-Status: options for review, 2026-07-16. Decides *when a deprecated route fragment that has stopped seeing traffic may actually be removed*. Context: retirement is usage-gated, never calendar-gated (`docs/notes/versioning.md` §B) — this document is about how long "quiet" must last, and what supplements the raw counter. The options are not all mutually exclusive; a recommended composition is at the end.
+Status: **resolved 2026-07-20** — the recommended composition at the end was adopted verbatim into `docs/plan/plan.md` **Phase 8**, which is now the authority. This document is retained as the reasoning behind that choice, not as an open decision. (Originally: options for review, 2026-07-16.)
+
+Decides *when a deprecated route fragment that has stopped seeing traffic may actually be removed*. Context: **zero observed traffic is a necessary condition for retirement; a calendar term may only ever lengthen the wait, never trigger a removal on its own** (`docs/notes/versioning.md` §B — reworded 2026-07-20 from "usage-gated, never calendar-gated", phrasing that was misread as forbidding the calendar floor Option B's recommended form depends on). This document is about how long "quiet" must last, and what supplements the raw counter. The options are not all mutually exclusive; a recommended composition is at the end.
 
 ## Option A — Fixed calendar window
 
@@ -17,6 +19,7 @@ Window per route-version = k × the maximum inter-request gap ever observed on t
 - **Pro:** self-sizing from real behavior; no global guess. Directly addresses Option A's failure mode.
 - **Con:** needs per-route-version gap history (small, but persistent to be meaningful across gateway restarts); cold routes with little history degenerate to a floor value (i.e. fall back to Option A's number anyway).
 - **Failure mode:** a caller whose rhythm *changes* (was hourly, becomes monthly) can still be outwaited incorrectly — rarer than A's failure but not zero.
+- **Status (2026-07-20): the persistence caveat is answered.** The gap history does **not** live in the gateway. `docs/plan/plan.md` Version Migration Strategy §2 decides that the observed max inter-request gap and "quiet since" are read from the per-route-version request-count metric already exported to the fleet's metrics store — which is durable, retained, and survives deploys, unlike every deliberately restart-scoped in-process store in SEAM. The evaluator is therefore a *query* over that series, adding no request-path state, no PVC, and no second stateful component to a single-replica gateway. Two consequences: gap resolution is bounded below by the scrape interval (irrelevant against a 7-day floor), and the store's retention window is load-bearing — a route-version older than retention reports "insufficient history" and falls back to the floor rather than inventing a gap, i.e. degrades to exactly the cold-route behavior noted above.
 
 ## Option C — Brownout probes (GitHub-style)
 
@@ -28,7 +31,9 @@ Before real removal, the deprecated route is intentionally served as `410 Gone` 
 
 ## Option D — PR-gated human retirement
 
-Removal is already a git operation (deleting the fragment from declarative-config). So the "workflow" is: when the quiet condition is met, SEAM (or a small cron) **opens the declarative-config PR** with the traffic evidence in the description; a human merges. Nothing is ever removed autonomously.
+Removal is already a git operation (deleting the fragment from declarative-config). So the "workflow" is: when the quiet condition is met, something **opens the declarative-config PR** with the traffic evidence in the description; a human merges. Nothing is ever removed autonomously.
+
+**Resolved 2026-07-20: that "something" is a separate job, never the gateway.** This note's original "SEAM (or a small cron)" hedge is settled in favour of the cron. Opening a PR needs a Forgejo write credential against the repo that controls every cluster in the fleet, and SEAM's OpenBao policy grants `read` on `seam/routes/*` **and nothing else** — the entire hostile-fragment threat model rests on that being literally true, so it takes no named exception. Retirement evaluation ships as `seam-retirement-evaluator`, a small scheduled job that queries the metrics store read-only and opens the PR under its own narrowly-scoped credential, held at its own OpenBao path that SEAM cannot read. It happens to be the same job Option B's gap-history query needs, so this costs nothing extra. See `docs/plan/plan.md` Phase 8.
 
 - **Pro:** the enforcement point is the merge button — auditable, reversible, zero new trust granted to automation; fits the existing GitOps rule that all cluster changes go through declarative-config anyway.
 - **Con:** adds human latency to every retirement (arguably a feature at this fleet size); a pile of unreviewed retirement PRs is possible.
