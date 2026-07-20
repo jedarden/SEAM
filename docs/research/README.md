@@ -1,16 +1,17 @@
 # Research Index
 
-Four research threads, conducted 2026-07-16 via parallel subagents, informing SEAM's core design and its near-future per-agent tool scoping requirement.
+**Six** research threads (count corrected 2026-07-20 — this read "Four" and listed five, and a sixth, `language-runtime-choice.md`, was cited by ADR-001 while never being indexed here at all). The **first four**, conducted 2026-07-16 via parallel subagents, inform the near-future per-agent tool scoping requirement and are the ones the combined recommendation below draws on. The **last two** were added afterwards and inform different decisions: version migration policy, and the gateway's implementation language.
 
 - [`secret-injection-gateways.md`](secret-injection-gateways.md) — prior art for the core proxy+inject function (Vault Agent, Boundary, Teleport, oauth2-proxy, Kong/Tyk/KrakenD, Secretless Broker, Infisical Agent Vault).
 - [`agent-tool-access-control.md`](agent-tool-access-control.md) — state of the art for scoping which tools an LLM agent can call (MCP gateways, Agent IAM vendors, multi-agent framework enforcement, OAuth2 scope conventions).
 - [`tailscale-identity-mechanisms.md`](tailscale-identity-mechanisms.md) — whether Tailscale's own Grants/WhoIs/tsnet primitives can supply per-agent identity instead of a custom auth layer.
 - [`needle-identity-model.md`](needle-identity-model.md) — what identity/credential concept NEEDLE (the agent worker fleet) currently gives to spawned agent sessions (spoiler: none).
-- [`version-migration-precedent.md`](version-migration-precedent.md) — how Kubernetes, Stripe, and the relevant HTTP RFCs handle evolving an API contract without breaking clients that never predictably reconnect — informs SEAM's version migration policy in `docs/notes/versioning.md`.
+- [`version-migration-precedent.md`](version-migration-precedent.md) — how Kubernetes, Stripe, and the relevant HTTP RFCs handle evolving an API contract without breaking clients that never predictably reconnect — informs SEAM's version migration policy in `docs/notes/versioning.md`. *(Added after the original four.)*
+- [`language-runtime-choice.md`](language-runtime-choice.md) — Go vs. Rust vs. TypeScript/Node vs. Python against SEAM's seven hard requirements (OpenAPI 3.1 merge and request validation, streaming/WebSocket reverse proxy, OpenBao client, Tailscale WhoIs/tsnet, file-watch hot reload, container footprint), with library claims verified against registries and the Python findings executed live. Ratified as Go in `docs/plan/plan.md` ADR-001. *(Added after the original four.)*
 
 ## Combined recommendation
 
-The four threads converge on one coherent design for per-agent tool scoping, which the core proxy+inject objective doesn't need but the near-future requirement does:
+The **first four** threads — the scoping-related ones — converge on one coherent design for per-agent tool scoping, which the core proxy+inject objective doesn't need but the near-future requirement does:
 
 1. **Identity:** each NEEDLE worker/agent gets its own `tsnet`-embedded ephemeral Tailscale node (ADR: don't build SPIFFE/SPIRE or a custom PKI — Tailscale already provides workload identity for this exact topology, and it's what Tailscale's own internal tools — TailSQL, Setec, Golink — use for the same purpose). This is necessary, not optional: today's shared Connector/egress proxy pods collapse every worker in a cluster into one indistinguishable caller from SEAM's point of view.
 2. **Authorization data:** scope claims (`service:action`, e.g. `k8s-ro:get`, `argocd:sync`) travel in the Tailscale Grant's opaque `app` capability field, read via `WhoIs` on the inbound connection — no separate JWT-issuing auth server needed for tailnet-native callers. Fall back to a bearer-claim-in-header model only for callers that genuinely can't be first-class tailnet peers.
