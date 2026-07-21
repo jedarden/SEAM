@@ -1,5 +1,27 @@
 # SEAM Plan
 
+## Status & Revision History
+
+- **Status:** Pre-implementation — Phase 1a not yet started (the repo is docs-only: `docs/` and nothing else, zero implementation code, per ADR-001 Context). **Plan version:** 1.0 (first version-stamped revision; the plan predates stamping, so every `(decided 2026-07-16)` / `(decided 2026-07-20)` marker below is retroactively part of it). **Last substantive revision:** 2026-07-21. **Owner:** jedarden.
+- **Provenance is inline, not a changelog** (added 2026-07-21). This plan carries each decision's history where the decision lives — as `(decided <date>)`, `(corrected <date>)`, `(clarified <date>)` and `(added <date>)` markers on the affected bullet — rather than in a separate changelog that would drift from the text it annotates. Two dates dominate that history: **2026-07-20** is the six-round adversarial gap-review pass that hardened Architecture, Data Models, the security controls (the dual allowlists, strip-then-inject, the owner chain), Version Migration Strategy and the phasing; **2026-07-21** is the plan-review pass that added the framing, acceptance, testing, performance and risk scaffolding — this section and its siblings (Normative Language, Glossary, Non-Goals, and the acceptance/testing/performance/risk sections). Content added in that pass carries the `(added 2026-07-21)` marker.
+
+**Revision History:**
+
+| Date | Change | Marker |
+|------|--------|--------|
+| 2026-07-15 | Repo scaffolded, docs-only — `README.md` + `docs/{notes,research,plan}` per the standard structure; no implementation code | — |
+| 2026-07-16 | Initial design and first review; 8 open questions resolved (in-process reload, service-by-service cutover, dynamic scope taxonomy, progressive-disclosure diff, per-fragment probe cadence, among them) | `(decided 2026-07-16)` |
+| 2026-07-20 | ADR-001 ratifies Go; six-round gap review hardens Architecture, Data Models, security, versioning and phasing | `(decided 2026-07-20)` / ADR-001 |
+| 2026-07-21 | Plan-review scaffolding: framing (this section, Normative Language, Glossary, Non-Goals), acceptance scenarios, testing strategy, performance budgets, risk register | `(added 2026-07-21)` |
+
+## Normative Language
+
+The key words below are to be read as in RFC 2119, and this plan — which predates the convention — already uses "must", "never", "always" and "may" throughout in exactly this binding sense; from this revision (added 2026-07-21) they are normative wherever they appear in a requirement, while a "should" in prose that is not a requirement carries no such weight. Grounded in rules already stated: **SEAM MUST strip every header it may set before injection** (Architecture, strip-then-inject); **a fragment naming an upstream outside the operator-owned allowlist MUST be quarantined fragment-wide** (Architecture, upstream-host allowlist); **the pipeline stages MUST NOT be reordered** (Architecture — "an implementation may not reorder these stages"); and **guard state MAY reset freely on restart** (Per-Route Guards; Version Migration Strategy §1 — the per-process view "may reset freely because nothing depends on it").
+
+- **MUST** / **MUST NOT** — an absolute requirement; an implementation violating it does not conform to this spec, and no fragment, deployment, or phase may relax it.
+- **SHOULD** / **SHOULD NOT** — recommended; deviation is permitted only with a documented rationale (this plan's `acknowledged`-valued fields — `x-unscrubbable`, `insecureSkipVerify`, `x-upstream-plaintext` — are its concrete, enumerable form).
+- **MAY** — truly optional, of no consequence to conformance either way.
+
 ## Overview
 
 SEAM (Self-documenting Endpoint Access Mediator) is a single unified endpoint that acts as a proxy to multiple authenticated services. It injects the required secret into a request received from an agent, sends the request on to the destination service, and passes the response back — the agent never sees the secret. It also self-documents: a merged OpenAPI spec drives `/docs` and `/openapi.json`, and malformed requests get a structured error naming the bad field and pointing at the right shape, instead of a bare 400.
@@ -7,6 +29,229 @@ SEAM (Self-documenting Endpoint Access Mediator) is a single unified endpoint th
 ## Motivation
 
 Today, each backend service (ArgoCD read-only proxy, per-cluster kubectl-proxy, the z.ai/GLM proxy, the twitterapi.io proxy) is documented by hand in CLAUDE.md with its own discovery and auth pattern. This doesn't scale: every new service needs new hand-written prose, agents have no standard way to discover what's available, and there's no mechanism to guide an agent that sends a malformed request back toward the correct one.
+
+## Glossary
+
+The load-bearing coined terms of this plan, defined once so fragment authors — who are largely agents, and often several of them working the same tree — share one vocabulary (added 2026-07-21; a framing artifact, not a new decision — every definition is mined from the section that owns the term).
+
+- **fragment** — a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields (`x-upstream`, `x-vault-path`, `x-inject-as`, …), delivered as one Kubernetes ConfigMap per upstream service and mounted at `/etc/gateway/routes.d/<svc>/`. The unit of route authoring, versioning, and retirement; a service ships N of them under one owner directory.
+- **route fragment schema / `x-seam-schema`** — the JSON Schema a fragment must satisfy (`x-seam-schema: v1`, a fragment-root marker). `x-seam-schema` versions the fragment *format SEAM parses*; it is distinct from `x-api-version`, which versions the *contract SEAM serves to callers*.
+- **owner chain** — the forgery-resistant binding `k8s/rs-manager/seam/routes/<svc>/` → ConfigMap `seam-routes-<svc>` → `mountPath /etc/gateway/routes.d/<svc>/` → `x-seam-owner: <svc>` → `x-vault-path ⊂ seam/routes/<svc>/*`. Its first three links are operator-owned (in SEAM's own manifest, not writable by a fragment author); `seam lint` is the only consumer that walks it whole, the gateway re-checks the last three at runtime from what it can observe.
+- **co-ownership rule** — a fragment's `x-vault-path` may reference only `seam/routes/<x-seam-owner>/*`, so "point service A's secret at service B's upstream" fails on ownership even inside the vault-path allowlist.
+- **upstream-host allowlist** vs **vault-path allowlist** — the two peer anti-exfiltration controls. The vault-path allowlist bounds *which secret* a fragment may name (the `seam/routes/*` prefix + co-ownership); the upstream-host allowlist (`seam-upstream-allowlist`) bounds *where that secret is sent* (permitted host suffixes and enumerated bare hostnames). Both operator-owned, both in SEAM's manifest and never in a fragment, both enforced twice (lint + merge-time quarantine).
+- **adapter / `x-adapter`** — a declarative, closed-vocabulary request/response transform carried by an *older* coexisting fragment, converting its contract into the newest version's so SEAM needs no N parallel implementations. Data, not code — so a contract migration is a ConfigMap edit, never a gateway binary deploy.
+- **quiet window** — the retirement drain period: how long a route-version's request counter must read zero before it may retire. Traffic-adaptive with a 7-day calendar floor, `max(3 × observed max inter-request gap, 7 days)`, read from the metrics store (Phase 8).
+- **brownout** — scheduled final-week `410 Gone` windows served on a deprecated route-version, converting "we believe nobody calls this" into a tested claim an LLM caller can read and self-migrate from. A caller appearing during one **cancels** retirement rather than being sacrificed to it.
+- **retirement** — usage-gated removal of a drained fragment, via an operator-merged declarative-config PR opened by `seam-retirement-evaluator`. Zero observed traffic is a necessary condition; a date never triggers it.
+- **`_all`** — the reserved instance-selector value that fans a request out to every mapped `x-upstream-map` instance concurrently and returns one instance-labeled merged envelope; invoking it requires the fragment-root `x-fanout-scope`.
+- **`_unversioned`** — the reserved `x-api-version` key for fragments predating versioning. Sorts strictly oldest, so it stays the default for callers sending no `X-SEAM-API-Version`; assigned by SEAM, a lint error if *authored*, but a legal value to *address*.
+- **`x-instance-param`** — the fragment-root field naming which path parameter selects an `x-upstream-map` entry (e.g. `cluster` for `/k8s/{cluster}/…`). `{instance}` throughout this plan is its generic stand-in; a real fragment names it concretely.
+- **scope-withheld** — a fan-out envelope status for an instance dropped from `_all` because the caller lacks its per-instance `requiredScope`: nothing dispatched, no `httpStatus`, no body, charged nothing — distinguishable from `error`, `timeout` and `breaker-refused`.
+- **breaker-refused** — a fan-out envelope status for an instance whose circuit breaker was open: not dispatched, no secret read, charged nothing, carrying the breaker's `openedAt`/`lastError`/`retryAfter` so it is diagnosable without a second call.
+- **tumbling window** — a guard/quota window anchored at process start (`^[0-9]+(s|m|h|d)$`, no calendar-aligned form): it opens at start, closes `window` later, the next opens immediately with the counter cleared, and a SEAM restart resets it unconditionally.
+- **pass-through fragment** — a route declaring neither `x-vault-path` nor `x-inject-as` (both-or-neither): SEAM forwards it with TLS, guards, health and versioning intact but injects nothing, scrubbing is a no-op, and it contributes no `/health/credentials` entry. The Phase 3 ArgoCD pilot is one.
+- **the pipeline** — the fixed **11-stage inbound / 4-stage outbound** request path (Architecture). "Stage N" everywhere in this plan means a position in those two lists and no other count is normative; the stages MUST NOT be reordered.
+- **control-plane surface** vs **caller-facing surface** — the control-plane surface is SEAM's own endpoints, resolved at pipeline stage 1 before the merged route table, in two tiers: caller-facing-and-scope-filtered (`/openapi.json`, `/docs`, `/docs/route`, `/whoami`, `/scopes`, `/changes`) and operator-only default-denied (`/config/status`, `/health/credentials`, `/health/upstreams`, behind `seam:ops:read`). The caller-facing surface is the proxy front door agents call, bound to the caller-facing listener port `8080` (the operator tier binds `8081`); SEAM's own base URL — the caller port's external address — populates the merged spec's `servers:`.
+- **spec version (`X-SEAM-Spec-Version`)** vs **API version (`x-api-version`)** — the two distinct version spaces, both spellable on a `?version=` parameter but never on the same endpoint. `X-SEAM-Spec-Version` is a hash of the whole currently-served merged spec (the archive key on `/openapi.json?version=`); `x-api-version` is a per-route contract marker, `v<n>` or `_unversioned` (the selector on `/docs/route?version=`). A value from the wrong alphabet is a 400 naming which the endpoint expects.
+- **Grant / WhoIs** — Tailscale identity terms. A caller's scope claims (`service:action`, e.g. `k8s-ro:get`) travel in the Tailscale **Grant**'s `app` capability field, read via **`WhoIs`** on the inbound connection — the tailnet-native authorization source Phase 7 enforces `x-required-scope` against.
+- **fan-out envelope** — the single buffered JSON object an `_all` request returns: `{instances, summary}`, keyed by instance, scrubbed exactly once against the union of every injected value, and bounded by `maxFanoutEnvelopeBytes` (overflowing instances become `truncated`).
+- **sentinel probe** — a byte-identical authenticated request the credential sentinel issues per fragment on its `x-credential-probe` cadence to validate a credential against its upstream. Carries an unforgeable in-process origin tag; excluded from the retirement, loop-breaker and quota counters, but counted — deliberately — in last-2xx and breaker state.
+
+## Non-Goals and What SEAM Is Not
+
+Every boundary below is traceable to a decision already in this plan; this section consolidates them so scope creep is caught by reference rather than re-argued (added 2026-07-21).
+
+**Non-Goals (v1):**
+
+- **Not highly available / multi-replica** — because guard counters, quota ledgers, last-2xx and breaker state are per-process and in-memory by design, and a second replica behind one Service silently doubles every threshold (a loop guard of 10 permits 20, a `$50` `x-quota` permits `$100`). Single-replica (`replicas: 1`, `maxSurge: 0`) is a load-bearing invariant; HA is a documented later upgrade path — a shared state store for counters/ledgers/breaker plus leader election for the sentinel (Version Migration Strategy §1) — not a v1 deliverable, and never reachable by raising `replicas`.
+- **Not an accounting system of record** — because `x-quota` is a runaway-spend *brake*: its windows are tumbling and restart-scoped, so a binary deploy resets every budget, and `X-SEAM-Budget-Remaining` is a fleet-wide fuel gauge, not a reservation (Per-Route Guards). The durable substrate for anything that must survive a restart is the metrics store (VictoriaMetrics), which is where retirement reads its evidence — SEAM's own memory is not.
+- **Not a general-purpose API gateway or WAF** — because SEAM fronts a fixed, operator-curated set of fleet upstreams bounded by the upstream-host allowlist, not arbitrary traffic. There is no rate-limiting-as-a-service, no request transformation beyond the closed `x-adapter` version vocabulary, and no destination an operator has not enumerated in SEAM's own manifest.
+- **Not a secrets manager** — because OpenBao remains the store of record; SEAM authenticates via Kubernetes auth and reads a single bounded prefix (`seam/routes/*`) at request time, holding secrets only in a 30-second in-memory cache (Architecture). It stores nothing, rotates nothing, and issues nothing.
+- **Not a public-internet ingress in v1** — because SEAM is reachable only behind the tag-restricted tailnet ACL until Phase 7 (Pre-Phase-7 Trust Boundary); no Funnel, no public ingress, no Cloudflare Tunnel before then. The non-tailnet (foreign-worker) bearer path is Phase 14, and it is the *only* phase that lifts this rule.
+- **Not a replacement for ArgoCD or GitOps** — because fragments ship through `jedarden/declarative-config` and are synced by ArgoCD like every other cluster change (CLAUDE.md); SEAM adds a hot-reload path *within* an onboarded service, it does not bypass the GitOps repo. Retirement itself is a declarative-config PR a human merges.
+- **Not client-side tool restriction** — because scope enforcement is server-side and default-deny (`x-required-scope`, Grant-checked at pipeline stage 5). Never rely on the calling agent's own tool list as the boundary — client-side restriction is UX, not security (Per-Agent Tool Scoping point 3).
+
+**What SEAM Is Not** (the plan's scattered is-not statements, consolidated):
+
+- **Not stateless** — emphatically. It holds per-process, load-bearing state (guard counters, quota ledgers, last-2xx, breaker state, the sentinel's probe loop), which is exactly why it runs single-replica (Version Migration Strategy §1).
+- **Not a proxy that trusts caller headers** — it is strip-then-inject, never trust-then-overlay: every injectable header *and* injected query-parameter name, plus `Authorization` and all `X-SEAM-*` request headers bar the documented exceptions, are deleted on ingress before injection (Architecture, pipeline stage 2).
+- **Not an open proxy** — the dual operator-owned allowlists (vault-path and upstream-host) plus default-deny at every boundary mean a correctly-filed, correctly-owned fragment still cannot name an arbitrary secret or an arbitrary destination (Architecture; Pre-Phase-7 Trust Boundary).
+- **Not calendar-gated on retirement** — zero observed traffic is a *necessary* condition; a calendar term (the 7-day floor) may only ever lengthen the wait, never trigger a removal on its own (Version Migration Strategy §2; Phase 8).
+- **Not a place where a fragment author self-certifies** — the owner chain and both allowlists live in SEAM's own manifest (`k8s/rs-manager/seam/`), outside every `routes/<svc>/` directory, so the author who would name a malicious host or secret cannot also write the rule that permits it (Architecture; Components).
+
+## Acceptance Scenarios
+
+These nine named scenarios are the independently-verifiable definitions of "correct" a build is checked against, each written as **Setup → Action → Expected → Pass criteria → Fail criteria**; they are the external oracle the Testing Strategy's acceptance suite implements (see **Testing Strategy** below), and every criterion here is traceable to a behavior specified elsewhere in this plan rather than introduced with it (added 2026-07-21). They are worded to be checkable by a test harness that observes SEAM's inbound response, its upstream request, and its control-plane surfaces — never SEAM's internal state — because that is exactly the boundary an agent sees. Where a scenario's behavior changes at Phase 7 (identity) or Phase 8 (versioning), the phase-conditioned form is stated, since a build is checked against the behavior of the phase it claims to have shipped.
+
+### Scenario 1: Secret injection and echo-scrubbing (happy path)
+
+**Setup.** A single-instance proxied route declaring `x-vault-path` (inside `seam/routes/<x-seam-owner>/*`) and `x-inject-as` `{kind, name}` — e.g. a Phase 4 z.ai/GLM or twitterapi.io fragment — whose upstream is reachable and whose OpenBao secret exists. The caller sends its own copy of the injected header or query-parameter name, its own `Authorization`, and several `X-SEAM-*` request headers, and the upstream is one that echoes the presented credential back in an error body.
+
+**Action.** The caller invokes the route.
+
+**Expected.** Pipeline stage 2 strips every injectable header, every occurrence of the injected query-parameter name, `Authorization`, and all `X-SEAM-*` request headers bar the two documented caller-supplied exceptions; stage 10 resolves the secret (30s cache or OpenBao) and injects exactly one credential per `x-inject-as`; stage 11 forwards; outbound stage 4 scrubs the exact injected value(s) out of the response body, headers and trailers, redacting to `[REDACTED-BY-SEAM]`.
+
+**Pass criteria.**
+- The injected value appears in **no** returned byte — body, headers, or trailers — including the upstream error body that echoes it, which arrives at the caller with the value replaced by `[REDACTED-BY-SEAM]`.
+- The upstream request carries **exactly one** injected credential under the declared `x-inject-as.name` (or `Authorization: Bearer <secret>` for `kind: bearer`), and it is SEAM's fetched value, not the caller's copy.
+- The caller's `Authorization`, every `X-SEAM-*` request header except `X-SEAM-Dry-Run` and `X-SEAM-API-Version`, and every caller-supplied instance of the injected header/query name (all occurrences; case-insensitive per-key for headers, exact for query keys) are **absent** from the upstream request.
+
+**Fail criteria.**
+- The injected value survives verbatim into any returned byte — an echoing error body is silently proxied through unscrubbed.
+- A caller-supplied `Authorization`, an `X-SEAM-*` header, or a duplicate injected-name header/query parameter silently survives into the upstream request (trust-then-overlay rather than strip-then-inject).
+- Two credentials reach the upstream, or the caller's supplied value silently overrides SEAM's injected one.
+
+### Scenario 2: Malformed request → structured 400
+
+**Setup.** A merged route with a declared request schema. The caller sends a request that violates it — a missing required field, a wrong type, or an out-of-range value — against the version that would serve it (`_unversioned` before Phase 8).
+
+**Action.** The caller invokes the route with the malformed request.
+
+**Expected.** Spec validation at pipeline stage 6 fails against the matched version's own declared schema, and SEAM returns a structured 400 before dry-run (stage 7), guards (stage 9), secret resolution (stage 10) or the upstream call (stage 11) run.
+
+**Pass criteria.**
+- The response is **400** with a structured body naming the offending field, what was expected there, and a pointer of the form `GET /docs/route?path=<openapi-path-template>&version=<v>` (the normalization-safe query-parameter shape, `&version=` equal to the version that would have served — `_unversioned` before Phase 8).
+- **No secret is fetched** from the 30s cache or OpenBao, and **no upstream connection is opened** — the request fails at stage 6, upstream of both.
+- No loop-breaker counter is incremented and no quota is drawn (guards are stage 9, below validation).
+
+**Fail criteria.**
+- A bare 400 with no field name, no expected shape, and no `/docs/route` pointer.
+- The upstream is silently contacted, or a secret is silently fetched, for a request that never validated.
+- The pointer uses the superseded `/docs/{route}` path-segment spelling, which Go's mux normalizes (`%2F` → `/`) so the pointer never resolves.
+
+### Scenario 3: Dead upstream → circuit breaker 503
+
+**Setup.** An upstream that fails repeatedly with breaker-qualifying faults — connection refused/reset, DNS or TLS handshake failure, request timeout, or any 5xx — under the default breaker policy (5 consecutive failures open the breaker for 30s, keyed on resolved upstream origin).
+
+**Action.** Enough consecutive qualifying failures accrue to open the per-upstream breaker; further callers then hit any route resolving to that origin.
+
+**Expected.** The breaker opens; every subsequent request to that origin is refused before dispatch with the structured 503, and one real caller is admitted as a half-open trial only after the open interval elapses.
+
+**Pass criteria.**
+- After 5 consecutive qualifying failures the breaker is open, and callers receive a **structured 503** naming the upstream, `openedAt` (when it started failing), `lastError`, and a derived `Retry-After` (seconds remaining in the current open interval, floored at 1, matching the body).
+- While open, **every** route on that origin fails fast with **no upstream dispatch, no secret fetch, and no quota draw** (refused before stage 11, so charged nothing); in a multi-instance map one dead cluster opens exactly one breaker and the other eight keep serving.
+- A **401 never counts** as a breaker failure (even one that triggers refetch-and-retry), and **no 4xx counts** — only transport faults, timeouts and 5xx do.
+
+**Fail criteria.**
+- Agents keep dispatching to the dead upstream and burn tokens indefinitely — the breaker never opens, or opens per-route/per-fragment instead of per-origin so one bad route hides the upstream's real state.
+- A routine 401 rotation or any 4xx silently trips the breaker, converting a healthy upstream into a self-inflicted fleet outage.
+- The 503 is bare (no upstream / `openedAt` / `lastError` / `Retry-After`), or the half-open trial fires a synthetic probe instead of admitting one real caller.
+
+### Scenario 4: Credential rotation self-heal
+
+**Setup.** A route whose injected credential has just rotated in OpenBao while SEAM still holds the previous value in its 30s cache (keyed by resolved `x-vault-path`); the upstream will 401 the stale credential. The request body is within `maxReplayableRequestBytes` (default 1 MiB) and is teed by the Phase 2 buffer.
+
+**Action.** The caller invokes the route; the upstream rejects the stale credential with a 401.
+
+**Expected.** SEAM eagerly invalidates the cached secret, refetches from OpenBao, re-strips inbound headers, re-injects the fresh credential, and retries once; the retry succeeds and the caller sees a transparent success. On a body over `maxReplayableRequestBytes` (or otherwise unreplayable — a request-side protocol upgrade or an unbounded chunked stream with no declared length), SEAM still invalidates and refetches but does **not** retry, returning the structured `credential-refresh-not-retried` envelope.
+
+**Pass criteria.**
+- On a replayable body, the 401 triggers cache invalidation, an OpenBao refetch, and **exactly one** retry with the fresh secret re-injected and inbound headers re-stripped; the caller's response is that successful retry, with no indication a rotation occurred.
+- `/health/credentials` reflects the refresh under the route's `(fragment, instance)` key (updated `lastVerified` / status).
+- On a body over `maxReplayableRequestBytes` or otherwise unreplayable, SEAM returns the structured **`credential-refresh-not-retried`** envelope — carrying the upstream's own status, its scrubbed body, and the plain statement that resending will now use the refreshed credential — and invalidates the cache regardless, so the caller's **next** request succeeds.
+
+**Fail criteria.**
+- The stale cached secret is silently served again with no refetch, leaving rotation latency unbounded.
+- The oversized-body case silently degrades — no retry and **no signal** — so the caller cannot detect that the credential was refreshed and its next request should be resent.
+- More than one retry, a retry that reuses the stale secret, or a retry that forgets to re-strip caller headers before re-injecting.
+
+### Scenario 5: Fan-out partial failure → 207
+
+**Setup.** `/k8s/_all/api/v1/pods` over the nine-cluster `x-upstream-map`, invoked by a caller holding both the fragment-root `x-fanout-scope` and the operation-level `x-required-scope`. Some clusters error or time out, at least one has an open breaker (breaker-refused), and at least one is one the caller lacks the per-instance `requiredScope` for (scope-withheld). The merged envelope fits within `maxFanoutEnvelopeBytes`.
+
+**Action.** The caller issues the `_all` fan-out.
+
+**Expected.** Stages 1–9 run once against the aggregate; stages 10–11 run per surviving instance; the fan-out envelope `{instances, summary}` is scrubbed once over the merged artifact against the union of injected values and returned with a derived status code and `X-SEAM-Fanout-Partial: 1`.
+
+**Pass criteria.**
+- The response is **207 Multi-Status** carrying `X-SEAM-Fanout-Partial: 1`, and the `instances` object distinguishes every per-instance outcome — `ok`, `error`, `timeout`, `breaker-refused`, `truncated`, `scope-withheld` — with `breaker-refused` carrying `openedAt`/`lastError`/`retryAfter` and both `breaker-refused` and `scope-withheld` carrying no body and charged nothing.
+- **200** is returned **only** when every dispatched instance returned 2xx and none was breaker-refused, truncated, or scope-withheld; the `summary` integers are exact, with `total - dispatched` equal to the breaker-refused plus scope-withheld instances.
+- When every instance is breaker-refused and **nothing was dispatched**, the response is the structured **503** (naming each refused instance and its `Retry-After`), not a 207; an all-`scope-withheld` fan-out is a **207 with zero dispatched**, never a 403 and never a 503.
+
+**Fail criteria.**
+- A partial answer (say, eight of nine instances failed) is returned as **200**, so a client that checks `response.ok` and moves on cannot tell it from a clean fleet-wide success.
+- The partiality signal is skippable — no 207 and no `X-SEAM-Fanout-Partial: 1` — or `error`/`timeout`/`breaker-refused`/`scope-withheld` are silently collapsed into one indistinguishable status.
+- A breaker-refused or scope-withheld instance is silently charged, or is dispatched and reads a secret despite never being sent to.
+
+### Scenario 6: Over-budget metered route → 402
+
+**Setup.** A metered route carrying `x-cost-per-call {amount, unit}` and `x-quota {amount, unit, window}` (twitterapi.io credits or z.ai quota units) whose tumbling window budget is exhausted. Before Phase 7 the budget is a single route-wide pool.
+
+**Action.** A caller invokes the route with the budget at zero.
+
+**Expected.** The cost governor at stage 9 refuses before dispatch with 402, carrying the retry timing and the exhausted budget gauge; nothing is charged because nothing is issued.
+
+**Pass criteria.**
+- The refusal is **402, and only 402**, carrying `Retry-After` set to the seconds remaining until the current window's `resets` instant and `X-SEAM-Budget-Remaining` showing `amount=0` (with `unit`, `window`, and the `resets` timestamp) on the 402 itself.
+- Anything refused before dispatch draws **nothing** from the quota — a breaker-refused instance, the quota refusal itself, a validation 400, a loop-breaker 429, and a dry-run all charge zero; a call is charged only at dispatch, per upstream request actually issued.
+- Before Phase 7 the reported remainder is the **shared route-wide** pool, and the response states it is route-wide (a fleet-wide fuel gauge, not the caller's reservation).
+
+**Fail criteria.**
+- The refusal is a **429** (opposite retry semantics — "retry later" versus "stop"), so a caller written against 402 treats it as an unhandled error or retries straight into the wall.
+- Quota is silently charged for a request that was never dispatched — a breaker-refused, dry-run, or already-refused call draws the budget down.
+- `X-SEAM-Budget-Remaining` omits `unit`, `window`, or `resets`, or the 402 carries no `Retry-After`, leaving the agent unable to tell "wait eleven minutes" from "wait eleven hours".
+
+### Scenario 7: Unauthorized route: 404-vs-403 oracle safety (Phase 7)
+
+**Setup.** Phase 7 enforcement live. A caller whose resolved tailnet Grant lacks a given scope, in two shapes: **(a)** a route entirely outside the caller's filtered spec, and **(b)** a route visible in the caller's own filtered spec but for a method it lacks scope on (holds `k8s-ro:get`, attempts `DELETE`).
+
+**Action.** The caller requests each, both directly and via `/docs/route`.
+
+**Expected.** The scope filter is applied before the existence check, so case (a) is indistinguishable from a nonexistent route and case (b) — visible-but-not-invocable — gets the scope-naming 403.
+
+**Pass criteria.**
+- A route outside the caller's filtered spec returns **404 byte-identically to a route that never existed** — on the route itself, on `/docs/route`, and on level-2 `/changes?since=&route=` — naming no scope; the 404 body names `/whoami` and the caller's `X-SEAM-Scope-Version`, and SEAM logs the resolved route server-side so the question stays answerable off the request path.
+- The scope-naming **403** appears **only** for the visible-but-not-invocable case (right path, wrong method), naming the missing scope and the Grant snippet that would fix it.
+- `/whoami` and `/scopes` (with `/scopes?all=1` gated behind `seam:scopes:read-all`) are the sanctioned discovery path for a route the caller does not yet know about.
+
+**Fail criteria.**
+- A **403 names a scope for a route the caller was never meant to know exists**, handing back an enumeration oracle that reconstructs the withheld route inventory of every service SEAM fronts, one probe at a time.
+- The 404 for an out-of-grant route differs observably (body text, headers, or timing) from a genuinely nonexistent route.
+- A guard refusal (429/402/503) is dressed up as an authorization 403, or the scope-naming 403 leaks for the enumeration case that filtering exists to withhold.
+
+### Scenario 8: Route contract drift mid-session (perpetually-live worker)
+
+**Setup.** A perpetually-live NEEDLE worker fetched `/openapi.json` hours ago and sends no `X-SEAM-API-Version`. A fragment then ships a breaking **`v2`** alongside the incumbent (`_unversioned`, or `v1`) under the same (path, method) — a legal coexistence pair on the (path, method, `x-api-version`) collision key, not a collision.
+
+**Action.** The worker keeps calling on its cached contract; a later response carries a changed `X-SEAM-Spec-Version`.
+
+**Expected.** A header-less caller resolves to the **oldest** still-served version, so the worker keeps getting the contract it learned; it notices the spec-version change on a call it was already making and catches up progressively; retirement of the old version waits on zero observed traffic, so the worker is never cut off mid-session.
+
+**Pass criteria.**
+- **Every** response carries `X-SEAM-Spec-Version`, and a worker sending no `X-SEAM-API-Version` keeps being served the oldest coexisting version (`_unversioned`, then `v1`) — never the new `v2`.
+- On noticing the header change, the worker can catch up via `/changes?since=<X-SEAM-Spec-Version>` level 1 (route-level list) and drill via `diffUrl` → level-2 field diff for **only its own routes** and `docsUrl` → `/docs/route?path=…&version=…`; `Deprecation`/`Sunset` headers on the deprecated fragment point it at the migration path.
+- `/openapi.json?version=` takes an `X-SEAM-Spec-Version` (a spec hash) and `/docs/route?version=` takes an `x-api-version` (`v<n>` or `_unversioned`); a value from the wrong alphabet is a **400 naming which the endpoint expects**, not an empty result. The old version retires only after its per-route-version counter reads zero for the quiet window.
+
+**Fail criteria.**
+- A breaking `v2` is **silently served to a header-less worker** (defaulting to newest), turning a coexisting change into a silent fleet-wide outage of exactly the callers coexistence exists to protect.
+- `?version=` value-space confusion — a spec hash is resolved against a route's version list, or an `x-api-version` against the spec ring buffer — so one read path returns the wrong contract.
+- A still-called old version is retired because a `Sunset` date arrived rather than because its traffic reached zero.
+
+### Scenario 9: Hostile agent-authored fragment is contained (security)
+
+**Setup.** A fragment — agents author these — that breaks one of the operator-owned controls: it names an `x-vault-path` outside `seam/routes/<x-seam-owner>/*`, **or** an `x-upstream` / `x-upstream-map` entry host outside the operator-owned upstream-host allowlist, **or** lies in `x-seam-owner` (disagreeing with the mounted parent directory it loads from).
+
+**Action.** The fragment is submitted through the declarative-config CI gate and, hypothetically, is assumed to reach runtime merge anyway.
+
+**Expected.** `seam lint` rejects it at CI, and — never trusting lint to have run — the gateway re-checks the observable links at merge time and quarantines the whole fragment, with the reason surfaced at `/config/status`. The operator-owned controls (the upstream-host allowlist, the per-service `mountPath` owner binding, the CA bundles) live in SEAM's own manifest, never in a fragment, so the author cannot self-certify.
+
+**Pass criteria.**
+- `seam lint` **fails the PR** for a mis-owned or out-of-prefix `x-vault-path`, a non-allowlisted upstream host (IP literals rejected outright), or an `x-seam-owner` that disagrees with its parent directory.
+- Reaching runtime, the gateway re-checks and **quarantines the whole fragment** (never partially loading it), names the offending path or host at `/config/status`, and leaves every other fragment's routes serving.
+- **No secret is ever fetched** for a mis-owned `x-vault-path`, and **no credential is dispatched** to a non-allowlisted host; a missing, empty, or unparseable allowlist fails closed (no host permitted, `/_seam/readyz` reports not-ready, `/config/status` names the condition).
+
+**Fail criteria.**
+- The fragment silently loads and serves — the self-certified host or secret is honored.
+- A secret is fetched for a mis-owned `x-vault-path`, or an injected credential is silently sent to a host outside the allowlist — the shortest path from "hostile fragment merged" to "credential in an attacker's log".
+- Quarantine is per-route rather than fragment-wide, letting a hostile declaration ride into the route table alongside the fragment's valid routes.
+
+### Success Metrics
+
+The three outcome buckets the acceptance scenarios above roll up into — the plan states its per-scenario oracles but never named the aggregate targets a shipped SEAM is judged against (added 2026-07-21).
+
+- **Performance.** The request-path SLOs — added injection/validation latency, scrubbing overhead, and the fan-out concurrency budget — are owned by the **Performance Budgets** section below (forward-reference); this bucket commits to the operational numbers the plan already fixes: **sub-second, zero-dropped-connection route reloads** (the in-process file-watcher re-merges, re-validates and atomically swaps the route table, in-flight requests finishing against the old table); a binary-deploy gap of **typically 5–30 seconds** under `replicas: 1` / `maxSurge: 0`, absorbed by the mandated **≥60-second caller retry-with-backoff** so no agent fails across a deploy; and a **30-second secret cache TTL** bounding silent-rotation latency, effectively zero for a rotation the upstream signals by rejecting the stale credential.
+- **Functionality.** The acceptance suite above passes; **both Phase 4 pilot upstreams** (z.ai/GLM and twitterapi.io) and the **nine-cluster Phase 5 kubectl-proxy map** are served through SEAM, the metered pair behind a live cost governor and the map behind per-instance breakers and (Phase 7) per-instance scopes; and the **credential sentinel catches a dead credential before an agent does** — the recurring pain this targets by name, the ~3-day `cloudspace-admin` OIDC expiry and the class of the 16-day-dead ESO static token that went unnoticed, surfaced at `/health/credentials` per `(fragment, instance)` rather than discovered as a failed agent call.
+- **Adoption.** Hand-written CLAUDE.md proxy prose is **deleted service-by-service** as each fragment goes live (Phase 6b), in the same change that cuts that service's agents over — the end state being a CLAUDE.md that carries **only the SEAM endpoint pointer** rather than a per-service discovery-and-auth recipe; and agents **discover routes from `/openapi.json`** (scope-filtered, from Phase 7) rather than from a prescribed per-agent tool list, flipping the default from "here are your prescribed tools" to "here is your tool interface — list the routes and choose."
 
 ## Architecture
 
