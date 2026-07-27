@@ -1,0 +1,1 @@
+http://traefik-rs-manager:8001

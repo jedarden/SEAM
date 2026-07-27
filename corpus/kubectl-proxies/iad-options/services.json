@@ -1,0 +1,1118 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T02:24:17Z",
+                "labels": {
+                    "k8s-app": "tigera-api"
+                },
+                "name": "calico-api",
+                "namespace": "calico-apiserver",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "operator.tigera.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "APIServer",
+                        "name": "default",
+                        "uid": "7ccc4b85-30c0-4d3a-8f71-78c86cfbc05d"
+                    }
+                ],
+                "resourceVersion": "3212",
+                "uid": "e6e1546c-e78c-49b8-923e-1b4569ee2803"
+            },
+            "spec": {
+                "clusterIP": "10.21.116.26",
+                "clusterIPs": [
+                    "10.21.116.26"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "apiserver",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 5443
+                    }
+                ],
+                "selector": {
+                    "apiserver": "true"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "prometheus.io/port": "9094",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2026-05-07T02:23:07Z",
+                "labels": {
+                    "k8s-app": "calico-kube-controllers"
+                },
+                "name": "calico-kube-controllers-metrics",
+                "namespace": "calico-system",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "operator.tigera.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Installation",
+                        "name": "default",
+                        "uid": "d05d527c-c57b-4d7e-a0b4-bb7f4a00c515"
+                    }
+                ],
+                "resourceVersion": "2840",
+                "uid": "0ebb8068-3608-44dc-a51a-29419331f057"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "metrics-port",
+                        "port": 9094,
+                        "protocol": "TCP",
+                        "targetPort": 9094
+                    }
+                ],
+                "selector": {
+                    "k8s-app": "calico-kube-controllers"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T02:22:14Z",
+                "labels": {
+                    "k8s-app": "calico-typha"
+                },
+                "name": "calico-typha",
+                "namespace": "calico-system",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "operator.tigera.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Installation",
+                        "name": "default",
+                        "uid": "d05d527c-c57b-4d7e-a0b4-bb7f4a00c515"
+                    }
+                ],
+                "resourceVersion": "2268",
+                "uid": "f4765d03-688d-4c4d-9b30-de68f24c3663"
+            },
+            "spec": {
+                "clusterIP": "10.21.116.96",
+                "clusterIPs": [
+                    "10.21.116.96"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "calico-typha",
+                        "port": 5473,
+                        "protocol": "TCP",
+                        "targetPort": "calico-typha"
+                    }
+                ],
+                "selector": {
+                    "k8s-app": "calico-typha"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:38Z",
+                "labels": {
+                    "app": "cert-manager",
+                    "app.kubernetes.io/component": "controller",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "cert-manager",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "argocd.argoproj.io/instance": "cert-manager-iad-options",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-iad-options",
+                "namespace": "cert-manager",
+                "resourceVersion": "11292",
+                "uid": "c82c01b6-37ce-4d95-9d88-48d5d2faaf81"
+            },
+            "spec": {
+                "clusterIP": "10.21.94.248",
+                "clusterIPs": [
+                    "10.21.94.248"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "tcp-prometheus-servicemonitor",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": "http-metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "controller",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/name": "cert-manager"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:38Z",
+                "labels": {
+                    "app": "cainjector",
+                    "app.kubernetes.io/component": "cainjector",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "cainjector",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "argocd.argoproj.io/instance": "cert-manager-iad-options",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-iad-options-cainjector",
+                "namespace": "cert-manager",
+                "resourceVersion": "11302",
+                "uid": "7c93f0b5-da72-4671-98f9-c1829a46bd78"
+            },
+            "spec": {
+                "clusterIP": "10.21.160.56",
+                "clusterIPs": [
+                    "10.21.160.56"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http-metrics",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": 9402
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "cainjector",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/name": "cainjector"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:38Z",
+                "labels": {
+                    "app": "webhook",
+                    "app.kubernetes.io/component": "webhook",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "webhook",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "argocd.argoproj.io/instance": "cert-manager-iad-options",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-iad-options-webhook",
+                "namespace": "cert-manager",
+                "resourceVersion": "11299",
+                "uid": "8af9138d-0fcd-4cfc-a45d-ca9fdcacf538"
+            },
+            "spec": {
+                "clusterIP": "10.21.69.22",
+                "clusterIPs": [
+                    "10.21.69.22"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "https"
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": "http-metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "webhook",
+                    "app.kubernetes.io/instance": "cert-manager-iad-options",
+                    "app.kubernetes.io/name": "webhook"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T02:10:22Z",
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                },
+                "name": "kubernetes",
+                "namespace": "default",
+                "resourceVersion": "201",
+                "uid": "8ae66764-e4fa-4ec5-835f-5bcf3a365e90"
+            },
+            "spec": {
+                "clusterIP": "10.21.0.1",
+                "clusterIPs": [
+                    "10.21.0.1"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 443
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "devpod-observer-ns-iad-options:/Service:devpod-observer/kubectl-proxy",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"devpod-observer-ns-iad-options:/Service:devpod-observer/kubectl-proxy\"},\"labels\":{\"app\":\"kubectl-proxy\",\"argocd.argoproj.io/instance\":\"devpod-observer-ns-iad-options\",\"component\":\"cross-cluster-access\",\"target-cluster\":\"iad-options\"},\"name\":\"kubectl-proxy\",\"namespace\":\"devpod-observer\"},\"spec\":{\"ports\":[{\"name\":\"proxy\",\"port\":8001,\"protocol\":\"TCP\",\"targetPort\":8001}],\"selector\":{\"app\":\"kubectl-proxy\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+                },
+                "creationTimestamp": "2026-05-07T02:32:10Z",
+                "labels": {
+                    "app": "kubectl-proxy",
+                    "argocd.argoproj.io/instance": "devpod-observer-ns-iad-options",
+                    "component": "cross-cluster-access",
+                    "target-cluster": "iad-options"
+                },
+                "name": "kubectl-proxy",
+                "namespace": "devpod-observer",
+                "resourceVersion": "11144598",
+                "uid": "e475f44b-c676-4b43-8afb-4b25dc3e4bcf"
+            },
+            "spec": {
+                "clusterIP": "10.21.187.60",
+                "clusterIPs": [
+                    "10.21.187.60"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "proxy",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": 8001
+                    }
+                ],
+                "selector": {
+                    "app": "kubectl-proxy"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:09Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "external-secrets-iad-options",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "external-secrets-webhook",
+                    "app.kubernetes.io/version": "v2.2.0",
+                    "argocd.argoproj.io/instance": "external-secrets-iad-options",
+                    "external-secrets.io/component": "webhook",
+                    "helm.sh/chart": "external-secrets-2.2.0"
+                },
+                "name": "external-secrets-iad-options-webhook",
+                "namespace": "external-secrets",
+                "resourceVersion": "10898",
+                "uid": "702cf650-d548-42a0-819f-ca05aa056023"
+            },
+            "spec": {
+                "clusterIP": "10.21.110.136",
+                "clusterIPs": [
+                    "10.21.110.136"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "webhook"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "external-secrets-iad-options",
+                    "app.kubernetes.io/name": "external-secrets-webhook"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"tailscale.com/tailnet-fqdn\":\"traefik-rs-manager.tail1b1987.ts.net\"},\"labels\":{\"app\":\"openbao\",\"argocd.argoproj.io/instance\":\"external-secrets-ns-iad-options\",\"component\":\"egress\"},\"name\":\"openbao\",\"namespace\":\"external-secrets\"},\"spec\":{\"ports\":[{\"name\":\"http\",\"port\":8200,\"protocol\":\"TCP\",\"targetPort\":8200}],\"type\":\"ClusterIP\"}}\n",
+                    "tailscale.com/tailnet-fqdn": "traefik-rs-manager.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-05-07T04:00:26Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "labels": {
+                    "app": "openbao",
+                    "argocd.argoproj.io/instance": "external-secrets-ns-iad-options",
+                    "component": "egress"
+                },
+                "name": "openbao",
+                "namespace": "external-secrets",
+                "resourceVersion": "23623",
+                "uid": "feaa8fc5-eede-469f-8024-54798220f054"
+            },
+            "spec": {
+                "externalName": "ts-openbao-4f9zt.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 8200,
+                        "protocol": "TCP",
+                        "targetPort": 8200
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-07T04:00:27Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "ceph-csi-rbd",
+                    "meta.helm.sh/release-namespace": "kube-system"
+                },
+                "creationTimestamp": "2026-07-23T11:06:46Z",
+                "labels": {
+                    "app": "ceph-csi-rbd",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "chart": "ceph-csi-rbd-3.15.1",
+                    "component": "nodeplugin",
+                    "heritage": "Helm",
+                    "release": "ceph-csi-rbd"
+                },
+                "name": "ceph-csi-rbd-nodeplugin-http-metrics",
+                "namespace": "kube-system",
+                "resourceVersion": "22108319",
+                "uid": "6646459c-dfd7-4678-82aa-9c0da4d03c69"
+            },
+            "spec": {
+                "clusterIP": "10.21.157.225",
+                "clusterIPs": [
+                    "10.21.157.225"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http-metrics",
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "ceph-csi-rbd",
+                    "component": "nodeplugin",
+                    "release": "ceph-csi-rbd"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "ceph-csi-rbd",
+                    "meta.helm.sh/release-namespace": "kube-system"
+                },
+                "creationTimestamp": "2026-07-23T11:06:46Z",
+                "labels": {
+                    "app": "ceph-csi-rbd",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "chart": "ceph-csi-rbd-3.15.1",
+                    "component": "provisioner",
+                    "heritage": "Helm",
+                    "release": "ceph-csi-rbd"
+                },
+                "name": "ceph-csi-rbd-provisioner-http-metrics",
+                "namespace": "kube-system",
+                "resourceVersion": "22108317",
+                "uid": "958040ff-c276-4dab-b710-e6539b174f9c"
+            },
+            "spec": {
+                "clusterIP": "10.21.104.181",
+                "clusterIPs": [
+                    "10.21.104.181"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http-metrics",
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "ceph-csi-rbd",
+                    "component": "provisioner",
+                    "release": "ceph-csi-rbd"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "headlamp",
+                    "meta.helm.sh/release-namespace": "kube-system"
+                },
+                "creationTimestamp": "2026-06-10T10:08:17Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "headlamp",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "headlamp",
+                    "app.kubernetes.io/version": "0.42.0",
+                    "helm.sh/chart": "headlamp-0.42.0"
+                },
+                "name": "headlamp",
+                "namespace": "kube-system",
+                "resourceVersion": "9886064",
+                "uid": "eeef78b5-6a55-4d49-a843-6200486a988e"
+            },
+            "spec": {
+                "clusterIP": "10.21.169.145",
+                "clusterIPs": [
+                    "10.21.169.145"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "headlamp",
+                    "app.kubernetes.io/name": "headlamp"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "prometheus.io/port": "9153",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2026-05-07T02:10:45Z",
+                "labels": {
+                    "k8s-app": "kube-dns",
+                    "kamaji.clastix.io/project": "kamaji",
+                    "kubernetes.io/cluster-service": "true",
+                    "kubernetes.io/name": "CoreDNS"
+                },
+                "name": "kube-dns",
+                "namespace": "kube-system",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "rbac.authorization.k8s.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ClusterRoleBinding",
+                        "name": "system:coredns",
+                        "uid": "9ad04493-7523-4bb4-88fa-694e52fd4930"
+                    }
+                ],
+                "resourceVersion": "330",
+                "uid": "85047047-c1bf-4d67-94dd-7db448cafaf4"
+            },
+            "spec": {
+                "clusterIP": "10.21.0.10",
+                "clusterIPs": [
+                    "10.21.0.10"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "dns",
+                        "port": 53,
+                        "protocol": "UDP",
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "dns-tcp",
+                        "port": 53,
+                        "protocol": "TCP",
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 9153,
+                        "protocol": "TCP",
+                        "targetPort": 9153
+                    }
+                ],
+                "selector": {
+                    "k8s-app": "kube-dns"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "metrics-server",
+                    "meta.helm.sh/release-namespace": "kube-system"
+                },
+                "creationTimestamp": "2026-05-07T02:12:13Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "metrics-server",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "metrics-server",
+                    "app.kubernetes.io/version": "0.7.0",
+                    "helm.sh/chart": "metrics-server-3.12.0"
+                },
+                "name": "metrics-server",
+                "namespace": "kube-system",
+                "resourceVersion": "681",
+                "uid": "7d224427-af17-4d64-94f1-7af2958499e6"
+            },
+            "spec": {
+                "clusterIP": "10.21.210.55",
+                "clusterIPs": [
+                    "10.21.210.55"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "https"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "metrics-server",
+                    "app.kubernetes.io/name": "metrics-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "projectsveltos.io/hash": "sha256:e4bffc47e04522f86b1ec86a02dddee67501770666bc6c9853d4c39279895834",
+                    "projectsveltos.io/owner-tier": "100"
+                },
+                "creationTimestamp": "2026-05-07T02:11:49Z",
+                "labels": {
+                    "projectsveltos.io/reason": "Resources",
+                    "projectsveltos.io/reference-kind": "ConfigMap",
+                    "projectsveltos.io/reference-name": "vcp-proxy-cluster-configmap",
+                    "projectsveltos.io/reference-namespace": "kube-system"
+                },
+                "name": "vcp-proxy",
+                "namespace": "kube-system",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "config.projectsveltos.io/v1beta1",
+                        "kind": "ClusterProfile",
+                        "name": "proxy-addons",
+                        "uid": "6dade94d-b9e3-4871-98cb-28740b854611"
+                    }
+                ],
+                "resourceVersion": "573",
+                "uid": "d85b0542-1188-4b32-8f37-c695f307a94c"
+            },
+            "spec": {
+                "clusterIP": "10.21.0.40",
+                "clusterIPs": [
+                    "10.21.0.40"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 6443,
+                        "protocol": "TCP",
+                        "targetPort": 6443
+                    }
+                ],
+                "selector": {
+                    "app": "vcp-proxy"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"argocd.argoproj.io/instance\":\"options-ns-iad-options\"},\"name\":\"queue-api\",\"namespace\":\"options\"},\"spec\":{\"ports\":[{\"port\":80,\"targetPort\":8000}],\"selector\":{\"app\":\"queue-api\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+                },
+                "creationTimestamp": "2026-05-07T04:14:13Z",
+                "labels": {
+                    "argocd.argoproj.io/instance": "options-ns-iad-options"
+                },
+                "name": "queue-api",
+                "namespace": "options",
+                "resourceVersion": "27356",
+                "uid": "b0371063-84ba-4e2f-a547-56073eefe2d0"
+            },
+            "spec": {
+                "clusterIP": "10.21.213.240",
+                "clusterIPs": [
+                    "10.21.213.240"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": 8000
+                    }
+                ],
+                "selector": {
+                    "app": "queue-api"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T04:00:27Z",
+                "generateName": "ts-openbao-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "openbao",
+                    "tailscale.com/parent-resource-ns": "external-secrets",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-openbao-4f9zt",
+                "namespace": "tailscale",
+                "resourceVersion": "23608",
+                "uid": "46899149-9a13-41ca-9f28-b4da5119cb09"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "feaa8fc5-eede-469f-8024-54798220f054"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:26Z",
+                "generateName": "ts-traefik-tailscale-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "traefik-tailscale",
+                    "tailscale.com/parent-resource-ns": "traefik",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-traefik-tailscale-vplzd",
+                "namespace": "tailscale",
+                "resourceVersion": "11103",
+                "uid": "c2953f19-cfca-4ed9-8563-1e9acb1abc0c"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "fb6b49e8-e6c5-412f-b98b-e983604e59e5"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-07T03:01:00Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "traefik-iad-options-traefik",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "traefik",
+                    "argocd.argoproj.io/instance": "traefik-iad-options",
+                    "helm.sh/chart": "traefik-39.0.6"
+                },
+                "name": "traefik-iad-options",
+                "namespace": "traefik",
+                "resourceVersion": "10799",
+                "uid": "644e80fd-12f2-4b2a-91b8-007d4c0baf2b"
+            },
+            "spec": {
+                "clusterIP": "10.21.44.247",
+                "clusterIPs": [
+                    "10.21.44.247"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "kubectl-tcp",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": "kubectl-tcp"
+                    },
+                    {
+                        "name": "vpn",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": "vpn"
+                    },
+                    {
+                        "name": "websecure",
+                        "port": 8443,
+                        "protocol": "TCP",
+                        "targetPort": "websecure"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "traefik-iad-options-traefik",
+                    "app.kubernetes.io/name": "traefik"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"tailscale.com/expose\":\"true\",\"tailscale.com/hostname\":\"traefik-iad-options\"},\"labels\":{\"argocd.argoproj.io/instance\":\"traefik-ns-iad-options\"},\"name\":\"traefik-tailscale\",\"namespace\":\"traefik\"},\"spec\":{\"ports\":[{\"name\":\"vpn\",\"port\":8444,\"protocol\":\"TCP\",\"targetPort\":8444},{\"name\":\"kubectl-tcp\",\"port\":8001,\"protocol\":\"TCP\",\"targetPort\":8001}],\"selector\":{\"app.kubernetes.io/name\":\"traefik\"},\"type\":\"ClusterIP\"}}\n",
+                    "tailscale.com/expose": "true",
+                    "tailscale.com/hostname": "traefik-iad-options"
+                },
+                "creationTimestamp": "2026-05-07T02:58:54Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "labels": {
+                    "argocd.argoproj.io/instance": "traefik-ns-iad-options"
+                },
+                "name": "traefik-tailscale",
+                "namespace": "traefik",
+                "resourceVersion": "11115",
+                "uid": "fb6b49e8-e6c5-412f-b98b-e983604e59e5"
+            },
+            "spec": {
+                "clusterIP": "10.21.227.199",
+                "clusterIPs": [
+                    "10.21.227.199"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "vpn",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    },
+                    {
+                        "name": "kubectl-tcp",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": 8001
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "traefik"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-07T03:01:26Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"argocd.argoproj.io/instance\":\"valkey-ns-iad-options\"},\"name\":\"valkey-service\",\"namespace\":\"valkey\"},\"spec\":{\"ports\":[{\"name\":\"redis\",\"port\":6379,\"protocol\":\"TCP\",\"targetPort\":6379}],\"selector\":{\"app.kubernetes.io/name\":\"valkey\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+                },
+                "creationTimestamp": "2026-05-07T04:14:13Z",
+                "labels": {
+                    "argocd.argoproj.io/instance": "valkey-ns-iad-options"
+                },
+                "name": "valkey-service",
+                "namespace": "valkey",
+                "resourceVersion": "110559",
+                "uid": "e9f886cb-79ad-453b-94e6-07eb32df6e14"
+            },
+            "spec": {
+                "clusterIP": "10.21.141.127",
+                "clusterIPs": [
+                    "10.21.141.127"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "redis",
+                        "port": 6379,
+                        "protocol": "TCP",
+                        "targetPort": 6379
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "valkey"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

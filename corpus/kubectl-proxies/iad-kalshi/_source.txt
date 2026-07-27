@@ -1,0 +1,1 @@
+http://kubectl-proxy-iad-kalshi:8001

@@ -1,0 +1,413 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 6192,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "armor-secrets",
+                "namespace": "armor",
+                "resourceVersion": "17857733",
+                "uid": "c0e28518-73c7-4a76-b7f3-d36234ef00d3"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/backblaze/kalshi-tape), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:18Z",
+                "name": "armor-secrets.18bcf155d8efc212",
+                "namespace": "armor",
+                "resourceVersion": "26677941",
+                "uid": "e3fa1a29-26fe-4557-8d02-84f7c56b3020"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6191,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "armor",
+                "resourceVersion": "17857738",
+                "uid": "ff9dd779-2e9f-4d1c-8d23-8dd1b0082797"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:19Z",
+                "name": "docker-hub-registry.18bcf155e79bbe95",
+                "namespace": "armor",
+                "resourceVersion": "26677943",
+                "uid": "6dcbec8b-b574-4782-841d-549f6b8d39bc"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6192,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "cloudflare-cert-manager-secret",
+                "namespace": "cert-manager",
+                "resourceVersion": "17857739",
+                "uid": "4f259027-81c4-4256-9ee9-1bf504424b92"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/cert-manager/cloudflare-credentials), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:19Z",
+                "name": "cloudflare-cert-manager-secret.18bcf155ddeaba97",
+                "namespace": "cert-manager",
+                "resourceVersion": "26677942",
+                "uid": "a0dd2c8d-3837-4296-bb57-62790bfddfc2"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6154,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T23:04:19Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ClusterSecretStore",
+                "name": "openbao",
+                "resourceVersion": "17861630",
+                "uid": "8d82ab0e-49df-4b6f-ae8a-79b98f2d6de7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:57Z",
+            "message": "invalid vault credentials: Error making API request.\n\nURL: GET http://openbao.external-secrets.svc.cluster.local:8200/v1/auth/token/lookup-self\nCode: 403. Errors:\n\n* permission denied",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:07:57Z",
+                "name": "openbao.18bd1295364f0d0d",
+                "namespace": "default",
+                "resourceVersion": "26677960",
+                "uid": "3eeb93c5-3d8c-42cb-9a2e-34bc8fb34922"
+            },
+            "reason": "InvalidProviderConfig",
+            "reportingComponent": "cluster-secret-store",
+            "reportingInstance": "",
+            "source": {
+                "component": "cluster-secret-store"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6194,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "backtest-scanner-env",
+                "namespace": "kalshi-backtest",
+                "resourceVersion": "17857744",
+                "uid": "fd3df975-a647-431f-b423-832f92826389"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/armor/kalshi-tape), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:20Z",
+                "name": "backtest-scanner-env.18bcf155bf9327a4",
+                "namespace": "kalshi-backtest",
+                "resourceVersion": "26677945",
+                "uid": "cea08bb9-6376-48b9-b33e-a8d4b161cb33"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6195,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "kalshi-backtest",
+                "resourceVersion": "17857742",
+                "uid": "d9c58e1d-21f9-464c-8bf3-fd3e7557228e"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:20Z",
+                "name": "docker-hub-registry.18bcf155c4124438",
+                "namespace": "kalshi-backtest",
+                "resourceVersion": "26677944",
+                "uid": "7226e488-a1e3-4994-9d11-d36fb69d8156"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6192,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "kalshi-tape-query",
+                "resourceVersion": "17857751",
+                "uid": "ab55883b-25e5-4abb-a0a6-0aed4b9901e6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:21Z",
+                "name": "docker-hub-registry.18bcf155caa7c99c",
+                "namespace": "kalshi-tape-query",
+                "resourceVersion": "26677946",
+                "uid": "d78ac87a-4e29-41a7-b34e-fbf580833a39"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6192,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "kalshi-tape-query-env",
+                "namespace": "kalshi-tape-query",
+                "resourceVersion": "17857755",
+                "uid": "b0c70090-3eaf-4753-9e70-c3a25856809f"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/armor/kalshi-tape), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:22Z",
+                "name": "kalshi-tape-query-env.18bcf155cdabbec8",
+                "namespace": "kalshi-tape-query",
+                "resourceVersion": "26677947",
+                "uid": "3fadcf30-d173-4a59-9998-22df60573f0b"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6194,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "17857757",
+                "uid": "be4fb45f-3a60-4b6f-a27f-39b6591add0d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:22Z",
+                "name": "docker-hub-registry.18bcf155e1a06005",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "26677948",
+                "uid": "957d33ab-5dc5-4bb4-b601-9d3198f8e9ab"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 2,
+            "eventTime": null,
+            "firstTimestamp": "2026-07-21T14:01:07Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{kalshi-tape}",
+                "kind": "Pod",
+                "name": "kalshi-tape-7655745f5b-h6gzl",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "18388904",
+                "uid": "4f627c7d-0030-4496-9e4d-51c07668e86a"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:01:37Z",
+            "message": "Liveness probe failed: Get \"http://10.20.159.78:8080/health\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+            "metadata": {
+                "creationTimestamp": "2026-07-27T15:01:37Z",
+                "name": "kalshi-tape-7655745f5b-h6gzl.18c452de6ae2bbb7",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "26669685",
+                "uid": "a94729df-4f62-482a-ad93-09946e6e0944"
+            },
+            "reason": "Unhealthy",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "prod-instance-17825494632400722",
+            "source": {
+                "component": "kubelet",
+                "host": "prod-instance-17825494632400722"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6194,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T12:55:03Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "kalshi-tape-env",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "17857763",
+                "uid": "823904d2-de4e-4662-9da6-6f924970f0de"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/kalshi), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:23Z",
+                "name": "kalshi-tape-env.18bcf155d5bd462f",
+                "namespace": "kalshi-tape",
+                "resourceVersion": "26677949",
+                "uid": "1b7a6f4c-4c85-4a8d-8a1a-ac9e01962b96"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6189,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T13:28:04Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "tailscale",
+                "resourceVersion": "17857764",
+                "uid": "a9ea0a17-9fb7-4f57-99af-56e949585f03"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:23Z",
+                "name": "docker-hub-registry.18bcf3231dc64cdc",
+                "namespace": "tailscale",
+                "resourceVersion": "26677950",
+                "uid": "bfc4242d-b500-49d5-be73-9c1ad0c44892"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6189,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-27T13:28:07Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "traefik",
+                "resourceVersion": "17857765",
+                "uid": "73c40b8d-8b10-436d-9ca8-358358a54f7f"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:31:56Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-kalshi/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-27T23:44:24Z",
+                "name": "docker-hub-registry.18bcf323e0257527",
+                "namespace": "traefik",
+                "resourceVersion": "26677951",
+                "uid": "289c5fb5-4f33-4321-9976-8180749433c7"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

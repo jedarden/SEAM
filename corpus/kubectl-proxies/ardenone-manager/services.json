@@ -1,0 +1,2680 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argo-events-ns-iad-ci:/Service:argo-events/bench-rebuild-egress",
+                    "tailscale.com/tailnet-fqdn": "bench.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-07-26T22:58:32Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "name": "bench-rebuild-egress",
+                "namespace": "argo-events",
+                "resourceVersion": "606175063",
+                "uid": "4955691f-b5c4-483d-9f1f-9572fd76e6f0"
+            },
+            "spec": {
+                "externalName": "ts-bench-rebuild-egress-hnw4v.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "rebuild",
+                        "port": 8761,
+                        "protocol": "TCP",
+                        "targetPort": 8761
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-07-26T22:58:33Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-applicationset-controller"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "applicationset-controller",
+                    "app.kubernetes.io/name": "argocd-applicationset-controller",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-applicationset-controller",
+                "namespace": "argocd",
+                "resourceVersion": "557399009",
+                "uid": "c7b5a4ff-ca13-4fe9-b4ef-ab14e9d5d66e"
+            },
+            "spec": {
+                "clusterIP": "10.43.133.253",
+                "clusterIPs": [
+                    "10.43.133.253"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 7000,
+                        "protocol": "TCP",
+                        "targetPort": "webhook"
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": "metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-applicationset-controller"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-dex-server"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "dex-server",
+                    "app.kubernetes.io/name": "argocd-dex-server",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-dex-server",
+                "namespace": "argocd",
+                "resourceVersion": "557399001",
+                "uid": "a840b3d6-4003-4bff-832b-959aa35a201b"
+            },
+            "spec": {
+                "clusterIP": "10.43.29.77",
+                "clusterIPs": [
+                    "10.43.29.77"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "appProtocol": "TCP",
+                        "name": "http",
+                        "port": 5556,
+                        "protocol": "TCP",
+                        "targetPort": 5556
+                    },
+                    {
+                        "name": "grpc",
+                        "port": 5557,
+                        "protocol": "TCP",
+                        "targetPort": 5557
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 5558,
+                        "protocol": "TCP",
+                        "targetPort": 5558
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-dex-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-metrics"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "metrics",
+                    "app.kubernetes.io/name": "argocd-metrics",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-metrics",
+                "namespace": "argocd",
+                "resourceVersion": "557399008",
+                "uid": "1f334251-9811-4098-8491-cabb12734a79"
+            },
+            "spec": {
+                "clusterIP": "10.43.45.191",
+                "clusterIPs": [
+                    "10.43.45.191"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "metrics",
+                        "port": 8082,
+                        "protocol": "TCP",
+                        "targetPort": 8082
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-application-controller"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-notifications-controller-metrics"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "notifications-controller",
+                    "app.kubernetes.io/name": "argocd-notifications-controller-metrics",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-notifications-controller-metrics",
+                "namespace": "argocd",
+                "resourceVersion": "557399012",
+                "uid": "7e16f226-1a35-41e2-bf45-91535f4c2461"
+            },
+            "spec": {
+                "clusterIP": "10.43.151.142",
+                "clusterIPs": [
+                    "10.43.151.142"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "metrics",
+                        "port": 9001,
+                        "protocol": "TCP",
+                        "targetPort": 9001
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-notifications-controller"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-readonly-proxy"
+                },
+                "creationTimestamp": "2026-04-04T15:01:53Z",
+                "labels": {
+                    "app": "argocd-readonly-proxy"
+                },
+                "name": "argocd-readonly-proxy",
+                "namespace": "argocd",
+                "resourceVersion": "559291149",
+                "uid": "f620f5eb-0809-47f8-89ac-8528389796a9"
+            },
+            "spec": {
+                "clusterIP": "10.43.168.245",
+                "clusterIPs": [
+                    "10.43.168.245"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "argocd-readonly-proxy"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-redis"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "redis",
+                    "app.kubernetes.io/name": "argocd-redis",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-redis",
+                "namespace": "argocd",
+                "resourceVersion": "557399006",
+                "uid": "edbed39e-1aff-48d4-9c33-feba020e3d47"
+            },
+            "spec": {
+                "clusterIP": "10.43.241.30",
+                "clusterIPs": [
+                    "10.43.241.30"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "tcp-redis",
+                        "port": 6379,
+                        "protocol": "TCP",
+                        "targetPort": 6379
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-redis"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-repo-server"
+                },
+                "creationTimestamp": "2026-03-25T19:28:56Z",
+                "labels": {
+                    "app.kubernetes.io/component": "repo-server",
+                    "app.kubernetes.io/name": "argocd-repo-server",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-repo-server",
+                "namespace": "argocd",
+                "resourceVersion": "557399005",
+                "uid": "9a7cdef4-d5d7-476c-b30c-7dae184133cf"
+            },
+            "spec": {
+                "clusterIP": "10.43.145.213",
+                "clusterIPs": [
+                    "10.43.145.213"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "server",
+                        "port": 8081,
+                        "protocol": "TCP",
+                        "targetPort": 8081
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 8084,
+                        "protocol": "TCP",
+                        "targetPort": 8084
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-repo-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-server"
+                },
+                "creationTimestamp": "2026-03-25T19:28:57Z",
+                "labels": {
+                    "app.kubernetes.io/component": "server",
+                    "app.kubernetes.io/name": "argocd-server",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-server",
+                "namespace": "argocd",
+                "resourceVersion": "557399010",
+                "uid": "bc64e7f1-2a98-4288-8294-f89b8782cc60"
+            },
+            "spec": {
+                "clusterIP": "10.43.122.62",
+                "clusterIPs": [
+                    "10.43.122.62"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    },
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Service:argocd/argocd-server-metrics"
+                },
+                "creationTimestamp": "2026-03-25T19:28:57Z",
+                "labels": {
+                    "app.kubernetes.io/component": "server",
+                    "app.kubernetes.io/name": "argocd-server-metrics",
+                    "app.kubernetes.io/part-of": "argocd"
+                },
+                "name": "argocd-server-metrics",
+                "namespace": "argocd",
+                "resourceVersion": "557399007",
+                "uid": "bc6b72f1-f15f-4aed-978f-d86208a888e0"
+            },
+            "spec": {
+                "clusterIP": "10.43.73.115",
+                "clusterIPs": [
+                    "10.43.73.115"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "metrics",
+                        "port": 8083,
+                        "protocol": "TCP",
+                        "targetPort": 8083
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "argocd-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cert-manager-ardenone-manager:/Service:cert-manager/cert-manager-ardenone-manager"
+                },
+                "creationTimestamp": "2026-03-27T11:08:58Z",
+                "labels": {
+                    "app": "cert-manager",
+                    "app.kubernetes.io/component": "controller",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "cert-manager",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-ardenone-manager",
+                "namespace": "cert-manager",
+                "resourceVersion": "557055491",
+                "uid": "65fe2946-c7d5-4561-a957-ad185c919b79"
+            },
+            "spec": {
+                "clusterIP": "10.43.22.19",
+                "clusterIPs": [
+                    "10.43.22.19"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "tcp-prometheus-servicemonitor",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": "http-metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "controller",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/name": "cert-manager"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cert-manager-ardenone-manager:/Service:cert-manager/cert-manager-ardenone-manager-cainjector"
+                },
+                "creationTimestamp": "2026-03-27T11:08:58Z",
+                "labels": {
+                    "app": "cainjector",
+                    "app.kubernetes.io/component": "cainjector",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "cainjector",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-ardenone-manager-cainjector",
+                "namespace": "cert-manager",
+                "resourceVersion": "557055488",
+                "uid": "0db3c7a6-408c-47c2-b24e-77bcbfebcedc"
+            },
+            "spec": {
+                "clusterIP": "10.43.150.66",
+                "clusterIPs": [
+                    "10.43.150.66"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http-metrics",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": 9402
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "cainjector",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/name": "cainjector"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cert-manager-ardenone-manager:/Service:cert-manager/cert-manager-ardenone-manager-webhook"
+                },
+                "creationTimestamp": "2026-03-27T11:08:59Z",
+                "labels": {
+                    "app": "webhook",
+                    "app.kubernetes.io/component": "webhook",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "webhook",
+                    "app.kubernetes.io/version": "v1.20.0",
+                    "helm.sh/chart": "cert-manager-v1.20.0"
+                },
+                "name": "cert-manager-ardenone-manager-webhook",
+                "namespace": "cert-manager",
+                "resourceVersion": "557055503",
+                "uid": "fb00cfa1-7985-4542-9886-62925e2aa9f5"
+            },
+            "spec": {
+                "clusterIP": "10.43.102.236",
+                "clusterIPs": [
+                    "10.43.102.236"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "https"
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 9402,
+                        "protocol": "TCP",
+                        "targetPort": "http-metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/component": "webhook",
+                    "app.kubernetes.io/instance": "cert-manager-ardenone-manager",
+                    "app.kubernetes.io/name": "webhook"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "coder-manifests-ardenone-cluster:/Service:coder/coder-template-sync"
+                },
+                "creationTimestamp": "2026-03-27T03:39:52Z",
+                "labels": {
+                    "app": "coder-template-sync"
+                },
+                "name": "coder-template-sync",
+                "namespace": "coder",
+                "resourceVersion": "557000016",
+                "uid": "4e3fa524-402f-4a87-ad3c-b3dd83bf476b"
+            },
+            "spec": {
+                "clusterIP": "10.43.9.40",
+                "clusterIPs": [
+                    "10.43.9.40"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "coder-template-sync"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2024-09-30T21:04:02Z",
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                },
+                "name": "kubernetes",
+                "namespace": "default",
+                "resourceVersion": "195",
+                "uid": "76fcdb4c-f914-4949-b92f-38c9492a5ab4"
+            },
+            "spec": {
+                "clusterIP": "10.43.0.1",
+                "clusterIPs": [
+                    "10.43.0.1"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 6443
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "devpod-observer-ns-ardenone-manager:/Service:devpod-observer/kubectl-proxy"
+                },
+                "creationTimestamp": "2026-03-25T20:27:41Z",
+                "labels": {
+                    "app": "kubectl-proxy",
+                    "component": "cross-cluster-access",
+                    "target-cluster": "ardenone-manager"
+                },
+                "name": "kubectl-proxy",
+                "namespace": "devpod-observer",
+                "resourceVersion": "559250784",
+                "uid": "2ac95506-da6d-4145-b025-3985d1e22b27"
+            },
+            "spec": {
+                "clusterIP": "10.43.244.159",
+                "clusterIPs": [
+                    "10.43.244.159"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "proxy",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": 8001
+                    }
+                ],
+                "selector": {
+                    "app": "kubectl-proxy"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "external-secrets-ardenone-manager:/Service:external-secrets/external-secrets-ardenone-manager-webhook",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"external-secrets-ardenone-manager:/Service:external-secrets/external-secrets-ardenone-manager-webhook\"},\"labels\":{\"app.kubernetes.io/instance\":\"external-secrets-ardenone-manager\",\"app.kubernetes.io/managed-by\":\"Helm\",\"app.kubernetes.io/name\":\"external-secrets-webhook\",\"app.kubernetes.io/version\":\"v2.1.0\",\"external-secrets.io/component\":\"webhook\",\"helm.sh/chart\":\"external-secrets-2.1.0\"},\"name\":\"external-secrets-ardenone-manager-webhook\",\"namespace\":\"external-secrets\"},\"spec\":{\"ports\":[{\"name\":\"webhook\",\"port\":443,\"protocol\":\"TCP\",\"targetPort\":\"webhook\"}],\"selector\":{\"app.kubernetes.io/instance\":\"external-secrets-ardenone-manager\",\"app.kubernetes.io/name\":\"external-secrets-webhook\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+                },
+                "creationTimestamp": "2026-03-25T20:28:17Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "external-secrets-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "external-secrets-webhook",
+                    "app.kubernetes.io/version": "v2.1.0",
+                    "external-secrets.io/component": "webhook",
+                    "helm.sh/chart": "external-secrets-2.1.0"
+                },
+                "name": "external-secrets-ardenone-manager-webhook",
+                "namespace": "external-secrets",
+                "resourceVersion": "557184965",
+                "uid": "81c25867-7f38-4213-b998-97debd2801bb"
+            },
+            "spec": {
+                "clusterIP": "10.43.31.189",
+                "clusterIPs": [
+                    "10.43.31.189"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "webhook"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "external-secrets-ardenone-manager",
+                    "app.kubernetes.io/name": "external-secrets-webhook"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "garage-operator-ardenone-manager:/Service:garage-operator/garage-operator-ardenone-manager-metrics"
+                },
+                "creationTimestamp": "2026-04-03T21:15:51Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "garage-operator-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "garage-operator",
+                    "app.kubernetes.io/version": "0.3.8",
+                    "control-plane": "controller-manager",
+                    "helm.sh/chart": "garage-operator-0.3.8"
+                },
+                "name": "garage-operator-ardenone-manager-metrics",
+                "namespace": "garage-operator",
+                "resourceVersion": "564684548",
+                "uid": "0c67093a-3783-4d83-bb86-345d7f0ad0c0"
+            },
+            "spec": {
+                "clusterIP": "10.43.232.253",
+                "clusterIPs": [
+                    "10.43.232.253"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 8443,
+                        "protocol": "TCP",
+                        "targetPort": "metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "garage-operator-ardenone-manager",
+                    "app.kubernetes.io/name": "garage-operator",
+                    "control-plane": "controller-manager"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "homepage-ns-ardenone-manager:/Service:homepage/homepage"
+                },
+                "creationTimestamp": "2026-03-25T20:27:45Z",
+                "labels": {
+                    "app.kubernetes.io/name": "homepage"
+                },
+                "name": "homepage",
+                "namespace": "homepage",
+                "resourceVersion": "557398651",
+                "uid": "7dfcad20-b1c8-4202-b40e-bed85b5ee669"
+            },
+            "spec": {
+                "clusterIP": "10.43.85.135",
+                "clusterIPs": [
+                    "10.43.85.135"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 3000,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "homepage"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "objectset.rio.cattle.io/applied": "H4sIAAAAAAAA/4ySQYvbMBCF/0p5Z9m142TjFfRQdimUQgmk7aXsQZYnG9W2JKRJSgj+70WJl00b0vZm8958vHmjI5Q33yhE4ywk9iUEOmNbSKwp7I0mCAzEqlWsII9Q1jpWbJyN6dc1P0hzJM6DcblWzD3lxr01iQBxU3c/LYXsed9BoqvihbIvxZtPxrbv3rets/9EWDUQJLQL1Nr4X/bolU4z3a6hLB4i0wABH9xAvKVdTG7vAkPivlxUV1rUQfkE4LAjjAK9aqg/1dHVMVPev8DPidJnsMR0mtb9LjKFLE71Tpg/bdNeDy7Q4+f1X/baqriFRKNpVlez+7ouy+W8UkVV36lmURab2eZuSZvlfDYv9GKZ8k7si4i3ahkFoiedVptyf1xBoizyeZUXeVlAvAoR8vul9CRg/Ac1mP6wcr3Rh/SojH3uac1Kd6lXFzhNHV8indOcy19Up+LZaddD4uvjCqO4dGas/S33l4ff3ANxMPqVne567X8SiNSTZhduHHMcx18BAAD//5X9LCMyAwAA",
+                    "objectset.rio.cattle.io/id": "",
+                    "objectset.rio.cattle.io/owner-gvk": "k3s.cattle.io/v1, Kind=Addon",
+                    "objectset.rio.cattle.io/owner-name": "coredns",
+                    "objectset.rio.cattle.io/owner-namespace": "kube-system",
+                    "prometheus.io/port": "9153",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2024-09-30T21:04:05Z",
+                "labels": {
+                    "k8s-app": "kube-dns",
+                    "kubernetes.io/cluster-service": "true",
+                    "kubernetes.io/name": "CoreDNS",
+                    "objectset.rio.cattle.io/hash": "bce283298811743a0386ab510f2f67ef74240c57"
+                },
+                "name": "kube-dns",
+                "namespace": "kube-system",
+                "resourceVersion": "262",
+                "uid": "ab75a183-aa93-48ce-af7e-513b6dbe45d9"
+            },
+            "spec": {
+                "clusterIP": "10.43.0.10",
+                "clusterIPs": [
+                    "10.43.0.10"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "dns",
+                        "port": 53,
+                        "protocol": "UDP",
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "dns-tcp",
+                        "port": 53,
+                        "protocol": "TCP",
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "metrics",
+                        "port": 9153,
+                        "protocol": "TCP",
+                        "targetPort": 9153
+                    }
+                ],
+                "selector": {
+                    "k8s-app": "kube-dns"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "objectset.rio.cattle.io/applied": "H4sIAAAAAAAA/4SQQWsbMRCF/0p5Z9nNep04FfRQWnopBUNKL6WHWe04VleWhGa8xZj970UbFxLaJCchvZn3vqczKPvvXMSnCIuxgcHgYw+LOy6jdwyDAyv1pAR7BsWYlNSnKPWaul/sVFiXxaelI9XAS5/e+uoA86yefkcui/txgMXQyiNlbMybLz727z/0fYqvWkQ6MGxFLN7JQriMXObjgf31bcnkqsVw7HghJ1E+YDII1HGYO1ahRFaWuujCUfRRhIWWY016Onbh+vqE6wWePckeFnTdt527uWrc7abhZtXuqF11q83uev2uu2HabK46t1tTJfxvdTy8P1NKMrtayefPdPDhtE3BuxMstoV3XD4dKdwpuQEGORUV2B/nvzl71SwXAXa9bg1ySZpcCrD49nELA6Vyz7qdJy4L008D4cBOU5l/81YWlPO/4NM0/QkAAP//sKxN444CAAA",
+                    "objectset.rio.cattle.io/id": "",
+                    "objectset.rio.cattle.io/owner-gvk": "k3s.cattle.io/v1, Kind=Addon",
+                    "objectset.rio.cattle.io/owner-name": "metrics-server-service",
+                    "objectset.rio.cattle.io/owner-namespace": "kube-system"
+                },
+                "creationTimestamp": "2024-09-30T21:04:07Z",
+                "labels": {
+                    "kubernetes.io/cluster-service": "true",
+                    "kubernetes.io/name": "Metrics-server",
+                    "objectset.rio.cattle.io/hash": "a5d3bc601c871e123fa32b27f549b6ea770bcf4a"
+                },
+                "name": "metrics-server",
+                "namespace": "kube-system",
+                "resourceVersion": "306",
+                "uid": "a47265ab-c0c7-4da1-96f0-f8c769dd1315"
+            },
+            "spec": {
+                "clusterIP": "10.43.117.197",
+                "clusterIPs": [
+                    "10.43.117.197"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": "https"
+                    }
+                ],
+                "selector": {
+                    "k8s-app": "metrics-server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "kubewall-ns-ardenone-manager:/Service:kubewall/kubewall"
+                },
+                "creationTimestamp": "2026-03-25T20:27:30Z",
+                "name": "kubewall",
+                "namespace": "kubewall",
+                "resourceVersion": "557398650",
+                "uid": "af2e2851-61fb-4fa1-8091-892bbd4c2bf5"
+            },
+            "spec": {
+                "clusterIP": "10.43.255.105",
+                "clusterIPs": [
+                    "10.43.255.105"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 7080,
+                        "protocol": "TCP",
+                        "targetPort": 7080
+                    }
+                ],
+                "selector": {
+                    "app": "kubewall"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "victorialogs-single-ardenone-manager:/Service:monitoring/victorialogs-single-ardenone-manager-vector-headless"
+                },
+                "creationTimestamp": "2026-04-04T14:46:17Z",
+                "labels": {
+                    "app.kubernetes.io/component": "Agent",
+                    "app.kubernetes.io/instance": "victorialogs-single-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "vector",
+                    "app.kubernetes.io/version": "0.50.0-distroless-libc",
+                    "helm.sh/chart": "vector-0.46.0"
+                },
+                "name": "victorialogs-single-ardenone-manager-vector-headless",
+                "namespace": "monitoring",
+                "resourceVersion": "559281239",
+                "uid": "4e2c8b50-03eb-492f-954f-45b0d92d4291"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "selector": {
+                    "app.kubernetes.io/component": "Agent",
+                    "app.kubernetes.io/instance": "victorialogs-single-ardenone-manager",
+                    "app.kubernetes.io/name": "vector"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "victorialogs-single-ardenone-manager:/Service:monitoring/vlogs-server"
+                },
+                "creationTimestamp": "2026-04-04T14:46:17Z",
+                "labels": {
+                    "app": "server",
+                    "app.kubernetes.io/instance": "victorialogs-single-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "victoria-logs-single",
+                    "app.kubernetes.io/version": "v1.36.1-scratch",
+                    "helm.sh/chart": "victoria-logs-single-0.11.17"
+                },
+                "name": "vlogs-server",
+                "namespace": "monitoring",
+                "resourceVersion": "559281237",
+                "uid": "4d0dd5b1-431e-440c-bcff-40aab6758cda"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 9428,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app": "server",
+                    "app.kubernetes.io/instance": "victorialogs-single-ardenone-manager",
+                    "app.kubernetes.io/name": "victoria-logs-single"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ardenone-manager:/Service:openbao/openbao-ardenone-manager"
+                },
+                "creationTimestamp": "2026-03-25T20:27:49Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "openbao",
+                    "helm.sh/chart": "openbao-0.26.1"
+                },
+                "name": "openbao-ardenone-manager",
+                "namespace": "openbao",
+                "resourceVersion": "556878432",
+                "uid": "1a7edfa3-28c9-46c6-8806-4a92590c912c"
+            },
+            "spec": {
+                "clusterIP": "10.43.154.60",
+                "clusterIPs": [
+                    "10.43.154.60"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "appProtocol": "HTTP",
+                        "name": "http",
+                        "port": 8200,
+                        "protocol": "TCP",
+                        "targetPort": 8200
+                    },
+                    {
+                        "name": "https-internal",
+                        "port": 8201,
+                        "protocol": "TCP",
+                        "targetPort": 8201
+                    }
+                ],
+                "publishNotReadyAddresses": true,
+                "selector": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/name": "openbao",
+                    "component": "server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ardenone-manager:/Service:openbao/openbao-ardenone-manager-internal"
+                },
+                "creationTimestamp": "2026-03-25T20:27:49Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "openbao",
+                    "helm.sh/chart": "openbao-0.26.1",
+                    "openbao-internal": "true"
+                },
+                "name": "openbao-ardenone-manager-internal",
+                "namespace": "openbao",
+                "resourceVersion": "556878427",
+                "uid": "a6744ac3-f4a8-4113-99f7-93cbd251aa40"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "appProtocol": "HTTP",
+                        "name": "http",
+                        "port": 8200,
+                        "protocol": "TCP",
+                        "targetPort": 8200
+                    },
+                    {
+                        "name": "https-internal",
+                        "port": 8201,
+                        "protocol": "TCP",
+                        "targetPort": 8201
+                    }
+                ],
+                "publishNotReadyAddresses": true,
+                "selector": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/name": "openbao",
+                    "component": "server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ardenone-manager:/Service:openbao/openbao-ardenone-manager-ui"
+                },
+                "creationTimestamp": "2026-03-25T20:27:49Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "openbao-ui",
+                    "helm.sh/chart": "openbao-0.26.1"
+                },
+                "name": "openbao-ardenone-manager-ui",
+                "namespace": "openbao",
+                "resourceVersion": "556878433",
+                "uid": "f7c38fac-e7c6-42d0-be83-af4015cec32d"
+            },
+            "spec": {
+                "clusterIP": "10.43.149.120",
+                "clusterIPs": [
+                    "10.43.149.120"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 8200,
+                        "protocol": "TCP",
+                        "targetPort": 8200
+                    }
+                ],
+                "publishNotReadyAddresses": true,
+                "selector": {
+                    "app.kubernetes.io/instance": "openbao-ardenone-manager",
+                    "app.kubernetes.io/name": "openbao",
+                    "component": "server"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ns-ardenone-manager:/Service:openbao/traefik-ardenone-cluster-egress",
+                    "tailscale.com/tailnet-fqdn": "traefik-ardenone-cluster.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-04-14T00:27:22Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "labels": {
+                    "app": "openbao-replicator",
+                    "component": "egress",
+                    "target-cluster": "ardenone-cluster"
+                },
+                "name": "traefik-ardenone-cluster-egress",
+                "namespace": "openbao",
+                "resourceVersion": "606409496",
+                "uid": "cd1aead2-bfd3-4407-b131-e393918b539a"
+            },
+            "spec": {
+                "externalName": "ts-traefik-ardenone-cluster-egress-cp5p2.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-05T16:31:47Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ns-ardenone-manager:/Service:openbao/traefik-ardenone-hub-egress",
+                    "tailscale.com/tailnet-fqdn": "traefik-ardenone-hub.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-04-19T20:25:55Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "labels": {
+                    "app": "openbao-replicator",
+                    "component": "egress",
+                    "target-cluster": "ardenone-hub"
+                },
+                "name": "traefik-ardenone-hub-egress",
+                "namespace": "openbao",
+                "resourceVersion": "587613581",
+                "uid": "a212d008-b5f3-42e9-ae67-f87c58907c45"
+            },
+            "spec": {
+                "externalName": "ts-traefik-ardenone-hub-egress-4jstq.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-05T16:31:47Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "openbao-ns-ardenone-manager:/Service:openbao/traefik-rs-manager-egress",
+                    "tailscale.com/tailnet-fqdn": "traefik-rs-manager.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-04-19T20:25:55Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "labels": {
+                    "app": "openbao-replicator",
+                    "component": "egress",
+                    "target-cluster": "rs-manager"
+                },
+                "name": "traefik-rs-manager-egress",
+                "namespace": "openbao",
+                "resourceVersion": "606409499",
+                "uid": "a0217199-a248-4764-b010-8770b524c47d"
+            },
+            "spec": {
+                "externalName": "ts-traefik-rs-manager-egress-47nnw.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "https",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-05T16:31:47Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Service:pbx-web/lab-rebuild-egress",
+                    "tailscale.com/tailnet-fqdn": "lab.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-05-02T20:26:47Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "name": "lab-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "606411533",
+                "uid": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+            },
+            "spec": {
+                "externalName": "ts-lab-rebuild-egress-42b5q.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "rebuild",
+                        "port": 8761,
+                        "protocol": "TCP",
+                        "targetPort": 8761
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-27T07:11:44Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Service:pbx-web/lab-rebuild-relay"
+                },
+                "creationTimestamp": "2026-05-02T20:26:51Z",
+                "labels": {
+                    "app.kubernetes.io/name": "lab-rebuild-relay"
+                },
+                "name": "lab-rebuild-relay",
+                "namespace": "pbx-web",
+                "resourceVersion": "571148283",
+                "uid": "f08b1686-47a7-47c0-af95-db54a65ec419"
+            },
+            "spec": {
+                "clusterIP": "10.43.98.88",
+                "clusterIPs": [
+                    "10.43.98.88"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 9001,
+                        "protocol": "TCP",
+                        "targetPort": 9001
+                    }
+                ],
+                "selector": {
+                    "app": "lab-rebuild-relay"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Service:pbx-web/pbx-rebuild-egress",
+                    "tailscale.com/tailnet-fqdn": "pbx.tail1b1987.ts.net"
+                },
+                "creationTimestamp": "2026-05-02T11:31:41Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "name": "pbx-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "606411530",
+                "uid": "5ccffc36-06db-4c6f-918b-65282098f508"
+            },
+            "spec": {
+                "externalName": "ts-pbx-rebuild-egress-r9czm.tailscale.svc.cluster.local",
+                "ports": [
+                    {
+                        "name": "rebuild",
+                        "port": 8761,
+                        "protocol": "TCP",
+                        "targetPort": 8761
+                    }
+                ],
+                "sessionAffinity": "None",
+                "type": "ExternalName"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-05T17:25:41Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Service:pbx-web/pbx-rebuild-relay"
+                },
+                "creationTimestamp": "2026-05-02T11:20:30Z",
+                "labels": {
+                    "app.kubernetes.io/name": "pbx-rebuild-relay"
+                },
+                "name": "pbx-rebuild-relay",
+                "namespace": "pbx-web",
+                "resourceVersion": "570950393",
+                "uid": "ba339565-79a5-432d-be4c-5f1715b95828"
+            },
+            "spec": {
+                "clusterIP": "10.43.153.39",
+                "clusterIPs": [
+                    "10.43.153.39"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "webhook",
+                        "port": 9001,
+                        "protocol": "TCP",
+                        "targetPort": 9001
+                    }
+                ],
+                "selector": {
+                    "app": "pbx-rebuild-relay"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Service:pbx-web/pbx-web",
+                    "metallb.universe.tf/allow-shared-ip": "pbx-web"
+                },
+                "creationTimestamp": "2026-05-01T20:49:59Z",
+                "finalizers": [
+                    "service.kubernetes.io/load-balancer-cleanup"
+                ],
+                "labels": {
+                    "app.kubernetes.io/component": "service",
+                    "app.kubernetes.io/name": "pbx-web"
+                },
+                "name": "pbx-web",
+                "namespace": "pbx-web",
+                "resourceVersion": "602748905",
+                "uid": "53ed9376-6b45-4bf7-ad03-0894ad9718b6"
+            },
+            "spec": {
+                "allocateLoadBalancerNodePorts": true,
+                "clusterIP": "10.43.206.230",
+                "clusterIPs": [
+                    "10.43.206.230"
+                ],
+                "externalTrafficPolicy": "Cluster",
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "nodePort": 32661,
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": 80
+                    },
+                    {
+                        "name": "rebuild",
+                        "nodePort": 31307,
+                        "port": 9000,
+                        "protocol": "TCP",
+                        "targetPort": 9000
+                    }
+                ],
+                "selector": {
+                    "app": "pbx-web"
+                },
+                "sessionAffinity": "None",
+                "type": "LoadBalancer"
+            },
+            "status": {
+                "loadBalancer": {
+                    "ingress": [
+                        {
+                            "ip": "10.20.23.100",
+                            "ipMode": "VIP"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pinniped-concierge-ns-ardenone-manager:/Service:pinniped-concierge/pinniped-concierge-api",
+                    "kapp.k14s.io/disable-default-label-scoping-rules": ""
+                },
+                "creationTimestamp": "2026-03-29T15:32:15Z",
+                "labels": {
+                    "app": "pinniped-concierge"
+                },
+                "name": "pinniped-concierge-api",
+                "namespace": "pinniped-concierge",
+                "resourceVersion": "557477692",
+                "uid": "fadab928-a757-4fc2-982f-cd64f21442f2"
+            },
+            "spec": {
+                "clusterIP": "10.43.179.29",
+                "clusterIPs": [
+                    "10.43.179.29"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 10250
+                    }
+                ],
+                "selector": {
+                    "deployment.pinniped.dev": "concierge"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-03-30T12:22:48Z",
+                "labels": {
+                    "app": "pinniped-concierge"
+                },
+                "name": "pinniped-concierge-impersonation-proxy-cluster-ip",
+                "namespace": "pinniped-concierge",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "kind": "Deployment",
+                        "name": "pinniped-concierge",
+                        "uid": "1e66e320-b79e-4f8b-b1ce-725a5ae115fa"
+                    }
+                ],
+                "resourceVersion": "557670203",
+                "uid": "baea0c2c-18bd-4dcb-846d-72ac7cccec5c"
+            },
+            "spec": {
+                "clusterIP": "10.43.252.216",
+                "clusterIPs": [
+                    "10.43.252.216"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    }
+                ],
+                "selector": {
+                    "app": "pinniped-concierge"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pinniped-concierge-ns-ardenone-manager:/Service:pinniped-concierge/pinniped-concierge-proxy",
+                    "kapp.k14s.io/disable-default-label-scoping-rules": ""
+                },
+                "creationTimestamp": "2026-03-29T15:32:15Z",
+                "labels": {
+                    "app": "pinniped-concierge"
+                },
+                "name": "pinniped-concierge-proxy",
+                "namespace": "pinniped-concierge",
+                "resourceVersion": "557477690",
+                "uid": "8e60a40f-a2f7-4fc2-bf7c-8fcc29f5c493"
+            },
+            "spec": {
+                "clusterIP": "10.43.226.92",
+                "clusterIPs": [
+                    "10.43.226.92"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 443,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    }
+                ],
+                "selector": {
+                    "deployment.pinniped.dev": "concierge"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "sealed-secrets-ardenone-manager:/Service:sealed-secrets/sealed-secrets-ardenone-manager"
+                },
+                "creationTimestamp": "2026-03-25T20:27:54Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "sealed-secrets",
+                    "app.kubernetes.io/part-of": "sealed-secrets",
+                    "app.kubernetes.io/version": "0.36.1",
+                    "helm.sh/chart": "sealed-secrets-2.18.4"
+                },
+                "name": "sealed-secrets-ardenone-manager",
+                "namespace": "sealed-secrets",
+                "resourceVersion": "556878563",
+                "uid": "6f12b377-ef9f-44ff-878f-2e9f5e003ce5"
+            },
+            "spec": {
+                "clusterIP": "10.43.15.106",
+                "clusterIPs": [
+                    "10.43.15.106"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/name": "sealed-secrets"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "sealed-secrets-ardenone-manager:/Service:sealed-secrets/sealed-secrets-ardenone-manager-metrics"
+                },
+                "creationTimestamp": "2026-03-25T20:27:54Z",
+                "labels": {
+                    "app.kubernetes.io/component": "metrics",
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "sealed-secrets",
+                    "app.kubernetes.io/part-of": "sealed-secrets",
+                    "app.kubernetes.io/version": "0.36.1",
+                    "helm.sh/chart": "sealed-secrets-2.18.4"
+                },
+                "name": "sealed-secrets-ardenone-manager-metrics",
+                "namespace": "sealed-secrets",
+                "resourceVersion": "556878554",
+                "uid": "1373c71f-eae5-4c59-af72-f6b1f0a6b71a"
+            },
+            "spec": {
+                "clusterIP": "10.43.212.164",
+                "clusterIPs": [
+                    "10.43.212.164"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "metrics",
+                        "port": 8081,
+                        "protocol": "TCP",
+                        "targetPort": "metrics"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/name": "sealed-secrets"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "sealed-secrets-ardenone-manager:/Service:sealed-secrets/sealed-secrets-ardenone-manager-sealed-secrets-web"
+                },
+                "creationTimestamp": "2026-03-25T20:27:54Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "sealed-secrets-web",
+                    "app.kubernetes.io/version": "v3.3.0",
+                    "helm.sh/chart": "sealed-secrets-web-3.3.0"
+                },
+                "name": "sealed-secrets-ardenone-manager-sealed-secrets-web",
+                "namespace": "sealed-secrets",
+                "resourceVersion": "556878548",
+                "uid": "c8e87826-c953-42f7-82c6-96d750cc04cb"
+            },
+            "spec": {
+                "clusterIP": "10.43.60.74",
+                "clusterIPs": [
+                    "10.43.60.74"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "sealed-secrets-ardenone-manager",
+                    "app.kubernetes.io/name": "sealed-secrets-web"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-07-26T22:58:32Z",
+                "generateName": "ts-bench-rebuild-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "bench-rebuild-egress",
+                    "tailscale.com/parent-resource-ns": "argo-events",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-bench-rebuild-egress-hnw4v",
+                "namespace": "tailscale",
+                "resourceVersion": "606124514",
+                "uid": "c3073f01-e318-4ec2-82fe-6692252e11a5"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "4955691f-b5c4-483d-9f1f-9572fd76e6f0"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-02T20:26:47Z",
+                "generateName": "ts-lab-rebuild-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "lab-rebuild-egress",
+                    "tailscale.com/parent-resource-ns": "pbx-web",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-lab-rebuild-egress-42b5q",
+                "namespace": "tailscale",
+                "resourceVersion": "571148215",
+                "uid": "78211a06-c332-4537-9713-3245f55f1fd5"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-05-02T11:53:12Z",
+                "generateName": "ts-pbx-rebuild-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "pbx-rebuild-egress",
+                    "tailscale.com/parent-resource-ns": "pbx-web",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-pbx-rebuild-egress-r9czm",
+                "namespace": "tailscale",
+                "resourceVersion": "570962829",
+                "uid": "0ebc0d76-ec4e-413a-8b39-1f12c47443b2"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "5ccffc36-06db-4c6f-918b-65282098f508"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-04-14T00:27:23Z",
+                "generateName": "ts-traefik-ardenone-cluster-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "traefik-ardenone-cluster-egress",
+                    "tailscale.com/parent-resource-ns": "openbao",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-traefik-ardenone-cluster-egress-cp5p2",
+                "namespace": "tailscale",
+                "resourceVersion": "562867599",
+                "uid": "52d5453d-631f-4b15-b868-273dd42d5b46"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "cd1aead2-bfd3-4407-b131-e393918b539a"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-04-19T20:25:58Z",
+                "generateName": "ts-traefik-ardenone-hub-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "traefik-ardenone-hub-egress",
+                    "tailscale.com/parent-resource-ns": "openbao",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-traefik-ardenone-hub-egress-4jstq",
+                "namespace": "tailscale",
+                "resourceVersion": "565441181",
+                "uid": "122c7f55-8c85-427b-a42f-1ff406e4eddf"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "a212d008-b5f3-42e9-ae67-f87c58907c45"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-04-19T20:26:06Z",
+                "generateName": "ts-traefik-rs-manager-egress-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "traefik-rs-manager-egress",
+                    "tailscale.com/parent-resource-ns": "openbao",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-traefik-rs-manager-egress-47nnw",
+                "namespace": "tailscale",
+                "resourceVersion": "565441287",
+                "uid": "7b3151a4-593a-4300-8065-f9e334d09ec1"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "a0217199-a248-4764-b010-8770b524c47d"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "creationTimestamp": "2026-04-03T21:14:54Z",
+                "generateName": "ts-traefik-tailscale-",
+                "labels": {
+                    "tailscale.com/managed": "true",
+                    "tailscale.com/parent-resource": "traefik-tailscale",
+                    "tailscale.com/parent-resource-ns": "traefik",
+                    "tailscale.com/parent-resource-type": "svc"
+                },
+                "name": "ts-traefik-tailscale-rq22b",
+                "namespace": "tailscale",
+                "resourceVersion": "558992287",
+                "uid": "2b2cd3ca-185c-493a-8184-481e1765aabd"
+            },
+            "spec": {
+                "clusterIP": "None",
+                "clusterIPs": [
+                    "None"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "PreferDualStack",
+                "selector": {
+                    "app": "eace90fc-4d10-4cce-88e7-5cab0752b971"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "flux-source-controller-ardenone-manager:/Service:tofu-controller/source-controller"
+                },
+                "creationTimestamp": "2026-03-26T01:16:14Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "tofu-controller",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/part-of": "flux",
+                    "app.kubernetes.io/version": "2.4.0",
+                    "control-plane": "controller",
+                    "helm.sh/chart": "flux2-2.14.0"
+                },
+                "name": "source-controller",
+                "namespace": "tofu-controller",
+                "resourceVersion": "556895963",
+                "uid": "7995370a-5ac4-4a89-9d07-704e762f7137"
+            },
+            "spec": {
+                "clusterIP": "10.43.134.249",
+                "clusterIPs": [
+                    "10.43.134.249"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 80,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app": "source-controller"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "trace-ns-ardenone-manager:/Service:trace/trace-collector"
+                },
+                "creationTimestamp": "2026-06-24T13:55:17Z",
+                "labels": {
+                    "app": "trace-collector"
+                },
+                "name": "trace-collector",
+                "namespace": "trace",
+                "resourceVersion": "593251694",
+                "uid": "b74ee73a-9527-4fa4-a5d4-0491587320b4"
+            },
+            "spec": {
+                "clusterIP": "10.43.124.147",
+                "clusterIPs": [
+                    "10.43.124.147"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app": "trace-collector"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "traefik-ns-ardenone-manager:/Service:traefik/ardenone-com-traefik-auth"
+                },
+                "creationTimestamp": "2026-03-25T20:27:34Z",
+                "name": "ardenone-com-traefik-auth",
+                "namespace": "traefik",
+                "resourceVersion": "557398781",
+                "uid": "39e8de9f-f85b-479d-b897-9679785f888a"
+            },
+            "spec": {
+                "clusterIP": "10.43.212.15",
+                "clusterIPs": [
+                    "10.43.212.15"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "port": 4181,
+                        "protocol": "TCP",
+                        "targetPort": 4181
+                    }
+                ],
+                "selector": {
+                    "app": "ardenone-com-traefik-auth"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "traefik-ardenone-manager:/Service:traefik/traefik-ardenone-manager"
+                },
+                "creationTimestamp": "2026-03-25T22:08:53Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "traefik-ardenone-manager-traefik",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "traefik",
+                    "helm.sh/chart": "traefik-39.0.6"
+                },
+                "name": "traefik-ardenone-manager",
+                "namespace": "traefik",
+                "resourceVersion": "559250951",
+                "uid": "39c83137-1a08-4452-b643-9225126b2ffb"
+            },
+            "spec": {
+                "clusterIP": "10.43.157.91",
+                "clusterIPs": [
+                    "10.43.157.91"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "kubectl-tcp",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": "kubectl-tcp"
+                    },
+                    {
+                        "name": "vpn",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": "vpn"
+                    },
+                    {
+                        "name": "websecure",
+                        "port": 8443,
+                        "protocol": "TCP",
+                        "targetPort": "websecure"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "traefik-ardenone-manager-traefik",
+                    "app.kubernetes.io/name": "traefik"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "traefik-ns-ardenone-manager:/Service:traefik/traefik-tailscale",
+                    "kubectl.kubernetes.io/restartedAt": "2026-04-04T10:06:00Z",
+                    "tailscale.com/expose": "true",
+                    "tailscale.com/hostname": "traefik-ardenone-manager"
+                },
+                "creationTimestamp": "2026-04-03T21:14:54Z",
+                "finalizers": [
+                    "tailscale.com/finalizer"
+                ],
+                "name": "traefik-tailscale",
+                "namespace": "traefik",
+                "resourceVersion": "572456154",
+                "uid": "eace90fc-4d10-4cce-88e7-5cab0752b971"
+            },
+            "spec": {
+                "clusterIP": "10.43.170.235",
+                "clusterIPs": [
+                    "10.43.170.235"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "vpn",
+                        "port": 8444,
+                        "protocol": "TCP",
+                        "targetPort": 8444
+                    },
+                    {
+                        "name": "kubectl-tcp",
+                        "port": 8001,
+                        "protocol": "TCP",
+                        "targetPort": 8001
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/name": "traefik"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-05T16:31:48Z",
+                        "message": "ProxyCreated",
+                        "reason": "ProxyCreated",
+                        "status": "True",
+                        "type": "TailscaleProxyReady"
+                    }
+                ],
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "external-dns-ardenone-manager:/Service:utilities/external-dns-ardenone-manager"
+                },
+                "creationTimestamp": "2026-03-27T23:52:53Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "external-dns-ardenone-manager",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "external-dns",
+                    "app.kubernetes.io/version": "0.20.0",
+                    "helm.sh/chart": "external-dns-1.20.0"
+                },
+                "name": "external-dns-ardenone-manager",
+                "namespace": "utilities",
+                "resourceVersion": "557158348",
+                "uid": "f0f570b6-91d2-4054-a3e3-9d5aea0daa1b"
+            },
+            "spec": {
+                "clusterIP": "10.43.242.121",
+                "clusterIPs": [
+                    "10.43.242.121"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 7979,
+                        "protocol": "TCP",
+                        "targetPort": "http"
+                    }
+                ],
+                "selector": {
+                    "app.kubernetes.io/instance": "external-dns-ardenone-manager",
+                    "app.kubernetes.io/name": "external-dns"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/Service:whisper-stt/whisper-openai"
+                },
+                "creationTimestamp": "2026-06-14T02:11:08Z",
+                "labels": {
+                    "app": "whisper-openai"
+                },
+                "name": "whisper-openai",
+                "namespace": "whisper-stt",
+                "resourceVersion": "589326100",
+                "uid": "a3532383-33dc-4402-820c-01dfb4be8b81"
+            },
+            "spec": {
+                "clusterIP": "10.43.86.131",
+                "clusterIPs": [
+                    "10.43.86.131"
+                ],
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "port": 8000,
+                        "protocol": "TCP",
+                        "targetPort": 8000
+                    }
+                ],
+                "selector": {
+                    "app": "whisper-openai"
+                },
+                "sessionAffinity": "None",
+                "type": "ClusterIP"
+            },
+            "status": {
+                "loadBalancer": {}
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/Service:whisper-stt/whisper-stt"
+                },
+                "creationTimestamp": "2026-05-01T17:40:18Z",
+                "finalizers": [
+                    "service.kubernetes.io/load-balancer-cleanup"
+                ],
+                "labels": {
+                    "app": "whisper-stt"
+                },
+                "name": "whisper-stt",
+                "namespace": "whisper-stt",
+                "resourceVersion": "602748924",
+                "uid": "c02117d2-e710-4f21-bc23-b9d634471483"
+            },
+            "spec": {
+                "allocateLoadBalancerNodePorts": true,
+                "clusterIP": "10.43.214.62",
+                "clusterIPs": [
+                    "10.43.214.62"
+                ],
+                "externalTrafficPolicy": "Cluster",
+                "internalTrafficPolicy": "Cluster",
+                "ipFamilies": [
+                    "IPv4"
+                ],
+                "ipFamilyPolicy": "SingleStack",
+                "ports": [
+                    {
+                        "name": "http",
+                        "nodePort": 32211,
+                        "port": 8080,
+                        "protocol": "TCP",
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "whisper-stt"
+                },
+                "sessionAffinity": "None",
+                "type": "LoadBalancer"
+            },
+            "status": {
+                "loadBalancer": {
+                    "ingress": [
+                        {
+                            "ip": "10.20.23.100",
+                            "ipMode": "VIP"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

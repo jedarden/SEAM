@@ -1,0 +1,1052 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argo-events-ns-iad-ci:/Namespace:argo-events/argo-events"
+                },
+                "creationTimestamp": "2026-07-23T17:38:30Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "argo-events"
+                },
+                "name": "argo-events",
+                "resourceVersion": "604831338",
+                "uid": "7bbd4972-88ad-4a9a-8418-372ba093dac5"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/sync-options": "Delete=false",
+                    "argocd.argoproj.io/tracking-id": "argocd-ns-ardenone-manager:/Namespace:argocd/argocd"
+                },
+                "creationTimestamp": "2026-03-25T19:26:48Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "argocd"
+                },
+                "name": "argocd",
+                "resourceVersion": "557398813",
+                "uid": "10c316b9-0e1c-4c62-bf4d-d63c77f9ab55"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "botburrow-ns-ardenone-manager:/Namespace:botburrow/botburrow"
+                },
+                "creationTimestamp": "2026-03-29T23:10:23Z",
+                "deletionTimestamp": "2026-07-17T21:43:36Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "botburrow"
+                },
+                "name": "botburrow",
+                "resourceVersion": "602749988",
+                "uid": "83377028-bf72-45ff-832a-dbeaccdb4639"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:41Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:41Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:41Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:41Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:41Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "botburrow-agents:/Namespace:botburrow-agents/botburrow-agents"
+                },
+                "creationTimestamp": "2026-03-29T23:02:06Z",
+                "deletionTimestamp": "2026-04-01T02:18:57Z",
+                "labels": {
+                    "app.kubernetes.io/name": "botburrow-agents",
+                    "app.kubernetes.io/part-of": "botburrow",
+                    "ardenone.com/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "botburrow-agents"
+                },
+                "name": "botburrow-agents",
+                "resourceVersion": "602750009",
+                "uid": "6ed10fe2-0afa-4e86-bcdf-561c2b7e77d4"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:02Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:04Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-05-05T18:57:54Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:04Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:04Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cert-manager-ns-ardenone-manager:/Namespace:cert-manager/cert-manager"
+                },
+                "creationTimestamp": "2026-03-25T20:27:29Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "cert-manager"
+                },
+                "name": "cert-manager",
+                "resourceVersion": "557398550",
+                "uid": "8865030b-d360-4641-b28d-8569874d51db"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "coder-manifests-ardenone-cluster:/Namespace:/coder"
+                },
+                "creationTimestamp": "2026-03-27T03:39:47Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "coder"
+                },
+                "name": "coder",
+                "resourceVersion": "556999916",
+                "uid": "9077a94c-90d0-4008-b08f-6c7cc310a5d1"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-30T21:04:01Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "default"
+                },
+                "name": "default",
+                "resourceVersion": "40",
+                "uid": "23c31bf1-d1fa-4198-af78-f3fa7c8bcedb"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "devpod-observer-ns-ardenone-manager:/Namespace:devpod-observer/devpod-observer"
+                },
+                "creationTimestamp": "2026-03-25T20:27:31Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "devpod-observer",
+                    "name": "devpod-observer",
+                    "purpose": "cross-cluster-access"
+                },
+                "name": "devpod-observer",
+                "resourceVersion": "557398562",
+                "uid": "b7d24789-592f-4814-9af6-45643ac03ab7"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "external-secrets-ns-ardenone-manager:/Namespace:external-secrets/external-secrets"
+                },
+                "creationTimestamp": "2026-03-25T20:27:28Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "external-secrets",
+                    "name": "external-secrets",
+                    "purpose": "secrets-management"
+                },
+                "name": "external-secrets",
+                "resourceVersion": "557398530",
+                "uid": "07788b21-8156-44a5-b0e6-6835e3897c61"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "garage-operator-ns-ardenone-manager:/Namespace:garage-operator/garage-operator"
+                },
+                "creationTimestamp": "2026-04-01T05:38:08Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "garage-operator"
+                },
+                "name": "garage-operator",
+                "resourceVersion": "558992211",
+                "uid": "85f69e68-b405-4573-8824-14d849edea61"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "garage-operator-ns-ardenone-manager:/Namespace:garage-operator/garage-operator-system"
+                },
+                "creationTimestamp": "2026-04-01T05:37:41Z",
+                "deletionTimestamp": "2026-04-13T02:17:48Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "garage-operator-system"
+                },
+                "name": "garage-operator-system",
+                "resourceVersion": "602749983",
+                "uid": "61fcb057-3c2a-440d-963b-580dfc02f5f9"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-04-13T02:17:56Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-13T02:21:46Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-05-05T17:40:48Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-13T02:21:46Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-13T02:21:46Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "headscale-client-ns-ardenone-manager:/Namespace:headscale-client/headscale-client"
+                },
+                "creationTimestamp": "2026-04-01T02:47:19Z",
+                "deletionTimestamp": "2026-04-15T02:04:00Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "headscale-client"
+                },
+                "name": "headscale-client",
+                "resourceVersion": "602749987",
+                "uid": "10de9a61-cc64-49d7-a249-5e6d66c32900"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-04-15T02:04:07Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-15T02:04:09Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-05-05T17:41:13Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-15T02:04:09Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-15T02:04:09Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "homepage-ns-ardenone-manager:/Namespace:homepage/homepage"
+                },
+                "creationTimestamp": "2026-03-25T20:27:36Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "homepage"
+                },
+                "name": "homepage",
+                "resourceVersion": "557398576",
+                "uid": "e11ab51f-5159-47ce-923b-3b46f590281b"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2026-03-25T19:25:11Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kube-node-lease"
+                },
+                "name": "kube-node-lease",
+                "resourceVersion": "556875941",
+                "uid": "5186f3ad-5ad2-462d-8291-18fb97e768a8"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-30T21:04:01Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kube-public"
+                },
+                "name": "kube-public",
+                "resourceVersion": "21",
+                "uid": "a716a843-ce34-42d1-b01b-1c7f7eaa2d51"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "kube-system-ns-ardenone-manager:/Namespace:kube-system/kube-system"
+                },
+                "creationTimestamp": "2024-09-30T21:04:01Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "kube-system"
+                },
+                "name": "kube-system",
+                "resourceVersion": "562868211",
+                "uid": "23921408-e6f6-4f02-a187-50d1cc422326"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "kubewall-ns-ardenone-manager:/Namespace:kubewall/kubewall"
+                },
+                "creationTimestamp": "2026-03-25T20:27:29Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kubewall"
+                },
+                "name": "kubewall",
+                "resourceVersion": "557398634",
+                "uid": "6269bddd-714a-4f07-9800-c5a5f459b689"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "monitoring-ns-ardenone-manager:/Namespace:monitoring/monitoring"
+                },
+                "creationTimestamp": "2026-04-04T14:45:18Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "monitoring"
+                },
+                "name": "monitoring",
+                "resourceVersion": "559280726",
+                "uid": "f4d3b282-6135-41b8-90e8-225b9e2519b4"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "mta-my-way:/Namespace:mta-my-way/mta-my-way"
+                },
+                "creationTimestamp": "2026-03-29T23:02:06Z",
+                "deletionTimestamp": "2026-04-01T02:19:28Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "mta-my-way",
+                    "name": "mta-my-way"
+                },
+                "name": "mta-my-way",
+                "resourceVersion": "602749991",
+                "uid": "645f72ea-f6bd-4e35-98fd-2c578834268b"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:34Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:35Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-05-05T18:57:54Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:35Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:35Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "needle-dashboard:/Namespace:needle/needle"
+                },
+                "creationTimestamp": "2026-03-27T03:39:38Z",
+                "deletionTimestamp": "2026-04-01T02:19:35Z",
+                "labels": {
+                    "app.kubernetes.io/name": "needle-dashboard",
+                    "app.kubernetes.io/part-of": "needle",
+                    "ardenone.com/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "needle"
+                },
+                "name": "needle",
+                "resourceVersion": "602749985",
+                "uid": "e3dbe56f-f4c5-4df5-b618-846bc05711c8"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:40Z",
+                        "message": "Discovery failed for some groups, 1 failing: unable to retrieve the complete list of server APIs: external.metrics.k8s.io/v1beta1: stale GroupVersion discovery: external.metrics.k8s.io/v1beta1",
+                        "reason": "DiscoveryFailed",
+                        "status": "True",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:41Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-05-05T18:57:48Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:41Z",
+                        "message": "All content successfully removed",
+                        "reason": "ContentRemoved",
+                        "status": "False",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-04-01T02:19:41Z",
+                        "message": "All content-preserving finalizers finished",
+                        "reason": "ContentHasNoFinalizers",
+                        "status": "False",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/sync-options": "Delete=false",
+                    "argocd.argoproj.io/tracking-id": "openbao-ns-ardenone-manager:/Namespace:openbao/openbao"
+                },
+                "creationTimestamp": "2026-03-25T20:27:33Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "openbao",
+                    "name": "openbao",
+                    "purpose": "secrets-management"
+                },
+                "name": "openbao",
+                "resourceVersion": "557398685",
+                "uid": "278cb1cf-cce3-4d58-b0f5-151134990a8d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:/Namespace:pbx-web/pbx-web"
+                },
+                "creationTimestamp": "2026-05-01T20:49:40Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "pbx-web",
+                    "name": "pbx-web"
+                },
+                "name": "pbx-web",
+                "resourceVersion": "570650013",
+                "uid": "128241c0-ff48-48f9-ba50-557ea4884540"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pinniped-concierge-ns-ardenone-manager:/Namespace:pinniped-concierge/pinniped-concierge"
+                },
+                "creationTimestamp": "2026-03-29T15:32:10Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "pinniped-concierge"
+                },
+                "name": "pinniped-concierge",
+                "resourceVersion": "557477581",
+                "uid": "37ac5df6-b3cc-437b-984a-27c08d64835d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "reloader-ns-ardenone-manager:/Namespace:reloader/reloader"
+                },
+                "creationTimestamp": "2026-03-29T12:16:10Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "reloader"
+                },
+                "name": "reloader",
+                "resourceVersion": "557448519",
+                "uid": "098ad6ff-7859-40fe-b8b1-a53e3fab4dc6"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "sealed-secrets-ns-ardenone-manager:/Namespace:sealed-secrets/sealed-secrets"
+                },
+                "creationTimestamp": "2026-03-25T20:27:28Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "sealed-secrets"
+                },
+                "name": "sealed-secrets",
+                "resourceVersion": "557398545",
+                "uid": "a03ad4fe-a9bc-45db-9165-fd47f5aded77"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "synology-ns-ardenone-manager:/Namespace:synology/synology"
+                },
+                "creationTimestamp": "2026-04-01T05:37:14Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "synology"
+                },
+                "name": "synology",
+                "resourceVersion": "558078644",
+                "uid": "625814f8-cd88-4e8a-8bf4-6ea77211c95b"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "system-upgrade-ns-ardenone-manager:/Namespace:system-upgrade/system-upgrade"
+                },
+                "creationTimestamp": "2026-03-25T20:27:38Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "system-upgrade",
+                    "pod-security.kubernetes.io/enforce": "privileged"
+                },
+                "name": "system-upgrade",
+                "resourceVersion": "557399236",
+                "uid": "1ac50b7c-2e2b-4d03-b6ea-4bbeccedf69b"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "tailscale-ns-ardenone-manager:/Namespace:tailscale/tailscale"
+                },
+                "creationTimestamp": "2026-03-26T02:17:28Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "tailscale"
+                },
+                "name": "tailscale",
+                "resourceVersion": "557398675",
+                "uid": "09ac503b-7a3b-4b14-86a3-11bd2bab6319"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2026-03-25T20:27:42Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "tofu-controller"
+                },
+                "name": "tofu-controller",
+                "resourceVersion": "556878287",
+                "uid": "12b01643-b02a-40c0-9e3b-33470eb57e5c"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "trace-ns-ardenone-manager:/Namespace:trace/trace"
+                },
+                "creationTimestamp": "2026-06-24T13:55:17Z",
+                "labels": {
+                    "app": "trace",
+                    "kubernetes.io/metadata.name": "trace"
+                },
+                "name": "trace",
+                "resourceVersion": "593251676",
+                "uid": "0f9532ff-7cbe-452a-8070-7eeb440076b5"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "traefik-ns-ardenone-manager:/Namespace:traefik/traefik"
+                },
+                "creationTimestamp": "2026-03-25T20:27:33Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "traefik"
+                },
+                "name": "traefik",
+                "resourceVersion": "557398769",
+                "uid": "2e487a32-32e9-481f-b2d4-d9410914a0d7"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "utilities-ns-ardenone-manager:/Namespace:utilities/utilities"
+                },
+                "creationTimestamp": "2026-03-27T23:52:21Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "utilities"
+                },
+                "name": "utilities",
+                "resourceVersion": "557398733",
+                "uid": "5563fc93-b615-464d-b708-f677b6701df3"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/Namespace:whisper-stt/whisper-stt"
+                },
+                "creationTimestamp": "2026-05-01T17:40:06Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "whisper-stt",
+                    "kuik.enix.io/ignore": "true"
+                },
+                "name": "whisper-stt",
+                "resourceVersion": "570897958",
+                "uid": "31faddd6-9074-46b9-8e21-e933c553b9c8"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

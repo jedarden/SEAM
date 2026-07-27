@@ -1,0 +1,2794 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-dzgvm",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"62a06c73-3882-4765-ad54-35437e1143da\",\"rbd.csi.ceph.com\":\"prod-instance-17768682043396745\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.198.40/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.159.194",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-04-22T14:38:19Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17768682043396745",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17768682043396745",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17768682043396745",
+                "resourceVersion": "29709198",
+                "uid": "4183580f-b856-4a95-8fef-7c258d32e720"
+            },
+            "spec": {
+                "podCIDR": "10.20.0.0/24",
+                "podCIDRs": [
+                    "10.20.0.0/24"
+                ],
+                "providerID": "openstack:///62a06c73-3882-4765-ad54-35437e1143da"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.198.40",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17768682043396745",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659044Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810020Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-28T04:34:56Z",
+                        "lastTransitionTime": "2026-06-28T04:34:56Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:53Z",
+                        "lastTransitionTime": "2026-07-26T15:51:36Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:53Z",
+                        "lastTransitionTime": "2026-04-28T22:15:36Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:53Z",
+                        "lastTransitionTime": "2026-04-28T22:15:36Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:53Z",
+                        "lastTransitionTime": "2026-06-28T04:34:44Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:29cdc34ede8cd9716d1f40a8200447355ae210c05a539c1b0262ccc5fcaf183c",
+                            "docker.io/library/python:3.12"
+                        ],
+                        "sizeBytes": 410598599
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:5062f6c22a2c3b8b3717c642af3852310d9a81c3c2c0fc72449a9a79ef09ae63",
+                            "docker.io/library/python:3.11"
+                        ],
+                        "sizeBytes": 408870933
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:6ca67fda4538da0ba66d3c1fe7e12ad6b6eda26b07dba5a4c5d24ca5eeb15ec6",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.7.0"
+                        ],
+                        "sizeBytes": 403599776
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ac576c814161a5db8ea6c91f9087562b0d99790f21e5af7b8f91524cf2fe05ed",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.289"
+                        ],
+                        "sizeBytes": 402619243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f2e3cda9249e29e32320560a18db5ce1f1e387df553ba0e1fc91b4ba9697f16a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.290"
+                        ],
+                        "sizeBytes": 402618786
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:b0a6f8de4b45a43db31ee70c6ee5153858eae8a486ce9288bdfff540b4961ca7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:6eb127d"
+                        ],
+                        "sizeBytes": 402569309
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:5a28c3592effe4527d6b4057d17360263fcc3b1e76f5bf0bf3e3a8b22c48f2b9",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5f2f0b0"
+                        ],
+                        "sizeBytes": 402569287
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:41551a0eddb777580f5c5f42041527252c057f7d5dc3f7fb9767f50403e979a7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:2dbc818"
+                        ],
+                        "sizeBytes": 402239293
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ab87bc97b6d67516a4cf34441b2d9e17431a60386542c58ad6604cc12e461645",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5b55c3b"
+                        ],
+                        "sizeBytes": 383583968
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:249d4cbcbbb3795b017062412002fd2e6237a46ad1f1a9c745c994f46f7c769a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:86e1055"
+                        ],
+                        "sizeBytes": 370325054
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:b523eff1caaaa2519c8a7dec8ac1cc112b256ddd9e8301c3532c7beb635295d3",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5dbc390"
+                        ],
+                        "sizeBytes": 370253423
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:df075bce0e3af476af7808ca60fb626784c74cd6a27715fc1c579b221a2177fd",
+                            "docker.io/ronaldraygun/devimprint-website-builder:8141f65"
+                        ],
+                        "sizeBytes": 369627813
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-filter-worker@sha256:0735ada615eb8e7b059f4f193bb9931444d92127f766de8f4adb92714abcdce2",
+                            "docker.io/ronaldraygun/commitgraph-filter-worker:1.0.0"
+                        ],
+                        "sizeBytes": 277455812
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:fbd4e254fd048d8e20835d25d3a2cd5a84e96d0653b7f6243255a6fe3b9e69c5",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.4"
+                        ],
+                        "sizeBytes": 238676725
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:a7fa6b22539ab1db96b6a1832887cbbac39c420679f2a04b49490e9fa2755bab",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.0.1"
+                        ],
+                        "sizeBytes": 187615955
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:c4d27c088e4e326fa71abb20e43d1788438998f16bc830490af804165a6b4926",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166321468
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7c8577946cc616911b551750c6e8777dd3dd3bc3c9992d0e0faec6c24782b21",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.804"
+                        ],
+                        "sizeBytes": 164819929
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:ace48d98b09d85328a36ed36210e1700e2b61473c5771d11553640c2bda42944",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.803"
+                        ],
+                        "sizeBytes": 164819681
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:9220d5cd702e3258df55202f4895840c337d8c0bf9f4e97f6f83cb0d81a29950",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.192"
+                        ],
+                        "sizeBytes": 163131629
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:e0b65eb1230c6a84c7c31b31d8625df02d8145a6215d66e810ee714fe0462bfc",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.200"
+                        ],
+                        "sizeBytes": 163131613
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:882dcac9f8aed1b28b6d92ef8c8cd2f1fc20913f4dca42342f3090d1490cd682",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.153"
+                        ],
+                        "sizeBytes": 163131107
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:83bebb73096a229a1868ace4b4e780674b9239ace7de0f344931bb069c5e67d8",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.181"
+                        ],
+                        "sizeBytes": 163131101
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:0d9d735b3113a6fb968b984a8c98c76cb1bf4131fc198e53602b79d0650ea1c5",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.180"
+                        ],
+                        "sizeBytes": 163131093
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:9cb6282e5cf490b8ba1340f8bfd8bfc3969fece6f3cb769509a8b860fdf9fb74",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.1"
+                        ],
+                        "sizeBytes": 163107607
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7b8435befaacdda7ff21b6a43ea0f4062ba2ef153759fd1eb7f7e86b745363d4",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.492"
+                        ],
+                        "sizeBytes": 163098095
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:b1d4c4adfff892e767f72173ef71d212ea28229b0b0d4ae75d3af94e31ef6dd8",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.3"
+                        ],
+                        "sizeBytes": 163088528
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7259892cdb61414275b1e779036e24f6c9632a2c442702065dbf2ab3e6eabc99"
+                        ],
+                        "sizeBytes": 162995715
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:384a4004c849db725e7b70140ac3d0763e8d616051de6f38279040082c95b397",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:latest"
+                        ],
+                        "sizeBytes": 162995695
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:5cbe9208e649f5b4eb95a6faaa1020a4ed254accbc8a03317ef9076e02c11b01"
+                        ],
+                        "sizeBytes": 162995547
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:8879726f1f04f2c5c6078962298a6ddc9a988df81371fbf3468f1d5d5e62c611"
+                        ],
+                        "sizeBytes": 162995527
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:cd32b863f07374cdbfa3e5bb9b13edb2423e6ca8097f22458e49ddbcee575b44"
+                        ],
+                        "sizeBytes": 162995243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7e3cd7cfa381086f099131a13880a7b917f82d56dbe2a0f3d999b63fde7d19ce"
+                        ],
+                        "sizeBytes": 162995235
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:cc8ef6a0fe08495937fe0fde1dcdda0e4ee732f36a1a4f0fd62c284364169edd"
+                        ],
+                        "sizeBytes": 162995224
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:efc2584364aeebede69e65e87891025b0781145e9c0ec47fe59b0ef4dd5d29ab"
+                        ],
+                        "sizeBytes": 162995224
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7acb7f771a559fb8d1e604ce0ca7a0799651a13f9d13168693d615a6f0b59cae"
+                        ],
+                        "sizeBytes": 161540140
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:167eaef2a966747808e67bc3d19b21aaa92df56fdb126b3c38588f1614bbff0f",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.1"
+                        ],
+                        "sizeBytes": 161540064
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:940022808f90b63f42cee622656fd1071da6e39eb8b4067c34b2ac5138f64530",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.6"
+                        ],
+                        "sizeBytes": 148871965
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:f38dc4f4f893c26d9419690d544e3b5e565e94695aaf9fff854d3ae6cc0b3d6b",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.5"
+                        ],
+                        "sizeBytes": 148871629
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:19474b542b964090aa44b517273d3993aa67d4fcbbce8d810e9b0645ad6dced0",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.4"
+                        ],
+                        "sizeBytes": 148871607
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:7382fb01b0af1ca429f066d707403bb03c2be32a968f09cbcc878c1c47f76a83",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.2"
+                        ],
+                        "sizeBytes": 148871391
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:30339f13a9bd9b78057f5aa90ef54cf1bcefa9b13602f85f3ce0a0ce953644e2",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.0"
+                        ],
+                        "sizeBytes": 148871363
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:c1014aa56beda71a6f51a53824fbbb40ceaf93a73edea5a837317c75980756c3",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.0.1"
+                        ],
+                        "sizeBytes": 148669958
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:940d621ebbe1113824a16b5e849ffe311556b2cab17ac1aa3c0f9671495f4b53",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.1.2"
+                        ],
+                        "sizeBytes": 148669952
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:b7cee7b673f569c37ace97947d9cc5137ad38d9ad862d8510b84e3c577f09276",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.1.1"
+                        ],
+                        "sizeBytes": 148669672
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:e4b87066a6aa551d9fb929f4be5ea4ffb710e898fbc2887f65e8b3a7efa15015",
+                            "docker.io/ronaldraygun/devimprint-aggregator:latest"
+                        ],
+                        "sizeBytes": 146333497
+                    },
+                    {
+                        "names": [
+                            "docker.io/amazon/aws-cli@sha256:69f42de2e79bfd7885e935fd0a1c5ef4f8cd744b09a046c98c726e9505f59f46",
+                            "docker.io/amazon/aws-cli:latest"
+                        ],
+                        "sizeBytes": 136529731
+                    },
+                    {
+                        "names": [
+                            "docker.io/amazon/aws-cli@sha256:44bb6879843b2ec0140517e5ffff2118a6168661eec0fcdfa5a65df53c4433b3"
+                        ],
+                        "sizeBytes": 136471548
+                    },
+                    {
+                        "names": [
+                            "docker.io/amazon/aws-cli@sha256:643507c10ada7964ca6157b3d799f030b90577643da9955d319a77399ed80d73",
+                            "docker.io/amazon/aws-cli:2.17.0"
+                        ],
+                        "sizeBytes": 125732170
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/node@sha256:856ac0c261160e7bb967ab43b31598fa89633b33eb2ee292e17384272d929e22",
+                            "docker.io/calico/node:v3.28.2"
+                        ],
+                        "sizeBytes": 119828494
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "1f0f4d56-5853-4c37-8623-ff6748bdeeb1",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "226909bb-ba52-dabe-315e-6f772ddb7680"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-fwbjr",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"f8c454e6-ba70-437f-87cc-3d61beaeabeb\",\"rbd.csi.ceph.com\":\"prod-instance-17768682057986746\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.198.42/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.1.192",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-04-22T14:39:08Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17768682057986746",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17768682057986746",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17768682057986746",
+                "resourceVersion": "29709233",
+                "uid": "1a795ead-b039-4194-9728-6fc3fd150c38"
+            },
+            "spec": {
+                "podCIDR": "10.20.1.0/24",
+                "podCIDRs": [
+                    "10.20.1.0/24"
+                ],
+                "providerID": "openstack:///f8c454e6-ba70-437f-87cc-3d61beaeabeb"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.198.42",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17768682057986746",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659052Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810028Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-28T04:35:27Z",
+                        "lastTransitionTime": "2026-06-28T04:35:27Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-07-23T00:38:59Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-04-28T22:15:36Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-04-28T22:15:36Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-06-28T04:35:12Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:29cdc34ede8cd9716d1f40a8200447355ae210c05a539c1b0262ccc5fcaf183c",
+                            "docker.io/library/python:3.12"
+                        ],
+                        "sizeBytes": 410598599
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:389894e47df7896b85be1c6cc634659d5f2fc55a605454758ae7a455fec1d63f",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.271"
+                        ],
+                        "sizeBytes": 403566518
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f23ca2dc7e2710af3684fbb6f57bf35b656bd6bd8934a9a48c25789a0d4c6b91",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.195"
+                        ],
+                        "sizeBytes": 403560054
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ef067d6be73d5e841efd984fe6433940224c909ec3262dc89aed696525d9740c",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.0"
+                        ],
+                        "sizeBytes": 402944427
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ac576c814161a5db8ea6c91f9087562b0d99790f21e5af7b8f91524cf2fe05ed",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.289"
+                        ],
+                        "sizeBytes": 402619243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f2e3cda9249e29e32320560a18db5ce1f1e387df553ba0e1fc91b4ba9697f16a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.290"
+                        ],
+                        "sizeBytes": 402618786
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:5a28c3592effe4527d6b4057d17360263fcc3b1e76f5bf0bf3e3a8b22c48f2b9",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5f2f0b0"
+                        ],
+                        "sizeBytes": 402569287
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:a7f74b5928adde934473799bb1952eab6529e95bcd1f19b1e4f610cddb8a69b1",
+                            "docker.io/ronaldraygun/devimprint-website-builder:ce8d532"
+                        ],
+                        "sizeBytes": 402569188
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:3e5305dc8cfbfd969695b4bdb7fb04f489c713b0ede0f4e511139b446373cc76",
+                            "docker.io/ronaldraygun/devimprint-website-builder:d333117"
+                        ],
+                        "sizeBytes": 402241310
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:41551a0eddb777580f5c5f42041527252c057f7d5dc3f7fb9767f50403e979a7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:2dbc818"
+                        ],
+                        "sizeBytes": 402239293
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:cc4580b91bd9a008d965f10caae190677a626fb8b0b25d147ad763fb7009a7a6",
+                            "docker.io/ronaldraygun/devimprint-website-builder:446c853"
+                        ],
+                        "sizeBytes": 402231301
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:dbdc6ac35dd4be120e88bbff8e8275a9ce1791f633c440bafcb09e921c07f7b0",
+                            "docker.io/ronaldraygun/devimprint-website-builder:71f5a17"
+                        ],
+                        "sizeBytes": 402229581
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:3522d2d4f6cda9d0ff7837287b49aee2c1dfbd7845dfce19ed10668ee4fc4c21",
+                            "docker.io/ronaldraygun/devimprint-website-builder:6f1bd87"
+                        ],
+                        "sizeBytes": 383585297
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:4560b607e5b316827691e303af2795caf55eb926870e9ff8c36f0e1a5b3439fa",
+                            "docker.io/ronaldraygun/devimprint-website-builder:397940b"
+                        ],
+                        "sizeBytes": 383584129
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ab87bc97b6d67516a4cf34441b2d9e17431a60386542c58ad6604cc12e461645",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5b55c3b"
+                        ],
+                        "sizeBytes": 383583968
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:249d4cbcbbb3795b017062412002fd2e6237a46ad1f1a9c745c994f46f7c769a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:86e1055"
+                        ],
+                        "sizeBytes": 370325054
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:df075bce0e3af476af7808ca60fb626784c74cd6a27715fc1c579b221a2177fd",
+                            "docker.io/ronaldraygun/devimprint-website-builder:8141f65"
+                        ],
+                        "sizeBytes": 369627813
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ac16b081c65bc2c6331c7174341343a8f4c7b54438f5e2134a0aa00acb9d0308"
+                        ],
+                        "sizeBytes": 361284170
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ed96b384ddd6e92f3d5cc7e31b31000567ee937ff0f3ed9b57841669462ec1d1",
+                            "docker.io/ronaldraygun/devimprint-website-builder:latest"
+                        ],
+                        "sizeBytes": 361284155
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:2a9268a70bd7a025b1168423598d5d92aecb9af3f8ba9f6b651921e00193c7d9"
+                        ],
+                        "sizeBytes": 355610800
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:fbd4e254fd048d8e20835d25d3a2cd5a84e96d0653b7f6243255a6fe3b9e69c5",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.4"
+                        ],
+                        "sizeBytes": 238676725
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:ad3321ca0bda4592637787ebf7b42f9803bd540a245c3fb75ab80b652c08832b",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.2.1"
+                        ],
+                        "sizeBytes": 238579146
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:c4d27c088e4e326fa71abb20e43d1788438998f16bc830490af804165a6b4926",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166321468
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-onboard-worker@sha256:09bb086bdab13c5f6026e394c797030d901a03b6c00e947b54700a50876f62a4",
+                            "docker.io/ronaldraygun/commitgraph-onboard-worker:1.1.0"
+                        ],
+                        "sizeBytes": 164891024
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7c8577946cc616911b551750c6e8777dd3dd3bc3c9992d0e0faec6c24782b21",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.804"
+                        ],
+                        "sizeBytes": 164819929
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:e9b5dc147ac76784e5acd4ecc0102b228ad07927ed9b86cbbe6c6cebe84a4445",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.726"
+                        ],
+                        "sizeBytes": 163441145
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:3a8596de7fbf7884852a6e112897db303258ced9993bb5cabc14b9ade0ea9c89",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.1.0"
+                        ],
+                        "sizeBytes": 163400712
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:9220d5cd702e3258df55202f4895840c337d8c0bf9f4e97f6f83cb0d81a29950",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.192"
+                        ],
+                        "sizeBytes": 163131629
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:e0b65eb1230c6a84c7c31b31d8625df02d8145a6215d66e810ee714fe0462bfc",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.200"
+                        ],
+                        "sizeBytes": 163131613
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:882dcac9f8aed1b28b6d92ef8c8cd2f1fc20913f4dca42342f3090d1490cd682",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.153"
+                        ],
+                        "sizeBytes": 163131107
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:83bebb73096a229a1868ace4b4e780674b9239ace7de0f344931bb069c5e67d8",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.181"
+                        ],
+                        "sizeBytes": 163131101
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:318bb9ffa8ec59d56ae0e4e4a6a107762e6f6fce3fd903ac85ada14387832e6d",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.3"
+                        ],
+                        "sizeBytes": 163108304
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:650abcca5e70c8d8ecfbf6b9747a19141d3cd332d743825cf7fb608176d29cac",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.2"
+                        ],
+                        "sizeBytes": 163107624
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:9cb6282e5cf490b8ba1340f8bfd8bfc3969fece6f3cb769509a8b860fdf9fb74",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.1"
+                        ],
+                        "sizeBytes": 163107607
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7b8435befaacdda7ff21b6a43ea0f4062ba2ef153759fd1eb7f7e86b745363d4",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.492"
+                        ],
+                        "sizeBytes": 163098095
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:61ba882dff0a33af8fab7a0fbcc767a96d1255625c574ae3887935c6685dc16f",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.239"
+                        ],
+                        "sizeBytes": 163098086
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:384a4004c849db725e7b70140ac3d0763e8d616051de6f38279040082c95b397",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:latest"
+                        ],
+                        "sizeBytes": 162995695
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:81a82adf60deecc0a11f2b76bda1c77f3b3eff2872323b35eaaad7f2b115105d"
+                        ],
+                        "sizeBytes": 162995548
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:5cbe9208e649f5b4eb95a6faaa1020a4ed254accbc8a03317ef9076e02c11b01"
+                        ],
+                        "sizeBytes": 162995547
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7ead8b7978e83417ab8345712210d604f5338ddb3345dbb83f0630928e57e30"
+                        ],
+                        "sizeBytes": 162995537
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:000f82225c36d0c8dca083b4a14dd3d48d9fa8865a2efc24f1fc702157c30d83"
+                        ],
+                        "sizeBytes": 162995536
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7b5bb37dcc08f11f947858bba4f894abf4d2278713de5680c74e7ef55a91c8e7"
+                        ],
+                        "sizeBytes": 162995533
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:8879726f1f04f2c5c6078962298a6ddc9a988df81371fbf3468f1d5d5e62c611"
+                        ],
+                        "sizeBytes": 162995527
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:6cdaaf92456b332a8ccdf153ae180d4f369a59ba3e63b4afd851091b4cc9ea5b"
+                        ],
+                        "sizeBytes": 162995519
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b88b3b5a64bb2d5366dbf51a53bb30de2e8980e77ada172cf183a9f37e258142"
+                        ],
+                        "sizeBytes": 162995272
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:cd32b863f07374cdbfa3e5bb9b13edb2423e6ca8097f22458e49ddbcee575b44"
+                        ],
+                        "sizeBytes": 162995243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7e3cd7cfa381086f099131a13880a7b917f82d56dbe2a0f3d999b63fde7d19ce"
+                        ],
+                        "sizeBytes": 162995235
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:efc2584364aeebede69e65e87891025b0781145e9c0ec47fe59b0ef4dd5d29ab"
+                        ],
+                        "sizeBytes": 162995224
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:3f34d2e004020bdfe5bda3a2f4df3030fbfdc7f3b5709b5758035506478be488",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:latest"
+                        ],
+                        "sizeBytes": 161543781
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "6e84e602-7353-4849-8028-e75c5db04836",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "5f94f909-7121-e47e-4c36-91d613220daf"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ],
+                "volumesAttached": [
+                    {
+                        "devicePath": "",
+                        "name": "kubernetes.io/csi/cinder.csi.openstack.org^d1a48adf-5de5-469d-90a3-cb8531df375b"
+                    }
+                ],
+                "volumesInUse": [
+                    "kubernetes.io/csi/cinder.csi.openstack.org^d1a48adf-5de5-469d-90a3-cb8531df375b"
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-dhdcz",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"7a6bf086-843b-4d3d-b907-0f06cf5fc146\",\"rbd.csi.ceph.com\":\"prod-instance-17768682065606747\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.198.43/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.101.64",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-04-22T14:39:09Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17768682065606747",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17768682065606747",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17768682065606747",
+                "resourceVersion": "29709235",
+                "uid": "6f0f194d-bf4a-4758-86cc-60598a71dc85"
+            },
+            "spec": {
+                "podCIDR": "10.20.2.0/24",
+                "podCIDRs": [
+                    "10.20.2.0/24"
+                ],
+                "providerID": "openstack:///7a6bf086-843b-4d3d-b907-0f06cf5fc146"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.198.43",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17768682065606747",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659052Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810028Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-28T04:34:36Z",
+                        "lastTransitionTime": "2026-06-28T04:34:36Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-07-09T12:39:05Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-04-28T22:15:37Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-04-28T22:15:37Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-06-28T04:34:22Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "ghcr.io/osgeo/gdal@sha256:0533fb474cdcda6efae865460fd9cccf91c9d70b792be17339f34505a7f7755c",
+                            "ghcr.io/osgeo/gdal:ubuntu-full-3.8.0"
+                        ],
+                        "sizeBytes": 1079157606
+                    },
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:5062f6c22a2c3b8b3717c642af3852310d9a81c3c2c0fc72449a9a79ef09ae63",
+                            "docker.io/library/python:3.11"
+                        ],
+                        "sizeBytes": 408870933
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:6ca67fda4538da0ba66d3c1fe7e12ad6b6eda26b07dba5a4c5d24ca5eeb15ec6",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.7.0"
+                        ],
+                        "sizeBytes": 403599776
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:389894e47df7896b85be1c6cc634659d5f2fc55a605454758ae7a455fec1d63f",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.271"
+                        ],
+                        "sizeBytes": 403566518
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ac576c814161a5db8ea6c91f9087562b0d99790f21e5af7b8f91524cf2fe05ed",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.289"
+                        ],
+                        "sizeBytes": 402619243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f2e3cda9249e29e32320560a18db5ce1f1e387df553ba0e1fc91b4ba9697f16a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.290"
+                        ],
+                        "sizeBytes": 402618786
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:71415a2a116e56df4dd040132ed957ed236bb71ec51859eed933b1a463a391c8",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.5.234"
+                        ],
+                        "sizeBytes": 402618560
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:41551a0eddb777580f5c5f42041527252c057f7d5dc3f7fb9767f50403e979a7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:2dbc818"
+                        ],
+                        "sizeBytes": 402239293
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:4560b607e5b316827691e303af2795caf55eb926870e9ff8c36f0e1a5b3439fa",
+                            "docker.io/ronaldraygun/devimprint-website-builder:397940b"
+                        ],
+                        "sizeBytes": 383584129
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ab87bc97b6d67516a4cf34441b2d9e17431a60386542c58ad6604cc12e461645",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5b55c3b"
+                        ],
+                        "sizeBytes": 383583968
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:16b4e0d92da27347e714a80b4d68ea932919c1aaa57bbc723bdf7c2cbc2a6002",
+                            "docker.io/ronaldraygun/devimprint-website-builder:7d00812"
+                        ],
+                        "sizeBytes": 383583268
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:6a2a6510585ae796f184473b4d2d4cc171a2c9fed2e24459aaaeb4f6a16ed1ea",
+                            "docker.io/ronaldraygun/devimprint-website-builder:8a7a6a5"
+                        ],
+                        "sizeBytes": 383583209
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:249d4cbcbbb3795b017062412002fd2e6237a46ad1f1a9c745c994f46f7c769a",
+                            "docker.io/ronaldraygun/devimprint-website-builder:86e1055"
+                        ],
+                        "sizeBytes": 370325054
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:c12427a2e991e44d95d4ead057d394cb22b049851de425f5fecc9fd4fc1434fd",
+                            "docker.io/ronaldraygun/devimprint-website-builder:bfa7bd6"
+                        ],
+                        "sizeBytes": 370254329
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:2185cd3ebdd3ce9758beb99b974059b0d71c55ef6bf8bb66ab12b39610be14ea",
+                            "docker.io/ronaldraygun/devimprint-website-builder:17cb8c2"
+                        ],
+                        "sizeBytes": 370253617
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:1f6cfc6582e626d7df75cccf2a124248ee94177893d5607e9c1e31c28adcd0e1",
+                            "docker.io/ronaldraygun/devimprint-website-builder:6419ee5"
+                        ],
+                        "sizeBytes": 370253605
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:84d9de85ca3f11ba50c1d24cd40a0f8ab132c16e595cd80a2858fe3c56afe96f"
+                        ],
+                        "sizeBytes": 369683087
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:1d29e9d894fc5c97fdb4bd475dbc413809463367434a46d21bab4204cc767bd7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:latest"
+                        ],
+                        "sizeBytes": 361234380
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ca74f2d63bb3371e2d7bda72ec773de18d02eb9b6c854536a58a0d2f61c8b99c",
+                            "docker.io/ronaldraygun/devimprint-website-builder:a988a50"
+                        ],
+                        "sizeBytes": 346258455
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f137fefa6a22ede83ceb9968b2affc7c959354ed4cdf6044a02d1d5982b5a6a7",
+                            "docker.io/ronaldraygun/devimprint-website-builder:5994c10"
+                        ],
+                        "sizeBytes": 334776270
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:f47510fdbe88b6938e5129c83e0369c454865a0f8ebf0733cedb16af505b90c2",
+                            "docker.io/ronaldraygun/devimprint-website-builder:bba67b9"
+                        ],
+                        "sizeBytes": 334735923
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:633eb967bf31674e29f906248314c5f8226a4c6bab0ab47ec7a458e0ede003ab",
+                            "docker.io/ronaldraygun/devimprint-website-builder:d4fab73"
+                        ],
+                        "sizeBytes": 334735765
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:6820a3c24cd8683767e1feb98fee86bd2eda807753d7b3c1df7c1183107dd905",
+                            "docker.io/ronaldraygun/devimprint-website-builder:136cbaa"
+                        ],
+                        "sizeBytes": 334735568
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-filter-worker@sha256:6b59980529e42ea436ba14f5f2f3713377f478cfc1c653f3e431935e97d224b2",
+                            "docker.io/ronaldraygun/commitgraph-filter-worker:1.1.0"
+                        ],
+                        "sizeBytes": 319111364
+                    },
+                    {
+                        "names": [
+                            "docker.io/alpine/k8s@sha256:7f485a380b3b890b8f4d0de63e242b79db728ef1e0fc5ae30d30cbe5f9e2d242",
+                            "docker.io/alpine/k8s:1.31.3"
+                        ],
+                        "sizeBytes": 313786832
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:c4d27c088e4e326fa71abb20e43d1788438998f16bc830490af804165a6b4926",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166321468
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-onboard-worker@sha256:09bb086bdab13c5f6026e394c797030d901a03b6c00e947b54700a50876f62a4",
+                            "docker.io/ronaldraygun/commitgraph-onboard-worker:1.1.0"
+                        ],
+                        "sizeBytes": 164891024
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7c8577946cc616911b551750c6e8777dd3dd3bc3c9992d0e0faec6c24782b21",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.804"
+                        ],
+                        "sizeBytes": 164819929
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:ace48d98b09d85328a36ed36210e1700e2b61473c5771d11553640c2bda42944",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.803"
+                        ],
+                        "sizeBytes": 164819681
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:0d09e0434475e6d8fac4d398734822542c637d1977d917d5f29416de9afb6ce0",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.727"
+                        ],
+                        "sizeBytes": 163441589
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:c7c86540d7a5802b7e57b89e742a055c0b37ddbe149421455612403ab6a69a62",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.728"
+                        ],
+                        "sizeBytes": 163441490
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:e9b5dc147ac76784e5acd4ecc0102b228ad07927ed9b86cbbe6c6cebe84a4445",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.726"
+                        ],
+                        "sizeBytes": 163441145
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:3a8596de7fbf7884852a6e112897db303258ced9993bb5cabc14b9ade0ea9c89",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.1.0"
+                        ],
+                        "sizeBytes": 163400712
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:9220d5cd702e3258df55202f4895840c337d8c0bf9f4e97f6f83cb0d81a29950",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.192"
+                        ],
+                        "sizeBytes": 163131629
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:e0b65eb1230c6a84c7c31b31d8625df02d8145a6215d66e810ee714fe0462bfc",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.200"
+                        ],
+                        "sizeBytes": 163131613
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:83bebb73096a229a1868ace4b4e780674b9239ace7de0f344931bb069c5e67d8",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.181"
+                        ],
+                        "sizeBytes": 163131101
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:0d9d735b3113a6fb968b984a8c98c76cb1bf4131fc198e53602b79d0650ea1c5",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.180"
+                        ],
+                        "sizeBytes": 163131093
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:318bb9ffa8ec59d56ae0e4e4a6a107762e6f6fce3fd903ac85ada14387832e6d",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.3"
+                        ],
+                        "sizeBytes": 163108304
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:37a051232497619794540a1652dff98f92b62356018ddde1c7ac67e8064128da",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.0"
+                        ],
+                        "sizeBytes": 163107600
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7b8435befaacdda7ff21b6a43ea0f4062ba2ef153759fd1eb7f7e86b745363d4",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.492"
+                        ],
+                        "sizeBytes": 163098095
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:61ba882dff0a33af8fab7a0fbcc767a96d1255625c574ae3887935c6685dc16f",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.239"
+                        ],
+                        "sizeBytes": 163098086
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:2cf888aa5a51f8e1bf4162300be4805686aa5a2afdd05502a9f09fce7f81158f"
+                        ],
+                        "sizeBytes": 162998044
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:d0fd5d473cb531e3ff6532f5c53450512e56af78504ea8ba5d7245cfa6a7fcb5",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:latest"
+                        ],
+                        "sizeBytes": 162998040
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:81a82adf60deecc0a11f2b76bda1c77f3b3eff2872323b35eaaad7f2b115105d"
+                        ],
+                        "sizeBytes": 162995548
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:5cbe9208e649f5b4eb95a6faaa1020a4ed254accbc8a03317ef9076e02c11b01",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:latest"
+                        ],
+                        "sizeBytes": 162995547
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7ead8b7978e83417ab8345712210d604f5338ddb3345dbb83f0630928e57e30"
+                        ],
+                        "sizeBytes": 162995537
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:000f82225c36d0c8dca083b4a14dd3d48d9fa8865a2efc24f1fc702157c30d83"
+                        ],
+                        "sizeBytes": 162995536
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:7b5bb37dcc08f11f947858bba4f894abf4d2278713de5680c74e7ef55a91c8e7"
+                        ],
+                        "sizeBytes": 162995533
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:4fbbe72d018c26da67edbc6c43e2088b60f3c4e82ca82b4ead914187de881a69"
+                        ],
+                        "sizeBytes": 162995532
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "eede584e-036c-40a5-a8ed-7ab1b496ea16",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "ead36c5b-048d-b65b-451c-6b3c41034490"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ],
+                "volumesAttached": [
+                    {
+                        "devicePath": "",
+                        "name": "kubernetes.io/csi/cinder.csi.openstack.org^51763d68-2e71-41a5-9497-f75bed01ed72"
+                    }
+                ],
+                "volumesInUse": [
+                    "kubernetes.io/csi/cinder.csi.openstack.org^51763d68-2e71-41a5-9497-f75bed01ed72"
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-76g46",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"a5e7d2c8-2f51-4232-b478-64a48f5f4f55\",\"rbd.csi.ceph.com\":\"prod-instance-17810537328635303\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.197.116/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.86.128",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-06-10T01:17:54Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17810537328635303",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17810537328635303",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17810537328635303",
+                "resourceVersion": "29709220",
+                "uid": "1719cd6a-9f95-43da-afa6-954385e116c5"
+            },
+            "spec": {
+                "podCIDR": "10.20.4.0/24",
+                "podCIDRs": [
+                    "10.20.4.0/24"
+                ],
+                "providerID": "openstack:///a5e7d2c8-2f51-4232-b478-64a48f5f4f55"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.197.116",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17810537328635303",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659060Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810036Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-28T04:34:02Z",
+                        "lastTransitionTime": "2026-06-28T04:34:02Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:57Z",
+                        "lastTransitionTime": "2026-07-07T23:10:14Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:57Z",
+                        "lastTransitionTime": "2026-06-10T01:17:54Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:57Z",
+                        "lastTransitionTime": "2026-06-10T01:17:54Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:57Z",
+                        "lastTransitionTime": "2026-06-28T04:33:53Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:e5875b2b50d91a1cadf5f01675504fd236a85358732e0c26a2e7afea1313de5a"
+                        ],
+                        "sizeBytes": 403560784
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:46db80b2e1880a6a8ef7add9bc5b3df6235b418d41daf234ba4699a3ce38a5fd",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.214"
+                        ],
+                        "sizeBytes": 403560651
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:e1571cc7c23a933d9ecf5e92176a8aabfbdebc5c2c3c94329a1f26b7cb658f08",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.194"
+                        ],
+                        "sizeBytes": 403559985
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:ef067d6be73d5e841efd984fe6433940224c909ec3262dc89aed696525d9740c",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.6.0"
+                        ],
+                        "sizeBytes": 402944427
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:ed610d1f80659678bcea93cbb0084d8354e94c2564ca6da497395d9c553eb055",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.6.0"
+                        ],
+                        "sizeBytes": 280161130
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:bc9dc5c30bcd01dbe55686044909be5a395d693eb96ffba83afb79988e471420",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.7.0"
+                        ],
+                        "sizeBytes": 280004432
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:fbd4e254fd048d8e20835d25d3a2cd5a84e96d0653b7f6243255a6fe3b9e69c5",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.4"
+                        ],
+                        "sizeBytes": 238676725
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:87fce0893a904a8dc6bf2d5dda80603e174a451869d385b284ef03f9c486ba98",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166324050
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-aggregator@sha256:612916efef131b23d622c1777de13273b7a81ac9c387205904bd53a11c587871",
+                            "docker.io/ronaldraygun/devimprint-aggregator:1.4.7"
+                        ],
+                        "sizeBytes": 148967082
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:4309283de7d6dd4c9fe6abc1c70eb009d5142ab43098744b8ef0b7aceb81cd35",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.0.1"
+                        ],
+                        "sizeBytes": 137159251
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/node@sha256:856ac0c261160e7bb967ab43b31598fa89633b33eb2ee292e17384272d929e22",
+                            "docker.io/calico/node:v3.28.2"
+                        ],
+                        "sizeBytes": 119828494
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-user-enrichment-worker@sha256:52f13dc04f8252e49ed3960893219b6eec4bfec197a9db083f490ca98666d26f",
+                            "docker.io/ronaldraygun/devimprint-user-enrichment-worker:1.1.0"
+                        ],
+                        "sizeBytes": 111535321
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/cni@sha256:04bd5d80c32a8751f3f4694fef04a50f20c4fed5e4e8b7c7cce752c79702baf3",
+                            "docker.io/calico/cni:v3.28.2"
+                        ],
+                        "sizeBytes": 94697321
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/external-secrets/external-secrets@sha256:876e627dbee5b0edd12da49b035469d12418cd6c3c4be5e383ae6a82e8bd4565",
+                            "ghcr.io/external-secrets/external-secrets:v2.2.0"
+                        ],
+                        "sizeBytes": 94222960
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/headlamp-k8s/headlamp@sha256:c9754bae1d799220da0547e51ceee234f6e66ebadc138518ca73e33ecd331e59",
+                            "ghcr.io/headlamp-k8s/headlamp:v0.42.0"
+                        ],
+                        "sizeBytes": 92883936
+                    },
+                    {
+                        "names": [
+                            "docker.io/rackspacengpc/cinder-csi-plugin@sha256:d20f0005c6ebdf3c7151bab2e705af5e77655da57cd1168e1a84c4bf9b3545d5",
+                            "docker.io/rackspacengpc/cinder-csi-plugin:v1.27.0-24-g58a9734a"
+                        ],
+                        "sizeBytes": 85101606
+                    },
+                    {
+                        "names": [
+                            "docker.io/timberio/vector@sha256:2f0769913c408e6a21dfd7cad18aa9ca590e77809a2f9c8acb03b295231c2f10",
+                            "docker.io/timberio/vector:0.50.0-distroless-libc"
+                        ],
+                        "sizeBytes": 63956557
+                    },
+                    {
+                        "names": [
+                            "docker.io/envoyproxy/envoy@sha256:5d17b613824732465c64a44ecc4ece631a0054db3ff5f5e3aeedfd095173ab05",
+                            "docker.io/envoyproxy/envoy:v1.26.1"
+                        ],
+                        "sizeBytes": 53619729
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:eb43ff125d8d58d7449dcba7d336c23bcac412f526d861db493b9994d8010280",
+                            "docker.io/library/python:3.13-slim"
+                        ],
+                        "sizeBytes": 42983155
+                    },
+                    {
+                        "names": [
+                            "docker.io/tailscale/k8s-operator@sha256:7956bd50dca9dc804b98720df94d112b54af85449ed0bf8cc7fad0346b225067",
+                            "docker.io/tailscale/k8s-operator:v1.94.2"
+                        ],
+                        "sizeBytes": 41349885
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/typha@sha256:58c09de1af1c971cc0b5effa30adeaa12871b9edd7f17979130a4cdd0c97af62",
+                            "docker.io/calico/typha:v3.28.2"
+                        ],
+                        "sizeBytes": 30941979
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kube-proxy@sha256:88bacb3e1d6c0c37c6da95c6d6b8e30531d0b4d0ab540cc290b0af51fbfebd90",
+                            "registry.k8s.io/kube-proxy:v1.29.6"
+                        ],
+                        "sizeBytes": 28408353
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0"
+                        ],
+                        "sizeBytes": 14781503
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kas-network-proxy/proxy-agent@sha256:b96637cd822d9588dc16d457601f284a527f32fbcec4d292956c89c952a2dd8d",
+                            "registry.k8s.io/kas-network-proxy/proxy-agent:v0.1.9"
+                        ],
+                        "sizeBytes": 10141205
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:fdff3ee285341bc58033b6b2458a5d45fd90ec6922a8ba6ebdd49b0c41e2cd34",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.6.3"
+                        ],
+                        "sizeBytes": 10124505
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/livenessprobe@sha256:2b10b24dafdc3ba94a03fc94d9df9941ca9d6a9207b927f5dfd21d59fbe05ba0",
+                            "registry.k8s.io/sig-storage/livenessprobe:v2.9.0"
+                        ],
+                        "sizeBytes": 9194114
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:52941e7c79f91ce40c64e7435307727585aba45302794cca62a6520a5f1c2208",
+                            "docker.io/ronaldraygun/armor:0.1.19"
+                        ],
+                        "sizeBytes": 7497488
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/pod2daemon-flexvol@sha256:884a37672683c3df5211c8f61dcb4c625f194575e5c3c5861a505685e2e09d03",
+                            "docker.io/calico/pod2daemon-flexvol:v3.28.2"
+                        ],
+                        "sizeBytes": 6634243
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c",
+                            "registry.k8s.io/pause:3.10.1"
+                        ],
+                        "sizeBytes": 320448
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/pause@sha256:9001185023633d17a2f98ff69b6ff2615b8ea02a825adffa40422f51dfdcde9d",
+                            "registry.k8s.io/pause:3.8"
+                        ],
+                        "sizeBytes": 311286
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "cdd844c2-0a10-4ad6-a133-4218919aa869",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "3cda60f8-d3f3-9068-ab31-228f1fcbb5b1"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-m8zkq",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"f37678c8-db97-49c0-a0b8-6b1e2a5b111b\",\"rbd.csi.ceph.com\":\"prod-instance-17825490771440572\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.198.97/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.111.65",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-06-27T08:40:08Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17825490771440572",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17825490771440572",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17825490771440572",
+                "resourceVersion": "29709234",
+                "uid": "2eb952b4-45d0-42e6-9e18-5b11b48d60a5"
+            },
+            "spec": {
+                "podCIDR": "10.20.5.0/24",
+                "podCIDRs": [
+                    "10.20.5.0/24"
+                ],
+                "providerID": "openstack:///f37678c8-db97-49c0-a0b8-6b1e2a5b111b"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.198.97",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17825490771440572",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659052Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810028Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-06-27T08:41:00Z",
+                        "lastTransitionTime": "2026-06-27T08:41:00Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-07-26T13:51:17Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-06-27T08:40:08Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-06-27T08:40:08Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:59Z",
+                        "lastTransitionTime": "2026-06-27T08:40:30Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-filter-worker@sha256:0735ada615eb8e7b059f4f193bb9931444d92127f766de8f4adb92714abcdce2",
+                            "docker.io/ronaldraygun/commitgraph-filter-worker:1.0.0"
+                        ],
+                        "sizeBytes": 277455812
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:fbd4e254fd048d8e20835d25d3a2cd5a84e96d0653b7f6243255a6fe3b9e69c5",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.4"
+                        ],
+                        "sizeBytes": 238676725
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:ad3321ca0bda4592637787ebf7b42f9803bd540a245c3fb75ab80b652c08832b",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.2.1"
+                        ],
+                        "sizeBytes": 238579146
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:c4d27c088e4e326fa71abb20e43d1788438998f16bc830490af804165a6b4926",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166321468
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7c8577946cc616911b551750c6e8777dd3dd3bc3c9992d0e0faec6c24782b21",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.804"
+                        ],
+                        "sizeBytes": 164819929
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:c7c86540d7a5802b7e57b89e742a055c0b37ddbe149421455612403ab6a69a62",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.728"
+                        ],
+                        "sizeBytes": 163441490
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:d3300f249d129097df21001981c16f8a510e4f91f437b51ceb51959809067bb8",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.0.3"
+                        ],
+                        "sizeBytes": 163400441
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/node@sha256:856ac0c261160e7bb967ab43b31598fa89633b33eb2ee292e17384272d929e22",
+                            "docker.io/calico/node:v3.28.2"
+                        ],
+                        "sizeBytes": 119828494
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/cni@sha256:04bd5d80c32a8751f3f4694fef04a50f20c4fed5e4e8b7c7cce752c79702baf3",
+                            "docker.io/calico/cni:v3.28.2"
+                        ],
+                        "sizeBytes": 94697321
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/external-secrets/external-secrets@sha256:876e627dbee5b0edd12da49b035469d12418cd6c3c4be5e383ae6a82e8bd4565",
+                            "ghcr.io/external-secrets/external-secrets:v2.2.0"
+                        ],
+                        "sizeBytes": 94222960
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-admin-ui@sha256:01e4f6bceaba6c9f001bc06e0f7c97812c046363a8f7d3aef2cf7d5b94c26838",
+                            "docker.io/ronaldraygun/devimprint-admin-ui:1.0.3"
+                        ],
+                        "sizeBytes": 88094326
+                    },
+                    {
+                        "names": [
+                            "docker.io/rackspacengpc/cinder-csi-plugin@sha256:d20f0005c6ebdf3c7151bab2e705af5e77655da57cd1168e1a84c4bf9b3545d5",
+                            "docker.io/rackspacengpc/cinder-csi-plugin:v1.27.0-24-g58a9734a"
+                        ],
+                        "sizeBytes": 85101606
+                    },
+                    {
+                        "names": [
+                            "docker.io/litestream/litestream@sha256:79e3bfce6ed758722916f816b028fffd9e0a971058f41b88e2779510cead1d8d",
+                            "docker.io/litestream/litestream:0.5.11"
+                        ],
+                        "sizeBytes": 71453383
+                    },
+                    {
+                        "names": [
+                            "docker.io/timberio/vector@sha256:2f0769913c408e6a21dfd7cad18aa9ca590e77809a2f9c8acb03b295231c2f10",
+                            "docker.io/timberio/vector:0.50.0-distroless-libc"
+                        ],
+                        "sizeBytes": 63956557
+                    },
+                    {
+                        "names": [
+                            "docker.io/tailscale/tailscale@sha256:95e528798bebe75f39b10e74e7051cf51188ee615934f232ba7ad06a3390ffa1",
+                            "docker.io/tailscale/tailscale:v1.94.2"
+                        ],
+                        "sizeBytes": 55806975
+                    },
+                    {
+                        "names": [
+                            "docker.io/envoyproxy/envoy@sha256:5d17b613824732465c64a44ecc4ece631a0054db3ff5f5e3aeedfd095173ab05",
+                            "docker.io/envoyproxy/envoy:v1.26.1"
+                        ],
+                        "sizeBytes": 53619729
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-user-worker@sha256:bc193cc4f96b1f29353a4e8ac8deee4dad98a2c117c195a17f554c939eae861d",
+                            "docker.io/ronaldraygun/commitgraph-user-worker:1.3.0"
+                        ],
+                        "sizeBytes": 49605973
+                    },
+                    {
+                        "names": [
+                            "docker.io/tailscale/k8s-operator@sha256:7956bd50dca9dc804b98720df94d112b54af85449ed0bf8cc7fad0346b225067",
+                            "docker.io/tailscale/k8s-operator:v1.94.2"
+                        ],
+                        "sizeBytes": 41349885
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-resizer@sha256:2a0b297cc7c4cd376ac7413df339ff2fdaa1ec9d099aed92b5ea1f031ef7f639",
+                            "registry.k8s.io/sig-storage/csi-resizer:v1.13.1"
+                        ],
+                        "sizeBytes": 32400950
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-attacher@sha256:a399393ff5bd156277c56bae0c08389b1a1b95b7fd6ea44a316ce55e0dd559d7",
+                            "registry.k8s.io/sig-storage/csi-attacher:v4.8.0"
+                        ],
+                        "sizeBytes": 32231444
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-provisioner@sha256:672e45d6a55678abc1d102de665b5cbd63848e75dc7896f238c8eaaf3c7d322f",
+                            "registry.k8s.io/sig-storage/csi-provisioner:v5.1.0"
+                        ],
+                        "sizeBytes": 32167411
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-snapshotter@sha256:dd788d79cf4c1b8edee6d9b80b8a1ebfc51a38a365c5be656986b129be9ac784",
+                            "registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0"
+                        ],
+                        "sizeBytes": 31143055
+                    },
+                    {
+                        "names": [
+                            "docker.io/cloudflare/cloudflared@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0",
+                            "docker.io/cloudflare/cloudflared:2026.3.0"
+                        ],
+                        "sizeBytes": 28703929
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kube-proxy@sha256:88bacb3e1d6c0c37c6da95c6d6b8e30531d0b4d0ab540cc290b0af51fbfebd90",
+                            "registry.k8s.io/kube-proxy:v1.29.6"
+                        ],
+                        "sizeBytes": 28408353
+                    },
+                    {
+                        "names": [
+                            "quay.io/oauth2-proxy/oauth2-proxy@sha256:d62e2d81c6f5048f652f67c302083be1272c181b971fad80e5a30ebe2b8b75d8",
+                            "quay.io/oauth2-proxy/oauth2-proxy:v7.8.1"
+                        ],
+                        "sizeBytes": 17071645
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0"
+                        ],
+                        "sizeBytes": 14781503
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-queue-api@sha256:8421eec372b10e94410390f7457c7d2703879f439440af0e0a1dc23c5118f83f",
+                            "docker.io/ronaldraygun/commitgraph-queue-api:2.3.0"
+                        ],
+                        "sizeBytes": 10685162
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kas-network-proxy/proxy-agent@sha256:b96637cd822d9588dc16d457601f284a527f32fbcec4d292956c89c952a2dd8d",
+                            "registry.k8s.io/kas-network-proxy/proxy-agent:v0.1.9"
+                        ],
+                        "sizeBytes": 10141205
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:fdff3ee285341bc58033b6b2458a5d45fd90ec6922a8ba6ebdd49b0c41e2cd34",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.6.3"
+                        ],
+                        "sizeBytes": 10124505
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/livenessprobe@sha256:2b10b24dafdc3ba94a03fc94d9df9941ca9d6a9207b927f5dfd21d59fbe05ba0",
+                            "registry.k8s.io/sig-storage/livenessprobe:v2.9.0"
+                        ],
+                        "sizeBytes": 9194114
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:8eb828e0b0f9bd7a1ab452b605463dd51a669550f8152fcc2230743ba96176e5",
+                            "docker.io/ronaldraygun/armor:0.1.1901"
+                        ],
+                        "sizeBytes": 7545774
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:75c157c9e487a3584362f7ff4e68bfbc4dafd4110923e0b13974d06ec2615436",
+                            "docker.io/ronaldraygun/armor:0.1.1896"
+                        ],
+                        "sizeBytes": 7544847
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:ce327bb050fe03d320f91dd29c281f110f0dedfdb156803470ba8fe1aa014de1",
+                            "docker.io/ronaldraygun/armor:0.1.1871"
+                        ],
+                        "sizeBytes": 7533083
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/pod2daemon-flexvol@sha256:884a37672683c3df5211c8f61dcb4c625f194575e5c3c5861a505685e2e09d03",
+                            "docker.io/calico/pod2daemon-flexvol:v3.28.2"
+                        ],
+                        "sizeBytes": 6634243
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/pause@sha256:9001185023633d17a2f98ff69b6ff2615b8ea02a825adffa40422f51dfdcde9d",
+                            "registry.k8s.io/pause:3.8"
+                        ],
+                        "sizeBytes": 311286
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "40d94729-edd1-4ee4-8112-0a2a5bf96069",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "fc449893-0d10-85ee-4438-feabada6f2f9"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "cluster.x-k8s.io/cluster-name": "c-5f30c973",
+                    "cluster.x-k8s.io/cluster-namespace": "org-kselolwaoxl3zxfm",
+                    "cluster.x-k8s.io/labels-from-machine": "",
+                    "cluster.x-k8s.io/machine": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf-4x2hz",
+                    "cluster.x-k8s.io/owner-kind": "MachineSet",
+                    "cluster.x-k8s.io/owner-name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c-nhzcf",
+                    "csi.volume.kubernetes.io/nodeid": "{\"cinder.csi.openstack.org\":\"e1a9c7b2-da2e-40e8-9be2-d09aab26baef\",\"rbd.csi.ceph.com\":\"prod-instance-17836047975861317\"}",
+                    "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/containerd/containerd.sock",
+                    "ngpc.pf9.io/cloudProvider": "initialized",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "projectcalico.org/IPv4Address": "104.239.197.141/24",
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.20.165.1",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-07-09T13:54:03Z",
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "compute1-4",
+                    "beta.kubernetes.io/os": "linux",
+                    "failure-domain.beta.kubernetes.io/region": "ORD",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "prod-instance-17836047975861317",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/worker": "",
+                    "node.kubernetes.io/instance-type": "compute1-4",
+                    "nodepool.ngpc.rxt.io/name": "6800a683-a1d6-4c77-bd69-f7ec8291ba9c",
+                    "servers.ngpc.rxt.io/class": "ch.vs1.medium-ord",
+                    "servers.ngpc.rxt.io/k8sNodeName": "prod-instance-17836047975861317",
+                    "servers.ngpc.rxt.io/type": "spot",
+                    "topology.cinder.csi.openstack.org/zone": "nova",
+                    "topology.kubernetes.io/region": "ORD"
+                },
+                "name": "prod-instance-17836047975861317",
+                "resourceVersion": "29709228",
+                "uid": "935c4b8d-ec79-4ac9-a6de-202cdc1cd172"
+            },
+            "spec": {
+                "podCIDR": "10.20.6.0/24",
+                "podCIDRs": [
+                    "10.20.6.0/24"
+                ],
+                "providerID": "openstack:///e1a9c7b2-da2e-40e8-9be2-d09aab26baef"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "104.239.197.141",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "prod-instance-17836047975861317",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "1500m",
+                    "ephemeral-storage": "91331288934",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "2659048Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "101430960Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3810024Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-07-09T13:54:41Z",
+                        "lastTransitionTime": "2026-07-09T13:54:41Z",
+                        "message": "Calico is running on this node",
+                        "reason": "CalicoIsUp",
+                        "status": "False",
+                        "type": "NetworkUnavailable"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:58Z",
+                        "lastTransitionTime": "2026-07-26T15:22:25Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:58Z",
+                        "lastTransitionTime": "2026-07-09T13:54:03Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:58Z",
+                        "lastTransitionTime": "2026-07-09T13:54:03Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:37:58Z",
+                        "lastTransitionTime": "2026-07-09T13:54:25Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "quay.io/cephcsi/cephcsi@sha256:f064d74506570613c9f70e670d0069297d851a79e42c1366e6a085c5167abfda",
+                            "quay.io/cephcsi/cephcsi:v3.15.1"
+                        ],
+                        "sizeBytes": 1024918467
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-website-builder@sha256:6ca67fda4538da0ba66d3c1fe7e12ad6b6eda26b07dba5a4c5d24ca5eeb15ec6",
+                            "docker.io/ronaldraygun/devimprint-website-builder:1.7.0"
+                        ],
+                        "sizeBytes": 403599776
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-filter-worker@sha256:0735ada615eb8e7b059f4f193bb9931444d92127f766de8f4adb92714abcdce2",
+                            "docker.io/ronaldraygun/commitgraph-filter-worker:1.0.0"
+                        ],
+                        "sizeBytes": 277455812
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:fbd4e254fd048d8e20835d25d3a2cd5a84e96d0653b7f6243255a6fe3b9e69c5",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.4"
+                        ],
+                        "sizeBytes": 238676725
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:8489f0a6b14256b7dee76baa572d12c6a6901b967b67cc336582a8d61261d2a7",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.3"
+                        ],
+                        "sizeBytes": 238669962
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:9baf5eb23c608b1022649ed88fadb621ae5bd78b83de9cbe0df4cc09dbf70373",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.2"
+                        ],
+                        "sizeBytes": 238667459
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:445a5922d4ec3b579d9e72625278b26bde70738c4916a76c3a190202998a7265",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.1"
+                        ],
+                        "sizeBytes": 238646351
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:e4cb8413c6493bea18bb600f963447b60f66f93be10ecdb7549c7d26f8a02d18",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.5.0"
+                        ],
+                        "sizeBytes": 238643181
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:cb1e20b25f24cf2fcad18257ac5fb378b226dfde90b54d0be6e123989a52863d",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.4.1"
+                        ],
+                        "sizeBytes": 238628627
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:da1f90622c4037a78fec527b50d50c65c60ffa2ce1b204fd4a0f60c2916ba004",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.4.0"
+                        ],
+                        "sizeBytes": 238619047
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:538636f6f314d2b2f6d19d468415cb61f3fe85ee2db838ac1a8e3055c087f27d",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.3.1"
+                        ],
+                        "sizeBytes": 238608696
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:de650fb42e5ad1daebf0ffa6b0258c5645e2dcef43d23548de6468d783a63890",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.3.0"
+                        ],
+                        "sizeBytes": 238605357
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:ad3321ca0bda4592637787ebf7b42f9803bd540a245c3fb75ab80b652c08832b",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.2.1"
+                        ],
+                        "sizeBytes": 238579146
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:7fb580ddbf01afc03fb48b3d2f08751a269a71d5ad6f1ae9b9271830b1c2db71",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.2.0"
+                        ],
+                        "sizeBytes": 238559626
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:5774291e737185bbc21c9fa9b6801b9ef5a386da68448d9903d1d1dbc35837e3",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.1.1"
+                        ],
+                        "sizeBytes": 238506258
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-aggregator@sha256:a0d78a8646e576b4400306ccf039e2d4d3001b9455aee7f13cd9ad8018781274",
+                            "docker.io/ronaldraygun/commitgraph-aggregator:1.1.0"
+                        ],
+                        "sizeBytes": 238067306
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-compactor@sha256:63c16d45bd03d4bee9eb31a7a0d8d9e068571d098c50f898cacb6e6a6a8f93e6",
+                            "docker.io/ronaldraygun/commitgraph-compactor:1.1.0"
+                        ],
+                        "sizeBytes": 238064620
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-clone-worker@sha256:c4d27c088e4e326fa71abb20e43d1788438998f16bc830490af804165a6b4926",
+                            "docker.io/ronaldraygun/commitgraph-clone-worker:1.2.0"
+                        ],
+                        "sizeBytes": 166321468
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-clone-worker@sha256:b7c8577946cc616911b551750c6e8777dd3dd3bc3c9992d0e0faec6c24782b21",
+                            "docker.io/ronaldraygun/devimprint-clone-worker:1.0.804"
+                        ],
+                        "sizeBytes": 164819929
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-onboard-worker@sha256:3a8596de7fbf7884852a6e112897db303258ced9993bb5cabc14b9ade0ea9c89",
+                            "docker.io/ronaldraygun/devimprint-onboard-worker:1.1.0"
+                        ],
+                        "sizeBytes": 163400712
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/node@sha256:856ac0c261160e7bb967ab43b31598fa89633b33eb2ee292e17384272d929e22",
+                            "docker.io/calico/node:v3.28.2"
+                        ],
+                        "sizeBytes": 119828494
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/cni@sha256:04bd5d80c32a8751f3f4694fef04a50f20c4fed5e4e8b7c7cce752c79702baf3",
+                            "docker.io/calico/cni:v3.28.2"
+                        ],
+                        "sizeBytes": 94697321
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-admin-ui@sha256:3573f4e599b4730a0145d3851cc3ca809f55a05f134b8e0154c80812bdd3f899",
+                            "docker.io/ronaldraygun/devimprint-admin-ui:1.1.0"
+                        ],
+                        "sizeBytes": 88099412
+                    },
+                    {
+                        "names": [
+                            "docker.io/rackspacengpc/cinder-csi-plugin@sha256:d20f0005c6ebdf3c7151bab2e705af5e77655da57cd1168e1a84c4bf9b3545d5",
+                            "docker.io/rackspacengpc/cinder-csi-plugin:v1.27.0-24-g58a9734a"
+                        ],
+                        "sizeBytes": 85101606
+                    },
+                    {
+                        "names": [
+                            "docker.io/litestream/litestream@sha256:79e3bfce6ed758722916f816b028fffd9e0a971058f41b88e2779510cead1d8d",
+                            "docker.io/litestream/litestream:0.5.11"
+                        ],
+                        "sizeBytes": 71453383
+                    },
+                    {
+                        "names": [
+                            "docker.io/timberio/vector@sha256:2f0769913c408e6a21dfd7cad18aa9ca590e77809a2f9c8acb03b295231c2f10",
+                            "docker.io/timberio/vector:0.50.0-distroless-libc"
+                        ],
+                        "sizeBytes": 63956557
+                    },
+                    {
+                        "names": [
+                            "docker.io/envoyproxy/envoy@sha256:5d17b613824732465c64a44ecc4ece631a0054db3ff5f5e3aeedfd095173ab05",
+                            "docker.io/envoyproxy/envoy:v1.26.1"
+                        ],
+                        "sizeBytes": 53619729
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-search-worker@sha256:965af18bb632c028030a3532d81537892131d770719d025b2ae22cc9b5ed02a4",
+                            "docker.io/ronaldraygun/devimprint-search-worker:1.2.0"
+                        ],
+                        "sizeBytes": 49759582
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-user-worker@sha256:a5717e9581588d84e02f3db1fb88a1245ac425c179f9c0cb7f15533a790d9e1e",
+                            "docker.io/ronaldraygun/devimprint-user-worker:1.1.0"
+                        ],
+                        "sizeBytes": 49756939
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-search-worker@sha256:c1490898e93df27780276e1a5805c0cc194279e30b77054baf23d90359db4934",
+                            "docker.io/ronaldraygun/commitgraph-search-worker:1.2.0"
+                        ],
+                        "sizeBytes": 49742519
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-user-worker@sha256:2184c09e1ce674227cc3bbf8d0bf68a7dfe4a0b0ad3bdd3d5c03d5316468f82d",
+                            "docker.io/ronaldraygun/commitgraph-user-worker:1.1.0"
+                        ],
+                        "sizeBytes": 49739766
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kube-proxy@sha256:88bacb3e1d6c0c37c6da95c6d6b8e30531d0b4d0ab540cc290b0af51fbfebd90",
+                            "registry.k8s.io/kube-proxy:v1.29.6"
+                        ],
+                        "sizeBytes": 28408353
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0"
+                        ],
+                        "sizeBytes": 14781503
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-queue-api@sha256:fee5fa70d99b47c305cc56f0c8f06a4c1b632a64d494bdd6ffffb6abbe9f971e",
+                            "docker.io/ronaldraygun/commitgraph-queue-api:2.5.0"
+                        ],
+                        "sizeBytes": 10699031
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-queue-api@sha256:cc5cfa9adc1cfd0ba34209085085ba04701e2a9a36095586122a71744b1b8280",
+                            "docker.io/ronaldraygun/commitgraph-queue-api:2.1.0"
+                        ],
+                        "sizeBytes": 10685177
+                    },
+                    {
+                        "names": [
+                            "docker.io/curlimages/curl@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13",
+                            "docker.io/curlimages/curl:latest"
+                        ],
+                        "sizeBytes": 10652192
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/commitgraph-queue-api@sha256:3d151c71c56e2c1b7765e08b9d387ab37cf7ce5b219810003f97791bab90719c",
+                            "docker.io/ronaldraygun/commitgraph-queue-api:2.0.0"
+                        ],
+                        "sizeBytes": 10621708
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/kas-network-proxy/proxy-agent@sha256:b96637cd822d9588dc16d457601f284a527f32fbcec4d292956c89c952a2dd8d",
+                            "registry.k8s.io/kas-network-proxy/proxy-agent:v0.1.9"
+                        ],
+                        "sizeBytes": 10141205
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar@sha256:fdff3ee285341bc58033b6b2458a5d45fd90ec6922a8ba6ebdd49b0c41e2cd34",
+                            "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.6.3"
+                        ],
+                        "sizeBytes": 10124505
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/sig-storage/livenessprobe@sha256:2b10b24dafdc3ba94a03fc94d9df9941ca9d6a9207b927f5dfd21d59fbe05ba0",
+                            "registry.k8s.io/sig-storage/livenessprobe:v2.9.0"
+                        ],
+                        "sizeBytes": 9194114
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor-restore-verifier@sha256:662d6312c4d5e89b2a652742a3b292c5c6d4451ca478af3bbe52d146dcde8498",
+                            "docker.io/ronaldraygun/armor-restore-verifier:latest"
+                        ],
+                        "sizeBytes": 8187233
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:5685891f269d6567fdf5fefd998c7753d26f053222197020d8869a4d0164825b",
+                            "docker.io/ronaldraygun/armor:0.1.1870"
+                        ],
+                        "sizeBytes": 8181125
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:75c157c9e487a3584362f7ff4e68bfbc4dafd4110923e0b13974d06ec2615436",
+                            "docker.io/ronaldraygun/armor:0.1.1896"
+                        ],
+                        "sizeBytes": 7544847
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:ce327bb050fe03d320f91dd29c281f110f0dedfdb156803470ba8fe1aa014de1",
+                            "docker.io/ronaldraygun/armor:0.1.1871"
+                        ],
+                        "sizeBytes": 7533083
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/armor@sha256:25a701d32cbbc2e3176d4d34b89389c41d279fe0332a11bde266c95f473dd846",
+                            "docker.io/ronaldraygun/armor:0.1.42"
+                        ],
+                        "sizeBytes": 7514801
+                    },
+                    {
+                        "names": [
+                            "docker.io/calico/pod2daemon-flexvol@sha256:884a37672683c3df5211c8f61dcb4c625f194575e5c3c5861a505685e2e09d03",
+                            "docker.io/calico/pod2daemon-flexvol:v3.28.2"
+                        ],
+                        "sizeBytes": 6634243
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/devimprint-queue-api@sha256:274b52f11b126edd9f05e6e9492ff86dc500267f60f071356e1a570042d3cdcf",
+                            "docker.io/ronaldraygun/devimprint-queue-api:1.4.0"
+                        ],
+                        "sizeBytes": 5151299
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/pause@sha256:9001185023633d17a2f98ff69b6ff2615b8ea02a825adffa40422f51dfdcde9d",
+                            "registry.k8s.io/pause:3.8"
+                        ],
+                        "sizeBytes": 311286
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "dfefd7cd-0287-44e2-a1ee-25c028704ba7",
+                    "containerRuntimeVersion": "containerd://2.2.1",
+                    "kernelVersion": "6.8.0-90-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0",
+                    "machineID": "8ce941246f014d6696d96413d51e1a47",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 22.04 LTS",
+                    "systemUUID": "ba362fcb-f144-f1cb-2502-4180e92c4e5e"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    }
+                ]
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

@@ -1,0 +1,511 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "alpha.kubernetes.io/provided-node-ip": "10.20.23.100,fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f",
+                    "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"12:38:28:0e:6b:99\"}",
+                    "flannel.alpha.coreos.com/backend-type": "vxlan",
+                    "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+                    "flannel.alpha.coreos.com/public-ip": "10.20.23.100",
+                    "k3s.io/hostname": "k3s-manager",
+                    "k3s.io/internal-ip": "10.20.23.100,fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f",
+                    "k3s.io/node-args": "[\"server\",\"--node-name\",\"k3s-manager\",\"--disable\",\"traefik\",\"server\",\"--tls-san\",\"k3s-manager.ardenone.com\"]",
+                    "k3s.io/node-config-hash": "RDO7KFW7ED4FLADWHSIONHG3KPFWENV7W2EMR2OT7PMRBETB4JZA====",
+                    "k3s.io/node-env": "{}",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2024-09-30T21:04:03Z",
+                "finalizers": [
+                    "wrangler.cattle.io/node"
+                ],
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "k3s",
+                    "beta.kubernetes.io/os": "linux",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "k3s-manager",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/control-plane": "true",
+                    "node-role.kubernetes.io/master": "true",
+                    "node.kubernetes.io/instance-type": "k3s",
+                    "plan.upgrade.cattle.io/server-plan": "915808ac867d78ab7af8c94661f234fa98e2b9804fc56ffcbdcbb2e9"
+                },
+                "name": "k3s-manager",
+                "resourceVersion": "606411738",
+                "uid": "8fb67775-e033-4909-b1fb-75e4450b8663"
+            },
+            "spec": {
+                "podCIDR": "10.42.0.0/24",
+                "podCIDRs": [
+                    "10.42.0.0/24"
+                ],
+                "providerID": "k3s://k3s-manager"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "10.20.23.100",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "k3s-manager",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "4",
+                    "ephemeral-storage": "98874566989",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "8131308Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "4",
+                    "ephemeral-storage": "101639152Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "8131308Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:36:41Z",
+                        "lastTransitionTime": "2026-05-05T18:57:20Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:36:41Z",
+                        "lastTransitionTime": "2026-05-05T18:57:20Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:36:41Z",
+                        "lastTransitionTime": "2026-05-05T18:57:20Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-07-27T15:36:41Z",
+                        "lastTransitionTime": "2026-05-05T19:49:30Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "docker.io/dbgate/dbgate@sha256:ef68b1be71d31fd0b34d758e4c156a2211824bc842444c72b48e0ce0af481ef5"
+                        ],
+                        "sizeBytes": 465380154
+                    },
+                    {
+                        "names": [
+                            "docker.io/dbgate/dbgate@sha256:dc64d25dd8c2b56fe35f5034e43243c892d4a2bafb7e10a494c827510d7c6a83"
+                        ],
+                        "sizeBytes": 463204571
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/botburrow-agents@sha256:fc4dd915c5dad9e355dd16b3facc4caa61ee80466d23cbd6239c435a9d1970f9"
+                        ],
+                        "sizeBytes": 420773878
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/botburrow-agents@sha256:158b33cf775bf066b7f5e6a958fac2e86160f943ea3acc8f4cc47f0f178c226a",
+                            "docker.io/ronaldraygun/botburrow-agents:latest"
+                        ],
+                        "sizeBytes": 403182613
+                    },
+                    {
+                        "names": [
+                            "docker.io/alpine/k8s@sha256:7f485a380b3b890b8f4d0de63e242b79db728ef1e0fc5ae30d30cbe5f9e2d242",
+                            "docker.io/alpine/k8s:1.31.3"
+                        ],
+                        "sizeBytes": 313786832
+                    },
+                    {
+                        "names": [
+                            "docker.io/alpine/k8s@sha256:097aa60cbef561146757c7494468e9d7b04d843597ad1a1515ed09d0708c8014",
+                            "docker.io/alpine/k8s:1.35.3"
+                        ],
+                        "sizeBytes": 308660472
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/coder/coder@sha256:19b3ecd02510b4ee91ba488c61a3f40a6c164c9aeef38999c855e55fd653097c",
+                            "localhost:7439/ghcr.io/coder/coder@sha256:19b3ecd02510b4ee91ba488c61a3f40a6c164c9aeef38999c855e55fd653097c",
+                            "ghcr.io/coder/coder:v2.29.1",
+                            "localhost:7439/ghcr.io/coder/coder:v2.29.1"
+                        ],
+                        "sizeBytes": 203359969
+                    },
+                    {
+                        "names": [
+                            "quay.io/argoproj/argocd@sha256:b6d161b4984c4bffb8c02250252fdd17f23fa4e2aa25fada0e606e1fa08d2348",
+                            "quay.io/argoproj/argocd:v3.4.3"
+                        ],
+                        "sizeBytes": 195027975
+                    },
+                    {
+                        "names": [
+                            "localhost:7439/quay.io/argoproj/argocd@sha256:9ab6baab65a6b283044a7d7b7dbe50f589564de9c8898d67c77d84b2b5df46bc",
+                            "quay.io/argoproj/argocd@sha256:9ab6baab65a6b283044a7d7b7dbe50f589564de9c8898d67c77d84b2b5df46bc",
+                            "localhost:7439/quay.io/argoproj/argocd:v3.2.3",
+                            "quay.io/argoproj/argocd:v3.2.3"
+                        ],
+                        "sizeBytes": 195026890
+                    },
+                    {
+                        "names": [
+                            "quay.io/argoproj/argocd@sha256:b2ddbd5fa319b6f3f2edba9a04b243a9357b283cf39e1952c9640e156f0995f6",
+                            "quay.io/argoproj/argocd:v3.3.5"
+                        ],
+                        "sizeBytes": 193847208
+                    },
+                    {
+                        "names": [
+                            "localhost:7439/postgres@sha256:6e9bbed548cc1ca776dd4685cfea9efe60d58df91186ec6bad7328fd03b388a5",
+                            "localhost:7439/postgres:16"
+                        ],
+                        "sizeBytes": 160119632
+                    },
+                    {
+                        "names": [
+                            "localhost:7439/ghcr.io/coder/coder@sha256:e8f9a0c62c946059e8b6b3dc3623f492031b0c0896ac51ecd740d5c615335553",
+                            "localhost:7439/ghcr.io/coder/coder:v2.18.2"
+                        ],
+                        "sizeBytes": 138079272
+                    },
+                    {
+                        "names": [
+                            "localhost:7439/quay.io/argoproj/argo-events@sha256:1d63fd70bba285ce03b728cf49dd695bfc18b2164b721ca37fe33d25578336a3",
+                            "localhost:7439/quay.io/argoproj/argo-events:v1.9.3"
+                        ],
+                        "sizeBytes": 117064651
+                    },
+                    {
+                        "names": [
+                            "quay.io/argoprojlabs/argocd-image-updater@sha256:3c56f354fac5f19ba980b752901c4bdc745434befc1943f1bdc27646371174cd",
+                            "quay.io/argoprojlabs/argocd-image-updater:v1.2.1"
+                        ],
+                        "sizeBytes": 109198985
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/botburrow-hub@sha256:0528fac2f506f299b1ac31b5c8639198de288aebe3435418cd6855b1b33efff8"
+                        ],
+                        "sizeBytes": 95964249
+                    },
+                    {
+                        "names": [
+                            "docker.io/ronaldraygun/botburrow-hub@sha256:c245f215c984e6ad66c07856861ef3cae1193e760ce4577315e9ab643baac9c4"
+                        ],
+                        "sizeBytes": 95961548
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/external-secrets/external-secrets@sha256:876e627dbee5b0edd12da49b035469d12418cd6c3c4be5e383ae6a82e8bd4565",
+                            "ghcr.io/external-secrets/external-secrets:v2.2.0"
+                        ],
+                        "sizeBytes": 94222960
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/external-secrets/external-secrets@sha256:ec40c3d9c48f8a1bea22a954339267b795de738546847906783f224ea8cc7a0f",
+                            "ghcr.io/external-secrets/external-secrets:v2.1.0"
+                        ],
+                        "sizeBytes": 91953118
+                    },
+                    {
+                        "names": [
+                            "quay.io/argoprojlabs/argocd-image-updater@sha256:5932edbe5e2d565e44071ceca890cc7ef283349c7ac1cbf07ec0b5633f512de4",
+                            "quay.io/argoprojlabs/argocd-image-updater:v0.13.1"
+                        ],
+                        "sizeBytes": 87357289
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:7fa7b07a26bd8d90a44bb975c6455b10d8dee467ce674b040750ffb4a0f486d6"
+                        ],
+                        "sizeBytes": 86068414
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:b6ac42c31845ea7c862d71451c16413a6284430d8ff08e16ad791f42718a7c71"
+                        ],
+                        "sizeBytes": 85681937
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:cc84f2f5eb3c7734353701ccbaa24ed02dacb0d119114e50e4251e2005f3990a"
+                        ],
+                        "sizeBytes": 85552387
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:a1a578fdcfc72754985c3b3b26e4f398a6a782e354d10cf2b156ecbf06d252e9"
+                        ],
+                        "sizeBytes": 85125403
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28",
+                            "ghcr.io/gethomepage/homepage:latest"
+                        ],
+                        "sizeBytes": 84480065
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:d8d784e5090111b6e4c56dfd90e272d2953a2094e87349f647165df0fa6c4401"
+                        ],
+                        "sizeBytes": 84197681
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/gethomepage/homepage@sha256:be49a60307fcce7909acdaf2f3b2f3d168a0468d62869bf72d380625dde91fb9"
+                        ],
+                        "sizeBytes": 80802324
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/kedacore/keda@sha256:652b5296af89e9892aba110cf956476b02c81b2063144aa2e0d4b0e3a2a35c88",
+                            "ghcr.io/kedacore/keda:2.16.1"
+                        ],
+                        "sizeBytes": 77859235
+                    },
+                    {
+                        "names": [
+                            "quay.io/openbao/openbao@sha256:87d715029a47328172774638cabfeb04d5b356678d660621b796b6a671f93581",
+                            "quay.io/openbao/openbao:2.5.1"
+                        ],
+                        "sizeBytes": 76621841
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/k3s-upgrade@sha256:731734cde8199c37f78159f19e6b2cdef8170d4b1b1b023624d72c308b9964e7",
+                            "docker.io/rancher/k3s-upgrade:v1.33.0-k3s1"
+                        ],
+                        "sizeBytes": 71420200
+                    },
+                    {
+                        "names": [
+                            "docker.io/timberio/vector@sha256:2f0769913c408e6a21dfd7cad18aa9ca590e77809a2f9c8acb03b295231c2f10",
+                            "docker.io/timberio/vector:0.50.0-distroless-libc"
+                        ],
+                        "sizeBytes": 63956557
+                    },
+                    {
+                        "names": [
+                            "quay.io/argoproj/argocli@sha256:7b06ffaf2260654cacf5e44982744c26fcc89502cd4592685086aff601073382",
+                            "quay.io/argoproj/argocli:v3.6.2"
+                        ],
+                        "sizeBytes": 61202037
+                    },
+                    {
+                        "names": [
+                            "docker.io/tailscale/tailscale@sha256:95e528798bebe75f39b10e74e7051cf51188ee615934f232ba7ad06a3390ffa1",
+                            "docker.io/tailscale/tailscale:v1.94.2"
+                        ],
+                        "sizeBytes": 55806975
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/traefik@sha256:acfc80650104f0194a15f73dc1648f517561bc1645391a15705332a064cfc33c",
+                            "docker.io/library/traefik:v3.6.11"
+                        ],
+                        "sizeBytes": 52518416
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/kubewall/kubewall@sha256:fb53f8772ad252022f5e117b5ed296d8022e02e14ba671dfe22777f9432e805d",
+                            "ghcr.io/kubewall/kubewall:latest"
+                        ],
+                        "sizeBytes": 48743941
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/kubewall/kubewall@sha256:206e62816eb57860ea17f62e518c6d38d1b5c420cfca8bfc1685a090ca3ae550"
+                        ],
+                        "sizeBytes": 48596275
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/dexidp/dex@sha256:b8469881d3cb3a73001506f0d3aaefecb9c45d2311c1e0f405d8ac538316c59d",
+                            "ghcr.io/dexidp/dex:v2.45.0"
+                        ],
+                        "sizeBytes": 48093516
+                    },
+                    {
+                        "names": [
+                            "docker.io/library/python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6",
+                            "docker.io/library/python:3-slim"
+                        ],
+                        "sizeBytes": 43427009
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/dexidp/dex@sha256:b08a58c9731c693b8db02154d7afda798e1888dc76db30d34c4a0d0b8a26d913",
+                            "ghcr.io/dexidp/dex:v2.43.0"
+                        ],
+                        "sizeBytes": 43032839
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/fluxcd/flux-cli@sha256:a9cb966cddc1a0c56dc0d57dda485d9477dd397f8b45f222717b24663471fd1f",
+                            "ghcr.io/fluxcd/flux-cli:v2.4.0"
+                        ],
+                        "sizeBytes": 41877267
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/external-dns/external-dns@sha256:ddc7f4212ed09a21024deb1f470a05240837712e74e4b9f6d1f2632ff10672e7",
+                            "registry.k8s.io/external-dns/external-dns:v0.20.0"
+                        ],
+                        "sizeBytes": 41709174
+                    },
+                    {
+                        "names": [
+                            "docker.io/tailscale/k8s-operator@sha256:7956bd50dca9dc804b98720df94d112b54af85449ed0bf8cc7fad0346b225067",
+                            "docker.io/tailscale/k8s-operator:v1.94.2"
+                        ],
+                        "sizeBytes": 41349885
+                    },
+                    {
+                        "names": [
+                            "registry.k8s.io/descheduler/descheduler@sha256:4001c25d6c967c7c69c76ea1b4619ddcd5568f42df6360e1ba320834cbcd0d5f",
+                            "registry.k8s.io/descheduler/descheduler:v0.31.0"
+                        ],
+                        "sizeBytes": 37500279
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:8578492c045a8cc32b132442a23778de4ee5166447eacda953122ab3ed69e73a",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.3.8"
+                        ],
+                        "sizeBytes": 34607170
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:a03dfefa6cad38a850263ecb7a353782ed17166d7ddc388f3f4246f6e07da561",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.3.5"
+                        ],
+                        "sizeBytes": 34585853
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:4bfa373ae8fca9c1f4babd670acc28ef7ae1541df51929b0dc1b62981656f5f3",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.3.2"
+                        ],
+                        "sizeBytes": 34582522
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:f4b9cfd7f57e006f1b6acf8693964def92b91542f495b7b46ab5d1579b22237d",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.3.1"
+                        ],
+                        "sizeBytes": 34581321
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:2a4a59475e144a6b8ec56e2e7bcb97622bfd5cfecea0e5bd3bb51403e953e5cf",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.2.9"
+                        ],
+                        "sizeBytes": 34575837
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:03fbd9eecbaab61a2b88c2a1a56fdeb511c7cc59aa569c6f48f04da0f36b93d2",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.2.6"
+                        ],
+                        "sizeBytes": 34445893
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/rajsinghtech/garage-operator@sha256:2ad76219fd4c444b31427b525e05ff1abcbd3693b45ed33266b5c21cf0898bcd",
+                            "ghcr.io/rajsinghtech/garage-operator:v0.2.3"
+                        ],
+                        "sizeBytes": 34212890
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/fluxcd/source-controller@sha256:3c5f0f022f990ffc0daf00e5b199548fc0fa6e7119e972318f0267081a332963",
+                            "ghcr.io/fluxcd/source-controller:v1.4.1"
+                        ],
+                        "sizeBytes": 32386205
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "f1ee069f-9ec0-4acd-971c-b15680cf7520",
+                    "containerRuntimeVersion": "containerd://2.0.4-k3s4",
+                    "kernelVersion": "6.1.0-25-amd64",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.33.0+k3s1",
+                    "machineID": "2d1b71f570ea4f1aa8f5277071951153",
+                    "operatingSystem": "linux",
+                    "osImage": "Debian GNU/Linux 12 (bookworm)",
+                    "swap": {
+                        "capacity": 1022357504
+                    },
+                    "systemUUID": "ede36a2d-115d-4efb-8d6c-f84ef6177a58"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": false,
+                            "userNamespaces": false
+                        },
+                        "name": "runhcs-wcow-process"
+                    }
+                ]
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

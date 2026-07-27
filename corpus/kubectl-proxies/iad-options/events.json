@@ -1,0 +1,324 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "cloudflare-cert-manager-secret",
+                "namespace": "cert-manager",
+                "resourceVersion": "8646242",
+                "uid": "33330c5e-6743-4359-9ffe-87099bdb4114"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/cloudflare/api), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "cloudflare-cert-manager-secret.18bd39ef0be5ab5a",
+                "namespace": "cert-manager",
+                "resourceVersion": "23787814",
+                "uid": "8c867248-e7b4-44ff-ad44-3e478227c112"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6073,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:06:38Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ClusterSecretStore",
+                "name": "openbao",
+                "resourceVersion": "8636237",
+                "uid": "73a8fa59-2a33-4340-99bb-22c173b7b82b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:33:58Z",
+            "message": "invalid vault credentials: Error making API request.\n\nURL: GET http://openbao.external-secrets.svc.cluster.local:8200/v1/auth/token/lookup-self\nCode: 403. Errors:\n\n* permission denied",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:06:38Z",
+                "name": "openbao.18bd39ffba9ef27c",
+                "namespace": "default",
+                "resourceVersion": "23787796",
+                "uid": "88387b6b-528b-405b-9d5e-18f8961d1471"
+            },
+            "reason": "InvalidProviderConfig",
+            "reportingComponent": "cluster-secret-store",
+            "reportingInstance": "",
+            "source": {
+                "component": "cluster-secret-store"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "backblaze-options-secret",
+                "namespace": "options",
+                "resourceVersion": "8646292",
+                "uid": "c0a0f119-99cc-420a-b9c9-9034e82b6280"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/backblaze/historical-options), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "backblaze-options-secret.18bd39ef0c9edf9a",
+                "namespace": "options",
+                "resourceVersion": "23787815",
+                "uid": "9a7e0eba-5fda-4b0d-a9b2-d54937fbd7d2"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "cloudflare-pages-externalsecret",
+                "namespace": "options",
+                "resourceVersion": "8646331",
+                "uid": "6b4ff61c-25ef-432c-ade3-23c05a35d43c"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/cloudflare/options-jedarden-com-pages), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "cloudflare-pages-externalsecret.18bd39ef0dd34749",
+                "namespace": "options",
+                "resourceVersion": "23787816",
+                "uid": "9b4b3239-4483-4c4e-99ec-88faef68b11b"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "docker-hub-registry",
+                "namespace": "options",
+                "resourceVersion": "8646310",
+                "uid": "ef76f80e-5911-421e-8ffd-61cf41f2442e"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/docker/pull), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "docker-hub-registry.18bd39ef0e72c320",
+                "namespace": "options",
+                "resourceVersion": "23787817",
+                "uid": "c6d65298-af06-4a18-a143-87efff4188d6"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 176,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:04:31Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{reconciler}",
+                "kind": "Pod",
+                "name": "queue-reconciler-8d8b947ff-z8zqz",
+                "namespace": "options",
+                "resourceVersion": "14871046",
+                "uid": "6ac53c78-a180-45e1-a881-99355cfe0046"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:22:36Z",
+            "message": "Created container: reconciler",
+            "metadata": {
+                "creationTimestamp": "2026-07-27T15:22:37Z",
+                "name": "queue-reconciler-8d8b947ff-z8zqz.18bd39e22dd553bb",
+                "namespace": "options",
+                "resourceVersion": "23784634",
+                "uid": "cc669ce3-6aca-49c2-b834-fc9e97811993"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "prod-instance-17826295632130819",
+            "source": {
+                "component": "kubelet",
+                "host": "prod-instance-17826295632130819"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 176,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:04:31Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{reconciler}",
+                "kind": "Pod",
+                "name": "queue-reconciler-8d8b947ff-z8zqz",
+                "namespace": "options",
+                "resourceVersion": "14871046",
+                "uid": "6ac53c78-a180-45e1-a881-99355cfe0046"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:22:37Z",
+            "message": "Started container reconciler",
+            "metadata": {
+                "creationTimestamp": "2026-07-27T15:22:37Z",
+                "name": "queue-reconciler-8d8b947ff-z8zqz.18bd39e238c87a43",
+                "namespace": "options",
+                "resourceVersion": "23784636",
+                "uid": "93380436-d841-4ce0-85eb-483fdf87296a"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "prod-instance-17826295632130819",
+            "source": {
+                "component": "kubelet",
+                "host": "prod-instance-17826295632130819"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 175,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T15:04:46Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{reconciler}",
+                "kind": "Pod",
+                "name": "queue-reconciler-8d8b947ff-z8zqz",
+                "namespace": "options",
+                "resourceVersion": "14871046",
+                "uid": "6ac53c78-a180-45e1-a881-99355cfe0046"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:22:36Z",
+            "message": "Container image \"ronaldraygun/options-queue-reconciler:0.1.10\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-27T15:22:36Z",
+                "name": "queue-reconciler-8d8b947ff-z8zqz.18bd46fe88984861",
+                "namespace": "options",
+                "resourceVersion": "23784633",
+                "uid": "80189725-061c-4a73-ac6e-6d8563cbf9db"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "prod-instance-17826295632130819",
+            "source": {
+                "component": "kubelet",
+                "host": "prod-instance-17826295632130819"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "valkey-secret",
+                "namespace": "options",
+                "resourceVersion": "8646343",
+                "uid": "a22e33a0-238d-482f-b603-20013446ea18"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/valkey/queue), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "valkey-secret.18bd39ef0ef0bcbb",
+                "namespace": "options",
+                "resourceVersion": "23787818",
+                "uid": "7366cb4f-f805-42a8-a81f-f25105f302be"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6085,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T11:05:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "valkey-secret",
+                "namespace": "valkey",
+                "resourceVersion": "8646363",
+                "uid": "acee33b0-72fb-4b70-8ead-5893417ba6f0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:34:02Z",
+            "message": "error processing spec.data[0] (key: rs-manager/iad-options/valkey/queue), err: ClusterSecretStore \"openbao\" is not ready",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:05:26Z",
+                "name": "valkey-secret.18bd39ef0f629ebf",
+                "namespace": "valkey",
+                "resourceVersion": "23787819",
+                "uid": "9590fcc2-4f77-4961-b003-b7b4230d010a"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

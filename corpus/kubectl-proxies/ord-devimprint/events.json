@@ -1,0 +1,132 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 8496,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T04:35:26Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ClusterSecretStore",
+                "name": "openbao",
+                "resourceVersion": "20174563",
+                "uid": "da56f9ac-a4fd-421d-99ec-bb7e40d166e9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:32:47Z",
+            "message": "store validated",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:12:26Z",
+                "name": "openbao.18bd24a6bdf0a113",
+                "namespace": "default",
+                "resourceVersion": "29707689",
+                "uid": "2fef1e19-6c7e-4777-8466-09276a3fe183"
+            },
+            "reason": "Valid",
+            "reportingComponent": "cluster-secret-store",
+            "reportingInstance": "",
+            "source": {
+                "component": "cluster-secret-store"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6107,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T04:35:32Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "buttondown",
+                "namespace": "devimprint",
+                "resourceVersion": "19392370",
+                "uid": "96fa725c-2de6-4178-b180-500d69bd3858"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:35:44Z",
+            "message": "error processing spec.data[0] (key: rs-manager/ord-devimprint/buttondown), err: Secret does not exist",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:16:41Z",
+                "name": "buttondown.18bd24a83c056e24",
+                "namespace": "devimprint",
+                "resourceVersion": "29708565",
+                "uid": "a393cbb5-c369-48e7-b3e4-e4fe86ac5fee"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6107,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T04:35:35Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "github-app",
+                "namespace": "devimprint",
+                "resourceVersion": "19392349",
+                "uid": "02be8af2-bd34-4b37-9de1-47967e3c2687"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:35:45Z",
+            "message": "error processing spec.data[0] (key: rs-manager/ord-devimprint/github-app), err: Secret does not exist",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:16:42Z",
+                "name": "github-app.18bd24a8e9043bb1",
+                "namespace": "devimprint",
+                "resourceVersion": "29708570",
+                "uid": "0389dd0c-46ac-4431-8fda-919ef7c52153"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 6108,
+            "eventTime": null,
+            "firstTimestamp": "2026-06-28T04:35:30Z",
+            "involvedObject": {
+                "apiVersion": "external-secrets.io/v1",
+                "kind": "ExternalSecret",
+                "name": "gitlab-pat",
+                "namespace": "devimprint",
+                "resourceVersion": "19392351",
+                "uid": "cec462f0-ddf7-479c-9d29-04aec896ebfd"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-07-27T15:35:44Z",
+            "message": "error processing spec.data[0] (key: rs-manager/ord-devimprint/gitlab-pat), err: Secret does not exist",
+            "metadata": {
+                "creationTimestamp": "2026-06-28T11:16:40Z",
+                "name": "gitlab-pat.18bd24a7ada8e261",
+                "namespace": "devimprint",
+                "resourceVersion": "29708564",
+                "uid": "9003abde-636d-4747-91ad-4c1cd6963f14"
+            },
+            "reason": "UpdateFailed",
+            "reportingComponent": "external-secrets",
+            "reportingInstance": "",
+            "source": {
+                "component": "external-secrets"
+            },
+            "type": "Warning"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

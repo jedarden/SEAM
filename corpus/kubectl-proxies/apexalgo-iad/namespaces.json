@@ -1,0 +1,1592 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-20T02:59:34Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "13-devtron"
+                },
+                "name": "13-devtron",
+                "resourceVersion": "528564",
+                "uid": "feffb033-a0b3-4c1f-9ffa-03bf3fd2fb8c"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "agent-observability-ns-apexalgo-iad:/Namespace:/agent-observability",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"agent-observability-ns-apexalgo-iad:/Namespace:/agent-observability\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"app.kubernetes.io/name\":\"agent-observability\",\"app.kubernetes.io/part-of\":\"mission-control\"},\"name\":\"agent-observability\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-02-17T13:41:43Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "app.kubernetes.io/name": "agent-observability",
+                    "app.kubernetes.io/part-of": "mission-control",
+                    "kubernetes.io/metadata.name": "agent-observability"
+                },
+                "name": "agent-observability",
+                "resourceVersion": "495506557",
+                "uid": "65d732ef-7842-46bc-9f5d-8dff988368cf"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "ai-code-battle-ns-apexalgo-iad:/Namespace:/ai-code-battle",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"ai-code-battle-ns-apexalgo-iad:/Namespace:/ai-code-battle\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"ai-code-battle\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-25T03:41:36Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "ai-code-battle"
+                },
+                "name": "ai-code-battle",
+                "resourceVersion": "528007718",
+                "uid": "1a4ce1c2-a7eb-4ef2-a2b9-da7dd72b7468"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-21T04:15:06Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "arc-systems"
+                },
+                "name": "arc-systems",
+                "resourceVersion": "882433",
+                "uid": "b37ce237-1b26-45ce-bd54-a28ea5c27125"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "argo-events-ns-apexalgo-iad:/Namespace:/argo-events",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"argo-events-ns-apexalgo-iad:/Namespace:/argo-events\"},\"name\":\"argo-events\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-02-11T13:29:27Z",
+                "deletionTimestamp": "2026-07-17T21:43:19Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "argo-events"
+                },
+                "name": "argo-events",
+                "resourceVersion": "659793996",
+                "uid": "3837e2e1-3d55-4220-857e-72f89a08529b"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-07-18T00:03:53Z",
+                        "message": "All resources successfully discovered",
+                        "reason": "ResourcesDiscovered",
+                        "status": "False",
+                        "type": "NamespaceDeletionDiscoveryFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:43:32Z",
+                        "message": "All legacy kube types successfully parsed",
+                        "reason": "ParsedGroupVersions",
+                        "status": "False",
+                        "type": "NamespaceDeletionGroupVersionParsingFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-27T12:22:21Z",
+                        "message": "All content successfully deleted, may be waiting on finalization",
+                        "reason": "ContentDeleted",
+                        "status": "False",
+                        "type": "NamespaceDeletionContentFailure"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:46:23Z",
+                        "message": "Some resources are remaining: eventbus.argoproj.io has 1 resource instances, eventsources.argoproj.io has 1 resource instances, sensors.argoproj.io has 1 resource instances",
+                        "reason": "SomeResourcesRemain",
+                        "status": "True",
+                        "type": "NamespaceContentRemaining"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-17T21:46:23Z",
+                        "message": "Some content in the namespace has finalizers remaining: eventbus-controller in 1 resource instances, eventsource-controller in 1 resource instances, sensor-controller in 1 resource instances",
+                        "reason": "SomeFinalizersRemain",
+                        "status": "True",
+                        "type": "NamespaceFinalizersRemaining"
+                    }
+                ],
+                "phase": "Terminating"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:54:07Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "calico-apiserver",
+                    "name": "calico-apiserver",
+                    "pod-security.kubernetes.io/enforce": "privileged",
+                    "pod-security.kubernetes.io/enforce-version": "latest"
+                },
+                "name": "calico-apiserver",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "operator.tigera.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "APIServer",
+                        "name": "default",
+                        "uid": "71598624-a5a3-4bde-9538-8ba6d1f976c9"
+                    }
+                ],
+                "resourceVersion": "4557",
+                "uid": "35ac9e61-ad21-4cb1-b169-d744ddc2f34d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:53:18Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "calico-system",
+                    "name": "calico-system",
+                    "pod-security.kubernetes.io/enforce": "privileged",
+                    "pod-security.kubernetes.io/enforce-version": "latest"
+                },
+                "name": "calico-system",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "operator.tigera.io/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Installation",
+                        "name": "default",
+                        "uid": "fdee4295-bfa6-4513-81ca-6b8e39e68410"
+                    }
+                ],
+                "resourceVersion": "4137",
+                "uid": "3f7f9c3b-aa08-4dc5-8397-b3d6779ffc90"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cert-manager-ns-apexalgo-iad:/Namespace:/cert-manager",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"cert-manager-ns-apexalgo-iad:/Namespace:/cert-manager\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"cert-manager\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2024-09-20T03:02:27Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "cert-manager"
+                },
+                "name": "cert-manager",
+                "resourceVersion": "532876007",
+                "uid": "a7b094e4-238d-406e-98f9-580bb943442a"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "claude-leaderboard-ns-apexalgo-iad:/Namespace:/claude-leaderboard",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"claude-leaderboard-ns-apexalgo-iad:/Namespace:/claude-leaderboard\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"name\":\"claude-leaderboard\"},\"name\":\"claude-leaderboard\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-02-27T15:11:40Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "claude-leaderboard",
+                    "name": "claude-leaderboard"
+                },
+                "name": "claude-leaderboard",
+                "resourceVersion": "505155205",
+                "uid": "7a02817b-4eb2-4f54-8b7a-559c8d187649"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-10-21T04:52:16Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "cluster-runner"
+                },
+                "name": "cluster-runner",
+                "resourceVersion": "22334909",
+                "uid": "5f03b864-4820-495b-ba9f-1e51ffb21aa5"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-21T04:16:17Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "cluster-runners"
+                },
+                "name": "cluster-runners",
+                "resourceVersion": "882874",
+                "uid": "581968d5-8c06-4253-a862-f2d80c27521e"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cnpg-ns-apexalgo-iad:/Namespace:/cnpg",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"cnpg-ns-apexalgo-iad:/Namespace:/cnpg\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"cnpg\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-02-24T03:19:38Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "cnpg"
+                },
+                "name": "cnpg",
+                "resourceVersion": "502584528",
+                "uid": "12f2c20e-79aa-41b0-bc0a-6e6c0f6bfb7e"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "cnpg-system-ns-apexalgo-iad:/Namespace:/cnpg-system",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"cnpg-system-ns-apexalgo-iad:/Namespace:/cnpg-system\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"cnpg-system\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2024-09-20T03:02:26Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "cnpg-system"
+                },
+                "name": "cnpg-system",
+                "resourceVersion": "532876540",
+                "uid": "6818dc29-7077-4122-970b-3b23fc74405e"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:14:39Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "default"
+                },
+                "name": "default",
+                "resourceVersion": "38",
+                "uid": "7bfb036e-362c-4ece-9c15-6dd71b93c42f"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "demo-timeclient-ns-apexalgo-iad:/Namespace:/demo-timeclient",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"demo-timeclient-ns-apexalgo-iad:/Namespace:/demo-timeclient\"},\"labels\":{\"app.kubernetes.io/instance\":\"demo-timeclient-ns-apexalgo-iad\",\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"demo-timeclient\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-11-17T02:09:34Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "demo-timeclient-ns-apexalgo-iad",
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "demo-timeclient"
+                },
+                "name": "demo-timeclient",
+                "resourceVersion": "559579889",
+                "uid": "061a5f50-5207-4d23-8996-b5c399e613c7"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "descheduler-ns-apexalgo-iad:/Namespace:/descheduler",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"descheduler-ns-apexalgo-iad:/Namespace:/descheduler\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"descheduler\"}}\n"
+                },
+                "creationTimestamp": "2026-04-01T22:17:17Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "descheduler"
+                },
+                "name": "descheduler",
+                "resourceVersion": "532876544",
+                "uid": "ecc25f7e-cfe0-4139-a8f2-f8bbb1f8a78c"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "development-ns-apexalgo-iad:/Namespace:/development",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"development-ns-apexalgo-iad:/Namespace:/development\"},\"labels\":{\"app.kubernetes.io/instance\":\"development-ns-apexalgo-iad\"},\"name\":\"development\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2024-09-20T03:21:04Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "development-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "development"
+                },
+                "name": "development",
+                "resourceVersion": "456199630",
+                "uid": "d551141b-1970-466c-8eaf-644cfa62ef52"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "devpod-ns-apexalgo-iad:/Namespace:/devpod",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"devpod-ns-apexalgo-iad:/Namespace:/devpod\"},\"labels\":{\"diagnostics-access\":\"allowed\",\"mcp-client\":\"true\",\"name\":\"devpod\",\"purpose\":\"development-tools\"},\"name\":\"devpod\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-06-07T13:18:16Z",
+                "labels": {
+                    "diagnostics-access": "allowed",
+                    "kubernetes.io/metadata.name": "devpod",
+                    "mcp-client": "true",
+                    "name": "devpod",
+                    "purpose": "development-tools"
+                },
+                "name": "devpod",
+                "resourceVersion": "514774341",
+                "uid": "1cb4e261-c61b-4764-a3ff-406219d14ac8"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "devpod-observer-ns-apexalgo-iad:/Namespace:/devpod-observer",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"devpod-observer-ns-apexalgo-iad:/Namespace:/devpod-observer\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"name\":\"devpod-observer\",\"purpose\":\"cross-cluster-access\"},\"name\":\"devpod-observer\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-12T03:55:16Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "devpod-observer",
+                    "name": "devpod-observer",
+                    "purpose": "cross-cluster-access"
+                },
+                "name": "devpod-observer",
+                "resourceVersion": "521725827",
+                "uid": "f51de053-1ccb-4057-8c19-6412e5b68385"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "external-secrets-ns-apexalgo-iad:/Namespace:/external-secrets",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"external-secrets-ns-apexalgo-iad:/Namespace:/external-secrets\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"name\":\"external-secrets\",\"purpose\":\"secrets-management\"},\"name\":\"external-secrets\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-21T01:42:43Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "external-secrets",
+                    "name": "external-secrets",
+                    "purpose": "secrets-management"
+                },
+                "name": "external-secrets",
+                "resourceVersion": "524710638",
+                "uid": "61e6bbd0-3011-4eed-b2aa-ad191b040f9d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "description": "Face detection application with bounding boxes and facial landmarks",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"description\":\"Face detection application with bounding boxes and facial landmarks\"},\"labels\":{\"app\":\"face-detection\",\"pod-security.kubernetes.io/enforce\":\"baseline\"},\"name\":\"face-detection\"}}\n"
+                },
+                "creationTimestamp": "2025-07-28T02:36:34Z",
+                "labels": {
+                    "app": "face-detection",
+                    "kubernetes.io/metadata.name": "face-detection",
+                    "pod-security.kubernetes.io/enforce": "baseline"
+                },
+                "name": "face-detection",
+                "resourceVersion": "275556733",
+                "uid": "7d11d6dd-099f-49e3-887d-688da5b9a7d2"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "gait-ns-apexalgo-iad:/Namespace:/gait",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"gait-ns-apexalgo-iad:/Namespace:/gait\"},\"labels\":{\"app.kubernetes.io/instance\":\"gait-ns-apexalgo-iad\"},\"name\":\"gait\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-07-09T18:25:20Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "gait-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "gait"
+                },
+                "name": "gait",
+                "resourceVersion": "461716853",
+                "uid": "b9d1ebec-d6e1-4a5c-a224-5d3a49cc8f05"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "garage-operator-ns-apexalgo-iad:/Namespace:/garage-operator",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"garage-operator-ns-apexalgo-iad:/Namespace:/garage-operator\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"garage-operator\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-04-03T21:14:51Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "garage-operator"
+                },
+                "name": "garage-operator",
+                "resourceVersion": "535487171",
+                "uid": "ee36ebb7-8f9c-49e6-89a5-aee3c3ee0992"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "garage-metrics-exporter-ns-apexalgo-iad:/Namespace:/garage-operator-system",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"garage-metrics-exporter-ns-apexalgo-iad:/Namespace:/garage-operator-system\"},\"labels\":{\"name\":\"garage-operator-system\"},\"name\":\"garage-operator-system\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-07-09T02:41:06Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "garage-operator-system",
+                    "name": "garage-operator-system"
+                },
+                "name": "garage-operator-system",
+                "resourceVersion": "643511713",
+                "uid": "93443078-3d67-4971-b9d6-2475a896ff6d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2026-01-21T00:44:59Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "keda"
+                },
+                "name": "keda",
+                "resourceVersion": "461548429",
+                "uid": "3624c088-02c0-4865-bc4e-ecae02e09dac"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-28T04:38:32Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "keydb-operator-apexalgo-iad",
+                    "app.kubernetes.io/managed-by": "kustomize",
+                    "app.kubernetes.io/name": "keydb-operator",
+                    "control-plane": "controller-manager",
+                    "kubernetes.io/metadata.name": "keydb-operator-system"
+                },
+                "name": "keydb-operator-system",
+                "resourceVersion": "137947554",
+                "uid": "a240b7a3-565d-4421-9446-1cdf616bb802"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "kronos-ns-apexalgo-iad:/Namespace:/kronos",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"kronos-ns-apexalgo-iad:/Namespace:/kronos\"},\"labels\":{\"app.kubernetes.io/name\":\"kronos\"},\"name\":\"kronos\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-01-26T02:46:11Z",
+                "labels": {
+                    "app.kubernetes.io/name": "kronos",
+                    "kubernetes.io/metadata.name": "kronos"
+                },
+                "name": "kronos",
+                "resourceVersion": "467663254",
+                "uid": "3e2eb486-eeb9-467d-bd37-c60b081f5628"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:14:39Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kube-node-lease"
+                },
+                "name": "kube-node-lease",
+                "resourceVersion": "29",
+                "uid": "14afd78b-844d-4881-9ff3-26a689153ef7"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:14:39Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kube-public"
+                },
+                "name": "kube-public",
+                "resourceVersion": "13",
+                "uid": "1009bc9d-e3ee-42ba-aaa5-87052a1b546d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:14:39Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kube-system"
+                },
+                "name": "kube-system",
+                "resourceVersion": "5",
+                "uid": "4a1e5149-2260-4a1f-a2ee-546312a090a2"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:16:58Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kubernetes-dashboard",
+                    "name": "kubernetes-dashboard"
+                },
+                "name": "kubernetes-dashboard",
+                "resourceVersion": "670",
+                "uid": "99860893-8cfd-4ca5-be24-c46e8f2ffdc4"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"name\":\"kubernetes-reflector\"},\"spec\":{},\"status\":{}}\n"
+                },
+                "creationTimestamp": "2024-09-20T03:02:24Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kubernetes-reflector"
+                },
+                "name": "kubernetes-reflector",
+                "resourceVersion": "529171",
+                "uid": "27ed299c-7bd6-4fde-b951-0229eead8ee4"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-21T03:40:45Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "kuik"
+                },
+                "name": "kuik",
+                "resourceVersion": "872965",
+                "uid": "10909c95-ab95-43e0-83ca-51214b31a7f0"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "local-path-storage-ns-apexalgo-iad:/Namespace:/local-path-storage",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"local-path-storage-ns-apexalgo-iad:/Namespace:/local-path-storage\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"local-path-storage\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-04T23:07:32Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "local-path-storage"
+                },
+                "name": "local-path-storage",
+                "resourceVersion": "510894163",
+                "uid": "eef3866c-94a3-4054-852c-66c8c1788c31"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "mcp-ns-apexalgo-iad:/Namespace:/mcp",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"mcp-ns-apexalgo-iad:/Namespace:/mcp\"},\"labels\":{\"app.kubernetes.io/instance\":\"mcp-ns-apexalgo-iad\"},\"name\":\"mcp\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-05-18T21:45:46Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "mcp-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "mcp"
+                },
+                "name": "mcp",
+                "resourceVersion": "477128890",
+                "uid": "b1a9c568-d6a9-4f6b-85ec-2372c0524622"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "monitoring-ns-apexalgo-iad:/Namespace:/monitoring",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"monitoring-ns-apexalgo-iad:/Namespace:/monitoring\"},\"labels\":{\"app.kubernetes.io/name\":\"monitoring\",\"app.kubernetes.io/part-of\":\"observability\"},\"name\":\"monitoring\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-01-13T11:55:33Z",
+                "labels": {
+                    "app.kubernetes.io/name": "monitoring",
+                    "app.kubernetes.io/part-of": "observability",
+                    "kubernetes.io/metadata.name": "monitoring"
+                },
+                "name": "monitoring",
+                "resourceVersion": "456924372",
+                "uid": "717dbfaa-0f7e-4565-945e-c186a4f68629"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "mta-my-way:/Namespace:mta-my-way/mta-my-way"
+                },
+                "creationTimestamp": "2026-04-01T22:14:45Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "mta-my-way",
+                    "name": "mta-my-way"
+                },
+                "name": "mta-my-way",
+                "resourceVersion": "532874317",
+                "uid": "171f0266-3047-4f37-afd2-11c072f98964"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "native-ads-profiling-ns-apexalgo-iad:/Namespace:/native-ads-profiling",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"native-ads-profiling-ns-apexalgo-iad:/Namespace:/native-ads-profiling\"},\"labels\":{\"app.kubernetes.io/part-of\":\"native-ads-profiling\"},\"name\":\"native-ads-profiling\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-14T14:52:37Z",
+                "labels": {
+                    "app.kubernetes.io/part-of": "native-ads-profiling",
+                    "kubernetes.io/metadata.name": "native-ads-profiling"
+                },
+                "name": "native-ads-profiling",
+                "resourceVersion": "519807652",
+                "uid": "cb984e85-af70-40b6-9db3-507997906917"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "network-test-ns-apexalgo-iad:/Namespace:/network-test",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"network-test-ns-apexalgo-iad:/Namespace:/network-test\"},\"name\":\"network-test\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-01-24T00:00:49Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "network-test"
+                },
+                "name": "network-test",
+                "resourceVersion": "559577449",
+                "uid": "8b3ff9c9-df5e-45ff-876b-ed6a36c136d0"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "news-trader-ns-apexalgo-iad:/Namespace:/news-trader",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"news-trader-ns-apexalgo-iad:/Namespace:/news-trader\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"name\":\"news-trader\"},\"name\":\"news-trader\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-05-08T18:07:57Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "news-trader",
+                    "name": "news-trader"
+                },
+                "name": "news-trader",
+                "resourceVersion": "650180468",
+                "uid": "66a188cd-33de-43e5-8bb3-8d517f3493e9"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "operators-ns-apexalgo-iad:/Namespace:/operators",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"operators-ns-apexalgo-iad:/Namespace:/operators\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"operators\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-07T16:30:51Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "operators"
+                },
+                "name": "operators",
+                "resourceVersion": "557093214",
+                "uid": "01863e02-032b-4ff4-a4fb-ae5cca0169e3"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "options-ns-apexalgo-iad:/Namespace:/options",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"options-ns-apexalgo-iad:/Namespace:/options\"},\"labels\":{\"app.kubernetes.io/instance\":\"options-ns-apexalgo-iad\"},\"name\":\"options\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-03-09T18:36:47Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "options-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "options"
+                },
+                "name": "options",
+                "resourceVersion": "456198879",
+                "uid": "33857c3a-d819-403d-a7a7-f4a53af49ea9"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "options-web-ns-apexalgo-iad:/Namespace:/options-web",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"options-web-ns-apexalgo-iad:/Namespace:/options-web\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\",\"purpose\":\"options-dashboard\"},\"name\":\"options-web\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-11T09:03:44Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "options-web",
+                    "purpose": "options-dashboard"
+                },
+                "name": "options-web",
+                "resourceVersion": "525576046",
+                "uid": "ea676216-1dcf-4935-a769-9558488ea17d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pinniped-concierge-ns-apexalgo-iad:/Namespace:/pinniped-concierge",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"pinniped-concierge-ns-apexalgo-iad:/Namespace:/pinniped-concierge\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"pinniped-concierge\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-04-01T22:17:58Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "pinniped-concierge"
+                },
+                "name": "pinniped-concierge",
+                "resourceVersion": "546758325",
+                "uid": "99316d93-bfb9-478e-a1c7-86a8c1360bd2"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "polymarket-ns-apexalgo-iad:/Namespace:/polymarket",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"polymarket-ns-apexalgo-iad:/Namespace:/polymarket\"},\"labels\":{\"app.kubernetes.io/name\":\"polymarket\",\"app.kubernetes.io/part-of\":\"ardenone\"},\"name\":\"polymarket\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-01-14T05:50:20Z",
+                "labels": {
+                    "app.kubernetes.io/name": "polymarket",
+                    "app.kubernetes.io/part-of": "ardenone",
+                    "kubernetes.io/metadata.name": "polymarket"
+                },
+                "name": "polymarket",
+                "resourceVersion": "458125162",
+                "uid": "5ae9c950-5e10-4857-8e79-41de27411b1e"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "prediction-markets-ns-apexalgo-iad:/Namespace:/prediction-markets",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"prediction-markets-ns-apexalgo-iad:/Namespace:/prediction-markets\"},\"labels\":{\"app.kubernetes.io/component\":\"trading-platform\",\"app.kubernetes.io/managed-by\":\"argocd\",\"app.kubernetes.io/name\":\"prediction-markets\",\"argocd.argoproj.io/instance\":\"prediction-markets\",\"prometheus\":\"monitored\"},\"name\":\"prediction-markets\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-02T18:13:21Z",
+                "labels": {
+                    "app.kubernetes.io/component": "trading-platform",
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "app.kubernetes.io/name": "prediction-markets",
+                    "argocd.argoproj.io/instance": "prediction-markets",
+                    "kubernetes.io/metadata.name": "prediction-markets",
+                    "prometheus": "monitored"
+                },
+                "name": "prediction-markets",
+                "resourceVersion": "549479662",
+                "uid": "35c64b24-f86c-452a-b9ef-93df1e92c233"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-10-11T17:47:53Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "projectsveltos"
+                },
+                "name": "projectsveltos",
+                "resourceVersion": "14214194",
+                "uid": "c039625e-e59c-4d00-8a1d-aaeece48bbd5"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "rackspace-spot-ns-apexalgo-iad:/Namespace:/rackspace-spot",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"rackspace-spot-ns-apexalgo-iad:/Namespace:/rackspace-spot\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"rackspace-spot\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-06-10T03:48:51Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "rackspace-spot"
+                },
+                "name": "rackspace-spot",
+                "resourceVersion": "610371916",
+                "uid": "7b0d0db2-5f04-4178-a1cd-89a96cae64de"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "reloader-ns-apexalgo-iad:/Namespace:/reloader",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"reloader-ns-apexalgo-iad:/Namespace:/reloader\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"reloader\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2024-09-20T03:02:25Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "reloader"
+                },
+                "name": "reloader",
+                "resourceVersion": "532880148",
+                "uid": "4578ac9e-d010-4d91-858e-ae75ba4ea3fd"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-20T03:02:26Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "sealed-secrets"
+                },
+                "name": "sealed-secrets",
+                "resourceVersion": "529186",
+                "uid": "b5e2f67c-0823-4969-9f0e-591d95637b00"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/instance\":\"shelltogo-ns-apexalgo-iad\"},\"name\":\"shelltogo\"}}\n"
+                },
+                "creationTimestamp": "2025-12-02T03:50:34Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "shelltogo-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "shelltogo"
+                },
+                "name": "shelltogo",
+                "resourceVersion": "417255663",
+                "uid": "22f2b7ce-9db2-422d-ac87-1ea37e4f19d2"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "static-site-dashboard-ns-apexalgo-iad:/Namespace:/static-site-dashboard",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"static-site-dashboard-ns-apexalgo-iad:/Namespace:/static-site-dashboard\"},\"labels\":{\"name\":\"static-site-dashboard\"},\"name\":\"static-site-dashboard\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-07-09T02:41:08Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "static-site-dashboard",
+                    "name": "static-site-dashboard"
+                },
+                "name": "static-site-dashboard",
+                "resourceVersion": "643512341",
+                "uid": "4e4fcaa1-49d6-4f97-b36c-56f843f7a245"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "storage-ns-apexalgo-iad:/Namespace:/storage",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"storage-ns-apexalgo-iad:/Namespace:/storage\"},\"name\":\"storage\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-02-27T05:45:34Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "storage"
+                },
+                "name": "storage",
+                "resourceVersion": "505950810",
+                "uid": "0c4b6dba-661b-474d-9f28-c420d1fa6bbd"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "tailscale-ns-apexalgo-iad:/Namespace:/tailscale",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"tailscale-ns-apexalgo-iad:/Namespace:/tailscale\"},\"labels\":{\"app.kubernetes.io/instance\":\"tailscale-ns-apexalgo-iad\"},\"name\":\"tailscale\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-06-21T12:01:53Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "tailscale-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "tailscale"
+                },
+                "name": "tailscale",
+                "resourceVersion": "465079300",
+                "uid": "a79b129e-1094-41db-b5a7-e7c785a8cbff"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-18T05:16:55Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "tigera-operator",
+                    "name": "tigera-operator"
+                },
+                "name": "tigera-operator",
+                "resourceVersion": "644",
+                "uid": "58266d4f-0a57-4bd0-8ff0-f15c2c55ce5d"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2024-09-20T03:02:26Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "traefik"
+                },
+                "name": "traefik",
+                "resourceVersion": "529189",
+                "uid": "641cb226-1efe-4574-ad4a-6a9a34a06328"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "creationTimestamp": "2026-01-10T05:19:54Z",
+                "labels": {
+                    "kubernetes.io/metadata.name": "trino"
+                },
+                "name": "trino",
+                "resourceVersion": "454440512",
+                "uid": "12f46397-1638-494d-9cf8-1158ebd267fc"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "utilities-ns-apexalgo-iad:/Namespace:/utilities",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"utilities-ns-apexalgo-iad:/Namespace:/utilities\"},\"labels\":{\"app.kubernetes.io/instance\":\"utilities-ns-apexalgo-iad\"},\"name\":\"utilities\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-11-28T20:12:50Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "utilities-ns-apexalgo-iad",
+                    "kubernetes.io/metadata.name": "utilities"
+                },
+                "name": "utilities",
+                "resourceVersion": "502590360",
+                "uid": "fc78db07-5c8e-4797-bc74-b4298585f1f8"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "valkey-ns-apexalgo-iad:/Namespace:/valkey",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"valkey-ns-apexalgo-iad:/Namespace:/valkey\"},\"labels\":{\"app\":\"valkey\",\"app.kubernetes.io/instance\":\"valkey-ns-apexalgo-iad\",\"cluster\":\"apexalgo-iad\"},\"name\":\"valkey\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2025-05-29T01:27:19Z",
+                "labels": {
+                    "app": "valkey",
+                    "app.kubernetes.io/instance": "valkey-ns-apexalgo-iad",
+                    "cluster": "apexalgo-iad",
+                    "kubernetes.io/metadata.name": "valkey"
+                },
+                "name": "valkey",
+                "resourceVersion": "473521548",
+                "uid": "a19e3b96-10db-4f64-adc7-c111f7510a63"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app.kubernetes.io/instance\":\"velero-ns-apexalgo-iad\",\"component\":\"velero\",\"pod-security.kubernetes.io/audit\":\"privileged\",\"pod-security.kubernetes.io/audit-version\":\"latest\",\"pod-security.kubernetes.io/enforce\":\"privileged\",\"pod-security.kubernetes.io/enforce-version\":\"latest\",\"pod-security.kubernetes.io/warn\":\"privileged\",\"pod-security.kubernetes.io/warn-version\":\"latest\"},\"name\":\"velero\"},\"spec\":{}}\n"
+                },
+                "creationTimestamp": "2025-07-27T13:07:28Z",
+                "labels": {
+                    "app.kubernetes.io/instance": "velero-ns-apexalgo-iad",
+                    "component": "velero",
+                    "kubernetes.io/metadata.name": "velero",
+                    "pod-security.kubernetes.io/audit": "privileged",
+                    "pod-security.kubernetes.io/audit-version": "latest",
+                    "pod-security.kubernetes.io/enforce": "privileged",
+                    "pod-security.kubernetes.io/enforce-version": "latest",
+                    "pod-security.kubernetes.io/warn": "privileged",
+                    "pod-security.kubernetes.io/warn-version": "latest"
+                },
+                "name": "velero",
+                "resourceVersion": "274846016",
+                "uid": "34a61aaf-a436-43fb-855f-8542aca49d24"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "vista-ns-apexalgo-iad:/Namespace:/vista",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"vista-ns-apexalgo-iad:/Namespace:/vista\"},\"labels\":{\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"vista\"},\"status\":{\"phase\":\"Active\"}}\n"
+                },
+                "creationTimestamp": "2026-03-15T21:42:04Z",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "argocd",
+                    "kubernetes.io/metadata.name": "vista"
+                },
+                "name": "vista",
+                "resourceVersion": "659098641",
+                "uid": "70f8d4a6-b5eb-449b-8dc6-3158bb546215"
+            },
+            "spec": {
+                "finalizers": [
+                    "kubernetes"
+                ]
+            },
+            "status": {
+                "phase": "Active"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

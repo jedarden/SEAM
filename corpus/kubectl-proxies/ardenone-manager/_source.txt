@@ -1,0 +1,1 @@
+http://traefik-ardenone-manager:8001
