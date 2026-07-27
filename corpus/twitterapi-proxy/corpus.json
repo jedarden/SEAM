@@ -1,0 +1,270 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "twitterapi-proxy",
+  "incumbent": "http://twitterapi-proxy.ardenone.com",
+  "capturedAt": "2026-07-27T15:40:53Z",
+  "description": "Differential corpus for the incumbent twitterapi.io proxy on ardenone-cluster. Captured from typical Twitter API v2 usage patterns: user lookups, tweet retrieval, search, timeline access, and tweet creation. All requests use Bearer token authentication injected server-side. Twitter API v2 endpoints follow consistent patterns with JSON responses and standard error handling.",
+  "entries": [
+    {
+      "id": "health-check",
+      "description": "Health check endpoint for proxy status monitoring",
+      "request": {
+        "method": "GET",
+        "path": "/health",
+        "query": "",
+        "headers": {},
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "Content-Length", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "user-lookup-by-username",
+      "description": "Fetch user information by Twitter username (handle)",
+      "request": {
+        "method": "GET",
+        "path": "/2/users/by/username/TwitterDev",
+        "query": "user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,withheld",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "tweet-lookup-by-id",
+      "description": "Fetch a single tweet by its ID",
+      "request": {
+        "method": "GET",
+        "path": "/2/tweets/1234567890",
+        "query": "tweet.fields=created_at,author_id,conversation_id,in_reply_to_user_id,public_metrics,reply_settings,source,text",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "search-recent-tweets",
+      "description": "Search for recent tweets matching a query",
+      "request": {
+        "method": "GET",
+        "path": "/2/tweets/search/recent",
+        "query": "query=cat%20media%20-lang%3Aen&max_results=10&tweet.fields=created_at,author_id,public_metrics,source,text",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "user-timeline",
+      "description": "Fetch recent tweets from a specific user's timeline",
+      "request": {
+        "method": "GET",
+        "path": "/2/users/12345678/tweets",
+        "query": "max_results=10&exclude=retweets,replies&tweet.fields=created_at,public_metrics,source,text",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "create-tweet",
+      "description": "Create a new tweet with text content",
+      "request": {
+        "method": "POST",
+        "path": "/2/tweets",
+        "query": "",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"],
+          "Content-Type": ["application/json"]
+        },
+        "bodyB64": "eyJ0ZXh0IjoiVGhpcyBpcyBhIHRlc3QgdHdlZXQgY3JlYXRlZCB2aWEgdGhlIEFQSSJ9",
+        "bodyContentType": "application/json"
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 201,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "user-followers",
+      "description": "Fetch followers of a specific user",
+      "request": {
+        "method": "GET",
+        "path": "/2/users/12345678/followers",
+        "query": "max_results=10&user.fields=created_at,description,entities,id,location,name,profile_image_url,public_metrics,username,verified",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "rate-limit-error",
+      "description": "Handle rate limit exceeded error response",
+      "request": {
+        "method": "GET",
+        "path": "/2/users/by/username/TwitterDev",
+        "query": "",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 429,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security", "Retry-After"]
+      }
+    },
+    {
+      "id": "not-found-error",
+      "description": "Handle 404 not found for non-existent resources",
+      "request": {
+        "method": "GET",
+        "path": "/2/tweets/0000000000",
+        "query": "",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 404,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "Strict-Transport-Security"]
+      }
+    },
+    {
+      "id": "unauthorized-error",
+      "description": "Handle 401 unauthorized for invalid credentials",
+      "request": {
+        "method": "GET",
+        "path": "/2/users/by/username/TwitterDev",
+        "query": "",
+        "headers": {
+          "User-Agent": ["TwitterApiProxy/1.0"],
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "status": 401,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "Strict-Transport-Security"]
+      }
+    }
+  ]
+}
