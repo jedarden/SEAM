@@ -7,3 +7,89 @@ Self-documenting Endpoint Access Mediator — a single unified HTTP endpoint tha
 - `docs/notes/` — features, constraints, design decisions
 - `docs/research/` — external reference material and prior art
 - `docs/plan/plan.md` — complete application plan
+
+## Running SEAM
+
+### Starting the Server
+
+```bash
+seam serve [flags]
+```
+
+### Configuration Flags
+
+#### Server Ports
+- `--caller-port` (default: `8080`) - Port for the caller-facing listener
+- `--operator-port` (default: `8081`) - Port for the operator-only listener
+
+#### Server Configuration
+- `--base-url` (default: `http://localhost:8080`) - Base URL for the caller-facing interface
+- `--spec-dir` (default: `./spec`) - Directory containing local OpenAPI spec files
+
+#### Corpus Capture
+- `--capture-enabled` (default: `false`) - Enable HTTP request/response capture for corpus collection
+- `--corpus-dir` (default: `corpus`) - Directory to store captured corpus files
+
+### Environment Variables
+
+All configuration flags can be set via environment variables with the `SEAM_` prefix:
+
+- `SEAM_CALLER_PORT` - Caller-facing port
+- `SEAM_OPERATOR_PORT` - Operator-only port
+- `SEAM_BASE_URL` - Base URL for caller interface
+- `SEAM_SPEC_DIR` - OpenAPI spec directory
+- `SEAM_CAPTURE_ENABLED` - Enable/disable corpus capture (`true`/`false` or `1`/`0`)
+- `SEAM_CORPUS_DIR` - Corpus storage directory
+
+### Examples
+
+#### Basic Usage (capture disabled)
+```bash
+seam serve
+```
+
+#### Enable Corpus Capture
+```bash
+# Via command-line flag
+seam serve --capture-enabled --corpus-dir ./my-corpus
+
+# Via environment variable
+SEAM_CAPTURE_ENABLED=true SEAM_CORPUS_DIR=./my-corpus seam serve
+```
+
+#### Custom Ports
+```bash
+seam serve --caller-port 9000 --operator-port 9001
+```
+
+### Capture Status Endpoint
+
+When capture is enabled, you can check the status via the operator endpoint:
+
+```bash
+curl http://localhost:8081/_seam/capture/status
+```
+
+Response:
+```json
+{
+  "enabled": true,
+  "entry_count": 42,
+  "corpus_dir": "corpus"
+}
+```
+
+### Manual Corpus Save
+
+Trigger an immediate save of the corpus:
+
+```bash
+curl -X POST http://localhost:8081/_seam/capture/save
+```
+
+Response:
+```json
+{
+  "status": "saved",
+  "entry_count": 42
+}
