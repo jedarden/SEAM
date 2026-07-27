@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -516,4 +517,388 @@ func TestSpecVersionStability(t *testing.T) {
 	if headerVersion1 != headerVersion2 {
 		t.Errorf("spec version changed between requests: %s != %s", headerVersion1, headerVersion2)
 	}
+}
+
+func TestDocsRouteHandlerMissingPathParameter(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test missing path parameter
+	req := httptest.NewRequest(http.MethodGet, "/docs/route", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", resp.StatusCode)
+	}
+
+	// Check error response structure
+	var errResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if errResp["error"] != "missing_required_parameter" {
+		t.Errorf("expected error 'missing_required_parameter', got %v", errResp["error"])
+	}
+
+	if errResp["message"] == nil {
+		t.Error("expected error message to be present")
+	}
+}
+
+func TestDocsRouteHandlerValidRoute(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test valid route lookup
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=GET", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check response structure
+	var routeResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&routeResp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	// Check required fields
+	if routeResp["path"] != "/openapi.json" {
+		t.Errorf("expected path '/openapi.json', got %v", routeResp["path"])
+	}
+
+	if routeResp["version"] != "_unversioned" {
+		t.Errorf("expected version '_unversioned', got %v", routeResp["version"])
+	}
+
+	// Check metadata
+	metadata, ok := routeResp["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected metadata to be present")
+	}
+
+	if metadata["spec_version"] == nil {
+		t.Error("expected spec_version in metadata")
+	}
+
+	if metadata["api_version"] == nil {
+		t.Error("expected api_version in metadata")
+	}
+
+	// Check operation data
+	operation, ok := routeResp["operation"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected operation to be present")
+	}
+
+	if operation["operationId"] != "getOpenapiSpec" {
+		t.Errorf("expected operationId 'getOpenapiSpec', got %v", operation["operationId"])
+	}
+
+	if operation["method"] != "GET" {
+		t.Errorf("expected method 'GET', got %v", operation["method"])
+	}
+}
+
+func TestDocsRouteHandlerAllMethods(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test route lookup without method parameter (should return all methods)
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/docs", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check response structure
+	var routeResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&routeResp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	// Should have methods map instead of single operation
+	if routeResp["methods"] == nil {
+		t.Fatal("expected methods to be present when no method specified")
+	}
+
+	methods, ok := routeResp["methods"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected methods to be a map")
+	}
+
+	// Check that GET method is present
+	getMethod, ok := methods["GET"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected GET method to be present")
+	}
+
+	if getMethod["operationId"] != "getDocs" {
+		t.Errorf("expected operationId 'getDocs', got %v", getMethod["operationId"])
+	}
+}
+
+func TestDocsRouteHandlerInvalidRoute(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test invalid route lookup
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/nonexistent&method=GET", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d", resp.StatusCode)
+	}
+
+	// Check error response structure
+	var errResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if errResp["error"] != "route_not_found" {
+		t.Errorf("expected error 'route_not_found', got %v", errResp["error"])
+	}
+}
+
+func TestDocsRouteHandlerInvalidMethod(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test valid path but invalid method
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=POST", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestDocsRouteHandlerVersionParameter(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test with explicit version parameter
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=GET&version=_unversioned", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check version in response
+	var routeResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&routeResp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if routeResp["version"] != "_unversioned" {
+		t.Errorf("expected version '_unversioned', got %v", routeResp["version"])
+	}
+}
+
+func TestDocsRouteHandlerWrongHTTPMethod(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test POST request to GET-only endpoint
+	req := httptest.NewRequest(http.MethodPost, "/docs/route?path=/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestDocsRouteHandlerResponseHeaders(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=GET", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	// Check version headers are present
+	specVersion := resp.Header.Get("X-SEAM-Spec-Version")
+	if specVersion == "" {
+		t.Error("expected X-SEAM-Spec-Version header to be set")
+	}
+
+	apiVersion := resp.Header.Get("X-SEAM-API-Version")
+	if apiVersion != "_unversioned" {
+		t.Errorf("expected X-SEAM-API-Version _unversioned, got %s", apiVersion)
+	}
+
+	// Check content type
+	ct := resp.Header.Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", ct)
+	}
+}
+
+func TestValidationMiddlewareSkipsReservedPaths(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test that reserved paths skip validation and return normally
+	reservedPaths := []string{
+		"/_seam/healthz",
+		"/_seam/readyz",
+		"/openapi.json",
+		"/docs",
+		"/docs/route",
+	}
+
+	for _, path := range reservedPaths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+
+			// Use the validation middleware wrapped handler
+			handler := s.validationMiddleware(s.callerMux)
+			handler.ServeHTTP(w, req)
+
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			// Reserved paths should not return validation errors
+			if resp.StatusCode == http.StatusBadRequest {
+				body, _ := io.ReadAll(resp.Body)
+				t.Errorf("reserved path %s should not trigger validation, got: %s", path, string(body))
+			}
+		})
+	}
+}
+
+func TestValidationMiddleware(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Create a handler that returns 200 OK
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Wrap with validation middleware
+	handler := s.validationMiddleware(nextHandler)
+
+	// Test that the middleware is wired up correctly for a non-reserved path
+	// In Phase 1a, there are no proxy routes, so non-reserved paths would still fail
+	// but we're testing the middleware wiring itself
+	t.Run("reserved_path_passes_through", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/_seam/healthz", nil)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200 for reserved path, got %d", resp.StatusCode)
+		}
+	})
 }
