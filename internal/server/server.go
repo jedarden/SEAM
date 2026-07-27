@@ -61,6 +61,8 @@ type Config struct {
 	OperatorPort int
 	BaseURL      string
 	SpecDir      string
+	CaptureEnabled bool
+	CorpusDir      string
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -74,6 +76,7 @@ type Server struct {
 	operatorListener net.Listener
 	wg               sync.WaitGroup
 	specLoader       *spec.Loader
+	captureMiddleware *CaptureMiddleware
 }
 
 // New creates a new Server with the given configuration
@@ -91,6 +94,20 @@ func New(cfg *Config) *Server {
 		specLoader:  specLoader,
 	}
 
+	// Initialize capture middleware if enabled
+	if cfg.CaptureEnabled {
+		corpusDir := cfg.CorpusDir
+		if corpusDir == "" {
+			corpusDir = "corpus"
+		}
+		s.captureMiddleware = NewCaptureMiddleware(corpusDir, "seam", "seam-incumbent", true)
+		// Load existing corpus if present
+		if err := s.captureMiddleware.Load(); err != nil {
+			log.Printf("Warning: failed to load existing corpus: %v", err)
+		}
+		log.Printf("Capture middleware enabled, corpus directory: %s", corpusDir)
+	}
+
 	s.setupRoutes()
 	return s
 }
@@ -102,10 +119,13 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
+	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
 
 	// Operator-only routes
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
 	s.operatorMux.HandleFunc("/config/status", s.configStatusHandler)
+	s.operatorMux.HandleFunc("/_seam/capture/save", s.captureSaveHandler)
+	s.operatorMux.HandleFunc("/_seam/capture/status", s.captureStatusHandler)
 }
 
 // healthzHandler returns 200 OK for liveness checks
@@ -191,6 +211,56 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}{
 		FragmentsLoaded: false,
 		Conditions:      []string{},
+	}
+
+	json.NewEncoder(w).Encode(status)
+}
+
+// captureSaveHandler manually saves the corpus
+func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.captureMiddleware == nil {
+		http.Error(w, "Capture middleware not enabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := s.captureMiddleware.Save(); err != nil {
+		log.Printf("Failed to save corpus: %v", err)
+		http.Error(w, "Failed to save corpus", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":     "saved",
+		"entry_count": s.captureMiddleware.GetEntryCount(),
+	})
+}
+
+// captureStatusHandler returns the current status of corpus capture
+func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	status := map[string]interface{}{
+		"enabled":     s.captureMiddleware != nil && s.captureMiddleware.IsEnabled(),
+		"entry_count": 0,
+		"corpus_dir":   "",
+	}
+
+	if s.captureMiddleware != nil {
+		status["entry_count"] = s.captureMiddleware.GetEntryCount()
+		status["corpus_dir"] = s.captureMiddleware.corpusDir
 	}
 
 	json.NewEncoder(w).Encode(status)
@@ -311,6 +381,173 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(html))
 }
 
+// docsRouteHandler returns route documentation for a specific endpoint
+// Query parameters:
+//   path - the OpenAPI path template (required)
+//   method - the HTTP method (optional, if omitted returns all methods)
+//   version - the API version (optional, defaults to _unversioned)
+func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters
+	query := r.URL.Query()
+	path := query.Get("path")
+	method := query.Get("method")
+	version := query.Get("version")
+
+	// Set default version
+	if version == "" {
+		version = "_unversioned"
+	}
+
+	// Validate required parameters
+	if path == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":   "missing_required_parameter",
+			"message": "The 'path' query parameter is required",
+			"example": "/docs/route?path=/openapi.json&method=GET",
+		})
+		return
+	}
+
+	// Get route information from the spec loader
+	routeInfo, err := s.specLoader.GetRoute(path, method, version)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":   "route_not_found",
+			"message": fmt.Sprintf("Route not found: %s", err),
+			"path":    path,
+			"method":  method,
+			"version": version,
+		})
+		return
+	}
+
+	// Build the response
+	response := map[string]interface{}{
+		"path":     routeInfo.Path,
+		"version":  routeInfo.Version,
+		"metadata": map[string]interface{}{
+			"description": "Route documentation for SEAM API",
+			"spec_version": s.specLoader.GetVersion(),
+			"api_version": s.specLoader.GetAPIVersion(),
+		},
+	}
+
+	// If we have multiple methods (no specific method requested)
+	if method == "" && len(routeInfo.Operations) > 0 {
+		methods := map[string]interface{}{}
+		for _, op := range routeInfo.Operations {
+			methodData := map[string]interface{}{
+				"summary":     op.Operation.Summary,
+				"description": op.Operation.Description,
+				"operationId": op.Operation.ID,
+				"tags":        op.Operation.Tags,
+			}
+
+			// Add parameters if present
+			if len(op.Operation.Parameters) > 0 {
+				params := []map[string]interface{}{}
+				for _, param := range op.Operation.Parameters {
+					params = append(params, map[string]interface{}{
+						"name":        param.Name,
+						"in":          param.In,
+						"description": param.Description,
+						"required":    param.Required,
+						"schema":      param.Schema,
+					})
+				}
+				methodData["parameters"] = params
+			}
+
+			// Add request body if present
+			if op.Operation.RequestBody != nil {
+				methodData["request_body"] = map[string]interface{}{
+					"description": op.Operation.RequestBody.Description,
+					"required":    op.Operation.RequestBody.Required,
+					"content":     op.Operation.RequestBody.Content,
+				}
+			}
+
+			// Add responses if present
+			if len(op.Operation.Responses) > 0 {
+				responses := map[string]interface{}{}
+				for code, response := range op.Operation.Responses {
+					responses[code] = map[string]interface{}{
+						"description": response.Description,
+						"content":     response.Content,
+					}
+				}
+				methodData["responses"] = responses
+			}
+
+			methods[op.Method] = methodData
+		}
+		response["methods"] = methods
+	} else if routeInfo.Operation != nil {
+		// Single method requested
+		response["method"] = method
+		methodData := map[string]interface{}{
+			"summary":     routeInfo.Operation.Summary,
+			"description": routeInfo.Operation.Description,
+			"operationId": routeInfo.Operation.ID,
+			"tags":        routeInfo.Operation.Tags,
+		}
+
+		// Add parameters if present
+		if len(routeInfo.Operation.Parameters) > 0 {
+			params := []map[string]interface{}{}
+			for _, param := range routeInfo.Operation.Parameters {
+				params = append(params, map[string]interface{}{
+					"name":        param.Name,
+					"in":          param.In,
+					"description": param.Description,
+					"required":    param.Required,
+					"schema":      param.Schema,
+				})
+			}
+			methodData["parameters"] = params
+		}
+
+		// Add request body if present
+		if routeInfo.Operation.RequestBody != nil {
+			methodData["request_body"] = map[string]interface{}{
+				"description": routeInfo.Operation.RequestBody.Description,
+				"required":    routeInfo.Operation.RequestBody.Required,
+				"content":     routeInfo.Operation.RequestBody.Content,
+			}
+		}
+
+		// Add responses if present
+		if len(routeInfo.Operation.Responses) > 0 {
+			responses := map[string]interface{}{}
+			for code, response := range routeInfo.Operation.Responses {
+				responses[code] = map[string]interface{}{
+					"description": response.Description,
+					"content":     response.Content,
+				}
+			}
+			methodData["responses"] = responses
+		}
+
+		response["operation"] = methodData
+	}
+
+	// Set headers and return response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
 // contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || indexOf(s, substr) >= 0))
@@ -350,9 +587,19 @@ func (s *Server) Start(ctx context.Context) error {
 	s.callerListener = callerListener
 	s.operatorListener = operatorListener
 
+	// Wrap caller mux with validation middleware (always active for caller port)
+	callerHandler := s.validationMiddleware(s.callerMux)
+	log.Printf("Validation middleware active on caller-facing port")
+
+	// Wrap with capture middleware if enabled
+	if s.captureMiddleware != nil {
+		callerHandler = s.captureMiddleware.Wrap(callerHandler)
+		log.Printf("Capture middleware active on caller-facing port")
+	}
+
 	// Create servers
 	s.callerServer = &http.Server{
-		Handler: s.callerMux,
+		Handler: callerHandler,
 	}
 	s.operatorServer = &http.Server{
 		Handler: s.operatorMux,
@@ -386,6 +633,15 @@ func (s *Server) Start(ctx context.Context) error {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Println("Shutting down server...")
+
+	// Save corpus before shutdown if capture is enabled
+	if s.captureMiddleware != nil && s.captureMiddleware.IsEnabled() {
+		if err := s.captureMiddleware.Save(); err != nil {
+			log.Printf("Failed to save corpus on shutdown: %v", err)
+		} else {
+			log.Printf("Corpus saved successfully (%d entries)", s.captureMiddleware.GetEntryCount())
+		}
+	}
 
 	// Close the caller server
 	if s.callerServer != nil {

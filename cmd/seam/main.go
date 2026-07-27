@@ -50,6 +50,8 @@ func serveCommand(args []string) {
 	operatorPort := fs.Int("operator-port", 8081, "Port for the operator-only listener")
 	baseURL := fs.String("base-url", "http://localhost:8080", "Base URL for the caller-facing interface")
 	specDir := fs.String("spec-dir", "./spec", "Directory containing local OpenAPI spec files")
+	captureEnabled := fs.Bool("capture-enabled", false, "Enable HTTP request/response capture")
+	corpusDir := fs.String("corpus-dir", "corpus", "Directory to store captured corpus files")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -68,6 +70,12 @@ func serveCommand(args []string) {
 	if val := os.Getenv("SEAM_SPEC_DIR"); val != "" {
 		*specDir = val
 	}
+	if val := os.Getenv("SEAM_CAPTURE_ENABLED"); val != "" {
+		*captureEnabled = val == "true" || val == "1"
+	}
+	if val := os.Getenv("SEAM_CORPUS_DIR"); val != "" {
+		*corpusDir = val
+	}
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("Starting SEAM gateway server:")
@@ -75,12 +83,18 @@ func serveCommand(args []string) {
 	log.Printf("  Operator-only port: %d", *operatorPort)
 	log.Printf("  Base URL: %s", *baseURL)
 	log.Printf("  Spec directory: %s", *specDir)
+	log.Printf("  Capture enabled: %v", *captureEnabled)
+	if *captureEnabled {
+		log.Printf("  Corpus directory: %s", *corpusDir)
+	}
 
 	cfg := &server.Config{
-		CallerPort:   *callerPort,
-		OperatorPort: *operatorPort,
-		BaseURL:      *baseURL,
-		SpecDir:      *specDir,
+		CallerPort:     *callerPort,
+		OperatorPort:   *operatorPort,
+		BaseURL:        *baseURL,
+		SpecDir:        *specDir,
+		CaptureEnabled: *captureEnabled,
+		CorpusDir:      *corpusDir,
 	}
 
 	srv := server.New(cfg)
