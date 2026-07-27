@@ -902,3 +902,158 @@ func TestValidationMiddleware(t *testing.T) {
 		}
 	})
 }
+
+func TestCaptureDisabledByDefault(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+		// CaptureEnabled is false by default (zero value)
+	}
+
+	s := New(cfg)
+
+	if s.captureMiddleware != nil {
+		t.Error("expected capture middleware to be nil when disabled")
+	}
+
+	if s.config.CaptureEnabled != false {
+		t.Error("expected CaptureEnabled to be false by default")
+	}
+}
+
+func TestCaptureEnabledWhenConfigured(t *testing.T) {
+	cfg := &Config{
+		CallerPort:     8080,
+		OperatorPort:   8081,
+		BaseURL:        "http://localhost:8080",
+		SpecDir:        "../../spec",
+		CaptureEnabled: true,
+		CorpusDir:      "test-corpus",
+	}
+
+	s := New(cfg)
+
+	if s.captureMiddleware == nil {
+		t.Error("expected capture middleware to be initialized when enabled")
+	}
+
+	if !s.config.CaptureEnabled {
+		t.Error("expected CaptureEnabled to be true when configured")
+	}
+
+	if s.captureMiddleware != nil && s.captureMiddleware.corpusDir != "test-corpus" {
+		t.Errorf("expected corpusDir to be 'test-corpus', got %s", s.captureMiddleware.corpusDir)
+	}
+}
+
+func TestCaptureMiddlewareDisabledBehavior(t *testing.T) {
+	// Create a capture middleware with enabled=false
+	cm := &CaptureMiddleware{
+		enabled: false,
+	}
+
+	// Create a test handler that sets a response
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test response"))
+	})
+
+	// Wrap with capture middleware
+	wrappedHandler := cm.Wrap(nextHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+	w := httptest.NewRecorder()
+
+	wrappedHandler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	// Should pass through to the next handler without capture
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "test response" {
+		t.Errorf("expected body 'test response', got %s", string(body))
+	}
+
+	// Should have no entries since capture is disabled
+	if len(cm.entries) != 0 {
+		t.Errorf("expected no entries when disabled, got %d", len(cm.entries))
+	}
+}
+
+func TestCaptureStatusEndpointWhenDisabled(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+		CaptureEnabled: false,
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/_seam/capture/status", nil)
+	w := httptest.NewRecorder()
+
+	s.operatorMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var status map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if status["enabled"] != false {
+		t.Errorf("expected enabled=false in status, got %v", status["enabled"])
+	}
+}
+
+func TestCaptureStatusEndpointWhenEnabled(t *testing.T) {
+	cfg := &Config{
+		CallerPort:     8080,
+		OperatorPort:   8081,
+		BaseURL:        "http://localhost:8080",
+		SpecDir:        "../../spec",
+		CaptureEnabled: true,
+		CorpusDir:      "test-corpus",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/_seam/capture/status", nil)
+	w := httptest.NewRecorder()
+
+	s.operatorMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var status map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if status["enabled"] != true {
+		t.Errorf("expected enabled=true in status, got %v", status["enabled"])
+	}
+
+	if status["corpus_dir"] == nil {
+		t.Error("expected corpus_dir to be present in status")
+	}
+}

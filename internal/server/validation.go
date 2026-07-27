@@ -2,16 +2,15 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
-// ValidationError is the structured error response for validation failures
+// ValidationErrorResponse is the structured error response for validation failures
 type ValidationErrorResponse struct {
-	Error           string `json:"error"`
-	Message         string `json:"message"`
+	Error            string                `json:"error"`
+	Message          string                `json:"message"`
 	ValidationErrors []ValidationFieldError `json:"validation_errors"`
-	DocsPointer     string `json:"docs_pointer"`
+	DocsPointer      string               `json:"docs_pointer"`
 }
 
 // ValidationFieldError represents a single field validation error
@@ -39,7 +38,7 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 		if validationErr != nil {
 			// Request validation failed - return structured 400 error
 			errJSON := validationErr.ToJSON(r.URL.Path, r.Method)
-			writeValidationError(w, r.URL.Path, r.Method, errJSON)
+			writeValidationError(w, errJSON)
 			return
 		}
 
@@ -49,34 +48,18 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 }
 
 // writeValidationError writes a structured 400 error response
-func writeValidationError(w http.ResponseWriter, path, method string, validationErrors interface{}) {
+func writeValidationError(w http.ResponseWriter, validationErrors map[string]interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 
 	response := ValidationErrorResponse{
-		Error:   "validation_failed",
-		Message: "Request does not conform to the OpenAPI specification",
-		DocsPointer: fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method),
+		Error:   validationErrors["error"].(string),
+		Message: validationErrors["message"].(string),
+		DocsPointer: validationErrors["docs_pointer"].(string),
 	}
 
-	// Handle both slice and single validation error formats
-	switch v := validationErrors.(type) {
-	case map[string]interface{}:
-		// Already formatted as JSON map from ValidationError.ToJSON()
-		if validationErrorsSlice, ok := v["validation_errors"].([]map[string]interface{}); ok {
-			for _, err := range validationErrorsSlice {
-				response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
-					Field:    getStringField(err, "field"),
-					Expected: getStringField(err, "expected"),
-					Actual:   getStringField(err, "actual"),
-					Reason:   getStringField(err, "reason"),
-					Line:     getIntField(err, "line"),
-					Column:   getIntField(err, "column"),
-				})
-			}
-		}
-	case []map[string]interface{}:
-		// Direct slice of validation errors
-		for _, err := range v {
+	// Handle validation errors array
+	if validationErrorsSlice, ok := validationErrors["validation_errors"].([]map[string]interface{}); ok {
+		for _, err := range validationErrorsSlice {
 			response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
 				Field:    getStringField(err, "field"),
 				Expected: getStringField(err, "expected"),
