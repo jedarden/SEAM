@@ -448,7 +448,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 			methodData := map[string]interface{}{
 				"summary":     op.Operation.Summary,
 				"description": op.Operation.Description,
-				"operationId": op.Operation.ID,
+				"operationId": op.Operation.OperationId,
 				"tags":        op.Operation.Tags,
 			}
 
@@ -477,9 +477,9 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Add responses if present
-			if len(op.Operation.Responses) > 0 {
+			if op.Operation.Responses != nil && op.Operation.Responses.Codes != nil {
 				responses := map[string]interface{}{}
-				for code, response := range op.Operation.Responses {
+				for code, response := range op.Operation.Responses.Codes.FromOldest() {
 					responses[code] = map[string]interface{}{
 						"description": response.Description,
 						"content":     response.Content,
@@ -497,7 +497,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		methodData := map[string]interface{}{
 			"summary":     routeInfo.Operation.Summary,
 			"description": routeInfo.Operation.Description,
-			"operationId": routeInfo.Operation.ID,
+			"operationId": routeInfo.Operation.OperationId,
 			"tags":        routeInfo.Operation.Tags,
 		}
 
@@ -526,9 +526,9 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Add responses if present
-		if len(routeInfo.Operation.Responses) > 0 {
+		if routeInfo.Operation.Responses != nil && routeInfo.Operation.Responses.Codes != nil {
 			responses := map[string]interface{}{}
-			for code, response := range routeInfo.Operation.Responses {
+			for code, response := range routeInfo.Operation.Responses.Codes.FromOldest() {
 				responses[code] = map[string]interface{}{
 					"description": response.Description,
 					"content":     response.Content,
