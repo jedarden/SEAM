@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"runtime"
 	"sync"
+
+	"github.com/ardenone/seam/internal/spec"
 )
 
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
@@ -71,14 +73,22 @@ type Server struct {
 	callerListener   net.Listener
 	operatorListener net.Listener
 	wg               sync.WaitGroup
+	specLoader       *spec.Loader
 }
 
 // New creates a new Server with the given configuration
 func New(cfg *Config) *Server {
+	// Initialize the spec loader
+	specLoader, err := spec.New(cfg.SpecDir, cfg.BaseURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize spec loader: %v", err)
+	}
+
 	s := &Server{
 		config:      cfg,
 		callerMux:   http.NewServeMux(),
 		operatorMux: http.NewServeMux(),
+		specLoader:  specLoader,
 	}
 
 	s.setupRoutes()
@@ -90,6 +100,8 @@ func (s *Server) setupRoutes() {
 	// Caller-facing routes
 	s.callerMux.HandleFunc("/_seam/healthz", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
+	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
+	s.callerMux.HandleFunc("/docs", s.docsHandler)
 
 	// Operator-only routes
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
@@ -182,6 +194,136 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(status)
+}
+
+// openapiJSONHandler returns the OpenAPI spec as JSON
+func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the spec JSON with servers populated
+	specJSON, err := s.specLoader.GetRawJSON()
+	if err != nil {
+		log.Printf("Failed to get spec JSON: %v", err)
+		http.Error(w, "Failed to load spec", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+
+	w.Write(specJSON)
+}
+
+// docsHandler returns the API documentation
+// In Phase 1a, this returns minimal HTML rendering of the spec
+func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check Accept header for content negotiation
+	accept := r.Header.Get("Accept")
+
+	// If client wants JSON, return the spec as JSON
+	if contains(accept, "application/json") {
+		s.openapiJSONHandler(w, r)
+		return
+	}
+
+	// Default to HTML rendering
+	specJSON, err := s.specLoader.GetRawJSON()
+	if err != nil {
+		log.Printf("Failed to get spec JSON: %v", err)
+		http.Error(w, "Failed to load spec", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+
+	// Minimal HTML rendering
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEAM API Documentation</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; }
+        .meta { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .meta p { margin: 5px 0; }
+        .endpoint { background: #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .endpoint .method { font-weight: bold; color: #007bff; }
+        .endpoint .path { font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 3px; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        code { background: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>SEAM API Documentation</h1>
+    <div class="meta">
+        <p><strong>Version:</strong> ` + s.specLoader.GetVersion() + `</p>
+        <p><strong>API Version:</strong> ` + s.specLoader.GetAPIVersion() + `</p>
+        <p><a href="/openapi.json">Download OpenAPI Spec (JSON)</a></p>
+    </div>
+    <h2>Available Endpoints</h2>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/openapi.json</span>
+        <p>Returns the complete OpenAPI 3.1 specification for SEAM</p>
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/docs</span>
+        <p>Returns this API documentation (HTML or JSON)</p>
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/_seam/healthz</span>
+        <p>Kubernetes liveness endpoint. Always returns 200 OK when the server is running.</p>
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/_seam/readyz</span>
+        <p>Kubernetes readiness endpoint. Returns readiness status.</p>
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/_seam/metrics</span>
+        <p>Prometheus-style metrics endpoint (operator-only port).</p>
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/config/status</span>
+        <p>Returns configuration fragment status.</p>
+    </div>
+    <h2>OpenAPI Specification</h2>
+    <pre><code>` + string(specJSON) + `</code></pre>
+</body>
+</html>`
+
+	w.Write([]byte(html))
+}
+
+// contains checks if a string contains a substring (case-insensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || indexOf(s, substr) >= 0))
+}
+
+// indexOf finds the index of a substring
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
 
 // Start begins listening on both ports
