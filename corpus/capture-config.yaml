@@ -1,0 +1,78 @@
+# SEAM Corpus Capture Configuration
+#
+# This file controls the corpus capture mechanism for various services.
+# Capture can be enabled/disabled per-service using the enabled flag.
+#
+# Usage:
+#   1. Set enabled: true for the service you want to capture
+#   2. Run: ./scripts/capture-argocd.sh start
+#   3. Make test requests to the capture proxy
+#   4. Run: ./scripts/capture-argocd.sh stop
+#   5. Corpus will be saved to the specified path
+
+# Global settings
+global:
+  # Default capture port (can be overridden per-service)
+  default_port: 8082
+
+  # Log level for capture operations
+  log_level: info
+
+# Service-specific capture configurations
+services:
+  argocd:
+    # Enable/disable capture for this service
+    enabled: false
+
+    # The incumbent proxy URL to capture from
+    incumbent_url: "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
+
+    # Service name token for the corpus
+    service_name: "argocd"
+
+    # Path where the corpus will be saved
+    corpus_path: "corpus/argocd-proxy/corpus.json"
+
+    # Port for the capture proxy to listen on
+    listen_port: 8082
+
+    # Free-form description for the corpus header
+    description: "ArgoCD read-only proxy corpus captured from production"
+
+    # Capture settings
+    capture:
+      # Capture interval - how often to auto-save the corpus (number of requests)
+      auto_save_interval: 10
+
+      # Maximum corpus size (in entries) before rotation
+      max_entries: 1000
+
+      # Whether to capture response bodies (can be large)
+      capture_bodies: true
+
+      # Response body size limit (in bytes, 0 = no limit)
+      max_body_size: 10485760  # 10MB default
+
+  # Example configuration for other services (not yet implemented)
+  # kubectl-proxy:
+  #   enabled: false
+  #   incumbent_url: "http://traefik-ardenone-cluster:8001"
+  #   service_name: "kubectl-proxy"
+  #   corpus_path: "corpus/kubectl-proxies/ardenone-cluster-corpus.json"
+  #   listen_port: 8083
+  #   description: "kubectl-proxy corpus for ardenone-cluster"
+
+  # twitterapi-proxy:
+  #   enabled: false
+  #   incumbent_url: "https://twitterapi.io"
+  #   service_name: "twitterapi"
+  #   corpus_path: "corpus/twitterapi-proxy/corpus.json"
+  #   listen_port: 8084
+  #   description: "Twitter API proxy corpus"
+
+# Notes:
+# - When enabled: false, the capture mechanism is dormant and does not affect normal operation
+# - When enabled: true, traffic is captured to the corpus but still forwarded to the incumbent
+# - The capture proxy is a transparent middleware - it does not modify requests or responses
+# - Set enabled: true ONLY when actively capturing corpus data
+# - Corpus files are git-tracked and should be reviewed before committing

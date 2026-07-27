@@ -1,0 +1,41 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "argocd",
+  "incumbent": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
+  "capturedAt": "2026-07-27T12:02:06-04:00",
+  "description": "ArgoCD read-only proxy corpus captured from production",
+  "entries": [
+    {
+      "id": "api-v1-applications-get",
+      "description": "GET /api/v1/applications",
+      "request": {
+        "method": "Get",
+        "path": "/api/v1/applications",
+        "headers": {
+          "Accept": [
+            "*/*"
+          ],
+          "User-Agent": [
+            "curl/8.14.1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "api-v1-clusters-get",
+      "description": "GET /api/v1/clusters",
+      "request": {
+        "method": "Get",
+        "path": "/api/v1/clusters",
+        "headers": {
+          "Accept": [
+            "*/*"
+          ],
+          "User-Agent": [
+            "curl/8.14.1"
+          ]
+        }
+      }
+    }
+  ]
+}

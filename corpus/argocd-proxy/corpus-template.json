@@ -1,0 +1,122 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "argocd",
+  "incumbent": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
+  "capturedAt": "2026-07-27T12:00:00Z",
+  "description": "ArgoCD read-only proxy corpus captured from production",
+  "entries": [
+    {
+      "id": "list-apps-get",
+      "description": "List all applications",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/applications",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/argocd/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "list-clusters-get",
+      "description": "List all clusters",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/clusters",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/argocd/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "get-app-myapp-get",
+      "description": "Get specific application details",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/applications/myapp",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/argocd/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Date", "Server"]
+      }
+    },
+    {
+      "id": "get-app-sync-get",
+      "description": "Get application sync status",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/applications/myapp/sync",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/argocd/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "get-app-manifest-get",
+      "description": "Get application manifest",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/applications/myapp/manifest",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/argocd/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ]
+    }
+  ]
+}
