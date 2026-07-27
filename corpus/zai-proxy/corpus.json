@@ -1,0 +1,159 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "zai-proxy",
+  "incumbent": "http://zai-proxy.devpod.svc.cluster.local:8080",
+  "capturedAt": "2026-07-27T12:00:00Z",
+  "description": "Differential corpus for the incumbent z.ai/GLM proxy on ardenone-cluster. Captured from typical usage patterns: basic message requests, streaming responses, multi-turn conversations, and system prompts. All requests use the Anthropic-compatible API format that the proxy translates to ZhipuAI/GLM format upstream.",
+  "entries": [
+    {
+      "id": "basic-message",
+      "description": "Basic single-turn message request without streaming",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "query": "",
+        "headers": {
+          "Content-Type": ["application/json"],
+          "X-API-Key": ["sk-ant-placeholder"],
+          "Anthropic-Version": ["2023-06-01"]
+        },
+        "bodyB64": "eyJtb2RlbCI6ImNsYXVkZS0zb3B1cy0yMDI0MDUxNCIsIm1heF90b2tlbnMiOjEwMCwibWVzc2FnZXMiOlt7InJvbGUiOiJ1c2VyIiwiY29udGVudCI6IlBsZWFzZSBleHBsYWluIHRoZSBkaWZmZXJlbmNlIGJldHdlZW4gY2xhc3NpZmljYXRpb24gYW5kIHJlZ3Jlc3Npb24uIn1dfQ==",
+        "bodyContentType": "application/json"
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/zai-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id"]
+      }
+    },
+    {
+      "id": "streaming-message",
+      "description": "Streaming message request for real-time response",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "query": "",
+        "headers": {
+          "Content-Type": ["application/json"],
+          "X-API-Key": ["sk-ant-placeholder"],
+          "Anthropic-Version": ["2023-06-01"]
+        },
+        "bodyB64": "eyJtb2RlbCI6ImNsYXVkZS0zb3B1cy0yMDI0MDUxNCIsIm1heF90b2tlbnIiOjEwMCwibWVzc2FnZXMiOlt7InJvbGUiOiJ1c2VyIiwiY29udGVudCI6IkhlbGxvISBIb3cgYXJlIHlvdT8ifV0sInN0cmVhbSI6dHJ1ZX0=",
+        "bodyContentType": "application/json"
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/zai-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id"]
+      }
+    },
+    {
+      "id": "system-prompt",
+      "description": "Message with system prompt for context setting",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "query": "",
+        "headers": {
+          "Content-Type": ["application/json"],
+          "X-API-Key": ["sk-ant-placeholder"],
+          "Anthropic-Version": ["2023-06-01"]
+        },
+        "bodyB64": "eyJtb2RlbCI6ImNsYXVkZS0zb3B1cy0yMDI0MDUxNCIsIm1heF90b2tlbnMiOjEwMCwic3lzdGVtIjoiWW91IGFyZSBhIGhlbHBmdWwgYXNzaXN0YW50IHdobyByZXNwb25kcyBjb25jdXNlbHkuIiwibWVzc2FnZXMiOlt7InJvbGUiOiJ1c2VyIiwiY29udGVudCI6IkNhbiB5b3Ugc3VtbWFyaXplIHRoaXMgYXJ0aWNsZSBpbiBvbmUgc2VudGVuY2U/In1dfQ==",
+        "bodyContentType": "application/json"
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/zai-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id"]
+      }
+    },
+    {
+      "id": "multi-turn-conversation",
+      "description": "Multi-turn conversation with context history",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "query": "",
+        "headers": {
+          "Content-Type": ["application/json"],
+          "X-API-Key": ["sk-ant-placeholder"],
+          "Anthropic-Version": ["2023-06-01"]
+        },
+        "bodyB64": "eyJtb2RlbCI6ImNsYXVkZS0zb3B1cy0yMDI0MDUxNCIsIm1heF90b2tlbnMiOjEwMCwibWVzc2FnZXMiOlt7InJvbGUiOiJ1c2VyIiwiY29udGVudCI6IllvdSBhcmUgYSBkYXRhIHNjaWVudGlzdC4ifSx7InJvbGUiOiJhc3Npc3RhbnQiLCJjb250ZW50IjoiVW5kZXJzdG9vZCEgSSBzcGVjaWFsaXplIGluIG1hY2hpbmUgbGVhcm5pbmcgYW5kIGRhdGEgYW5hbHl0aWNzLiJ9LHsicm9sZSI6InVzZXIiLCJjb250ZW50IjoiV2hhdCBhcmUgdGhlIGtleSBkaWZmZXJlbmNlcyBiZXR3ZWVuIHN1cGVydmlzZWQgYW5kIHVuc3VwZXJ2aXNlZCBsZWFybmluZz8ifV19",
+        "bodyContentType": "application/json"
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/zai-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "X-Request-Id"]
+      }
+    },
+    {
+      "id": "health-check",
+      "description": "Health check endpoint for proxy status",
+      "request": {
+        "method": "GET",
+        "path": "/health",
+        "query": "",
+        "headers": {},
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "Content-Length"]
+      }
+    },
+    {
+      "id": "metrics-endpoint",
+      "description": "Prometheus metrics endpoint for monitoring",
+      "request": {
+        "method": "GET",
+        "path": "/metrics",
+        "query": "",
+        "headers": {},
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [],
+      "expect": {
+        "status": 200,
+        "ignoreHeaders": ["Date", "Server", "Content-Length"]
+      }
+    }
+  ]
+}
