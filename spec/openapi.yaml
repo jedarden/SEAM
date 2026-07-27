@@ -1,0 +1,170 @@
+openapi: 3.1.0
+info:
+  title: SEAM API
+  version: 0.1.0
+  description: |
+    SEAM (Self-documenting Endpoint Access Mediator) is a unified gateway that proxies
+    authenticated service requests while injecting required secrets. This spec describes
+    the Phase 1a control-plane endpoints.
+
+    **Phase 1a scope:** Gateway scaffold with hand-written whole spec (no fragment merge yet).
+    Control-plane endpoints are reserved and short-circuit route-table lookup.
+  contact:
+    name: SEAM Project
+    url: https://github.com/ardenone/seam
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+# servers will be populated at runtime with the caller-facing base URL
+servers: []
+
+paths:
+  /openapi.json:
+    get:
+      summary: Get OpenAPI spec
+      description: Returns the complete OpenAPI 3.1 specification for SEAM
+      operationId: getOpenapiSpec
+      tags:
+        - Documentation
+      responses:
+        '200':
+          description: OpenAPI 3.1 spec JSON
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            X-SEAM-Spec-Version:
+              description: Stable hash of the served spec (changes only when spec content changes)
+              schema:
+                type: string
+            X-SEAM-API-Version:
+              description: API version (constant at _unversioned until Phase 8)
+              schema:
+                type: string
+                default: _unversioned
+
+  /docs:
+    get:
+      summary: API documentation
+      description: Returns rendered API documentation (HTML or JSON)
+      operationId: getDocs
+      tags:
+        - Documentation
+      responses:
+        '200':
+          description: API documentation
+          content:
+            application/json:
+              schema:
+                type: object
+            text/html:
+              schema:
+                type: string
+          headers:
+            X-SEAM-Spec-Version:
+              description: Stable hash of the served spec
+              schema:
+                type: string
+            X-SEAM-API-Version:
+              description: API version
+              schema:
+                type: string
+                default: _unversioned
+
+  /_seam/healthz:
+    get:
+      summary: Liveness probe
+      description: |
+        Kubernetes liveness endpoint. Always returns 200 OK when the server is running.
+        This is a minimal health check that confirms the HTTP server is responsive.
+      operationId: healthz
+      tags:
+        - Health
+      externalDocs:
+        description: Kubernetes probe documentation
+        url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+      responses:
+        '200':
+          description: Server is live
+          content:
+            text/plain:
+              schema:
+                type: string
+                enum: ["OK"]
+
+  /_seam/readyz:
+    get:
+      summary: Readiness probe
+      description: |
+        Kubernetes readiness endpoint. In Phase 1a, always returns ready=true.
+        Phase 6a will add login dependency gating.
+      operationId: readyz
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                required: [ready]
+
+  /_seam/metrics:
+    get:
+      summary: Prometheus metrics
+      description: |
+        Prometheus-style metrics endpoint. In Phase 1a, exposes Go runtime/build basics.
+        Phase 8 will add per-route-version series.
+      operationId: metrics
+      tags:
+        - Metrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /config/status:
+    get:
+      summary: Configuration status
+      description: |
+        Returns configuration fragment status. In Phase 1a, returns a quiescent/empty payload.
+        Phase 1b will populate it with fragment quarantine status.
+      operationId: configStatus
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fragments_loaded:
+                    type: boolean
+                    description: Whether route fragments are loaded (false in Phase 1a)
+                  conditions:
+                    type: array
+                    items:
+                      type: string
+                    description: Array of condition messages (empty in Phase 1a)
+                required: [fragments_loaded, conditions]
+
+tags:
+  - name: Documentation
+    description: API documentation and specification endpoints
+  - name: Health
+    description: Health check endpoints for Kubernetes probes
+  - name: Metrics
+    description: Metrics and monitoring endpoints
+  - name: Configuration
+    description: Configuration and fragment status endpoints

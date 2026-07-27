@@ -15,7 +15,7 @@ func TestHealthzHandler(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -44,7 +44,7 @@ func TestHealthzHandlerWrongMethod(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -67,7 +67,7 @@ func TestReadyzHandler(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -100,7 +100,7 @@ func TestMetricsHandler(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -144,7 +144,7 @@ func TestConfigStatusHandler(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -181,7 +181,7 @@ func TestConfigStatusHandlerWrongMethod(t *testing.T) {
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -247,7 +247,7 @@ func TestServerStart(t *testing.T) {
 		CallerPort:   0, // 0 means OS assigns a port
 		OperatorPort: 0,
 		BaseURL:      "http://localhost:8080",
-		SpecDir:      "./spec",
+		SpecDir:      "../../spec",
 	}
 
 	s := New(cfg)
@@ -274,5 +274,246 @@ func TestServerStart(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Error("server start timed out")
+	}
+}
+
+func TestOpenAPIJSONHandler(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check content type is JSON
+	ct := resp.Header.Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", ct)
+	}
+
+	// Check version headers are present
+	specVersion := resp.Header.Get("X-SEAM-Spec-Version")
+	if specVersion == "" {
+		t.Error("expected X-SEAM-Spec-Version header to be set")
+	}
+	if len(specVersion) != 16 { // SHA256 first 16 hex chars
+		t.Errorf("expected X-SEAM-Spec-Version to be 16 chars, got %d", len(specVersion))
+	}
+
+	apiVersion := resp.Header.Get("X-SEAM-API-Version")
+	if apiVersion != "_unversioned" {
+		t.Errorf("expected X-SEAM-API-Version _unversioned, got %s", apiVersion)
+	}
+
+	// Parse response as JSON and verify it's valid OpenAPI 3.1
+	var spec map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&spec); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	// Check OpenAPI version
+	if openapiVersion, ok := spec["openapi"].(string); !ok || openapiVersion != "3.1.0" {
+		t.Errorf("expected openapi version 3.1.0, got %v", spec["openapi"])
+	}
+
+	// Check servers array is populated with our base URL
+	servers, ok := spec["servers"].([]interface{})
+	if !ok || len(servers) != 1 {
+		t.Errorf("expected servers array with 1 element, got %v", spec["servers"])
+	} else {
+		server, ok := servers[0].(map[string]interface{})
+		if !ok {
+			t.Error("expected server to be an object")
+		} else {
+			if url, ok := server["url"].(string); !ok || url != "http://localhost:8080" {
+				t.Errorf("expected server.url to be http://localhost:8080, got %v", server["url"])
+			}
+		}
+	}
+}
+
+func TestOpenAPIJSONHandlerWrongMethod(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestDocsHandlerHTML(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check content type is HTML
+	ct := resp.Header.Get("Content-Type")
+	if !strings.Contains(ct, "text/html") {
+		t.Errorf("expected Content-Type to contain text/html, got %s", ct)
+	}
+
+	// Check version headers are present
+	specVersion := resp.Header.Get("X-SEAM-Spec-Version")
+	if specVersion == "" {
+		t.Error("expected X-SEAM-Spec-Version header to be set")
+	}
+
+	apiVersion := resp.Header.Get("X-SEAM-API-Version")
+	if apiVersion != "_unversioned" {
+		t.Errorf("expected X-SEAM-API-Version _unversioned, got %s", apiVersion)
+	}
+
+	// Read body and check it's HTML
+	body := make([]byte, 4096)
+	n, _ := resp.Body.Read(body)
+	bodyStr := string(body[:n])
+
+	if !strings.Contains(bodyStr, "<!DOCTYPE html>") {
+		t.Error("expected response to contain HTML doctype")
+	}
+	if !strings.Contains(bodyStr, "SEAM API Documentation") {
+		t.Error("expected response to contain 'SEAM API Documentation'")
+	}
+}
+
+func TestDocsHandlerJSON(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	req.Header.Set("Accept", "application/json")
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check content type is JSON
+	ct := resp.Header.Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", ct)
+	}
+
+	// Check version headers are present
+	specVersion := resp.Header.Get("X-SEAM-Spec-Version")
+	if specVersion == "" {
+		t.Error("expected X-SEAM-Spec-Version header to be set")
+	}
+
+	// Parse response as JSON
+	var spec map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&spec); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	// Check it's valid OpenAPI
+	if _, ok := spec["openapi"]; !ok {
+		t.Error("expected response to contain openapi field")
+	}
+}
+
+func TestSpecVersionStability(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s1 := New(cfg)
+	s2 := New(cfg)
+
+	// Both loaders should produce the same spec version for the same spec
+	v1 := s1.specLoader.GetVersion()
+	v2 := s2.specLoader.GetVersion()
+
+	if v1 != v2 {
+		t.Errorf("spec version not stable: %s != %s", v1, v2)
+	}
+
+	// Verify the version is used in responses
+	req1 := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w1 := httptest.NewRecorder()
+	s1.callerMux.ServeHTTP(w1, req1)
+
+	resp1 := w1.Result()
+	defer resp1.Body.Close()
+
+	headerVersion1 := resp1.Header.Get("X-SEAM-Spec-Version")
+	if headerVersion1 != v1 {
+		t.Errorf("header version %s doesn't match loader version %s", headerVersion1, v1)
+	}
+
+	// Second request should have the same version
+	req2 := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w2 := httptest.NewRecorder()
+	s2.callerMux.ServeHTTP(w2, req2)
+
+	resp2 := w2.Result()
+	defer resp2.Body.Close()
+
+	headerVersion2 := resp2.Header.Get("X-SEAM-Spec-Version")
+	if headerVersion2 != v2 {
+		t.Errorf("header version %s doesn't match loader version %s", headerVersion2, v2)
+	}
+
+	if headerVersion1 != headerVersion2 {
+		t.Errorf("spec version changed between requests: %s != %s", headerVersion1, headerVersion2)
 	}
 }
