@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -256,20 +257,20 @@ func (ve *ValidationError) ToJSON(path, method string) map[string]interface{} {
 
 	for _, err := range ve.Errors {
 		errorDetails = append(errorDetails, map[string]interface{}{
-			"field":       err.SpecPath,
-			"expected":    err.HowToFix,
-			"actual":      err.RequestPath,
-			"reason":      err.Reason,
-			"line":        err.SpecLine,
-			"column":      err.SpecCol,
+			"field":          err.SpecPath,
+			"expected_shape": err.HowToFix,
+			"actual":         err.RequestPath,
+			"reason":         err.Reason,
+			"line":           err.SpecLine,
+			"column":         err.SpecCol,
 		})
 	}
 
 	return map[string]interface{}{
 		"error":             "validation_failed",
-		"message":          "Request does not conform to the OpenAPI specification",
+		"message":           "Request does not conform to the OpenAPI specification",
 		"validation_errors": errorDetails,
-		"docs_pointer": fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method),
+		"docs_url": fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method),
 	}
 }
 
@@ -289,3 +290,112 @@ type OperationHolder struct {
 	Method    string
 	Operation *v3.Operation
 }
+
+// FormatValidationErrorTo400 converts libopenapi-validator errors to structured 400 format
+func FormatValidationErrorTo400(validationErrors []*errors.ValidationError, path, method string) map[string]interface{} {
+	errorDetails := []map[string]interface{}{}
+
+	for _, err := range validationErrors {
+		errorDetails = append(errorDetails, map[string]interface{}{
+			"field":          err.SpecPath,
+			"expected_shape": extractExpectedShape(err),
+			"actual":         err.RequestPath,
+			"reason":         err.Reason,
+			"line":           err.SpecLine,
+			"column":         err.SpecCol,
+		})
+	}
+
+	return map[string]interface{}{
+		"error":             "validation_failed",
+		"message":           "Request does not conform to the OpenAPI specification",
+		"validation_errors": errorDetails,
+		"docs_url":          FormatDocsURL(path, method),
+	}
+}
+
+// FormatDocsURL generates the docs URL for a given path and method
+func FormatDocsURL(path, method string) string {
+	return fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method)
+}
+
+// extractExpectedShape derives the expected shape/type from a validation error
+func extractExpectedShape(err *errors.ValidationError) string {
+	// Start with the HowToFix as the base expected shape
+	expectedShape := err.HowToFix
+
+	// If no HowToFix is provided, fall back to generic message
+	// Don't try to enhance with validation type if we have no substantive content
+	if expectedShape == "" {
+		return "See OpenAPI specification for required format"
+	}
+
+	// Enhance with validation type information only if we have HowToFix content
+	if err.ValidationType != "" {
+		var typeInfo string
+		switch strings.ToLower(err.ValidationType) {
+		case "request":
+			typeInfo = "Request validation"
+		case "response":
+			typeInfo = "Response validation"
+		case "parameter":
+			typeInfo = "Parameter validation"
+		case "requestbody":
+			typeInfo = "Request body validation"
+		case "security":
+			typeInfo = "Security validation"
+		default:
+			typeInfo = err.ValidationType + " validation"
+		}
+
+		expectedShape = typeInfo + ": " + expectedShape
+	}
+
+	// Add validation subtype if available
+	if err.ValidationSubType != "" {
+		expectedShape = expectedShape + " (" + err.ValidationSubType + ")"
+	}
+
+	return expectedShape
+}
+
+// ValidationFieldError represents a single field error in the structured 400 response
+type ValidationFieldError struct {
+	Field          string `json:"field"`
+	ExpectedShape  string `json:"expected_shape"`
+	Actual         string `json:"actual,omitempty"`
+	Reason         string `json:"reason"`
+	Line           int    `json:"line,omitempty"`
+	Column         int    `json:"column,omitempty"`
+}
+
+// Structured400Response represents the complete structured 400 error response
+type Structured400Response struct {
+	Error            string                  `json:"error"`
+	Message          string                  `json:"message"`
+	ValidationErrors []ValidationFieldError  `json:"validation_errors"`
+	DocsURL          string                  `json:"docs_url"`
+}
+
+// ConvertToStructured400 converts a ValidationError to Structured400Response
+func ConvertToStructured400(ve *ValidationError, path, method string) *Structured400Response {
+	response := &Structured400Response{
+		Error:   "validation_failed",
+		Message: "Request does not conform to the OpenAPI specification",
+		DocsURL: FormatDocsURL(path, method),
+	}
+
+	for _, err := range ve.Errors {
+		response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
+			Field:          err.SpecPath,
+			ExpectedShape:  extractExpectedShape(err),
+			Actual:         err.RequestPath,
+			Reason:         err.Reason,
+			Line:           err.SpecLine,
+			Column:         err.SpecCol,
+		})
+	}
+
+	return response
+}
+

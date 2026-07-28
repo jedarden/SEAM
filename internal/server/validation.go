@@ -10,17 +10,17 @@ type ValidationErrorResponse struct {
 	Error            string                `json:"error"`
 	Message          string                `json:"message"`
 	ValidationErrors []ValidationFieldError `json:"validation_errors"`
-	DocsPointer      string               `json:"docs_pointer"`
+	DocsURL          string               `json:"docs_url"`
 }
 
 // ValidationFieldError represents a single field validation error
 type ValidationFieldError struct {
-	Field    string `json:"field"`
-	Expected string `json:"expected"`
-	Actual   string `json:"actual"`
-	Reason   string `json:"reason"`
-	Line     int    `json:"line,omitempty"`
-	Column   int    `json:"column,omitempty"`
+	Field          string `json:"field"`
+	ExpectedShape  string `json:"expected_shape"`
+	Actual         string `json:"actual"`
+	Reason         string `json:"reason"`
+	Line           int    `json:"line,omitempty"`
+	Column         int    `json:"column,omitempty"`
 }
 
 // validationMiddleware returns a middleware that validates requests against the OpenAPI spec
@@ -54,19 +54,19 @@ func writeValidationError(w http.ResponseWriter, validationErrors map[string]int
 	response := ValidationErrorResponse{
 		Error:   validationErrors["error"].(string),
 		Message: validationErrors["message"].(string),
-		DocsPointer: validationErrors["docs_pointer"].(string),
+		DocsURL: validationErrors["docs_url"].(string),
 	}
 
 	// Handle validation errors array
 	if validationErrorsSlice, ok := validationErrors["validation_errors"].([]map[string]interface{}); ok {
 		for _, err := range validationErrorsSlice {
 			response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
-				Field:    getStringField(err, "field"),
-				Expected: getStringField(err, "expected"),
-				Actual:   getStringField(err, "actual"),
-				Reason:   getStringField(err, "reason"),
-				Line:     getIntField(err, "line"),
-				Column:   getIntField(err, "column"),
+				Field:         getStringField(err, "field"),
+				ExpectedShape: getStringField(err, "expected_shape"),
+				Actual:        getStringField(err, "actual"),
+				Reason:        getStringField(err, "reason"),
+				Line:          getIntField(err, "line"),
+				Column:        getIntField(err, "column"),
 			})
 		}
 	}
