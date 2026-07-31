@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -423,4 +424,19 @@ func TestArgoCDProxyBaselineNoCorpusLeakage(t *testing.T) {
 	}
 
 	t.Log("No corpus files created with capture disabled")
+}
+
+// getAvailablePort binds an ephemeral TCP port, closes the listener, and
+// returns the port number so a caller can pre-compute config (e.g. BaseURL)
+// before the server itself binds it.
+func getAvailablePort(t *testing.T) int {
+	t.Helper()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate available port: %v", err)
+	}
+	defer l.Close()
+
+	return l.Addr().(*net.TCPAddr).Port
 }
