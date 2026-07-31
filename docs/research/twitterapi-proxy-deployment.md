@@ -200,3 +200,31 @@ it was written against an assumed Twitter API v2 shape and does not match realit
 
 A real capture against the live service is needed before the SEAM route fragment can be
 diffed against the incumbent. Filed as follow-up bead **`bf-1x3w`**.
+
+### Resolved — re-captured 2026-07-31 (`bf-1x3w`)
+
+`corpus/twitterapi-proxy/corpus.json` has been re-captured live over the tailnet
+ingress using the §6 method: 12 entries, all `/twitter/*` (plus the proxy-local
+`/health`), `injectAs {kind: header, name: x-api-key}`, and the §5 Cloudflare/trace
+volatile-header set. `scripts/capture-twitterapi-proxy.sh` re-verifies every entry
+against the live service (`verify`) and primes the cache (`warm`).
+
+Two claims above needed refinement once every endpoint was probed rather than just
+`/twitter/user/info`:
+
+- **The `{status, msg, data}` envelope is per-endpoint, not universal.** Three shapes
+  exist: `/twitter/user/info` → `{status, msg, data{…}}`; `/twitter/user/last_tweets` →
+  `{status, code, msg, data{pin_tweet, tweets[]}}` (extra `code`); `/twitter/tweets`,
+  `/twitter/tweet/advanced_search` and `/twitter/user/followers` → a **bare** payload
+  (`{tweets: […]}` / `{followers: […], has_next_page, next_cursor, status, msg, code}`)
+  with no `data` wrapper at all. A consumer must not assume one envelope.
+- **Errors do not use the success envelope.** Both `404` (unknown path) and `400`
+  (missing required param) return a bare `{"detail": "…"}`. ✅ *Verified live*:
+  `/twitter/nonexistent/endpoint` → `404 {"detail":"Not Found"}`;
+  `/twitter/user/info` with no `userName` → `400 {"detail":"userName is required"}`.
+
+Also confirmed live: `POST` to an unknown path returns the same `404 {"detail":"Not Found"}`
+as `GET`, so the fallback is method-agnostic; a cursor-bearing request escapes
+`FRONT_PAGE_TTL_SECS` and is cached forever, making it the one corpus entry whose
+live-data body is byte-stable enough to compare; and `/health` returns **no**
+`x-cache-status` header at all (it never enters the cache path).
