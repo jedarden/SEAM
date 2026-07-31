@@ -1,13 +1,123 @@
 {
   "schema": "seam-diff-corpus/v1",
   "service": "twitterapi-proxy",
-  "incumbent": "http://twitterapi-proxy.ardenone.com",
-  "capturedAt": "2026-07-27T15:40:53Z",
-  "description": "Differential corpus for the incumbent twitterapi.io proxy on ardenone-cluster. Captured from typical Twitter API v2 usage patterns: user lookups, tweet retrieval, search, timeline access, and tweet creation. All requests use Bearer token authentication injected server-side. Twitter API v2 endpoints follow consistent patterns with JSON responses and standard error handling.",
+  "incumbent": "https://twitterapi-proxy.ardenone.com:8444",
+  "capturedAt": "2026-07-31T01:43:40Z",
+  "description": "Differential corpus for the incumbent twitterapi-proxy on ardenone-cluster, captured live over the tailnet ingress (Traefik entryPoint `vpn`, 100.71.31.73:8444) on 2026-07-31. Supersedes the bf-kki8 corpus, which was written against an assumed Twitter API v2 shape and matched nothing this service does (see docs/research/twitterapi-proxy-deployment.md §7). The incumbent is a wholly generic pass-through caching reverse proxy for api.twitterapi.io with no Twitter semantics: it defines exactly one endpoint of its own (GET /health, local, empty body, no upstream call) and forwards every other path verbatim. Callers send no credential — the proxy strips inbound `x-api-key` and `authorization` and injects the key server-side — so entries carry a secret *ref* describing how SEAM must inject (kind=header, name=x-api-key), never a value. Entries deliberately omit `expect.status`, so the plain differential rule (incumbent.status == seam.status) applies; the status verified live is recorded in each entry's description instead, which is a stricter check than pinning. Reproduce with scripts/capture-twitterapi-proxy.sh.",
   "entries": [
     {
-      "id": "health-check",
-      "description": "Health check endpoint for proxy status monitoring",
+      "id": "cache-bypass-forced-miss",
+      "description": "Control header `X-Cache-Bypass: 1` forces a cache miss and a fresh, BILLED upstream call. Verified live 2026-07-31: an already-cached request that returns `x-cache-status: hit` returns `x-cache-status: miss` with this header set. Skipped by default because it is the one entry that cannot be replayed for free — each replay bills twitterapi.io credits on both the incumbent and the SEAM side. Unskip only for a deliberate, budgeted bypass-semantics run.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/tweets",
+        "query": "tweet_ids=2082712206169256279",
+        "headers": {
+          "Accept": ["application/json"],
+          "X-Cache-Bypass": ["1"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true,
+        "skip": "Bypasses the cache by design, so every replay bills upstream credits on both targets. Enable deliberately, not in CI."
+      }
+    },
+    {
+      "id": "credential-stripping",
+      "description": "Security invariant: the proxy strips inbound `x-api-key` and `authorization` (FORBIDDEN_FORWARD_HEADERS) and substitutes its own key, so a caller can neither leak nor override it. The two credential headers below are deliberate decoys, not real secrets. Verified live 2026-07-31: both requests returned 200 with `x-cache-status: hit`, i.e. the bogus values changed nothing. SEAM must strip identically; the harness leak check additionally proves the real injected key never appears in the response.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/tweets",
+        "query": "tweet_ids=2082712206169256279",
+        "headers": {
+          "Accept": ["application/json"],
+          "Authorization": ["Bearer NOT-A-REAL-TOKEN-decoy"],
+          "X-Api-Key": ["NOT-A-REAL-KEY-decoy"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
+      }
+    },
+    {
+      "id": "error-missing-required-param",
+      "description": "Upstream 400 for a missing required query param. Verified live 2026-07-31: `GET /twitter/user/info` with no userName → 400, content-length 33, body {\"detail\":\"userName is required\"}. Note the error shape is a bare {detail} object — NOT the {status,msg,data} success envelope. Deterministic, so the body is compared: non-2xx responses are never cached, and this payload is a fixed string.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/user/info",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"]
+      }
+    },
+    {
+      "id": "error-unknown-path",
+      "description": "Upstream 404 for a path twitterapi.io does not serve, proving the proxy's catch-all fallback forwards unknown paths rather than answering them itself. Verified live 2026-07-31: 404, content-length 22, body {\"detail\":\"Not Found\"}. Deterministic, so the body is compared. Errors are never cached, so this entry always exercises a real upstream round-trip (twitterapi.io does not bill non-2xx).",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/nonexistent/endpoint",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"]
+      }
+    },
+    {
+      "id": "health",
+      "description": "The only endpoint the proxy defines itself. Routed before the catch-all fallback so liveness/readiness probes never burn an API credit. Verified live 2026-07-31: 200, `content-length: 0`, EMPTY body, and notably NO `x-cache-status` header (no cache path is taken) and none of the upstream Cloudflare headers. Takes no secret: there is no upstream call. Body is compared — empty is the assertion.",
       "request": {
         "method": "GET",
         "path": "/health",
@@ -16,157 +126,18 @@
         "bodyB64": "",
         "bodyContentType": ""
       },
-      "secrets": [],
       "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "Content-Length", "Strict-Transport-Security"]
+        "ignoreHeaders": ["Content-Length", "Date"]
       }
     },
     {
-      "id": "user-lookup-by-username",
-      "description": "Fetch user information by Twitter username (handle)",
-      "request": {
-        "method": "GET",
-        "path": "/2/users/by/username/TwitterDev",
-        "query": "user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,withheld",
-        "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
-          "Accept": ["application/json"]
-        },
-        "bodyB64": "",
-        "bodyContentType": ""
-      },
-      "secrets": [
-        {
-          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
-          "injectAs": {
-            "kind": "bearer"
-          }
-        }
-      ],
-      "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
-      }
-    },
-    {
-      "id": "tweet-lookup-by-id",
-      "description": "Fetch a single tweet by its ID",
-      "request": {
-        "method": "GET",
-        "path": "/2/tweets/1234567890",
-        "query": "tweet.fields=created_at,author_id,conversation_id,in_reply_to_user_id,public_metrics,reply_settings,source,text",
-        "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
-          "Accept": ["application/json"]
-        },
-        "bodyB64": "",
-        "bodyContentType": ""
-      },
-      "secrets": [
-        {
-          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
-          "injectAs": {
-            "kind": "bearer"
-          }
-        }
-      ],
-      "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
-      }
-    },
-    {
-      "id": "search-recent-tweets",
-      "description": "Search for recent tweets matching a query",
-      "request": {
-        "method": "GET",
-        "path": "/2/tweets/search/recent",
-        "query": "query=cat%20media%20-lang%3Aen&max_results=10&tweet.fields=created_at,author_id,public_metrics,source,text",
-        "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
-          "Accept": ["application/json"]
-        },
-        "bodyB64": "",
-        "bodyContentType": ""
-      },
-      "secrets": [
-        {
-          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
-          "injectAs": {
-            "kind": "bearer"
-          }
-        }
-      ],
-      "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
-      }
-    },
-    {
-      "id": "user-timeline",
-      "description": "Fetch recent tweets from a specific user's timeline",
-      "request": {
-        "method": "GET",
-        "path": "/2/users/12345678/tweets",
-        "query": "max_results=10&exclude=retweets,replies&tweet.fields=created_at,public_metrics,source,text",
-        "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
-          "Accept": ["application/json"]
-        },
-        "bodyB64": "",
-        "bodyContentType": ""
-      },
-      "secrets": [
-        {
-          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
-          "injectAs": {
-            "kind": "bearer"
-          }
-        }
-      ],
-      "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
-      }
-    },
-    {
-      "id": "create-tweet",
-      "description": "Create a new tweet with text content",
+      "id": "post-method-forwarded",
+      "description": "Proves the method is forwarded verbatim, not just GET. Uses an unknown path so there is no write side effect and nothing is billed: twitterapi.io's real write ops (the *_v2 endpoints) cost $0.002-0.003 each AND actually post to X, so they must never appear in a replayed corpus. Verified live 2026-07-31: POST /twitter/nonexistent/endpoint → 404, content-length 22, {\"detail\":\"Not Found\"} — identical to the GET, confirming the fallback is method-agnostic. Deterministic, so the body is compared.",
       "request": {
         "method": "POST",
-        "path": "/2/tweets",
+        "path": "/twitter/nonexistent/endpoint",
         "query": "",
         "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
-          "Accept": ["application/json"],
-          "Content-Type": ["application/json"]
-        },
-        "bodyB64": "eyJ0ZXh0IjoiVGhpcyBpcyBhIHRlc3QgdHdlZXQgY3JlYXRlZCB2aWEgdGhlIEFQSSJ9",
-        "bodyContentType": "application/json"
-      },
-      "secrets": [
-        {
-          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
-          "injectAs": {
-            "kind": "bearer"
-          }
-        }
-      ],
-      "expect": {
-        "status": 201,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
-      }
-    },
-    {
-      "id": "user-followers",
-      "description": "Fetch followers of a specific user",
-      "request": {
-        "method": "GET",
-        "path": "/2/users/12345678/followers",
-        "query": "max_results=10&user.fields=created_at,description,entities,id,location,name,profile_image_url,public_metrics,username,verified",
-        "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
           "Accept": ["application/json"]
         },
         "bodyB64": "",
@@ -176,24 +147,23 @@
         {
           "ref": "vault:seam/routes/twitterapi-proxy/api-key",
           "injectAs": {
-            "kind": "bearer"
+            "kind": "header",
+            "name": "x-api-key"
           }
         }
       ],
       "expect": {
-        "status": 200,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security"]
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"]
       }
     },
     {
-      "id": "rate-limit-error",
-      "description": "Handle rate limit exceeded error response",
+      "id": "search-advanced",
+      "description": "Advanced tweet search, the heaviest read path. Verified live 2026-07-31: 200, bare {\"tweets\":[...]} payload with NO {status,msg,data} wrapper. Body ignored: a Latest-sorted search re-runs against a moving index, and with no cursor it is a front-page request (FRONT_PAGE_TTL_SECS=300), so the incumbent's and SEAM's independent caches cannot be expected to hold the same result set.",
       "request": {
         "method": "GET",
-        "path": "/2/users/by/username/TwitterDev",
-        "query": "",
+        "path": "/twitter/tweet/advanced_search",
+        "query": "query=from%3Aelonmusk&queryType=Latest",
         "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
           "Accept": ["application/json"]
         },
         "bodyB64": "",
@@ -203,24 +173,24 @@
         {
           "ref": "vault:seam/routes/twitterapi-proxy/api-key",
           "injectAs": {
-            "kind": "bearer"
+            "kind": "header",
+            "name": "x-api-key"
           }
         }
       ],
       "expect": {
-        "status": 429,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Strict-Transport-Security", "Retry-After"]
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
       }
     },
     {
-      "id": "not-found-error",
-      "description": "Handle 404 not found for non-existent resources",
+      "id": "tweets-by-id",
+      "description": "Fetch tweets by id — the replacement for the bf-kki8 entry that used the nonexistent /2/tweets/{id} path. Verified live 2026-07-31: 200, bare {\"tweets\":[...]} payload with NO {status,msg,data} wrapper. Body ignored: the tweet text is immutable but its engagement counters (likeCount, retweetCount, viewCount) tick continuously, and with no cursor this is a front-page request (300s TTL), so two independently-cached proxies will disagree.",
       "request": {
         "method": "GET",
-        "path": "/2/tweets/0000000000",
-        "query": "",
+        "path": "/twitter/tweets",
+        "query": "tweet_ids=2082712206169256279",
         "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
           "Accept": ["application/json"]
         },
         "bodyB64": "",
@@ -230,24 +200,24 @@
         {
           "ref": "vault:seam/routes/twitterapi-proxy/api-key",
           "injectAs": {
-            "kind": "bearer"
+            "kind": "header",
+            "name": "x-api-key"
           }
         }
       ],
       "expect": {
-        "status": 404,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "Strict-Transport-Security"]
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
       }
     },
     {
-      "id": "unauthorized-error",
-      "description": "Handle 401 unauthorized for invalid credentials",
+      "id": "user-followers-cursor-paged",
+      "description": "THE deterministic anchor of this corpus, and the only entry whose live-data body is compared byte-for-byte. A request carrying a non-empty `cursor` is NOT a front-page request, so it escapes FRONT_PAGE_TTL_SECS=300 and is cached forever — the page is therefore frozen and identical on every replay. Verified live 2026-07-31: first call `x-cache-status: miss`, repeat `hit`, and a repeat with the two query params REORDERED also `hit`, confirming the cache key normalizes query order. Cursor value came from the `next_cursor` of the front-page call.",
       "request": {
         "method": "GET",
-        "path": "/2/users/by/username/TwitterDev",
-        "query": "",
+        "path": "/twitter/user/followers",
+        "query": "userName=elonmusk&cursor=1872192298332259623",
         "headers": {
-          "User-Agent": ["TwitterApiProxy/1.0"],
           "Accept": ["application/json"]
         },
         "bodyB64": "",
@@ -257,13 +227,94 @@
         {
           "ref": "vault:seam/routes/twitterapi-proxy/api-key",
           "injectAs": {
-            "kind": "bearer"
+            "kind": "header",
+            "name": "x-api-key"
           }
         }
       ],
       "expect": {
-        "status": 401,
-        "ignoreHeaders": ["Date", "Server", "X-Request-Id", "Strict-Transport-Security"]
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"]
+      }
+    },
+    {
+      "id": "user-followers-front-page",
+      "description": "Cursorless follower page — the front-page counterpart to user-followers-cursor-paged, kept so the 300s-TTL path is exercised alongside the cache-forever one. Verified live 2026-07-31: 200, flat payload {\"followers\":[...],\"has_next_page\":true,\"next_cursor\":\"...\",\"status\":\"success\",\"msg\":\"success\",\"code\":0} — status/msg sit at the top level here, NOT wrapping a `data` object. Body ignored: the follower list and next_cursor both move.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/user/followers",
+        "query": "userName=elonmusk",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
+      }
+    },
+    {
+      "id": "user-info",
+      "description": "User lookup by handle — the replacement for the bf-kki8 entry that used the nonexistent /2/users/by/username/{handle} path. Verified live 2026-07-31: 200 with the {\"status\":\"success\",\"msg\":\"success\",\"data\":{...}} envelope; data carries id, userName, followers, createdAt, pinnedTweetIds, isBlueVerified, etc. Body ignored: `followers`/`statusesCount`/`favouritesCount` change minute to minute and, being cursorless, the entry re-fetches every 300s.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/user/info",
+        "query": "userName=elonmusk",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
+      }
+    },
+    {
+      "id": "user-last-tweets",
+      "description": "A user's recent tweets — the replacement for the bf-kki8 /2/users/{id}/tweets entry. Verified live 2026-07-31: 200 with a THIRD envelope variant, {\"status\":\"success\",\"code\":0,\"msg\":\"success\",\"data\":{\"pin_tweet\":...,\"tweets\":[...]}} plus top-level has_next_page/next_cursor — note the extra `code` field that /twitter/user/info does not return. Body ignored: new tweets arrive constantly and this is a cursorless 300s-TTL entry.",
+      "request": {
+        "method": "GET",
+        "path": "/twitter/user/last_tweets",
+        "query": "userName=elonmusk",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [
+        {
+          "ref": "vault:seam/routes/twitterapi-proxy/api-key",
+          "injectAs": {
+            "kind": "header",
+            "name": "x-api-key"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": ["Alt-Svc", "Cf-Cache-Status", "Cf-Ray", "Content-Length", "Date", "Nel", "Report-To", "Server", "X-Cache-Status", "X-Trace-Id"],
+        "ignoreBody": true
       }
     }
   ]
