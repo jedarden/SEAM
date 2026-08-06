@@ -1,0 +1,405 @@
+{
+  "$comment": "Example SEAM route fragments demonstrating authentication extensions. All examples are valid and should pass validation against route-fragment-schema-auth.json.",
+  "examples": {
+    "$comment": "Collection of example fragments with different auth configurations.",
+
+    "example-1-bearer-auth": {
+      "$comment": "Basic bearer token authentication with credential probe.",
+      "description": "Weather service fragment injecting bearer token with health checks.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "weather-service",
+        "x-api-version": "v1",
+        "x-upstream": "https://weather.api.example.com",
+        "x-vault-path": "seam/routes/weather-service/api-token",
+        "x-inject-as": {
+          "kind": "bearer"
+        },
+        "x-credential-probe": {
+          "path": "/health",
+          "method": "GET",
+          "interval": "30s"
+        },
+        "x-required-scope": "weather:query:data",
+        "paths": {
+          "/forecast": {
+            "get": {
+              "summary": "Get weather forecast",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-2-header-auth": {
+      "$comment": "Custom header authentication with multiple scopes.",
+      "description": "Kubernetes read-only API with X-API-Key header injection and multiple required scopes.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "k8s-ro",
+        "x-api-version": "v1",
+        "x-upstream": "https://kubernetes.default.svc",
+        "x-vault-path": "seam/routes/k8s-ro/service-account-token",
+        "x-inject-as": {
+          "kind": "header",
+          "name": "X-API-Key"
+        },
+        "x-credential-probe": {
+          "path": "/api/v1/namespaces/default/pods",
+          "method": "GET",
+          "interval": "1m"
+        },
+        "x-required-scope": ["k8s-ro:get", "k8s-ro:list"],
+        "paths": {
+          "/api/v1/namespaces/{namespace}/pods": {
+            "get": {
+              "summary": "List pods in namespace",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-3-query-auth": {
+      "$comment": "Query parameter authentication.",
+      "description": "External API with API token passed as query parameter.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "data-processor",
+        "x-api-version": "v2",
+        "x-upstream": "https://api.processor.example.com",
+        "x-vault-path": "seam/routes/data-processor/query-token",
+        "x-inject-as": {
+          "kind": "query",
+          "name": "api_key"
+        },
+        "x-credential-probe": {
+          "path": "/status",
+          "method": "HEAD",
+          "interval": "2m"
+        },
+        "x-required-scope": "data-processor:read",
+        "paths": {
+          "/process": {
+            "post": {
+              "summary": "Process data",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-4-pass-through": {
+      "$comment": "Pass-through proxy with no credential injection and no probe.",
+      "description": "Public API gateway with OAuth scopes but no Vault credentials.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "public-gateway",
+        "x-api-version": "v1",
+        "x-upstream": "https://public.api.example.com",
+        "x-required-scope": "public:access",
+        "paths": {
+          "/info": {
+            "get": {
+              "summary": "Get public information",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-5-multi-instance": {
+      "$comment": "Multi-instance map with per-instance credentials.",
+      "description": "Multi-environment service with different Vault paths per instance.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "multi-env",
+        "x-api-version": "v3",
+        "x-instance-param": "env",
+        "x-upstream-map": {
+          "production": {
+            "url": "https://api.production.example.com",
+            "vaultPath": "seam/routes/multi-env/production-token",
+            "injectAs": {
+              "kind": "bearer"
+            },
+            "probeInterval": "1m",
+            "requiredScope": "multi-env:prod"
+          },
+          "staging": {
+            "url": "https://api.staging.example.com",
+            "vaultPath": "seam/routes/multi-env/staging-token",
+            "injectAs": {
+              "kind": "header",
+              "name": "X-Auth-Token"
+            },
+            "probeInterval": "30s",
+            "requiredScope": "multi-env:stage"
+          },
+          "development": {
+            "url": "https://api.development.example.com",
+            "vaultPath": "seam/routes/multi-env/dev-token",
+            "injectAs": {
+              "kind": "bearer"
+            },
+            "probeInterval": "5m",
+            "requiredScope": "multi-env:dev"
+          }
+        },
+        "x-required-scope": "multi-env:read",
+        "paths": {
+          "/api/v1/data": {
+            "get": {
+              "summary": "Get data",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-6-operation-level-scope": {
+      "$comment": "Fragment-level default scope overridden at operation level.",
+      "description": "API with default read scope, but write operation requires broader scope.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "cms-service",
+        "x-api-version": "v1",
+        "x-upstream": "https://cms.example.com",
+        "x-vault-path": "seam/routes/cms-service/auth-token",
+        "x-inject-as": {
+          "kind": "bearer"
+        },
+        "x-credential-probe": {
+          "path": "/api/health",
+          "method": "GET",
+          "interval": "45s"
+        },
+        "x-required-scope": "cms:read",
+        "paths": {
+          "/api/v1/content": {
+            "get": {
+              "$comment": "Inherits fragment-level cms:read scope.",
+              "summary": "List content",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            },
+            "post": {
+              "$comment": "Overrides fragment-level scope with cms:write.",
+              "x-required-scope": "cms:write",
+              "summary": "Create content",
+              "responses": {
+                "201": { "description": "Created" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "invalid-examples": {
+    "$comment": "Examples that SHOULD FAIL validation, demonstrating constraint enforcement.",
+
+    "invalid-1-missing-inject-as": {
+      "$comment": "FAILS: x-vault-path without x-inject-as violates constraint-vault-inject-paired.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "Missing x-inject-as (constraint-vault-inject-paired)"
+    },
+
+    "invalid-2-missing-vault-path": {
+      "$comment": "FAILS: x-inject-as without x-vault-path violates constraint-vault-inject-paired.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-inject-as": { "kind": "bearer" },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "Missing x-vault-path (constraint-vault-inject-paired)"
+    },
+
+    "invalid-3-passthrough-with-probe": {
+      "$comment": "FAILS: x-credential-probe on pass-through fragment violates constraint-passthrough-has-no-probe.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "x-credential-probe": {
+          "path": "/health",
+          "method": "GET",
+          "interval": "30s"
+        },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-credential-probe forbidden on pass-through route (constraint-passthrough-has-no-probe)"
+    },
+
+    "invalid-4-invalid-vault-path": {
+      "$comment": "FAILS: x-vault-path not starting with seam/routes/ violates pattern.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "secret/data/bad-path",
+        "x-inject-as": { "kind": "bearer" },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-vault-path must match pattern ^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/"
+    },
+
+    "invalid-5-invalid-vault-path-traversal": {
+      "$comment": "FAILS: x-vault-path with .. traversal attacks are rejected.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/../other-service/secret",
+        "x-inject-as": { "kind": "bearer" },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-vault-path cannot contain .. (path traversal rejected)"
+    },
+
+    "invalid-6-invalid-vault-path-globs": {
+      "$comment": "FAILS: x-vault-path with glob patterns are rejected.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-service/*/secret",
+        "x-inject-as": { "kind": "bearer" },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-vault-path cannot contain glob patterns (* or ?)"
+    },
+
+    "invalid-7-empty-scope-array": {
+      "$comment": "FAILS: Empty scope array violates minItems constraint.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "x-required-scope": [],
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-required-scope array must have minItems: 1"
+    },
+
+    "invalid-8-duplicate-scopes": {
+      "$comment": "FAILS: Duplicate scopes in array violate uniqueItems constraint.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "x-required-scope": ["service:read", "service:read"],
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-required-scope array must have unique items"
+    },
+
+    "invalid-9-invalid-scope-format": {
+      "$comment": "FAILS: Invalid scope format violates scopeString pattern.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "x-required-scope": "invalid-scope",
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "Scope must match pattern ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(:[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+    },
+
+    "invalid-10-header-without-name": {
+      "$comment": "FAILS: kind:header requires name field.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "x-inject-as": { "kind": "header" },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "kind:header requires name property"
+    },
+
+    "invalid-11-bearer-with-name": {
+      "$comment": "FAILS: kind:bearer must not have name field.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "x-inject-as": {
+          "kind": "bearer",
+          "name": "Authorization"
+        },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "kind:bearer cannot have name property"
+    },
+
+    "invalid-12-credential-probe-missing-fields": {
+      "$comment": "FAILS: x-credential-probe missing required fields.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "x-inject-as": { "kind": "bearer" },
+        "x-credential-probe": {
+          "path": "/health"
+        },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "x-credential-probe requires method and interval"
+    },
+
+    "invalid-13-invalid-probe-path": {
+      "$comment": "FAILS: Probe path must start with /.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "x-inject-as": { "kind": "bearer" },
+        "x-credential-probe": {
+          "path": "health",
+          "method": "GET",
+          "interval": "30s"
+        },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "Probe path must match pattern ^/"
+    },
+
+    "invalid-14-invalid-duration-format": {
+      "$comment": "FAILS: Duration must match pattern ^[0-9]+(s|m|h|d)$.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-vault-path": "seam/routes/bad-example/token",
+        "x-inject-as": { "kind": "bearer" },
+        "x-credential-probe": {
+          "path": "/health",
+          "method": "GET",
+          "interval": "30minutes"
+        },
+        "paths": { "/test": { "get": { "responses": { "200": {} } } } }
+      },
+      "expected-error": "Duration must match pattern ^[0-9]+(s|m|h|d)$"
+    }
+  }
+}

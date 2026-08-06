@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ardenone.com/seam/route-fragment-schema-auth/v1.json",
+  "title": "SEAM Route Fragment Authentication Extensions",
+  "description": "JSON Schema for SEAM authentication and credential extension fields. Extracted from the main route-fragment-schema.json for focused validation of auth-specific extensions: x-vault-path, x-inject-as, x-required-scope, and x-credential-probe.",
+  "type": "object",
+
+  "properties": {
+    "x-vault-path": {
+      "$ref": "#/$defs/vaultPath",
+      "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither)."
+    },
+    "x-inject-as": {
+      "$ref": "#/$defs/injectAs",
+      "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither)."
+    },
+    "x-required-scope": {
+      "$ref": "#/$defs/scopeArray",
+      "$comment": "Optional fragment-root DEFAULT; any operation-level x-required-scope REPLACES it (validator-side), never merges. Conjunctive array; bare string sugar for one element."
+    },
+    "x-credential-probe": {
+      "$ref": "#/$defs/credentialProbe",
+      "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as)."
+    }
+  },
+
+  "allOf": [
+    { "$ref": "#/$defs/constraint-vault-inject-paired" },
+    { "$ref": "#/$defs/constraint-passthrough-has-no-probe" }
+  ],
+
+  "$defs": {
+    "vaultPath": {
+      "type": "string",
+      "pattern": "^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/",
+      "description": "OpenBao secret path for credential storage. Must resolve inside the allowlist prefix seam/routes/* and be co-owned with the fragment owner (seam/routes/<owner>/*).",
+      "examples": [
+        "seam/routes/my-service/api-key",
+        "seam/routes/k8s-ro/token",
+        "seam/routes/weather-service/secret"
+      ],
+      "allOf": [
+        {
+          "not": { "pattern": "(^|/)\\.\\.(/|$)" },
+          "description": "Path traversal (..) is rejected for security."
+        },
+        {
+          "not": { "pattern": "[*?]" },
+          "description": "Glob patterns are rejected to prevent directory enumeration."
+        },
+        {
+          "not": { "pattern": "\\{" },
+          "description": "Templated segments are rejected to prevent injection attacks."
+        }
+      ]
+    },
+
+    "injectAs": {
+      "type": "object",
+      "required": ["kind"],
+      "description": "Defines how a credential from Vault is injected into upstream requests.",
+      "properties": {
+        "kind": {
+          "enum": ["header", "bearer", "query"],
+          "description": "Injection method: header (custom header), bearer (Authorization: Bearer), query (query parameter)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Header or query parameter name. Required for kind=header and kind=query, forbidden for kind=bearer."
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        { "kind": "header", "name": "X-API-Key" },
+        { "kind": "bearer" },
+        { "kind": "query", "name": "token" }
+      ],
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "header" } } },
+          "then": { "required": ["name"] },
+          "description": "Header injection requires a name."
+        },
+        {
+          "if": { "properties": { "kind": { "const": "query" } } },
+          "then": { "required": ["name"] },
+          "description": "Query injection requires a name."
+        },
+        {
+          "if": { "properties": { "kind": { "const": "bearer" } } },
+          "then": { "not": { "required": ["name"] } },
+          "description": "Bearer injection uses standard Authorization header; name must be omitted."
+        }
+      ]
+    },
+
+    "scopeString": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(:[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+      "description": "Colon-delimited service:action scope (e.g., k8s-ro:get, argocd:sync). At least two segments; supports three-segment control-plane scopes (seam:ops:read, seam:scopes:read-all).",
+      "examples": [
+        "k8s-ro:get",
+        "argocd:sync",
+        "seam:ops:read",
+        "weather-service:query:data"
+      ]
+    },
+
+    "scopeArray": {
+      "description": "Conjunctive set of scopes a caller must hold. A bare string is sugar for a one-element array.",
+      "oneOf": [
+        { "$ref": "#/$defs/scopeString" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scopeString" },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Array of scopes; must have at least one element with no duplicates."
+        }
+      ],
+      "examples": [
+        "k8s-ro:get",
+        ["k8s-ro:get", "argocd:sync"],
+        ["seam:ops:read", "seam:scopes:read-all"]
+      ]
+    },
+
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+(s|m|h|d)$",
+      "description": "Time duration: number followed by unit (s=seconds, m=minutes, h=hours, d=days). No calendar-aligned forms (mo/y).",
+      "examples": ["30s", "5m", "1h", "7d"]
+    },
+
+    "credentialProbe": {
+      "type": "object",
+      "required": ["path", "method", "interval"],
+      "description": "Defines a health check request to validate credential viability against the upstream service.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "A designated safe upstream path for health checking. Must be a route the fragment serves.",
+          "examples": ["/health", "/api/v1/status", "/ping"]
+        },
+        "method": {
+          "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+          "description": "HTTP method for the probe request.",
+          "default": "GET"
+        },
+        "interval": {
+          "$ref": "#/$defs/duration",
+          "description": "Per-fragment probe interval. An x-upstream-map entry may override per instance."
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        { "path": "/health", "method": "GET", "interval": "30s" },
+        { "path": "/api/v1/status", "method": "HEAD", "interval": "1m" },
+        { "path": "/ping", "method": "POST", "interval": "5m" }
+      ]
+    },
+
+    "constraint-vault-inject-paired": {
+      "description": "x-vault-path and x-inject-as must be declared together or omitted together. A fragment with neither is a pass-through proxy route.",
+      "oneOf": [
+        { "required": ["x-vault-path", "x-inject-as"] },
+        { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } }
+      ],
+      "comment": "This constraint prevents partial credential configuration where only the source or injection method is defined."
+    },
+
+    "constraint-passthrough-has-no-probe": {
+      "description": "A pass-through route (no credential injection) cannot have a credential probe, since there is no credential to validate.",
+      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } },
+      "then": { "not": { "required": ["x-credential-probe"] } }
+    }
+  }
+}
