@@ -495,6 +495,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		// Single method requested
 		response["method"] = method
 		methodData := map[string]interface{}{
+			"method":      method,
 			"summary":     routeInfo.Operation.Summary,
 			"description": routeInfo.Operation.Description,
 			"operationId": routeInfo.Operation.OperationId,
