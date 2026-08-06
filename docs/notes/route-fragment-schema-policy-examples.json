@@ -16,12 +16,16 @@
             "url": "https://weather.api.example.com",
             "vaultPath": "seam/routes/weather-service/api-token",
             "injectAs": { "kind": "bearer" },
+            "target_host": "weather.api.example.com",
+            "rewrite_path": "/api/v1/forecast",
             "requiredScope": "weather:read:us-east"
           },
           "eu-west": {
             "url": "https://weather.eu.example.com",
             "vaultPath": "seam/routes/weather-service/eu-token",
             "injectAs": { "kind": "bearer" },
+            "target_host": "weather.eu.example.com",
+            "rewrite_path": "/api/v1/forecast",
             "requiredScope": "weather:read:eu-west"
           }
         },
@@ -31,17 +35,13 @@
             "get": {
               "summary": "Get weather forecast with rate limiting",
               "x-loop-guard": {
-                "maxRepeats": 5,
-                "window": "10s"
+                "max_iterations": 5,
+                "backoff_ms": 10000
               },
-              "x-cost-per-call": {
-                "amount": 0.001,
-                "unit": "usd"
-              },
+              "x-cost-per-call": 0.001,
               "x-quota": {
-                "amount": 100,
-                "unit": "requests",
-                "window": "1h"
+                "limit": 100,
+                "window_seconds": 3600
               },
               "responses": {
                 "200": { "description": "Success" }
@@ -66,8 +66,8 @@
             "get": {
               "summary": "Search with loop guard",
               "x-loop-guard": {
-                "maxRepeats": 3,
-                "window": "5s"
+                "max_iterations": 3,
+                "backoff_ms": 5000
               },
               "responses": {
                 "200": { "description": "Success" }
@@ -98,10 +98,7 @@
           "/transactions": {
             "get": {
               "summary": "Get transactions with cost tracking",
-              "x-cost-per-call": {
-                "amount": 0.005,
-                "unit": "credits"
-              },
+              "x-cost-per-call": 0.005,
               "responses": {
                 "200": { "description": "Success" }
               }
@@ -124,14 +121,10 @@
           "/export": {
             "get": {
               "summary": "Export data with quota limit",
-              "x-cost-per-call": {
-                "amount": 1,
-                "unit": "exports"
-              },
+              "x-cost-per-call": 1,
               "x-quota": {
-                "amount": 50,
-                "unit": "exports",
-                "window": "1h"
+                "limit": 50,
+                "window_seconds": 3600
               },
               "responses": {
                 "200": { "description": "Success" }
@@ -154,17 +147,23 @@
           "us": {
             "url": "https://us.api.example.com",
             "vaultPath": "seam/routes/multi-region/us-token",
-            "injectAs": { "kind": "bearer" }
+            "injectAs": { "kind": "bearer" },
+            "target_host": "us.api.example.com",
+            "rewrite_path": "/v1/data"
           },
           "eu": {
             "url": "https://eu.api.example.com",
             "vaultPath": "seam/routes/multi-region/eu-token",
-            "injectAs": { "kind": "bearer" }
+            "injectAs": { "kind": "bearer" },
+            "target_host": "eu.api.example.com",
+            "rewrite_path": "/v1/data"
           },
           "ap": {
             "url": "https://ap.api.example.com",
             "vaultPath": "seam/routes/multi-region/ap-token",
-            "injectAs": { "kind": "bearer" }
+            "injectAs": { "kind": "bearer" },
+            "target_host": "ap.api.example.com",
+            "rewrite_path": "/v1/data"
           }
         },
         "x-required-scope": "multi-region:read",
@@ -173,17 +172,13 @@
             "get": {
               "summary": "Get data with aggressive loop guard and quota",
               "x-loop-guard": {
-                "maxRepeats": 10,
-                "window": "30s"
+                "max_iterations": 10,
+                "backoff_ms": 30000
               },
-              "x-cost-per-call": {
-                "amount": 0.01,
-                "unit": "usd"
-              },
+              "x-cost-per-call": 0.01,
               "x-quota": {
-                "amount": 1000,
-                "unit": "requests",
-                "window": "24h"
+                "limit": 1000,
+                "window_seconds": 86400
               },
               "responses": {
                 "200": { "description": "Success" }
@@ -192,17 +187,13 @@
             "post": {
               "summary": "Create data with stricter limits",
               "x-loop-guard": {
-                "maxRepeats": 3,
-                "window": "60s"
+                "max_iterations": 3,
+                "backoff_ms": 60000
               },
-              "x-cost-per-call": {
-                "amount": 0.05,
-                "unit": "usd"
-              },
+              "x-cost-per-call": 0.05,
               "x-quota": {
-                "amount": 100,
-                "unit": "requests",
-                "window": "1h"
+                "limit": 100,
+                "window_seconds": 3600
               },
               "responses": {
                 "201": { "description": "Created" }
@@ -226,18 +217,24 @@
             "url": "https://prod.service.example.com",
             "vaultPath": "seam/routes/env-router/prod-token",
             "injectAs": { "kind": "bearer" },
+            "target_host": "prod.service.example.com",
+            "rewrite_path": "/api/status",
             "requiredScope": "env-router:prod"
           },
           "staging": {
             "url": "https://staging.service.example.com",
             "vaultPath": "seam/routes/env-router/staging-token",
             "injectAs": { "kind": "bearer" },
+            "target_host": "staging.service.example.com",
+            "rewrite_path": "/api/status",
             "requiredScope": "env-router:staging"
           },
           "dev": {
             "url": "https://dev.service.example.com",
             "vaultPath": "seam/routes/env-router/dev-token",
             "injectAs": { "kind": "bearer" },
+            "target_host": "dev.service.example.com",
+            "rewrite_path": "/api/status",
             "requiredScope": "env-router:dev"
           }
         },
@@ -260,7 +257,7 @@
     "$comment": "Examples that SHOULD FAIL validation, demonstrating policy constraint enforcement.",
 
     "invalid-1-negative-cost": {
-      "$comment": "FAILS: Negative cost amount violates exclusiveMinimum: 0.",
+      "$comment": "FAILS: Negative cost violates exclusiveMinimum: 0.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -268,20 +265,17 @@
         "paths": {
           "/test": {
             "get": {
-              "x-cost-per-call": {
-                "amount": -0.001,
-                "unit": "usd"
-              },
+              "x-cost-per-call": -0.001,
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "x-cost-per-call amount must be greater than 0 (exclusiveMinimum: 0)"
+      "expected-error": "x-cost-per-call must be greater than 0 (exclusiveMinimum: 0)"
     },
 
     "invalid-2-zero-cost": {
-      "$comment": "FAILS: Zero cost amount violates exclusiveMinimum: 0.",
+      "$comment": "FAILS: Zero cost violates exclusiveMinimum: 0.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -289,20 +283,17 @@
         "paths": {
           "/test": {
             "get": {
-              "x-cost-per-call": {
-                "amount": 0,
-                "unit": "usd"
-              },
+              "x-cost-per-call": 0,
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "x-cost-per-call amount must be greater than 0 (exclusiveMinimum: 0)"
+      "expected-error": "x-cost-per-call must be greater than 0 (exclusiveMinimum: 0)"
     },
 
     "invalid-3-negative-quota": {
-      "$comment": "FAILS: Negative quota amount violates exclusiveMinimum: 0.",
+      "$comment": "FAILS: Negative quota limit violates minimum: 1.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -310,22 +301,21 @@
         "paths": {
           "/test": {
             "get": {
-              "x-cost-per-call": { "amount": 1, "unit": "requests" },
+              "x-cost-per-call": 1,
               "x-quota": {
-                "amount": -100,
-                "unit": "requests",
-                "window": "1h"
+                "limit": -100,
+                "window_seconds": 3600
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "x-quota amount must be greater than 0 (exclusiveMinimum: 0)"
+      "expected-error": "x-quota limit must be at least 1 (minimum: 1)"
     },
 
-    "invalid-4-invalid-duration": {
-      "$comment": "FAILS: Invalid duration format violates pattern ^[0-9]+(s|m|h|d)$.",
+    "invalid-4-negative-max-iterations": {
+      "$comment": "FAILS: Negative max_iterations violates minimum: 1.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -334,19 +324,19 @@
           "/test": {
             "get": {
               "x-loop-guard": {
-                "maxRepeats": 5,
-                "window": "10seconds"
+                "max_iterations": -1,
+                "backoff_ms": 100
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "Duration must match pattern ^[0-9]+(s|m|h|d)$"
+      "expected-error": "max_iterations must be at least 1 (minimum: 1)"
     },
 
-    "invalid-5-negative-max-repeats": {
-      "$comment": "FAILS: Negative maxRepeats violates minimum: 1.",
+    "invalid-5-negative-backoff-ms": {
+      "$comment": "FAILS: Negative backoff_ms violates minimum: 1.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -355,19 +345,19 @@
           "/test": {
             "get": {
               "x-loop-guard": {
-                "maxRepeats": -1,
-                "window": "10s"
+                "max_iterations": 5,
+                "backoff_ms": -100
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "maxRepeats must be at least 1 (minimum: 1)"
+      "expected-error": "backoff_ms must be at least 1 (minimum: 1)"
     },
 
-    "invalid-6-zero-max-repeats": {
-      "$comment": "FAILS: Zero maxRepeats violates minimum: 1.",
+    "invalid-6-zero-quota-window": {
+      "$comment": "FAILS: Zero window_seconds violates minimum: 1.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -375,16 +365,17 @@
         "paths": {
           "/test": {
             "get": {
-              "x-loop-guard": {
-                "maxRepeats": 0,
-                "window": "10s"
+              "x-cost-per-call": 1,
+              "x-quota": {
+                "limit": 100,
+                "window_seconds": 0
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "maxRepeats must be at least 1 (minimum: 1)"
+      "expected-error": "window_seconds must be at least 1 (minimum: 1)"
     },
 
     "invalid-7-quota-without-cost": {
@@ -397,9 +388,8 @@
           "/test": {
             "get": {
               "x-quota": {
-                "amount": 100,
-                "unit": "requests",
-                "window": "1h"
+                "limit": 100,
+                "window_seconds": 3600
               },
               "responses": { "200": { "description": "Success" } }
             }
@@ -409,29 +399,8 @@
       "expected-error": "x-quota requires x-cost-per-call (constraint-quota-requires-cost)"
     },
 
-    "invalid-8-invalid-unit-format": {
-      "$comment": "FAILS: Invalid unit format violates pattern ^[a-z][a-z0-9-]*$.",
-      "fragment": {
-        "x-seam-schema": "v1",
-        "x-seam-owner": "bad-example",
-        "x-upstream": "https://example.com",
-        "paths": {
-          "/test": {
-            "get": {
-              "x-cost-per-call": {
-                "amount": 0.01,
-                "unit": "USD"
-              },
-              "responses": { "200": { "description": "Success" } }
-            }
-          }
-        }
-      },
-      "expected-error": "Unit must match pattern ^[a-z][a-z0-9-]*$ (lowercase only)"
-    },
-
-    "invalid-9-missing-loop-guard-fields": {
-      "$comment": "FAILS: x-loop-guard missing required maxRepeats or window.",
+    "invalid-8-missing-loop-guard-fields": {
+      "$comment": "FAILS: x-loop-guard missing required max_iterations or backoff_ms.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -440,18 +409,39 @@
           "/test": {
             "get": {
               "x-loop-guard": {
-                "maxRepeats": 5
+                "max_iterations": 5
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "x-loop-guard requires both maxRepeats and window"
+      "expected-error": "x-loop-guard requires both max_iterations and backoff_ms"
     },
 
-    "invalid-10-missing-cost-fields": {
-      "$comment": "FAILS: x-cost-per-call missing required amount or unit.",
+    "invalid-9-missing-quota-fields": {
+      "$comment": "FAILS: x-quota missing required limit or window_seconds.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": 1,
+              "x-quota": {
+                "limit": 100
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-quota requires both limit and window_seconds"
+    },
+
+    "invalid-10-cost-is-not-a-number": {
+      "$comment": "FAILS: x-cost-per-call must be a number, not an object.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -467,11 +457,11 @@
           }
         }
       },
-      "expected-error": "x-cost-per-call requires both amount and unit"
+      "expected-error": "x-cost-per-call must be a number (type), not an object"
     },
 
-    "invalid-11-missing-quota-fields": {
-      "$comment": "FAILS: x-quota missing required amount, unit, or window.",
+    "invalid-11-zero-max-iterations": {
+      "$comment": "FAILS: Zero max_iterations violates minimum: 1.",
       "fragment": {
         "x-seam-schema": "v1",
         "x-seam-owner": "bad-example",
@@ -479,17 +469,38 @@
         "paths": {
           "/test": {
             "get": {
-              "x-cost-per-call": { "amount": 1, "unit": "requests" },
-              "x-quota": {
-                "amount": 100,
-                "unit": "requests"
+              "x-loop-guard": {
+                "max_iterations": 0,
+                "backoff_ms": 100
               },
               "responses": { "200": { "description": "Success" } }
             }
           }
         }
       },
-      "expected-error": "x-quota requires amount, unit, and window"
+      "expected-error": "max_iterations must be at least 1 (minimum: 1)"
+    },
+
+    "invalid-12-negative-window-seconds": {
+      "$comment": "FAILS: Negative window_seconds violates minimum: 1.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": 1,
+              "x-quota": {
+                "limit": 100,
+                "window_seconds": -3600
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "window_seconds must be at least 1 (minimum: 1)"
     }
   }
 }
