@@ -1,0 +1,34 @@
+{
+  "$comment": "INVALID example - zero x-quota.window_seconds should be REJECTED",
+  "description": "This should FAIL validation - zero window is not allowed",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "x-api-version": "v1",
+  "x-instance-param": "region",
+  "x-upstream-map": {
+    "us-east": {
+      "url": "https://api.example.com",
+      "vaultPath": "seam/routes/test-service/token",
+      "injectAs": { "kind": "bearer" }
+    }
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "summary": "Test with zero window",
+        "x-loop-guard": {
+          "max_iterations": 1,
+          "backoff_ms": 0
+        },
+        "x-cost-per-call": 0.001,
+        "x-quota": {
+          "limit": 1,
+          "window_seconds": 0
+        },
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    }
+  }
+}

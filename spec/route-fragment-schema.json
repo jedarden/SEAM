@@ -170,7 +170,7 @@
       "required": ["max_iterations", "backoff_ms"],
       "properties": {
         "max_iterations": { "type": "integer", "minimum": 1, "$comment": "Maximum number of iterations allowed before the loop guard intervenes." },
-        "backoff_ms": { "type": "integer", "minimum": 1, "$comment": "Backoff delay in milliseconds between iterations." }
+        "backoff_ms": { "type": "integer", "minimum": 0, "$comment": "Backoff delay in milliseconds between iterations. Zero means no backoff." }
       },
       "additionalProperties": false
     },
