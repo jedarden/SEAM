@@ -22,7 +22,12 @@
     },
     "components": { "type": "object", "$comment": "Optional reusable OpenAPI components (schemas, parameters, ...). Not SEAM-validated beyond being an object; libopenapi owns OpenAPI validity." },
 
-    "x-seam-schema": { "type": "string", "$comment": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. A version marker (e.g., 'v1', 'v2')." },
+    "x-seam-schema": {
+      "type": "string",
+      "description": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. A version marker (e.g., 'v1', 'v2').",
+      "examples": ["v1"],
+      "$comment": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. A version marker (e.g., 'v1', 'v2')."
+    },
     "x-seam-owner": { "$ref": "#/$defs/ownerToken", "$comment": "Fragment-root only; required day one. Redundant in-file declaration of the owning service, checked against the mounted parent directory at runtime (validator-side: must equal the directory the fragment was loaded from)." },
     "x-api-version": { "$ref": "#/$defs/apiVersion", "$comment": "Fragment-root only. The literal _unversioned is rejected here (the pattern requires v then a non-zero digit); it is SEAM-assigned, never authored." },
 
