@@ -1,0 +1,34 @@
+{
+  "$comment": "VALID example - x-quota.limit: 1 should be ACCEPTED",
+  "description": "This should PASS validation - quota limit of 1 is the minimum allowed value",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "x-api-version": "v1",
+  "x-instance-param": "region",
+  "x-upstream-map": {
+    "us-east": {
+      "url": "https://api.example.com",
+      "vaultPath": "seam/routes/test-service/token",
+      "injectAs": { "kind": "bearer" }
+    }
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "summary": "Test with minimum quota limit (1)",
+        "x-loop-guard": {
+          "max_iterations": 10,
+          "backoff_ms": 100
+        },
+        "x-cost-per-call": 0.01,
+        "x-quota": {
+          "limit": 1,
+          "window_seconds": 60
+        },
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    }
+  }
+}
