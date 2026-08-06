@@ -76,8 +76,8 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 |---|---|---|
 | `x-required-scope` | `scopeArray` | **The authority** wherever both root and operation are present; *replaces* the root default. Per-method granularity is what makes the visible-but-not-invocable 403 expressible. |
 | `x-loop-guard` | `loopGuard` | `{maxRepeats, window}`. Absent = no loop guard on that route. |
-| `x-cost-per-call` | `costPerCall` | `{amount, unit}`. Required if `x-quota` is present. |
-| `x-quota` | `quota` | `{amount, unit, window}`. `unit` must equal the same route's `x-cost-per-call.unit` (validator-side). Requires `x-cost-per-call` (schema-encoded). |
+| `x-cost-per-call` | `costPerCall` | Number (>= 0) in arbitrary cost units. Required if `x-quota` is present. |
+| `x-quota` | `quota` | `{limit, window_seconds}`. Requires `x-cost-per-call` (schema-encoded). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-requires-approval` | boolean | RESERVED forward-compat. |
 
