@@ -203,6 +203,8 @@
       "required": ["url"],
       "properties": {
         "url": { "$ref": "#/$defs/upstreamUrl" },
+        "target_host": { "type": "string", "minLength": 1, "$comment": "Optional override for the target host header sent to the upstream." },
+        "rewrite_path": { "type": "string", "minLength": 1, "$comment": "Optional path rewrite applied before forwarding to the upstream." },
         "vaultPath": { "$ref": "#/$defs/vaultPath" },
         "injectAs": { "$ref": "#/$defs/injectAs" },
         "tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Per-instance override of x-upstream-tls." },
