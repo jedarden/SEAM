@@ -175,21 +175,16 @@
       "additionalProperties": false
     },
     "costPerCall": {
-      "type": "object",
-      "required": ["amount", "unit"],
-      "properties": {
-        "amount": { "type": "number", "exclusiveMinimum": 0 },
-        "unit": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "$comment": "Lowercase label: usd, credits, tokens, requests. SEAM never converts between units." }
-      },
-      "additionalProperties": false
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "$comment": "Cost per call in arbitrary cost units. Must be positive (negative costs rejected)."
     },
     "quota": {
       "type": "object",
-      "required": ["amount", "unit", "window"],
+      "required": ["limit", "window_seconds"],
       "properties": {
-        "amount": { "type": "number", "exclusiveMinimum": 0 },
-        "unit": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "$comment": "MUST be byte-identical to the same route's x-cost-per-call.unit (validator-side equality check)." },
-        "window": { "$ref": "#/$defs/duration" }
+        "limit": { "type": "integer", "minimum": 1, "$comment": "Maximum number of cost units allowed within the window. Must be at least 1." },
+        "window_seconds": { "type": "integer", "minimum": 1, "$comment": "Time window in seconds. Must be positive (zero or negative rejected)." }
       },
       "additionalProperties": false
     },
