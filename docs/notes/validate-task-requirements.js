@@ -68,7 +68,7 @@ const invalidExamples = [
       'paths': {
         '/test': {
           'get': {
-            'x-cost-per-call': { 'amount': -0.001, 'unit': 'usd' },
+            'x-cost-per-call': -0.001,
             'responses': { '200': { 'description': 'OK' } }
           }
         }
@@ -84,7 +84,7 @@ const invalidExamples = [
       'paths': {
         '/test': {
           'get': {
-            'x-cost-per-call': { 'amount': 0, 'unit': 'usd' },
+            'x-cost-per-call': 0,
             'responses': { '200': { 'description': 'OK' } }
           }
         }
@@ -100,8 +100,8 @@ const invalidExamples = [
       'paths': {
         '/test': {
           'get': {
-            'x-cost-per-call': { 'amount': 1, 'unit': 'requests' },
-            'x-quota': { 'amount': 100, 'unit': 'requests', 'window': '0s' },
+            'x-cost-per-call': 1,
+            'x-quota': { 'limit': 100, 'window_seconds': 0 },
             'responses': { '200': { 'description': 'OK' } }
           }
         }
@@ -132,7 +132,9 @@ const completeExample = {
     'us-east': {
       'url': 'https://weather.api.example.com',
       'vaultPath': 'seam/routes/weather-service/api-token',
-      'injectAs': { 'kind': 'bearer' }
+      'injectAs': { 'kind': 'bearer' },
+      'target_host': 'weather.api.example.com',
+      'rewrite_path': '/api/v1/forecast'
     }
   },
   'x-required-scope': 'weather:query:data',
@@ -141,17 +143,13 @@ const completeExample = {
       'get': {
         'summary': 'Get weather forecast with rate limiting',
         'x-loop-guard': {
-          'maxRepeats': 5,
-          'window': '10s'
+          'max_iterations': 5,
+          'backoff_ms': 10000
         },
-        'x-cost-per-call': {
-          'amount': 0.001,
-          'unit': 'usd'
-        },
+        'x-cost-per-call': 0.001,
         'x-quota': {
-          'amount': 100,
-          'unit': 'requests',
-          'window': '1h'
+          'limit': 100,
+          'window_seconds': 3600
         },
         'responses': {
           '200': { 'description': 'Success' }
