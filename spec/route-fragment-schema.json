@@ -176,8 +176,8 @@
     },
     "costPerCall": {
       "type": "number",
-      "exclusiveMinimum": 0,
-      "$comment": "Cost per call in arbitrary cost units. Must be positive (negative costs rejected)."
+      "minimum": 0,
+      "$comment": "Cost per call in arbitrary cost units. Must be non-negative (negative costs rejected)."
     },
     "quota": {
       "type": "object",
