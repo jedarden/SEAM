@@ -1,0 +1,495 @@
+{
+  "$comment": "Example SEAM route fragments demonstrating policy and metadata extensions. All examples are valid and should pass validation against route-fragment-schema.json.",
+  "examples": {
+    "$comment": "Collection of example fragments with different policy configurations.",
+
+    "example-1-all-policy-extensions": {
+      "$comment": "Complete example demonstrating all five policy extensions.",
+      "description": "Weather service fragment with loop guard, cost tracking, quota limits, and multi-instance routing.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "weather-service",
+        "x-api-version": "v1",
+        "x-instance-param": "region",
+        "x-upstream-map": {
+          "us-east": {
+            "url": "https://weather.api.example.com",
+            "vaultPath": "seam/routes/weather-service/api-token",
+            "injectAs": { "kind": "bearer" },
+            "requiredScope": "weather:read:us-east"
+          },
+          "eu-west": {
+            "url": "https://weather.eu.example.com",
+            "vaultPath": "seam/routes/weather-service/eu-token",
+            "injectAs": { "kind": "bearer" },
+            "requiredScope": "weather:read:eu-west"
+          }
+        },
+        "x-required-scope": "weather:query:data",
+        "paths": {
+          "/forecast": {
+            "get": {
+              "summary": "Get weather forecast with rate limiting",
+              "x-loop-guard": {
+                "maxRepeats": 5,
+                "window": "10s"
+              },
+              "x-cost-per-call": {
+                "amount": 0.001,
+                "unit": "usd"
+              },
+              "x-quota": {
+                "amount": 100,
+                "unit": "requests",
+                "window": "1h"
+              },
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-2-loop-guard-only": {
+      "$comment": "Fragment with loop guard protection only.",
+      "description": "Search API with repeat request protection to prevent abuse.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "search-service",
+        "x-api-version": "v1",
+        "x-upstream": "https://search.api.example.com",
+        "x-required-scope": "search:query",
+        "paths": {
+          "/search": {
+            "get": {
+              "summary": "Search with loop guard",
+              "x-loop-guard": {
+                "maxRepeats": 3,
+                "window": "5s"
+              },
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-3-cost-tracking-only": {
+      "$comment": "Fragment with cost per call tracking only.",
+      "description": "External API with cost tracking for billing purposes.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "billing-service",
+        "x-api-version": "v2",
+        "x-upstream": "https://premium.api.example.com",
+        "x-vault-path": "seam/routes/billing-service/api-key",
+        "x-inject-as": { "kind": "bearer" },
+        "x-credential-probe": {
+          "path": "/health",
+          "method": "GET",
+          "interval": "1m"
+        },
+        "x-required-scope": "billing:read",
+        "paths": {
+          "/transactions": {
+            "get": {
+              "summary": "Get transactions with cost tracking",
+              "x-cost-per-call": {
+                "amount": 0.005,
+                "unit": "credits"
+              },
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-4-quota-only": {
+      "$comment": "Fragment with quota limits only (requires cost-per-call).",
+      "description": "Data export API with hourly quota limits.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "export-service",
+        "x-api-version": "v1",
+        "x-upstream": "https://export.api.example.com",
+        "x-required-scope": "export:read",
+        "paths": {
+          "/export": {
+            "get": {
+              "summary": "Export data with quota limit",
+              "x-cost-per-call": {
+                "amount": 1,
+                "unit": "exports"
+              },
+              "x-quota": {
+                "amount": 50,
+                "unit": "exports",
+                "window": "1h"
+              },
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-5-multi-instance-with-policy": {
+      "$comment": "Multi-instance map with operation-level policy overrides.",
+      "description": "Multi-region API with different costs and quotas per region.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "multi-region",
+        "x-api-version": "v3",
+        "x-instance-param": "region",
+        "x-upstream-map": {
+          "us": {
+            "url": "https://us.api.example.com",
+            "vaultPath": "seam/routes/multi-region/us-token",
+            "injectAs": { "kind": "bearer" }
+          },
+          "eu": {
+            "url": "https://eu.api.example.com",
+            "vaultPath": "seam/routes/multi-region/eu-token",
+            "injectAs": { "kind": "bearer" }
+          },
+          "ap": {
+            "url": "https://ap.api.example.com",
+            "vaultPath": "seam/routes/multi-region/ap-token",
+            "injectAs": { "kind": "bearer" }
+          }
+        },
+        "x-required-scope": "multi-region:read",
+        "paths": {
+          "/api/data": {
+            "get": {
+              "summary": "Get data with aggressive loop guard and quota",
+              "x-loop-guard": {
+                "maxRepeats": 10,
+                "window": "30s"
+              },
+              "x-cost-per-call": {
+                "amount": 0.01,
+                "unit": "usd"
+              },
+              "x-quota": {
+                "amount": 1000,
+                "unit": "requests",
+                "window": "24h"
+              },
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            },
+            "post": {
+              "summary": "Create data with stricter limits",
+              "x-loop-guard": {
+                "maxRepeats": 3,
+                "window": "60s"
+              },
+              "x-cost-per-call": {
+                "amount": 0.05,
+                "unit": "usd"
+              },
+              "x-quota": {
+                "amount": 100,
+                "unit": "requests",
+                "window": "1h"
+              },
+              "responses": {
+                "201": { "description": "Created" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-6-fragment-root-with-upstream-map": {
+      "$comment": "Fragment demonstrating x-upstream-map structure at fragment root.",
+      "description": "Environment-based routing with instance selection.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "env-router",
+        "x-api-version": "v1",
+        "x-instance-param": "env",
+        "x-upstream-map": {
+          "prod": {
+            "url": "https://prod.service.example.com",
+            "vaultPath": "seam/routes/env-router/prod-token",
+            "injectAs": { "kind": "bearer" },
+            "requiredScope": "env-router:prod"
+          },
+          "staging": {
+            "url": "https://staging.service.example.com",
+            "vaultPath": "seam/routes/env-router/staging-token",
+            "injectAs": { "kind": "bearer" },
+            "requiredScope": "env-router:staging"
+          },
+          "dev": {
+            "url": "https://dev.service.example.com",
+            "vaultPath": "seam/routes/env-router/dev-token",
+            "injectAs": { "kind": "bearer" },
+            "requiredScope": "env-router:dev"
+          }
+        },
+        "x-required-scope": "env-router:read",
+        "paths": {
+          "/status": {
+            "get": {
+              "summary": "Get status",
+              "responses": {
+                "200": { "description": "Success" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "invalid-examples": {
+    "$comment": "Examples that SHOULD FAIL validation, demonstrating policy constraint enforcement.",
+
+    "invalid-1-negative-cost": {
+      "$comment": "FAILS: Negative cost amount violates exclusiveMinimum: 0.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": {
+                "amount": -0.001,
+                "unit": "usd"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-cost-per-call amount must be greater than 0 (exclusiveMinimum: 0)"
+    },
+
+    "invalid-2-zero-cost": {
+      "$comment": "FAILS: Zero cost amount violates exclusiveMinimum: 0.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": {
+                "amount": 0,
+                "unit": "usd"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-cost-per-call amount must be greater than 0 (exclusiveMinimum: 0)"
+    },
+
+    "invalid-3-negative-quota": {
+      "$comment": "FAILS: Negative quota amount violates exclusiveMinimum: 0.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": { "amount": 1, "unit": "requests" },
+              "x-quota": {
+                "amount": -100,
+                "unit": "requests",
+                "window": "1h"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-quota amount must be greater than 0 (exclusiveMinimum: 0)"
+    },
+
+    "invalid-4-invalid-duration": {
+      "$comment": "FAILS: Invalid duration format violates pattern ^[0-9]+(s|m|h|d)$.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-loop-guard": {
+                "maxRepeats": 5,
+                "window": "10seconds"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "Duration must match pattern ^[0-9]+(s|m|h|d)$"
+    },
+
+    "invalid-5-negative-max-repeats": {
+      "$comment": "FAILS: Negative maxRepeats violates minimum: 1.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-loop-guard": {
+                "maxRepeats": -1,
+                "window": "10s"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "maxRepeats must be at least 1 (minimum: 1)"
+    },
+
+    "invalid-6-zero-max-repeats": {
+      "$comment": "FAILS: Zero maxRepeats violates minimum: 1.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-loop-guard": {
+                "maxRepeats": 0,
+                "window": "10s"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "maxRepeats must be at least 1 (minimum: 1)"
+    },
+
+    "invalid-7-quota-without-cost": {
+      "$comment": "FAILS: x-quota without x-cost-per-call violates constraint-quota-requires-cost.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-quota": {
+                "amount": 100,
+                "unit": "requests",
+                "window": "1h"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-quota requires x-cost-per-call (constraint-quota-requires-cost)"
+    },
+
+    "invalid-8-invalid-unit-format": {
+      "$comment": "FAILS: Invalid unit format violates pattern ^[a-z][a-z0-9-]*$.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": {
+                "amount": 0.01,
+                "unit": "USD"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "Unit must match pattern ^[a-z][a-z0-9-]*$ (lowercase only)"
+    },
+
+    "invalid-9-missing-loop-guard-fields": {
+      "$comment": "FAILS: x-loop-guard missing required maxRepeats or window.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-loop-guard": {
+                "maxRepeats": 5
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-loop-guard requires both maxRepeats and window"
+    },
+
+    "invalid-10-missing-cost-fields": {
+      "$comment": "FAILS: x-cost-per-call missing required amount or unit.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": {
+                "amount": 0.01
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-cost-per-call requires both amount and unit"
+    },
+
+    "invalid-11-missing-quota-fields": {
+      "$comment": "FAILS: x-quota missing required amount, unit, or window.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "bad-example",
+        "x-upstream": "https://example.com",
+        "paths": {
+          "/test": {
+            "get": {
+              "x-cost-per-call": { "amount": 1, "unit": "requests" },
+              "x-quota": {
+                "amount": 100,
+                "unit": "requests"
+              },
+              "responses": { "200": { "description": "Success" } }
+            }
+          }
+        }
+      },
+      "expected-error": "x-quota requires amount, unit, and window"
+    }
+  }
+}

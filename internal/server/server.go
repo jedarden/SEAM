@@ -57,10 +57,12 @@ func isReservedPath(path string) bool {
 
 // Config holds the server configuration
 type Config struct {
-	CallerPort   int
-	OperatorPort int
-	BaseURL      string
-	SpecDir      string
+	CallerPort     int
+	OperatorPort   int
+	BaseURL        string
+	SpecDir        string
+	FragmentMode   bool
+	SchemaPath     string
 	CaptureEnabled bool
 	CorpusDir      string
 }
@@ -82,9 +84,21 @@ type Server struct {
 // New creates a new Server with the given configuration
 func New(cfg *Config) *Server {
 	// Initialize the spec loader
-	specLoader, err := spec.New(cfg.SpecDir, cfg.BaseURL)
-	if err != nil {
-		log.Fatalf("Failed to initialize spec loader: %v", err)
+	var specLoader *spec.Loader
+	var err error
+
+	if cfg.FragmentMode {
+		specLoader, err = spec.NewWithFragments(cfg.SpecDir, cfg.BaseURL, cfg.SchemaPath)
+		if err != nil {
+			log.Fatalf("Failed to initialize spec loader in fragment mode: %v", err)
+		}
+		log.Printf("Loaded spec from fragments in %s", cfg.SpecDir)
+	} else {
+		specLoader, err = spec.New(cfg.SpecDir, cfg.BaseURL)
+		if err != nil {
+			log.Fatalf("Failed to initialize spec loader: %v", err)
+		}
+		log.Printf("Loaded spec from %s", cfg.SpecDir)
 	}
 
 	s := &Server{
@@ -194,8 +208,6 @@ func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // configStatusHandler returns configuration fragment status
-// In Phase 1a, this returns a quiescent/empty payload.
-// Phase 1b (bf-5m2) will populate it with fragment quarantine status.
 func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -205,14 +217,8 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	status := struct {
-		FragmentsLoaded bool     `json:"fragments_loaded"`
-		Conditions      []string `json:"conditions"`
-	}{
-		FragmentsLoaded: false,
-		Conditions:      []string{},
-	}
-
+	// Get fragment status from the spec loader
+	status := s.specLoader.GetFragmentStatus()
 	json.NewEncoder(w).Encode(status)
 }
 

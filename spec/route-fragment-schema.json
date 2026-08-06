@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ardenone.com/seam/route-fragment-schema/v1.json",
+  "title": "SEAM Route Fragment (x-seam-schema v1)",
+  "description": "Concrete JSON Schema for a SEAM route fragment (x-seam-schema: v1). A fragment is a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields. Authored alongside its companion design note docs/notes/route-fragment-schema.md, which is the authority on placement decisions and on the cross-field constraints that this schema cannot express and the Go validator (seam lint + runtime quarantine) must enforce on top. References docs/plan/plan.md Data Models, Architecture, Open Questions and ADR-001.",
+  "type": "object",
+  "required": ["x-seam-schema", "x-seam-owner", "paths"],
+  "additionalProperties": true,
+  "$comment": "additionalProperties is deliberately true at every level: OpenAPI-native keys are validated for OpenAPI correctness by pb33f libopenapi (not by this schema), and unknown x-* keys pass through unchecked so a v1 validator does not reject a fragment carrying a forward field (x-requires-approval, or a v2 marker). x-seam-schema is the detectable escape hatch if the format itself evolves. Only the SEAM-owned extension keys named below are shape-validated here.",
+
+  "properties": {
+    "openapi": { "type": "string", "$comment": "Optional. A fragment is a paths/components fragment, not a standalone OpenAPI document; the merge layer may synthesize or strip this." },
+    "info": { "type": "object", "$comment": "Optional OpenAPI info; informational for a fragment." },
+    "paths": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^/": { "$ref": "#/$defs/pathItem" }
+      },
+      "additionalProperties": false,
+      "$comment": "OpenAPI requires path template keys to begin with '/'. Every path item is validated as a SEAM path item."
+    },
+    "components": { "type": "object", "$comment": "Optional reusable OpenAPI components (schemas, parameters, ...). Not SEAM-validated beyond being an object; libopenapi owns OpenAPI validity." },
+
+    "x-seam-schema": { "const": "v1", "$comment": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. const so a v2 fragment is rejected (not shape-guessed) by a v1 validator." },
+    "x-seam-owner": { "$ref": "#/$defs/ownerToken", "$comment": "Fragment-root only; required day one. Redundant in-file declaration of the owning service, checked against the mounted parent directory at runtime (validator-side: must equal the directory the fragment was loaded from)." },
+    "x-api-version": { "$ref": "#/$defs/apiVersion", "$comment": "Fragment-root only. The literal _unversioned is rejected here (the pattern requires v then a non-zero digit); it is SEAM-assigned, never authored." },
+
+    "x-upstream": { "$ref": "#/$defs/upstreamUrl", "$comment": "Fragment-root. The single upstream base URL this fragment forwards to. Mutually exclusive with x-upstream-map. Host membership in the operator-owned allowlist is validator-side (manifest-level, not fragment-level)." },
+    "x-upstream-map": { "$ref": "#/$defs/upstreamMap", "$comment": "Fragment-root. Multi-instance map: designated instance parameter (x-instance-param) -> per-instance entry. Mutually exclusive with x-upstream; requires x-instance-param." },
+    "x-instance-param": { "$ref": "#/$defs/paramName", "$comment": "Fragment-root. Required with x-upstream-map, forbidden without it. Must name a path parameter present in EVERY path the fragment declares (validator-side, cross-path)." },
+
+    "x-upstream-strip-prefix": { "$ref": "#/$defs/upstreamStripPrefix", "$comment": "Fragment-root shorthand rewrite: a literal prefix removed from every matched template. Must be a prefix of every declared path (validator-side, cross-path). Upstream-facing: forbidden on an x-adapter fragment." },
+    "x-upstream-plaintext": { "$ref": "#/$defs/acknowledged", "$comment": "Fragment-root. Required when x-upstream is http://. Mutually exclusive with x-upstream-map (per-entry plaintext is used there instead)." },
+
+    "x-upstream-tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Fragment-root upstream transport policy; absent means verify against system trust store with hostname checking. Upstream-facing: taken from targetVersion on an x-adapter fragment." },
+    "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (prefix seam/routes/<owner>/*) and allowlist membership are validator-side." },
+    "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither)." },
+    "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as)." },
+    "x-breaker": { "$ref": "#/$defs/breaker", "$comment": "Fragment-root tuning of the per-upstream circuit breaker. On by default (infrastructure guard); enabled:false is the opt-out. Upstream-facing: forbidden on an x-adapter fragment." },
+
+    "x-required-scope": { "$ref": "#/$defs/scopeArray", "$comment": "Optional fragment-root DEFAULT; any operation-level x-required-scope REPLACES it (validator-side), never merges. Conjunctive array; bare string sugar for one element." },
+    "x-fanout-scope": { "$ref": "#/$defs/scopeArray", "$comment": "Fragment-root. Gates the _all fan-out in addition to the operation-level scope. Parsed and carried from Phase 10; enforced from Phase 7." },
+    "x-seam-deprecated": { "$ref": "#/$defs/seamDeprecated", "$comment": "Fragment-root object marking every route deprecated. Feeds Deprecation/Sunset headers and the retirement metric." },
+    "x-adapter": { "$ref": "#/$defs/adapter", "$comment": "Fragment-root. Declarative request/response transforms delegating to a live targetVersion. Mutually exclusive with x-upstream/x-upstream-map and every upstream-facing field." },
+    "x-unscrubbable": { "$ref": "#/$defs/acknowledged", "$comment": "Allowed at fragment-root OR operation level. Acknowledgement that a route runs unscrubbed (response cannot be scanned for echoed secrets)." },
+    "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." }
+  },
+
+  "allOf": [
+    { "$ref": "#/$defs/constraint-adapter-excludes-upstream-fields" },
+    { "$ref": "#/$defs/constraint-upstream-xor-map" },
+    { "$ref": "#/$defs/constraint-forwarding-fragment-has-upstream" },
+    { "$ref": "#/$defs/constraint-map-requires-instance-param" },
+    { "$ref": "#/$defs/constraint-instance-param-only-with-map" },
+    { "$ref": "#/$defs/constraint-upstream-excludes-instance-param" },
+    { "$ref": "#/$defs/constraint-vault-inject-paired" },
+    { "$ref": "#/$defs/constraint-passthrough-has-no-probe" },
+    { "$ref": "#/$defs/constraint-plaintext-required-on-http" },
+    { "$ref": "#/$defs/constraint-plaintext-excludes-map" }
+  ],
+
+  "$defs": {
+    "ownerToken": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+      "$comment": "One flat segment, no slashes, no dots — simultaneously a legal directory name, ConfigMap suffix, filename stem and OpenBao path segment."
+    },
+    "apiVersion": {
+      "type": "string",
+      "pattern": "^v[1-9][0-9]*$",
+      "$comment": "v<positive integer>, ordered numerically. No dotted/dated/v1beta1 forms; _unversioned is SEAM-assigned and rejected as an author value."
+    },
+    "paramName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "$comment": "Bare OpenAPI path-parameter name."
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+(s|m|h|d)$",
+      "$comment": "Closed duration grammar shared by x-quota.window and x-loop-guard.window. No calendar-aligned form (no mo/y). Tumbling window anchored at process start; restart resets it. A value above 168h is a lint WARNING, not a schema failure (validator-side)."
+    },
+    "scopeString": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(:[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+      "$comment": "Colon-delimited service:action (e.g. k8s-ro:get, argocd:sync) including three-segment control-plane scopes (seam:ops:read, seam:scopes:read-all). At least two segments."
+    },
+    "scopeArray": {
+      "description": "Conjunctive set of scopes a caller must hold. A bare string is sugar for a one-element array.",
+      "oneOf": [
+        { "$ref": "#/$defs/scopeString" },
+        { "type": "array", "items": { "$ref": "#/$defs/scopeString" }, "minItems": 1, "uniqueItems": true }
+      ],
+      "$comment": "Duplicates collapse and order is insignificant (validator-side normalization); uniqueItems flags obvious dups."
+    },
+    "acknowledged": {
+      "type": "string",
+      "const": "acknowledged",
+      "$comment": "The only accepted value for fields that exist to make an exposure enumerable (insecureSkipVerify, x-upstream-plaintext, x-unscrubbable). No false form — absence is refusal, not permission."
+    },
+    "upstreamUrl": {
+      "type": "string",
+      "pattern": "^https?://",
+      "not": {
+        "description": "IP-literal hosts are rejected outright: they defeat the enumeration the upstream-host allowlist exists to provide.",
+        "pattern": "^https?://(\\[[0-9a-fA-F:.]+\\]|[0-9]{1,3}(\\.[0-9]{1,3}){3})"
+      },
+      "$comment": "Absolute http(s) URL; https is preferred (a live credential is injected into every forwarded request). Host membership in the operator-owned allowlist is validator-side."
+    },
+    "vaultPath": {
+      "type": "string",
+      "pattern": "^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/",
+      "$comment": "Must resolve inside the OpenBao allowlist prefix seam/routes/* and be co-owned: seam/routes/<x-seam-owner>/*. The prefix shape is encoded; equality with the fragment's owner is validator-side.",
+      "allOf": [
+        { "not": { "pattern": "(^|/)\\.\\.(/|$)" }, "$comment": "Reject path traversal." },
+        { "not": { "pattern": "[*?]" }, "$comment": "Reject globs." },
+        { "not": { "pattern": "\\{" }, "$comment": "Reject templated segments." }
+      ]
+    },
+    "injectAs": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["header", "bearer", "query"] },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "header" } } }, "then": { "required": ["name"] } },
+        { "if": { "properties": { "kind": { "const": "query" } } }, "then": { "required": ["name"] } },
+        { "if": { "properties": { "kind": { "const": "bearer" } } }, "then": { "not": { "required": ["name"] } } }
+      ],
+      "$comment": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>)."
+    },
+    "upstreamTls": {
+      "type": "object",
+      "properties": {
+        "caBundle": { "type": "string", "minLength": 1, "$comment": "Names a PEM key in the seam-upstream-ca ConfigMap, resolved as a file under /etc/gateway/upstream-ca/." },
+        "serverName": { "type": "string", "minLength": 1, "$comment": "Overrides SNI/hostname verification." },
+        "insecureSkipVerify": { "$ref": "#/$defs/acknowledged" }
+      },
+      "additionalProperties": false
+    },
+    "upstreamStripPrefix": {
+      "type": "string",
+      "pattern": "^/",
+      "minLength": 2,
+      "not": {
+        "anyOf": [
+          { "pattern": "/$", "$comment": "no trailing slash — applied to all paths, so a trailing / would strip the leading / off the remainder" },
+          { "pattern": "\\{", "$comment": "no templated segments — a strip is a literal, not a rewrite template" }
+        ]
+      },
+      "$comment": "Fragment-root literal path prefix (leading /, minLength 2 so not the bare '/', no trailing /, no parameters) removed from every matched template after the designated instance segment is dropped — the ergonomic form of step 3's upstream-path rewrite. Must be a prefix of EVERY path the fragment declares (validator-side, cross-path: a partly-applicable strip silently forwards one fragment's routes to two different upstream path shapes). Upstream-facing: forbidden on an x-adapter fragment."
+    },
+    "breaker": {
+      "type": "object",
+      "properties": {
+        "threshold": { "type": "integer", "minimum": 1 },
+        "openSeconds": { "type": "integer", "minimum": 1 },
+        "maxOpenSeconds": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean", "$comment": "Default true; false is the lint-flagged, /config/status-enumerated opt-out." }
+      },
+      "additionalProperties": false,
+      "$comment": "All optional; absent means the SEAM default policy owned by Passive Route Health."
+    },
+    "loopGuard": {
+      "type": "object",
+      "required": ["maxRepeats", "window"],
+      "properties": {
+        "maxRepeats": { "type": "integer", "minimum": 1, "$comment": "Count of identical (normalized-hash) requests tolerated within one window before the guard fires." },
+        "window": { "$ref": "#/$defs/duration" }
+      },
+      "additionalProperties": false
+    },
+    "costPerCall": {
+      "type": "object",
+      "required": ["amount", "unit"],
+      "properties": {
+        "amount": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "$comment": "Lowercase label: usd, credits, tokens, requests. SEAM never converts between units." }
+      },
+      "additionalProperties": false
+    },
+    "quota": {
+      "type": "object",
+      "required": ["amount", "unit", "window"],
+      "properties": {
+        "amount": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "$comment": "MUST be byte-identical to the same route's x-cost-per-call.unit (validator-side equality check)." },
+        "window": { "$ref": "#/$defs/duration" }
+      },
+      "additionalProperties": false
+    },
+    "credentialProbe": {
+      "type": "object",
+      "required": ["path", "method", "interval"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "$comment": "A designated safe upstream path. Must be a route the fragment serves (validator-side, cross-path)." },
+        "method": { "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
+        "interval": { "$ref": "#/$defs/duration", "$comment": "Per-fragment default; an x-upstream-map entry may override per instance." }
+      },
+      "additionalProperties": false
+    },
+    "upstreamMapEntry": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": { "$ref": "#/$defs/upstreamUrl" },
+        "vaultPath": { "$ref": "#/$defs/vaultPath" },
+        "injectAs": { "$ref": "#/$defs/injectAs" },
+        "tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Per-instance override of x-upstream-tls." },
+        "plaintext": { "$ref": "#/$defs/acknowledged", "$comment": "Required when this entry's url is http:// (plaintext is per-entry, never inherited). Mutually exclusive with inheriting a fragment-level marker — there is none on a map fragment." },
+        "probeInterval": { "$ref": "#/$defs/duration", "$comment": "Per-instance override of x-credential-probe.interval." },
+        "breaker": { "$ref": "#/$defs/breaker", "$comment": "Per-instance override of x-breaker." },
+        "requiredScope": { "$ref": "#/$defs/scopeArray", "$comment": "Per-instance authorization: scope(s) a caller must additionally hold to reach THIS instance. Union with operation-level x-required-scope at stage 5 (validator/runtime)." }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "url": { "pattern": "^http://" } } }, "then": { "required": ["plaintext"] } },
+        { "$ref": "#/$defs/constraint-entry-vault-inject-paired" }
+      ],
+      "$comment": "vaultPath/injectAs bind per-instance (both or neither), defaulting to the fragment-level fields when omitted. The effective pair must resolve both-or-neither per instance (validator-side merge)."
+    },
+    "upstreamMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/upstreamMapEntry" },
+      "$comment": "Keys are instance names selected by the x-instance-param segment. Reserved keys: _all (fan-out) and _default (single-instance reporting key)."
+    },
+    "seamDeprecated": {
+      "type": "object",
+      "required": ["since"],
+      "properties": {
+        "since": { "type": "string", "format": "date", "$comment": "ISO date the deprecation was declared; populates Deprecation directly." },
+        "sunset": { "type": "string", "format": "date", "$comment": "Optional advisory removal date; emitted as Sunset verbatim." },
+        "brownout": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["start", "end"],
+            "properties": {
+              "start": { "type": "string", "format": "date-time" },
+              "end": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          },
+          "$comment": "Ordered, non-overlapping RFC 3339 windows, each inside [since, sunset]; requires sunset. Machine-written by seam-retirement-evaluator. Ordering/non-overlap/range and the sunset requirement are enforced below + validator-side."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "required": ["brownout"] }, "then": { "required": ["sunset"] } }
+      ],
+      "$comment": "A bare x-seam-deprecated: true is a lint error — it fails type:object here."
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["targetVersion", "request", "response"],
+      "properties": {
+        "targetVersion": { "$ref": "#/$defs/apiVersion", "$comment": "Names a LIVE served x-api-version this fragment adapts into (validator-side: must exist after merge)." },
+        "request": { "type": "array", "items": { "type": "object" } },
+        "response": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false,
+      "$comment": "Each list is an ordered sequence of transforms from a CLOSED vocabulary owned by Version Migration Strategy §2 / Phase 8. The transform object shape is intentionally permissive here (items: object) and will be tightened when §2 finalizes the vocabulary; no expressions, no scripting."
+    },
+    "pathItem": {
+      "type": "object",
+      "properties": {
+        "x-upstream-path-template": {
+          "type": "string",
+          "pattern": "^/",
+          "$comment": "Path-item-level authoritative rewrite in the UPSTREAM's own terms. Must name no designated instance parameter and every {param} must exist in the matched template (validator-side, cross-field with x-instance-param and the sibling path template). Upstream-facing: forbidden on an x-adapter fragment."
+        },
+        "get": { "$ref": "#/$defs/operation" },
+        "put": { "$ref": "#/$defs/operation" },
+        "post": { "$ref": "#/$defs/operation" },
+        "delete": { "$ref": "#/$defs/operation" },
+        "options": { "$ref": "#/$defs/operation" },
+        "head": { "$ref": "#/$defs/operation" },
+        "patch": { "$ref": "#/$defs/operation" },
+        "trace": { "$ref": "#/$defs/operation" }
+      },
+      "additionalProperties": true
+    },
+    "operation": {
+      "type": "object",
+      "properties": {
+        "x-required-scope": { "$ref": "#/$defs/scopeArray", "$comment": "Operation-level authority; REPLACES any fragment-root default (validator-side), never merges." },
+        "x-loop-guard": { "$ref": "#/$defs/loopGuard" },
+        "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
+        "x-quota": { "$ref": "#/$defs/quota" },
+        "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
+        "x-requires-approval": { "type": "boolean" }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        { "$ref": "#/$defs/constraint-quota-requires-cost" }
+      ]
+    },
+
+    "constraint-quota-requires-cost": {
+      "if": { "required": ["x-quota"] },
+      "then": { "required": ["x-cost-per-call"] },
+      "$comment": "A budget with no per-call draw can never be decremented, so it caps nothing while reading as though it does."
+    },
+    "constraint-entry-vault-inject-paired": {
+      "if": { "anyOf": [{}] },
+      "then": {},
+      "$comment": "Placeholder kept intentionally inert; the effective per-instance both-or-neither resolution requires merging fragment-level defaults with the entry and is enforced by the validator (cannot be expressed per-entry in isolation).",
+      "deprecated": true
+    },
+    "constraint-adapter-excludes-upstream-fields": {
+      "if": { "required": ["x-adapter"] },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["x-upstream"] },
+            { "required": ["x-upstream-map"] },
+            { "required": ["x-instance-param"] },
+            { "required": ["x-upstream-strip-prefix"] },
+            { "required": ["x-upstream-tls"] },
+            { "required": ["x-upstream-plaintext"] },
+            { "required": ["x-vault-path"] },
+            { "required": ["x-inject-as"] },
+            { "required": ["x-credential-probe"] },
+            { "required": ["x-breaker"] }
+          ]
+        }
+      },
+      "$comment": "An adapting fragment delegates to targetVersion's route; every upstream-facing field is taken from the target. (A path-item x-upstream-path-template on an adapter fragment is likewise illegal — enforced validator-side, cross-level.)"
+    },
+    "constraint-upstream-xor-map": {
+      "if": { "required": ["x-upstream-map"] },
+      "then": { "not": { "required": ["x-upstream"] } },
+      "$comment": "A fragment declares exactly one upstream target by construction; the reverse direction is covered by constraint-forwarding-fragment-has-upstream."
+    },
+    "constraint-forwarding-fragment-has-upstream": {
+      "if": { "not": { "anyOf": [{ "required": ["x-adapter"] }, { "required": ["x-upstream"] }, { "required": ["x-upstream-map"] }] } },
+      "then": false,
+      "$comment": "A non-adapter fragment must declare an upstream target (x-upstream or x-upstream-map). An x-adapter fragment declares neither (excluded above)."
+    },
+    "constraint-map-requires-instance-param": {
+      "if": { "required": ["x-upstream-map"] },
+      "then": { "required": ["x-instance-param"] }
+    },
+    "constraint-instance-param-only-with-map": {
+      "if": { "required": ["x-instance-param"] },
+      "then": { "required": ["x-upstream-map"] },
+      "$comment": "x-instance-param without x-upstream-map is a lint error."
+    },
+    "constraint-upstream-excludes-instance-param": {
+      "if": { "required": ["x-upstream"] },
+      "then": { "not": { "required": ["x-instance-param"] } },
+      "$comment": "A single-instance route has no instance-selector segment."
+    },
+    "constraint-vault-inject-paired": {
+      "oneOf": [
+        { "required": ["x-vault-path", "x-inject-as"] },
+        { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } }
+      ],
+      "$comment": "Both or neither. A fragment declaring neither is a legal pass-through proxy route. On an x-adapter fragment both are already forbidden, so this is consistent."
+    },
+    "constraint-passthrough-has-no-probe": {
+      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } },
+      "then": { "not": { "required": ["x-credential-probe"] } },
+      "$comment": "There is no credential to validate against the upstream on a pass-through route."
+    },
+    "constraint-plaintext-required-on-http": {
+      "if": { "properties": { "x-upstream": { "pattern": "^http://" } }, "required": ["x-upstream"] },
+      "then": { "required": ["x-upstream-plaintext"] },
+      "$comment": "Plaintext acknowledgement is required for any hop that does not leave an authenticated network path."
+    },
+    "constraint-plaintext-excludes-map": {
+      "if": { "required": ["x-upstream-map"] },
+      "then": { "not": { "required": ["x-upstream-plaintext"] } },
+      "$comment": "On a map fragment acknowledgement is per-entry plaintext, never fragment-wide."
+    }
+  }
+}

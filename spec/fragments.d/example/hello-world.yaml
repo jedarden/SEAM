@@ -1,0 +1,73 @@
+{
+  "x-seam-schema": "v1",
+  "x-seam-owner": "example",
+  "x-api-version": "v1",
+  "x-upstream": "https://example.com",
+  "paths": {
+    "/hello": {
+      "get": {
+        "summary": "Hello World endpoint",
+        "description": "A simple example endpoint that returns a hello world message",
+        "operationId": "helloWorld",
+        "tags": ["Example"],
+        "x-required-scope": ["example:read"],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Hello, World!"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hello/{name}": {
+      "get": {
+        "summary": "Personalized greeting",
+        "description": "Returns a personalized greeting",
+        "operationId": "helloName",
+        "tags": ["Example"],
+        "x-required-scope": ["example:read"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Name to greet",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Hello, Alice!"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
