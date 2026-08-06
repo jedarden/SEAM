@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,16 +19,18 @@ import (
 
 // Loader handles loading and serving OpenAPI specs
 type Loader struct {
-	specPath    string
-	baseURL     string
-	rawDocument []byte
-	specVersion string // Stable hash of the spec
-	loadedDoc   libopenapi.Document
-	model       *libopenapi.DocumentModel[v3.Document]
-	validator   validator.Validator
+	specPath       string
+	baseURL        string
+	rawDocument    []byte
+	specVersion    string // Stable hash of the spec
+	loadedDoc      libopenapi.Document
+	model          *libopenapi.DocumentModel[v3.Document]
+	validator      validator.Validator
+	fragmentLoader *FragmentLoader // Fragment loader for fragment mode
+	fragmentMode   bool            // Whether we're in fragment mode
 }
 
-// New creates a new spec loader
+// New creates a new spec loader in static mode (single openapi.yaml file)
 func New(specDir, baseURL string) (*Loader, error) {
 	// Expect exactly one spec file in the directory
 	specPath := filepath.Join(specDir, "openapi.yaml")
@@ -66,13 +69,77 @@ func New(specDir, baseURL string) (*Loader, error) {
 	v := validator.NewValidatorFromV3Model(&model.Model, nil)
 
 	return &Loader{
-		specPath:    specPath,
-		baseURL:     baseURL,
-		rawDocument: rawDocument,
-		specVersion: specVersion,
-		loadedDoc:   loadedDoc,
-		model:       model,
-		validator:   v,
+		specPath:     specPath,
+		baseURL:      baseURL,
+		rawDocument:  rawDocument,
+		specVersion:  specVersion,
+		loadedDoc:    loadedDoc,
+		model:        model,
+		validator:    v,
+		fragmentMode: false,
+	}, nil
+}
+
+// NewWithFragments creates a new spec loader in fragment mode
+// Loads fragments from specDir/fragments.d and merges them into a single OpenAPI spec
+func NewWithFragments(specDir, baseURL, schemaPath string) (*Loader, error) {
+	// Initialize fragment loader
+	fragmentLoader, err := NewFragmentLoader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fragment loader: %w", err)
+	}
+
+	// Load fragments from the fragments.d directory
+	fragmentsDir := filepath.Join(specDir, "fragments.d")
+	if err := fragmentLoader.LoadDirectory(fragmentsDir); err != nil {
+		return nil, fmt.Errorf("failed to load fragments: %w", err)
+	}
+
+	// Validate fragments against the schema if schema is provided
+	if schemaPath != "" {
+		if err := fragmentLoader.ValidateFragments(schemaPath); err != nil {
+			log.Printf("Warning: fragment validation had errors: %v", err)
+		}
+	}
+
+	// Merge fragments into a single document
+	mergedJSON, err := fragmentLoader.MergeFragments(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge fragments: %w", err)
+	}
+
+	// Compute stable hash of the merged spec
+	hash := sha256.Sum256(mergedJSON)
+	specVersion := hex.EncodeToString(hash[:])[:16] // Use first 16 hex chars (64 bits)
+
+	// Load the merged document using libopenapi
+	loadedDoc, err := libopenapi.NewDocument(mergedJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load merged OpenAPI document: %w", err)
+	}
+
+	// Build the model for validation and route extraction
+	documentModel, err := loadedDoc.BuildV3Model()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build OpenAPI model: %w", err)
+	}
+
+	// Store the document model for later use
+	model := documentModel
+
+	// Create the validator using the v3 model directly
+	v := validator.NewValidatorFromV3Model(&model.Model, nil)
+
+	return &Loader{
+		specPath:       fragmentsDir,
+		baseURL:        baseURL,
+		rawDocument:    mergedJSON,
+		specVersion:    specVersion,
+		loadedDoc:      loadedDoc,
+		model:          model,
+		validator:      v,
+		fragmentLoader: fragmentLoader,
+		fragmentMode:   true,
 	}, nil
 }
 
@@ -397,5 +464,41 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 	}
 
 	return response
+}
+
+// GetFragmentStatus returns status information about loaded fragments
+func (l *Loader) GetFragmentStatus() map[string]interface{} {
+	if !l.fragmentMode || l.fragmentLoader == nil {
+		return map[string]interface{}{
+			"fragments_loaded": false,
+			"conditions":       []string{},
+		}
+	}
+
+	conditions := []string{}
+	quarantined := l.fragmentLoader.GetQuarantined()
+
+	if len(quarantined) > 0 {
+		conditions = append(conditions, fmt.Sprintf("%d fragments quarantined", len(quarantined)))
+		for _, q := range quarantined {
+			for _, reason := range q.QuarantineReasons {
+				conditions = append(conditions, fmt.Sprintf("  - %s: %s", q.SourceFile, reason))
+			}
+		}
+	}
+
+	validCount := l.fragmentLoader.GetValidFragmentCount()
+	if validCount == 0 {
+		conditions = append(conditions, "No valid fragments loaded")
+	} else {
+		conditions = append(conditions, fmt.Sprintf("%d valid fragments loaded", validCount))
+	}
+
+	return map[string]interface{}{
+		"fragments_loaded":   true,
+		"valid_count":        validCount,
+		"quarantined_count":  len(quarantined),
+		"conditions":         conditions,
+	}
 }
 

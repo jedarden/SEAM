@@ -50,6 +50,8 @@ func serveCommand(args []string) {
 	operatorPort := fs.Int("operator-port", 8081, "Port for the operator-only listener")
 	baseURL := fs.String("base-url", "http://localhost:8080", "Base URL for the caller-facing interface")
 	specDir := fs.String("spec-dir", "./spec", "Directory containing local OpenAPI spec files")
+	fragmentMode := fs.Bool("fragment-mode", false, "Enable fragment merge mode (reads from spec-dir/fragments.d)")
+	schemaPath := fs.String("schema-path", "./spec/route-fragment-schema.json", "Path to route-fragment JSON schema for validation")
 	captureEnabled := fs.Bool("capture-enabled", false, "Enable HTTP request/response capture")
 	corpusDir := fs.String("corpus-dir", "corpus", "Directory to store captured corpus files")
 
@@ -70,6 +72,12 @@ func serveCommand(args []string) {
 	if val := os.Getenv("SEAM_SPEC_DIR"); val != "" {
 		*specDir = val
 	}
+	if val := os.Getenv("SEAM_FRAGMENT_MODE"); val != "" {
+		*fragmentMode = val == "true" || val == "1"
+	}
+	if val := os.Getenv("SEAM_SCHEMA_PATH"); val != "" {
+		*schemaPath = val
+	}
 	if val := os.Getenv("SEAM_CAPTURE_ENABLED"); val != "" {
 		*captureEnabled = val == "true" || val == "1"
 	}
@@ -83,6 +91,10 @@ func serveCommand(args []string) {
 	log.Printf("  Operator-only port: %d", *operatorPort)
 	log.Printf("  Base URL: %s", *baseURL)
 	log.Printf("  Spec directory: %s", *specDir)
+	log.Printf("  Fragment mode: %v", *fragmentMode)
+	if *fragmentMode {
+		log.Printf("  Schema path: %s", *schemaPath)
+	}
 	log.Printf("  Capture enabled: %v", *captureEnabled)
 	if *captureEnabled {
 		log.Printf("  Corpus directory: %s", *corpusDir)
@@ -93,6 +105,8 @@ func serveCommand(args []string) {
 		OperatorPort:   *operatorPort,
 		BaseURL:        *baseURL,
 		SpecDir:        *specDir,
+		FragmentMode:   *fragmentMode,
+		SchemaPath:     *schemaPath,
 		CaptureEnabled: *captureEnabled,
 		CorpusDir:      *corpusDir,
 	}
