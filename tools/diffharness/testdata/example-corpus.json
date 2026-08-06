@@ -1,0 +1,41 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "test-service",
+  "incumbent": "https://httpbin.org",
+  "capturedAt": "2026-08-05T10:00:00Z",
+  "description": "Example corpus for testing the diffharness",
+  "entries": [
+    {
+      "id": "json-get",
+      "description": "Simple JSON GET request",
+      "request": {
+        "method": "GET",
+        "path": "/json",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [],
+      "expect": null
+    },
+    {
+      "id": "status-200",
+      "description": "Status endpoint",
+      "request": {
+        "method": "GET",
+        "path": "/status/200",
+        "query": "",
+        "headers": {
+          "Accept": ["application/json"]
+        },
+        "bodyB64": "",
+        "bodyContentType": ""
+      },
+      "secrets": [],
+      "expect": null
+    }
+  ]
+}

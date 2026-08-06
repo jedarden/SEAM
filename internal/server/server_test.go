@@ -837,17 +837,22 @@ func TestValidationMiddlewareSkipsReservedPaths(t *testing.T) {
 	s := New(cfg)
 
 	// Test that reserved paths skip validation and return normally
-	reservedPaths := []string{
-		"/_seam/healthz",
-		"/_seam/readyz",
-		"/openapi.json",
-		"/docs",
-		"/docs/route",
+	// Each path is paired with its required query parameters (if any)
+	reservedPaths := []struct {
+	path   string
+	query  string
+	}{
+		{"/_seam/healthz", ""},
+		{"/_seam/readyz", ""},
+		{"/openapi.json", ""},
+		{"/docs", ""},
+		{"/docs/route", "?path=/openapi.json&method=GET"},
 	}
 
-	for _, path := range reservedPaths {
-		t.Run(path, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, path, nil)
+	for _, item := range reservedPaths {
+		t.Run(item.path, func(t *testing.T) {
+			url := item.path + item.query
+			req := httptest.NewRequest(http.MethodGet, url, nil)
 			w := httptest.NewRecorder()
 
 			// Use the validation middleware wrapped handler
@@ -858,9 +863,14 @@ func TestValidationMiddlewareSkipsReservedPaths(t *testing.T) {
 			defer resp.Body.Close()
 
 			// Reserved paths should not return validation errors
+			// (they may return handler errors like 400 for missing params, but not validation errors)
 			if resp.StatusCode == http.StatusBadRequest {
 				body, _ := io.ReadAll(resp.Body)
-				t.Errorf("reserved path %s should not trigger validation, got: %s", path, string(body))
+				bodyStr := string(body)
+				// Check if it's specifically a validation error (not a handler error)
+				if strings.Contains(bodyStr, "validation_failed") || strings.Contains(bodyStr, "validation_errors") {
+					t.Errorf("reserved path %s should not trigger validation, got: %s", item.path, bodyStr)
+				}
 			}
 		})
 	}
