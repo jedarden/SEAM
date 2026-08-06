@@ -167,10 +167,10 @@
     },
     "loopGuard": {
       "type": "object",
-      "required": ["maxRepeats", "window"],
+      "required": ["max_iterations", "backoff_ms"],
       "properties": {
-        "maxRepeats": { "type": "integer", "minimum": 1, "$comment": "Count of identical (normalized-hash) requests tolerated within one window before the guard fires." },
-        "window": { "$ref": "#/$defs/duration" }
+        "max_iterations": { "type": "integer", "minimum": 1, "$comment": "Maximum number of iterations allowed before the loop guard intervenes." },
+        "backoff_ms": { "type": "integer", "minimum": 1, "$comment": "Backoff delay in milliseconds between iterations." }
       },
       "additionalProperties": false
     },
