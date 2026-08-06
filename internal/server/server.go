@@ -129,6 +129,7 @@ func New(cfg *Config) *Server {
 // setupRoutes configures the HTTP routes for both listeners
 func (s *Server) setupRoutes() {
 	// Caller-facing routes
+	s.callerMux.HandleFunc("/_seam/health", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/healthz", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
