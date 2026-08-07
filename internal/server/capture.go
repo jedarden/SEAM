@@ -26,8 +26,6 @@ type CaptureMiddleware struct {
 	entries   []CorpusEntry
 	autoSave  bool
 	saveCount int
-	saveFile  *os.File
-	savePath  string
 }
 
 // CorpusEntry represents a single captured request/response pair
@@ -341,7 +339,7 @@ func (r *responseRecorder) Headers() http.Header {
 		return r.headers
 	}
 	// If WriteHeader wasn't called yet, return current headers
-	return r.ResponseWriter.Header()
+	return r.Header()
 }
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
@@ -378,6 +376,14 @@ func (r *responseRecorder) Flush() {
 }
 
 // CloseNotify support (deprecated but might be needed)
+//
+// The deprecated http.CloseNotifier reference is deliberate: responseRecorder
+// wraps an arbitrary http.ResponseWriter, and dropping this method would stop
+// forwarding CloseNotify for any wrapped writer that still implements it.
+// Detecting a deprecated interface in order to proxy it is exactly the case
+// SA1019 cannot distinguish from using it in new code.
+//
+//nolint:staticcheck // SA1019: intentional passthrough of a deprecated interface
 func (r *responseRecorder) CloseNotify() <-chan bool {
 	if notifier, ok := r.ResponseWriter.(http.CloseNotifier); ok {
 		return notifier.CloseNotify()

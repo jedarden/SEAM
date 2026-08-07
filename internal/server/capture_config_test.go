@@ -78,12 +78,12 @@ func TestCaptureFlagEnabled(t *testing.T) {
 func TestCaptureEnvVar(t *testing.T) {
 	// Set environment variable
 	oldVal := os.Getenv("SEAM_CAPTURE_ENABLED")
-	os.Setenv("SEAM_CAPTURE_ENABLED", "true")
+	_ = os.Setenv("SEAM_CAPTURE_ENABLED", "true")
 	defer func() {
 		if oldVal != "" {
-			os.Setenv("SEAM_CAPTURE_ENABLED", oldVal)
+			_ = os.Setenv("SEAM_CAPTURE_ENABLED", oldVal)
 		} else {
-			os.Unsetenv("SEAM_CAPTURE_ENABLED")
+			_ = os.Unsetenv("SEAM_CAPTURE_ENABLED")
 		}
 	}()
 
@@ -100,12 +100,12 @@ func TestCaptureEnvVarFalse(t *testing.T) {
 
 	for _, val := range falseValues {
 		oldVal := os.Getenv("SEAM_CAPTURE_ENABLED")
-		os.Setenv("SEAM_CAPTURE_ENABLED", val)
+		_ = os.Setenv("SEAM_CAPTURE_ENABLED", val)
 		defer func() {
 			if oldVal != "" {
-				os.Setenv("SEAM_CAPTURE_ENABLED", oldVal)
+				_ = os.Setenv("SEAM_CAPTURE_ENABLED", oldVal)
 			} else {
-				os.Unsetenv("SEAM_CAPTURE_ENABLED")
+				_ = os.Unsetenv("SEAM_CAPTURE_ENABLED")
 			}
 		}()
 
@@ -166,7 +166,7 @@ func TestCaptureMiddlewareBehaviorWhenDisabled(t *testing.T) {
 	// Create a test handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Wrap with capture middleware
@@ -202,7 +202,7 @@ func TestCaptureMiddlewareBehaviorWhenEnabled(t *testing.T) {
 	// Create a test handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Wrap with capture middleware

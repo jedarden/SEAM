@@ -204,7 +204,7 @@ func validateFragmentsDir(fragmentsDir string) error {
 		log.Printf("[Loader] Fragments directory is not readable: %s - %v", fragmentsDir, err)
 		return fmt.Errorf("fragments directory is not readable: %s: %w", fragmentsDir, err)
 	}
-	file.Close()
+	_ = file.Close()
 
 	log.Printf("[Loader] Fragments directory validation passed: %s", fragmentsDir)
 	return nil
