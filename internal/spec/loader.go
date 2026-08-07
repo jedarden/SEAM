@@ -28,6 +28,7 @@ type Loader struct {
 	validator      validator.Validator
 	fragmentLoader *FragmentLoader // Fragment loader for fragment mode
 	fragmentMode   bool            // Whether we're in fragment mode
+	fragmentsDir   string          // Directory containing fragment files
 }
 
 // New creates a new spec loader in static mode (single openapi.yaml file)
@@ -77,6 +78,7 @@ func New(specDir, baseURL string) (*Loader, error) {
 		model:        model,
 		validator:    v,
 		fragmentMode: false,
+		fragmentsDir: "",
 	}, nil
 }
 
@@ -144,7 +146,15 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		validator:      v,
 		fragmentLoader: fragmentLoader,
 		fragmentMode:   true,
+		fragmentsDir:   fragmentsDir,
 	}, nil
+}
+
+// NewLoader creates a new spec loader using SEAM_FRAGMENTS_DIR environment variable
+// Reads SEAM_FRAGMENTS_DIR from environment, defaults to "./fragments" if not set
+func NewLoader(baseURL string) (*Loader, error) {
+	fragmentsDir := getFragmentsDir()
+	return NewWithFragments("", baseURL, "", fragmentsDir)
 }
 
 // GetVersion returns the stable spec version hash
@@ -468,6 +478,15 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 	}
 
 	return response
+}
+
+// getFragmentsDir returns the fragments directory path from the environment variable
+// or the default "./fragments" if not set
+func getFragmentsDir() string {
+	if val := os.Getenv("SEAM_FRAGMENTS_DIR"); val != "" {
+		return val
+	}
+	return "./fragments"
 }
 
 // GetFragmentStatus returns status information about loaded fragments
