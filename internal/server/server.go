@@ -288,9 +288,17 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the spec JSON with servers populated
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
-		log.Printf("Failed to get spec JSON: %v", err)
+		log.Printf("[openapi.json] Failed to get spec JSON: %v", err)
 		http.Error(w, "Failed to load spec", http.StatusInternalServerError)
 		return
+	}
+
+	// Check if no fragments were loaded (fragment mode only)
+	if s.specLoader.fragmentMode && s.specLoader.fragmentLoader != nil {
+		validCount := s.specLoader.fragmentLoader.GetValidFragmentCount()
+		if validCount == 0 {
+			log.Printf("[openapi.json] Warning: No valid fragments loaded, returning empty spec")
+		}
 	}
 
 	// Set headers
