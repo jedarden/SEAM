@@ -294,9 +294,9 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if no fragments were loaded (fragment mode only)
-	if s.specLoader.fragmentMode && s.specLoader.fragmentLoader != nil {
-		validCount := s.specLoader.fragmentLoader.GetValidFragmentCount()
-		if validCount == 0 {
+	fragmentStatus := s.specLoader.GetFragmentStatus()
+	if fragmentsLoaded, ok := fragmentStatus["fragments_loaded"].(bool); ok && fragmentsLoaded {
+		if validCount, ok := fragmentStatus["valid_count"].(int); ok && validCount == 0 {
 			log.Printf("[openapi.json] Warning: No valid fragments loaded, returning empty spec")
 		}
 	}
