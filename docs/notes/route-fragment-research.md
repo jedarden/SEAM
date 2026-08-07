@@ -117,7 +117,7 @@ paths:
 
 ### 3. Fragment Schema Patterns from Open-Source
 
-Based on research of OpenAPI 3.1 fragment patterns:
+Based on research of OpenAPI 3.1 fragment patterns and API gateway implementations:
 
 **Pattern 1: Component-Based Reusability**
 - OpenAPI 3.1 supports the `components` object for reusable schemas, parameters, and responses
@@ -135,6 +135,21 @@ Based on research of OpenAPI 3.1 fragment patterns:
 - Multiple fragments are merged at runtime by the gateway
 - Collision detection on (path, method, `x-api-version`) triple
 - Each fragment is owned by a service (matched to directory structure: `fragments.d/<owner>/`)
+
+**Pattern 4: API Gateway Vendor Extensions**
+All major API gateways follow the same vendor extension pattern:
+
+- **AWS API Gateway:** Uses `x-amazon-*` prefix for AWS-specific configurations ([docs](https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-swagger-extensions.html))
+- **Google Cloud:** Uses `x-google-*` prefix for backend routing ([docs](https://docs.cloud.google.com/api-gateway/docs/oasv2-extensions))
+- **Kong Gateway:** Uses `x-kong-*` prefix for plugin configurations ([docs](https://developer.konghq.com/plugins/oas-validation/))
+- **Tyk Gateway:** Uses `x-tyk-*` prefix for request validation ([docs](https://tyk.io/docs/api-management/traffic-transformation/request-validation))
+- **IBM API Connect:** Uses `x-ibm-*` prefix for IBM-specific extensions ([docs](https://www.ibm.com/docs/en/api-connect/software/10.0.x_cd?topic=file-extensions-openapi-specification))
+
+**Common Pattern:** All gateways use:
+1. OpenAPI 3.1 as the base specification
+2. Vendor-specific `x-*` extensions for gateway configuration
+3. JSON Schema for validation of extension fields
+4. Separation of OpenAPI-native correctness vs. vendor extension validation
 
 ---
 
