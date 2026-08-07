@@ -258,16 +258,16 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["header", "bearer", "query"] },
+        "kind": { "enum": ["header", "query", "cookie"] },
         "name": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false,
       "allOf": [
         { "if": { "properties": { "kind": { "const": "header" } } }, "then": { "required": ["name"] } },
         { "if": { "properties": { "kind": { "const": "query" } } }, "then": { "required": ["name"] } },
-        { "if": { "properties": { "kind": { "const": "bearer" } } }, "then": { "not": { "required": ["name"] } } }
+        { "if": { "properties": { "kind": { "const": "cookie" } } }, "then": { "required": ["name"] } }
       ],
-      "description": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>)."
+      "description": "Specifies how to inject the credential into the request. kind:header -> inject as HTTP header (e.g., {kind: header, name: X-API-Key} for X-API-Key: <secret>). kind:query -> inject as query parameter (e.g., {kind: query, name: api_key} for ?api_key=<secret>). kind:cookie -> inject as HTTP cookie (e.g., {kind: cookie, name: session} for Cookie: session=<secret>). The name field is required for all injection kinds and specifies the header/query parameter/cookie name."
     },
     "upstreamTls": {
       "type": "object",
