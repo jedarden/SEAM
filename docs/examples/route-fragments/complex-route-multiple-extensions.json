@@ -1,0 +1,306 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Multi-Tenant SaaS API Gateway",
+    "version": "1.0.0",
+    "description": "Complex multi-instance proxy with per-tenant credentials, scoped fanout, loop guards, cost tracking, and quota enforcement. Demonstrates multiple SEAM extensions in concert."
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "saas-gateway",
+  "x-api-version": "v2",
+  "x-instance-param": "tenant",
+  "x-upstream-map": {
+    "_all": {
+      "url": "https://api.saas-provider.com",
+      "vaultPath": "seam/routes/saas-gateway/fanout-secret",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-Fanout-Token"
+      },
+      "tls": {
+        "caBundle": "saas-ca"
+      },
+      "breaker": {
+        "threshold": 20,
+        "openSeconds": 45
+      }
+    },
+    "acme-corp": {
+      "url": "https://acme-corp.saas-provider.com",
+      "vaultPath": "seam/routes/saas-gateway/acme-corp-token",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-Tenant-Token"
+      },
+      "tls": {
+        "caBundle": "acme-ca",
+        "serverName": "acme-corp.saas-provider.com"
+      },
+      "breaker": {
+        "threshold": 15,
+        "openSeconds": 30
+      },
+      "requiredScope": "tenant:acme-corp"
+    },
+    "globex-inc": {
+      "url": "https://globex-inc.saas-provider.com",
+      "vaultPath": "seam/routes/saas-gateway/globex-inc-token",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-Tenant-Token"
+      },
+      "tls": {
+        "caBundle": "globex-ca"
+      },
+      "breaker": {
+        "threshold": 10,
+        "openSeconds": 60
+      },
+      "requiredScope": "tenant:globex-inc"
+    },
+    "soylent-corp": {
+      "url": "https://soylent-corp.saas-provider.com",
+      "vaultPath": "seam/routes/saas-gateway/soylent-corp-token",
+      "injectAs": {
+        "kind": "bearer"
+      },
+      "probeInterval": "45s",
+      "breaker": {
+        "enabled": false
+      },
+      "requiredScope": "tenant:soylent-corp"
+    }
+  },
+  "x-upstream-strip-prefix": "/saas",
+  "x-credential-probe": {
+    "path": "/api/v2/health",
+    "method": "GET",
+    "interval": "30s"
+  },
+  "x-breaker": {
+    "threshold": 25,
+    "openSeconds": 60,
+    "maxOpenSeconds": 600
+  },
+  "x-fanout-scope": "saas:fanout-all",
+  "paths": {
+    "/saas/api/v2/tenants/{tenant}/users": {
+      "get": {
+        "summary": "List users for a tenant",
+        "operationId": "listUsers",
+        "tags": ["users"],
+        "x-required-scope": "saas:users:read",
+        "x-cost-per-call": 2.0,
+        "x-quota": {
+          "limit": 10000,
+          "window_seconds": 3600
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Tenant identifier (or _all for fanout)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "description": "Page size"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Pagination cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated user list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "email": { "type": "string" },
+                          "name": { "type": "string" }
+                        }
+                      }
+                    },
+                    "nextCursor": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid tenant credentials"
+          },
+          "429": {
+            "description": "Quota exceeded"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a user for a tenant",
+        "operationId": "createUser",
+        "tags": ["users"],
+        "x-required-scope": "saas:users:write",
+        "x-cost-per-call": 5.0,
+        "x-quota": {
+          "limit": 1000,
+          "window_seconds": 3600
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "name"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "name": { "type": "string" },
+                  "role": {
+                    "type": "string",
+                    "enum": ["admin", "user", "viewer"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "email": { "type": "string" },
+                    "name": { "type": "string" },
+                    "createdAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "429": {
+            "description": "Write quota exceeded"
+          }
+        }
+      }
+    },
+    "/saas/api/v2/tenants/{tenant}/reports": {
+      "post": {
+        "summary": "Generate tenant report with loop guard",
+        "operationId": "generateReport",
+        "tags": ["reports"],
+        "x-required-scope": "saas:reports:generate",
+        "x-cost-per-call": 50.0,
+        "x-quota": {
+          "limit": 10,
+          "window_seconds": 3600
+        },
+        "x-loop-guard": {
+          "max_iterations": 3,
+          "backoff_ms": 1000
+        },
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["reportType", "dateRange"],
+                "properties": {
+                  "reportType": {
+                    "type": "string",
+                    "enum": ["usage", "billing", "audit"]
+                  },
+                  "dateRange": {
+                    "type": "object",
+                    "required": ["start", "end"],
+                    "properties": {
+                      "start": { "type": "string", "format": "date" },
+                      "end": { "type": "string", "format": "date" }
+                    }
+                  },
+                  "includeDetails": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Report generation started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reportId": { "type": "string" },
+                    "status": { "type": "string", "enum": ["queued", "processing"] }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Report generation quota exceeded"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "SEAM-issued OAuth2 bearer token"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

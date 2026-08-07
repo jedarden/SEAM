@@ -1,0 +1,165 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "External Weather API with Cost Control",
+    "version": "1.0.0",
+    "description": "Proxies to a paid weather API with per-call cost accounting and quota enforcement to prevent runaway bills."
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "weather-api",
+  "x-api-version": "v1",
+  "x-upstream": "https://api.weatherprovider.com",
+  "x-vault-path": "seam/routes/weather-api/provider-api-key",
+  "x-inject-as": {
+    "kind": "header",
+    "name": "X-API-Key"
+  },
+  "x-breaker": {
+    "threshold": 10,
+    "openSeconds": 60
+  },
+  "paths": {
+    "/weather/current/{location}": {
+      "get": {
+        "summary": "Get current weather for a location",
+        "operationId": "getCurrentWeather",
+        "tags": ["weather"],
+        "x-required-scope": "weather:read",
+        "x-cost-per-call": 1.0,
+        "x-quota": {
+          "limit": 1000,
+          "window_seconds": 86400
+        },
+        "parameters": [
+          {
+            "name": "location",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Location identifier (city, lat/long, etc.)"
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["metric", "imperial"]
+            },
+            "description": "Unit system"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current weather data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "temperature": { "type": "number" },
+                    "conditions": { "type": "string" },
+                    "humidity": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/weather/forecast/{location}": {
+      "get": {
+        "summary": "Get 7-day weather forecast",
+        "operationId": "getForecast",
+        "tags": ["weather"],
+        "x-required-scope": "weather:read",
+        "x-cost-per-call": 5.0,
+        "x-quota": {
+          "limit": 200,
+          "window_seconds": 86400
+        },
+        "parameters": [
+          {
+            "name": "location",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "description": "Number of forecast days (1-7)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Weather forecast data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "forecast": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded"
+          }
+        }
+      }
+    },
+    "/weather/historical/{location}/{date}": {
+      "get": {
+        "summary": "Get historical weather data",
+        "operationId": "getHistoricalWeather",
+        "tags": ["weather"],
+        "x-required-scope": "weather:read",
+        "x-cost-per-call": 10.0,
+        "x-quota": {
+          "limit": 50,
+          "window_seconds": 86400
+        },
+        "parameters": [
+          {
+            "name": "location",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "date" },
+            "description": "Historical date (YYYY-MM-DD)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical weather data",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "429": {
+            "description": "Historical data quota exceeded"
+          }
+        }
+      }
+    }
+  }
+}
