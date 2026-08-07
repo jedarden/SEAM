@@ -9,10 +9,10 @@ import (
 // TestComputeSpecHash tests that the hash computation is stable
 func TestComputeSpecHash(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     []byte
-		wantLen  int  // Expected hash length
-		stable   bool // Should produce same hash on repeated calls
+		name    string
+		data    []byte
+		wantLen int  // Expected hash length
+		stable  bool // Should produce same hash on repeated calls
 	}{
 		{
 			name:    "Empty spec",
@@ -198,7 +198,7 @@ func TestComputeSpecHash_HeaderSafe(t *testing.T) {
 
 	// Check that hash contains only hex characters (0-9, a-f)
 	for _, r := range hash {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
 			t.Errorf("Hash contains non-hex character: %c (full hash: %s)", r, hash)
 		}
 	}
