@@ -54,6 +54,7 @@ func serveCommand(args []string) {
 	schemaPath := fs.String("schema-path", "./spec/route-fragment-schema.json", "Path to route-fragment JSON schema for validation")
 	captureEnabled := fs.Bool("capture-enabled", false, "Enable HTTP request/response capture")
 	corpusDir := fs.String("corpus-dir", "corpus", "Directory to store captured corpus files")
+	fragmentsDir := fs.String("fragments-dir", "./fragments", "Directory containing OpenAPI fragment files")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -62,6 +63,9 @@ func serveCommand(args []string) {
 	// Override with environment variables if set
 	if val := os.Getenv("SEAM_CALLER_PORT"); val != "" {
 		fmt.Sscanf(val, "%d", callerPort)
+	}
+	if val := os.Getenv("SEAM_FRAGMENTS_DIR"); val != "" {
+		*fragmentsDir = val
 	}
 	if val := os.Getenv("SEAM_OPERATOR_PORT"); val != "" {
 		fmt.Sscanf(val, "%d", operatorPort)
@@ -93,6 +97,7 @@ func serveCommand(args []string) {
 	log.Printf("  Spec directory: %s", *specDir)
 	log.Printf("  Fragment mode: %v", *fragmentMode)
 	if *fragmentMode {
+		log.Printf("  Fragments directory: %s", *fragmentsDir)
 		log.Printf("  Schema path: %s", *schemaPath)
 	}
 	log.Printf("  Capture enabled: %v", *captureEnabled)
@@ -109,6 +114,7 @@ func serveCommand(args []string) {
 		SchemaPath:     *schemaPath,
 		CaptureEnabled: *captureEnabled,
 		CorpusDir:      *corpusDir,
+		FragmentsDir:   *fragmentsDir,
 	}
 
 	srv := server.New(cfg)

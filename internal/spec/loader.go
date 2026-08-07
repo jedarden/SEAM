@@ -81,16 +81,20 @@ func New(specDir, baseURL string) (*Loader, error) {
 }
 
 // NewWithFragments creates a new spec loader in fragment mode
-// Loads fragments from specDir/fragments.d and merges them into a single OpenAPI spec
-func NewWithFragments(specDir, baseURL, schemaPath string) (*Loader, error) {
+// Loads fragments from the specified fragments directory and merges them into a single OpenAPI spec
+func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loader, error) {
 	// Initialize fragment loader
 	fragmentLoader, err := NewFragmentLoader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fragment loader: %w", err)
 	}
 
-	// Load fragments from the fragments.d directory
-	fragmentsDir := filepath.Join(specDir, "fragments.d")
+	// Use default fragments directory if not specified
+	if fragmentsDir == "" {
+		fragmentsDir = filepath.Join(specDir, "fragments.d")
+	}
+
+	// Load fragments from the fragments directory
 	if err := fragmentLoader.LoadDirectory(fragmentsDir); err != nil {
 		return nil, fmt.Errorf("failed to load fragments: %w", err)
 	}

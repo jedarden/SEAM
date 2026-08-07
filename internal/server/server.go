@@ -65,6 +65,7 @@ type Config struct {
 	SchemaPath     string
 	CaptureEnabled bool
 	CorpusDir      string
+	FragmentsDir   string
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -88,11 +89,15 @@ func New(cfg *Config) *Server {
 	var err error
 
 	if cfg.FragmentMode {
-		specLoader, err = spec.NewWithFragments(cfg.SpecDir, cfg.BaseURL, cfg.SchemaPath)
+		specLoader, err = spec.NewWithFragments(cfg.SpecDir, cfg.BaseURL, cfg.SchemaPath, cfg.FragmentsDir)
 		if err != nil {
 			log.Fatalf("Failed to initialize spec loader in fragment mode: %v", err)
 		}
-		log.Printf("Loaded spec from fragments in %s", cfg.SpecDir)
+		if cfg.FragmentsDir != "" {
+			log.Printf("Loaded spec from fragments in %s", cfg.FragmentsDir)
+		} else {
+			log.Printf("Loaded spec from fragments in %s/fragments.d", cfg.SpecDir)
+		}
 	} else {
 		specLoader, err = spec.New(cfg.SpecDir, cfg.BaseURL)
 		if err != nil {
