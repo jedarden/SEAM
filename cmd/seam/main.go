@@ -62,13 +62,17 @@ func serveCommand(args []string) {
 
 	// Override with environment variables if set
 	if val := os.Getenv("SEAM_CALLER_PORT"); val != "" {
-		fmt.Sscanf(val, "%d", callerPort)
+		if _, err := fmt.Sscanf(val, "%d", callerPort); err != nil {
+			log.Printf("[config] invalid SEAM_CALLER_PORT %q, keeping %d: %v", val, *callerPort, err)
+		}
 	}
 	if val := os.Getenv("SEAM_FRAGMENTS_DIR"); val != "" {
 		*fragmentsDir = val
 	}
 	if val := os.Getenv("SEAM_OPERATOR_PORT"); val != "" {
-		fmt.Sscanf(val, "%d", operatorPort)
+		if _, err := fmt.Sscanf(val, "%d", operatorPort); err != nil {
+			log.Printf("[config] invalid SEAM_OPERATOR_PORT %q, keeping %d: %v", val, *operatorPort, err)
+		}
 	}
 	if val := os.Getenv("SEAM_BASE_URL"); val != "" {
 		*baseURL = val
