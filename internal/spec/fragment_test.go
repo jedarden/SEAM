@@ -279,7 +279,7 @@ func TestComputeSpecHash_JSONEncodingConsistency(t *testing.T) {
 		"paths": map[string]interface{}{
 			"/users": map[string]interface{}{
 				"get": map[string]interface{}{
-					"summary":  "List users",
+					"summary": "List users",
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
 							"description": "Success",
