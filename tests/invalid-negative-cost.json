@@ -1,6 +1,6 @@
 {
-  "$comment": "INVALID example - negative x-cost-per-call should be REJECTED",
-  "description": "This should FAIL validation - negative cost is not allowed",
+  "$comment": "INVALID example - negative x-cost-per-call (-1) should be REJECTED",
+  "description": "This should FAIL validation - negative cost (-1) is not allowed",
   "x-seam-schema": "v1",
   "x-seam-owner": "test-service",
   "x-api-version": "v1",
@@ -20,7 +20,7 @@
           "max_iterations": 1,
           "backoff_ms": 0
         },
-        "x-cost-per-call": -0.001,
+        "x-cost-per-call": -1,
         "x-quota": {
           "limit": 1,
           "window_seconds": 1
