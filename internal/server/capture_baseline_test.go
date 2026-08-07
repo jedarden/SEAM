@@ -37,7 +37,7 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer s.Shutdown(ctx)
+	defer func() { _ = s.Shutdown(ctx) }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -132,7 +132,7 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tc.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tc.expectedStatus, resp.StatusCode)
@@ -170,7 +170,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer s.Shutdown(ctx)
+	defer func() { _ = s.Shutdown(ctx) }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -191,7 +191,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 			iterations := 50
 			var totalTime time.Duration
 			var maxTime time.Duration
-			var minTime time.Duration = time.Hour // Initialize to high value
+			minTime := time.Hour // Initialize to high value
 
 			// Warmup
 			for i := 0; i < 5; i++ {
@@ -199,7 +199,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Warmup request failed: %v", err)
 				}
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 
 			// Actual measurements
@@ -209,7 +209,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Request failed: %v", err)
 				}
-				resp.Body.Close()
+				_ = resp.Body.Close()
 
 				elapsed := time.Since(start)
 				totalTime += elapsed
@@ -267,7 +267,7 @@ func TestArgoCDProxyBaselineConsistency(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer s.Shutdown(ctx)
+	defer func() { _ = s.Shutdown(ctx) }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -289,7 +289,7 @@ func TestArgoCDProxyBaselineConsistency(t *testing.T) {
 
 		body, _ := io.ReadAll(resp.Body)
 		responses = append(responses, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Verify all responses are consistent
@@ -331,7 +331,7 @@ func TestArgoCDProxyBaselineCaptureStatusDisabled(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer s.Shutdown(ctx)
+	defer func() { _ = s.Shutdown(ctx) }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -341,7 +341,7 @@ func TestArgoCDProxyBaselineCaptureStatusDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get capture status: %v", err)
 	}
-	defer statusResp.Body.Close()
+	defer func() { _ = statusResp.Body.Close() }()
 
 	if statusResp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200 from capture status, got %d", statusResp.StatusCode)
@@ -396,7 +396,7 @@ func TestArgoCDProxyBaselineNoCorpusLeakage(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer s.Shutdown(ctx)
+	defer func() { _ = s.Shutdown(ctx) }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -407,7 +407,7 @@ func TestArgoCDProxyBaselineNoCorpusLeakage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Verify no corpus files were created
@@ -436,7 +436,7 @@ func getAvailablePort(t *testing.T) int {
 	if err != nil {
 		t.Fatalf("failed to allocate available port: %v", err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 
 	return l.Addr().(*net.TCPAddr).Port
 }

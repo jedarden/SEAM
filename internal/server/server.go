@@ -155,7 +155,7 @@ func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 // readyzHandler returns readiness status
@@ -168,7 +168,7 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]bool{"ready": true})
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ready": true})
 }
 
 // metricsHandler returns Prometheus-style metrics
@@ -187,30 +187,30 @@ func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines that currently exist.\n")
-	fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
-	fmt.Fprintf(w, "go_goroutines %d\n\n", runtime.NumGoroutine())
+	_, _ = fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines that currently exist.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
+	_, _ = fmt.Fprintf(w, "go_goroutines %d\n\n", runtime.NumGoroutine())
 
-	fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n")
-	fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes gauge\n")
-	fmt.Fprintf(w, "go_memstats_alloc_bytes %d\n\n", m.Alloc)
+	_, _ = fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes gauge\n")
+	_, _ = fmt.Fprintf(w, "go_memstats_alloc_bytes %d\n\n", m.Alloc)
 
-	fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n")
-	fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes_total counter\n")
-	fmt.Fprintf(w, "go_memstats_alloc_bytes_total %d\n\n", m.TotalAlloc)
+	_, _ = fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes_total counter\n")
+	_, _ = fmt.Fprintf(w, "go_memstats_alloc_bytes_total %d\n\n", m.TotalAlloc)
 
-	fmt.Fprintf(w, "# HELP go_memstats_sys_bytes Number of bytes obtained from system.\n")
-	fmt.Fprintf(w, "# TYPE go_memstats_sys_bytes gauge\n")
-	fmt.Fprintf(w, "go_memstats_sys_bytes %d\n\n", m.Sys)
+	_, _ = fmt.Fprintf(w, "# HELP go_memstats_sys_bytes Number of bytes obtained from system.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_sys_bytes gauge\n")
+	_, _ = fmt.Fprintf(w, "go_memstats_sys_bytes %d\n\n", m.Sys)
 
-	fmt.Fprintf(w, "# HELP go_threads Number of OS threads created.\n")
-	fmt.Fprintf(w, "# TYPE go_threads gauge\n")
-	fmt.Fprintf(w, "go_threads %d\n\n", runtime.NumCPU())
+	_, _ = fmt.Fprintf(w, "# HELP go_threads Number of OS threads created.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE go_threads gauge\n")
+	_, _ = fmt.Fprintf(w, "go_threads %d\n\n", runtime.NumCPU())
 
 	// Build info
-	fmt.Fprintf(w, "# HELP seam_build_info Build information about the seam binary.\n")
-	fmt.Fprintf(w, "# TYPE seam_build_info gauge\n")
-	fmt.Fprintf(w, "seam_build_info{version=\"dev\"} 1\n")
+	_, _ = fmt.Fprintf(w, "# HELP seam_build_info Build information about the seam binary.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE seam_build_info gauge\n")
+	_, _ = fmt.Fprintf(w, "seam_build_info{version=\"dev\"} 1\n")
 }
 
 // configStatusHandler returns configuration fragment status
@@ -225,7 +225,7 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get fragment status from the spec loader
 	status := s.specLoader.GetFragmentStatus()
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // captureSaveHandler manually saves the corpus
@@ -248,7 +248,7 @@ func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":      "saved",
 		"entry_count": s.captureMiddleware.GetEntryCount(),
 	})
@@ -275,7 +275,7 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 		status["corpus_dir"] = s.captureMiddleware.corpusDir
 	}
 
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // openapiJSONHandler returns the OpenAPI spec as JSON
@@ -307,7 +307,7 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 
-	w.Write(specJSON)
+	_, _ = w.Write(specJSON)
 }
 
 // docsHandler returns the API documentation
@@ -398,7 +398,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>`
 
-	w.Write([]byte(html))
+	_, _ = w.Write([]byte(html))
 }
 
 // docsRouteHandler returns route documentation for a specific endpoint
@@ -428,7 +428,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "missing_required_parameter",
 			"message": "The 'path' query parameter is required",
 			"example": "/docs/route?path=/openapi.json&method=GET",
@@ -441,7 +441,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "route_not_found",
 			"message": fmt.Sprintf("Route not found: %s", err),
 			"path":    path,
@@ -567,7 +567,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // contains checks if a string contains a substring (case-insensitive)
@@ -601,7 +601,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	operatorListener, err := net.Listen("tcp", operatorAddr)
 	if err != nil {
-		callerListener.Close()
+		_ = callerListener.Close()
 		return fmt.Errorf("failed to bind operator port %d: %w", s.config.OperatorPort, err)
 	}
 

@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pb33f/libopenapi"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -37,7 +36,6 @@ type FragmentLoader struct {
 	schemaCompiler *jsonschema.Compiler
 	fragments      []*Fragment
 	quarantined    []*Fragment
-	document       libopenapi.Document // Merged document
 }
 
 // NewFragmentLoader creates a new fragment loader

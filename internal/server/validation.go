@@ -72,7 +72,7 @@ func writeValidationError(w http.ResponseWriter, validationErrors map[string]int
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // getStringField safely extracts a string field from a map

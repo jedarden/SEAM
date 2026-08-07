@@ -27,7 +27,7 @@ func TestHealthzHandler(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -56,7 +56,7 @@ func TestHealthzHandlerWrongMethod(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -79,7 +79,7 @@ func TestReadyzHandler(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -112,7 +112,7 @@ func TestMetricsHandler(t *testing.T) {
 	s.operatorMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -156,7 +156,7 @@ func TestConfigStatusHandler(t *testing.T) {
 	s.operatorMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -193,7 +193,7 @@ func TestConfigStatusHandlerWrongMethod(t *testing.T) {
 	s.operatorMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -294,7 +294,7 @@ func TestOpenAPIJSONHandler(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -363,7 +363,7 @@ func TestOpenAPIJSONHandlerWrongMethod(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -386,7 +386,7 @@ func TestDocsHandlerHTML(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -439,7 +439,7 @@ func TestDocsHandlerJSON(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -494,7 +494,7 @@ func TestSpecVersionStability(t *testing.T) {
 	s1.callerMux.ServeHTTP(w1, req1)
 
 	resp1 := w1.Result()
-	defer resp1.Body.Close()
+	defer func() { _ = resp1.Body.Close() }()
 
 	headerVersion1 := resp1.Header.Get("X-SEAM-Spec-Version")
 	if headerVersion1 != v1 {
@@ -507,7 +507,7 @@ func TestSpecVersionStability(t *testing.T) {
 	s2.callerMux.ServeHTTP(w2, req2)
 
 	resp2 := w2.Result()
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	headerVersion2 := resp2.Header.Get("X-SEAM-Spec-Version")
 	if headerVersion2 != v2 {
@@ -536,7 +536,7 @@ func TestDocsRouteHandlerMissingPathParameter(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -574,7 +574,7 @@ func TestDocsRouteHandlerValidRoute(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -641,7 +641,7 @@ func TestDocsRouteHandlerAllMethods(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -691,7 +691,7 @@ func TestDocsRouteHandlerInvalidRoute(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status 404, got %d", resp.StatusCode)
@@ -725,7 +725,7 @@ func TestDocsRouteHandlerInvalidMethod(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status 404, got %d", resp.StatusCode)
@@ -749,7 +749,7 @@ func TestDocsRouteHandlerVersionParameter(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -783,7 +783,7 @@ func TestDocsRouteHandlerWrongHTTPMethod(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -806,7 +806,7 @@ func TestDocsRouteHandlerResponseHeaders(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check version headers are present
 	specVersion := resp.Header.Get("X-SEAM-Spec-Version")
@@ -860,7 +860,7 @@ func TestValidationMiddlewareSkipsReservedPaths(t *testing.T) {
 			handler.ServeHTTP(w, req)
 
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Reserved paths should not return validation errors
 			// (they may return handler errors like 400 for missing params, but not validation errors)
@@ -889,7 +889,7 @@ func TestValidationMiddleware(t *testing.T) {
 	// Create a handler that returns 200 OK
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Wrap with validation middleware
@@ -905,7 +905,7 @@ func TestValidationMiddleware(t *testing.T) {
 		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected status 200 for reserved path, got %d", resp.StatusCode)
@@ -967,7 +967,7 @@ func TestCaptureMiddlewareDisabledBehavior(t *testing.T) {
 	// Create a test handler that sets a response
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	// Wrap with capture middleware
@@ -979,7 +979,7 @@ func TestCaptureMiddlewareDisabledBehavior(t *testing.T) {
 	wrappedHandler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should pass through to the next handler without capture
 	if resp.StatusCode != http.StatusOK {
@@ -1014,7 +1014,7 @@ func TestCaptureStatusEndpointWhenDisabled(t *testing.T) {
 	s.operatorMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -1048,7 +1048,7 @@ func TestCaptureStatusEndpointWhenEnabled(t *testing.T) {
 	s.operatorMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
