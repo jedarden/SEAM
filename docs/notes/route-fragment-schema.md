@@ -75,9 +75,9 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | Field | Shape (→ `$def`) | Notes |
 |---|---|---|
 | `x-required-scope` | `scopeArray` | **The authority** wherever both root and operation are present; *replaces* the root default. Per-method granularity is what makes the visible-but-not-invocable 403 expressible. |
-| `x-loop-guard` | `loopGuard` | `{maxRepeats, window}`. Absent = no loop guard on that route. |
-| `x-cost-per-call` | `costPerCall` | Number (>= 0) in arbitrary cost units. Required if `x-quota` is present. |
-| `x-quota` | `quota` | `{limit, window_seconds}`. Requires `x-cost-per-call` (schema-encoded). |
+| `x-loop-guard` | `loopGuard` | `{max_depth, max_redirects}`. Prevents infinite recursion and excessive redirect chains. `max_depth >= 1`, `max_redirects >= 0`. Absent = no loop guard on that route. |
+| `x-cost-per-call` | `costPerCall` | Number (>= 0) in USD with max 2 decimal places. Required if `x-quota` is present. Used for quota tracking and cost monitoring. |
+| `x-quota` | `quota` | `{limit, window, scope}`. Rate limiting quota based on accumulated cost. `limit >= 1`, `window` in RFC3339 duration (e.g., '60s', '5m'), `scope` enum (global, per-token, per-user, per-route). Requires `x-cost-per-call` (schema-encoded). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-requires-approval` | boolean | RESERVED forward-compat. |
 
@@ -257,6 +257,66 @@ Delegates to a live `v1` route; declares none of the upstream-facing fields (the
   "paths": { "/argocd/api/v1/applications": { "get": { "x-required-scope": ["argocd:read"] } } }
 }
 ```
+
+### 6.5 Rate limiting and monitoring — cost tracking and quota enforcement
+
+Demonstrates fragment-root defaults for loop protection, cost tracking, and quota, with operation-level overrides. The expensive `analyze` endpoint has tighter limits than the cheap `list` endpoint.
+
+```json
+{
+  "x-seam-schema": "v1",
+  "x-seam-owner": "analytics",
+  "x-upstream": "https://analytics.service.example.com",
+  "x-loop-guard": {
+    "max_depth": 10,
+    "max_redirects": 5
+  },
+  "x-cost-per-call": 0.01,
+  "x-quota": {
+    "limit": 1000,
+    "window": "1h",
+    "scope": "per-token"
+  },
+  "paths": {
+    "/analytics/data": {
+      "get": {
+        "x-required-scope": ["analytics:read"],
+        "x-cost-per-call": 0.001,
+        "x-quota": {
+          "limit": 10000,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "summary": "List data (cheap, high quota)"
+      },
+      "post": {
+        "x-required-scope": ["analytics:analyze"],
+        "x-cost-per-call": 0.05,
+        "x-quota": {
+          "limit": 200,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "summary": "Analyze data (expensive, low quota)"
+      }
+    },
+    "/analytics/export": {
+      "get": {
+        "x-required-scope": ["analytics:export"],
+        "x-loop-guard": {
+          "max_depth": 5,
+          "max_redirects": 0
+        },
+        "summary": "Export data (strict loop guard, inherits cost/quota from fragment-root)"
+      }
+    }
+  }
+}
+```
+
+**Fragment-root defaults apply to all operations** unless overridden: the `GET /analytics/export` operation inherits `x-cost-per-call: 0.01` and the `per-token` quota from the fragment root, but applies a stricter loop guard (max_depth 5, no redirects). The `GET /analytics/data` operation overrides both cost and quota with more generous limits for cheap reads, while `POST /analytics/data` overrides with tighter limits for expensive analysis.
+
+The `scope: per-token` quota means each caller's API token has its own cost bucket — token A's heavy `POST` consumption doesn't affect token B's allowance. Other scope options: `global` (fleet-wide), `per-user` (by user identity), `per-route` (per route path).
 
 ---
 
