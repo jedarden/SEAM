@@ -85,48 +85,68 @@ func New(specDir, baseURL string) (*Loader, error) {
 // NewWithFragments creates a new spec loader in fragment mode
 // Loads fragments from the specified fragments directory and merges them into a single OpenAPI spec
 func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loader, error) {
+	log.Printf("[Loader] Creating new fragment-mode loader")
+	log.Printf("[Loader] Base URL: %s", baseURL)
+	log.Printf("[Loader] Spec directory: %s", specDir)
+	log.Printf("[Loader] Fragments directory: %s", fragmentsDir)
+	log.Printf("[Loader] Schema path: %s", schemaPath)
+
 	// Initialize fragment loader
 	fragmentLoader, err := NewFragmentLoader()
 	if err != nil {
+		log.Printf("[Loader] Error creating fragment loader: %v", err)
 		return nil, fmt.Errorf("failed to create fragment loader: %w", err)
 	}
 
 	// Use default fragments directory if not specified
 	if fragmentsDir == "" {
 		fragmentsDir = filepath.Join(specDir, "fragments.d")
+		log.Printf("[Loader] Using default fragments directory: %s", fragmentsDir)
 	}
 
 	// Load fragments from the fragments directory
+	log.Printf("[Loader] Loading fragments from directory: %s", fragmentsDir)
 	if err := fragmentLoader.LoadDirectory(fragmentsDir); err != nil {
+		log.Printf("[Loader] Error loading fragments: %v", err)
 		return nil, fmt.Errorf("failed to load fragments: %w", err)
 	}
 
 	// Validate fragments against the schema if schema is provided
 	if schemaPath != "" {
+		log.Printf("[Loader] Validating fragments against schema: %s", schemaPath)
 		if err := fragmentLoader.ValidateFragments(schemaPath); err != nil {
-			log.Printf("Warning: fragment validation had errors: %v", err)
+			log.Printf("[Loader] Warning: fragment validation had errors: %v", err)
 		}
+	} else {
+		log.Printf("[Loader] No schema provided, skipping fragment validation")
 	}
 
 	// Merge fragments into a single document
+	log.Printf("[Loader] Merging fragments into single OpenAPI document")
 	mergedJSON, err := fragmentLoader.MergeFragments(baseURL)
 	if err != nil {
+		log.Printf("[Loader] Error merging fragments: %v", err)
 		return nil, fmt.Errorf("failed to merge fragments: %w", err)
 	}
 
 	// Compute stable hash of the merged spec
 	hash := sha256.Sum256(mergedJSON)
 	specVersion := hex.EncodeToString(hash[:])[:16] // Use first 16 hex chars (64 bits)
+	log.Printf("[Loader] Generated spec version hash: %s", specVersion)
 
 	// Load the merged document using libopenapi
+	log.Printf("[Loader] Loading merged document with libopenapi")
 	loadedDoc, err := libopenapi.NewDocument(mergedJSON)
 	if err != nil {
+		log.Printf("[Loader] Error loading OpenAPI document: %v", err)
 		return nil, fmt.Errorf("failed to load merged OpenAPI document: %w", err)
 	}
 
 	// Build the model for validation and route extraction
+	log.Printf("[Loader] Building OpenAPI v3 model")
 	documentModel, err := loadedDoc.BuildV3Model()
 	if err != nil {
+		log.Printf("[Loader] Error building OpenAPI model: %v", err)
 		return nil, fmt.Errorf("failed to build OpenAPI model: %w", err)
 	}
 
@@ -134,7 +154,14 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 	model := documentModel
 
 	// Create the validator using the v3 model directly
+	log.Printf("[Loader] Creating validator from v3 model")
 	v := validator.NewValidatorFromV3Model(&model.Model, nil)
+
+	validFragmentCount := fragmentLoader.GetValidFragmentCount()
+	quarantinedCount := fragmentLoader.GetQuarantinedCount()
+
+	log.Printf("[Loader] Fragment-mode loader created successfully")
+	log.Printf("[Loader] Valid fragments: %d, Quarantined: %d", validFragmentCount, quarantinedCount)
 
 	return &Loader{
 		specPath:       fragmentsDir,
@@ -152,27 +179,34 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 
 // validateFragmentsDir checks if the fragments directory exists and is readable
 func validateFragmentsDir(fragmentsDir string) error {
+	log.Printf("[Loader] Validating fragments directory: %s", fragmentsDir)
+
 	// Check if directory exists
 	info, err := os.Stat(fragmentsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.Printf("[Loader] Fragments directory does not exist: %s", fragmentsDir)
 			return fmt.Errorf("fragments directory does not exist: %s", fragmentsDir)
 		}
+		log.Printf("[Loader] Failed to access fragments directory: %s - %v", fragmentsDir, err)
 		return fmt.Errorf("failed to access fragments directory: %s: %w", fragmentsDir, err)
 	}
 
 	// Check if path is actually a directory
 	if !info.IsDir() {
+		log.Printf("[Loader] Fragments path is not a directory: %s", fragmentsDir)
 		return fmt.Errorf("fragments path is not a directory: %s", fragmentsDir)
 	}
 
 	// Check if directory is readable by attempting to open it
 	file, err := os.Open(fragmentsDir)
 	if err != nil {
+		log.Printf("[Loader] Fragments directory is not readable: %s - %v", fragmentsDir, err)
 		return fmt.Errorf("fragments directory is not readable: %s: %w", fragmentsDir, err)
 	}
 	file.Close()
 
+	log.Printf("[Loader] Fragments directory validation passed: %s", fragmentsDir)
 	return nil
 }
 
@@ -180,12 +214,15 @@ func validateFragmentsDir(fragmentsDir string) error {
 // Reads SEAM_FRAGMENTS_DIR from environment, defaults to "./fragments" if not set
 func NewLoader(baseURL string) (*Loader, error) {
 	fragmentsDir := getFragmentsDir()
+	log.Printf("[Loader] NewLoader called with fragments dir from env: %s", fragmentsDir)
 
 	// Validate the fragments directory before proceeding
 	if err := validateFragmentsDir(fragmentsDir); err != nil {
+		log.Printf("[Loader] Fragments directory validation failed: %v", err)
 		return nil, err
 	}
 
+	log.Printf("[Loader] Fragments directory validated successfully: %s", fragmentsDir)
 	return NewWithFragments("", baseURL, "", fragmentsDir)
 }
 
@@ -516,8 +553,10 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 // or the default "./fragments" if not set
 func getFragmentsDir() string {
 	if val := os.Getenv("SEAM_FRAGMENTS_DIR"); val != "" {
+		log.Printf("[Loader] Using SEAM_FRAGMENTS_DIR from environment: %s", val)
 		return val
 	}
+	log.Printf("[Loader] SEAM_FRAGMENTS_DIR not set, using default: ./fragments")
 	return "./fragments"
 }
 

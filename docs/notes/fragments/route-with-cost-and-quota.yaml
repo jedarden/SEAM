@@ -1,0 +1,115 @@
+x-seam-schema: v1
+x-seam-owner: ml-inference
+x-api-version: v1
+x-upstream: https://ml-inference.ardenone.svc.cluster.local:8443
+x-vault-path: seam/routes/ml-inference/bearer-token
+x-inject-as:
+  kind: bearer
+x-upstream-tls:
+  caBundle: ml-inference-ca
+  insecureSkipVerify: acknowledged
+
+paths:
+  /ml/inference:
+    post:
+      operationId: runInference
+      summary: Run ML model inference
+      tags:
+        - Inference
+      x-cost-per-call: 0.001
+      x-quota:
+        limit: 1000
+        window_seconds: 3600
+      x-loop-guard:
+        max_iterations: 5
+        backoff_ms: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model_id
+                - input
+              properties:
+                model_id:
+                  type: string
+                  description: Model identifier
+                input:
+                  type: array
+                  items:
+                    type: number
+                  description: Input feature vector
+                parameters:
+                  type: object
+                  description: Optional model parameters
+      responses:
+        "200":
+          description: Inference result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prediction:
+                    type: number
+                  confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+        "400":
+          description: Invalid input
+        "402":
+          description: Quota exceeded
+        "429":
+          description: Too many requests or loop detected
+
+  /ml/inference/batch:
+    post:
+      operationId: runBatchInference
+      summary: Run ML model inference on multiple inputs
+      tags:
+        - Inference
+      x-cost-per-call: 0.005
+      x-quota:
+        limit: 500
+        window_seconds: 3600
+      x-loop-guard:
+        max_iterations: 3
+        backoff_ms: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model_id
+                - inputs
+              properties:
+                model_id:
+                  type: string
+                inputs:
+                  type: array
+                  items:
+                    type: array
+                    items:
+                      type: number
+                  maxItems: 100
+      responses:
+        "200":
+          description: Batch inference results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      type: number
+        "400":
+          description: Invalid input or batch size exceeds limit
+        "402":
+          description: Quota exceeded

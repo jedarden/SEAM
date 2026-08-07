@@ -59,6 +59,45 @@ Both phases use the **same validation engine** in `internal/spec`, ensuring `sea
 
 ---
 
+## Example Fragments
+
+Five realistic SEAM fragments are provided in `docs/notes/fragments/` to demonstrate schema validation and integration patterns. All have been validated against `route-fragment-schema.json` using the script in `scripts/validate-fragments.js`.
+
+| Fragment | Purpose | Key Features |
+|----------|---------|--------------|
+| `argocd-read-only-proxy.yaml` | ArgoCD read-only proxy (Phase 3 migration target) | Secret injection, credential probing, circuit breaker, strip-prefix |
+| `simple-secret-injection.yaml` | Simple secret-injecting route | Basic header injection, health probe |
+| `route-with-credential-probing.yaml` | Route with credential probing | TLS config, circuit breaker tuning, POST probe |
+| `route-with-cost-and-quota.yaml` | Route with cost/quota limits | Cost-per-call, quota window, loop guard |
+| `complex-multi-instance-route.yaml` | Complex multi-instance route | Instance param, upstream map, per-instance scopes, fan-out |
+
+**Validation:**
+
+```bash
+node scripts/validate-fragments.js
+```
+
+All 5 fragments pass schema validation (as of 2026-08-07).
+
+**What each fragment demonstrates:**
+
+1. **ArgoCD read-only proxy**: Real-world Phase 3 target. Shows bearer auth injection, `/argocd` strip-prefix, credential probing against `/api/v1/version`, and circuit breaker tuning.
+
+2. **Simple secret injection**: Minimal viable fragment. Header-based API key injection with a GET health probe.
+
+3. **Credential probing**: Advanced TLS config with CA bundle and server name override. Demonstrates POST-based probe (Prometheus query endpoint).
+
+4. **Cost and quota**: Economic controls. `x-cost-per-call` + `x-quota` + `x-loop-guard` on ML inference endpoints to prevent runaway spend and infinite loops.
+
+5. **Multi-instance map**: The full `x-upstream-map` pattern. K8s fleet proxy with per-instance vault paths, scopes, probe intervals, and breakers. Includes `_all` fan-out key and `x-fanout-scope`.
+
+These fragments serve as:
+- **Conformance tests**: Verify schema correctness
+- **Documentation**: Show idiomatic SEAM fragment structure
+- **Templates**: Copy-paste starting points for new services
+
+---
+
 ## Part 1: Phase 1b - Runtime Quarantine
 
 ### 1.1 Admission Control Workflow
@@ -864,10 +903,17 @@ If migrating from JSON Schema → Go structs:
 
 ## Appendix: Quick Reference
 
-### A. Schema Location
+### A. Schema and Examples Location
 
 ```
-docs/notes/route-fragment-schema.json
+docs/notes/route-fragment-schema.json    # JSON Schema 2020-12 contract
+docs/notes/fragments/                    # Example fragments (5 validated examples)
+├── argocd-read-only-proxy.yaml
+├── simple-secret-injection.yaml
+├── route-with-credential-probing.yaml
+├── route-with-cost-and-quota.yaml
+└── complex-multi-instance-route.yaml
+scripts/validate-fragments.js            # Validation script
 ```
 
 ### B. Validator Package

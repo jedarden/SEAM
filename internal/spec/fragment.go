@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,14 +55,21 @@ func NewFragmentLoader() (*FragmentLoader, error) {
 // LoadDirectory loads all fragments from a directory tree
 // Expected layout: fragments.d/<service>/<fragment-name>.yaml
 func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
+	log.Printf("[Fragment] Loading fragments from directory: %s", fragmentsDir)
+
 	if _, err := os.Stat(fragmentsDir); os.IsNotExist(err) {
 		// Directory doesn't exist - not an error, just no fragments
+		log.Printf("[Fragment] Fragments directory does not exist: %s (no fragments to load)", fragmentsDir)
 		return nil
 	}
+
+	loadedCount := 0
+	errorCount := 0
 
 	// Walk the directory tree looking for .yaml and .yml files
 	err := filepath.Walk(fragmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			log.Printf("[Fragment] Error accessing path %s: %v", path, err)
 			return err
 		}
 
@@ -71,20 +79,30 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 
 		// Only process .yaml and .yml files
 		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+			log.Printf("[Fragment] Loading fragment file: %s", path)
 			fragment, err := fl.loadFragmentFile(path)
 			if err != nil {
 				// Log but don't fail - quarantine problematic fragments
-				fmt.Printf("Warning: failed to load fragment %s: %v\n", path, err)
+				log.Printf("[Fragment] Warning: failed to load fragment %s: %v", path, err)
+				errorCount++
 				return nil
 			}
 
 			if fragment != nil {
 				fl.fragments = append(fl.fragments, fragment)
+				loadedCount++
+				log.Printf("[Fragment] Successfully loaded fragment: %s (owner: %s, schema: %s)", path, fragment.Owner, fragment.SchemaVer)
 			}
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		log.Printf("[Fragment] Error walking directory tree: %v", err)
+	} else {
+		log.Printf("[Fragment] Fragment loading complete: %d loaded, %d errors", loadedCount, errorCount)
+	}
 
 	return err
 }
@@ -138,32 +156,48 @@ func (fl *FragmentLoader) loadFragmentFile(path string) (*Fragment, error) {
 
 // ValidateFragments validates all loaded fragments against the schema
 func (fl *FragmentLoader) ValidateFragments(schemaPath string) error {
+	log.Printf("[Fragment] Validating fragments against schema: %s", schemaPath)
+
 	// Load the schema
 	schemaBytes, err := os.ReadFile(schemaPath)
 	if err != nil {
+		log.Printf("[Fragment] Error reading schema file: %v", err)
 		return fmt.Errorf("failed to read schema file: %w", err)
 	}
 
 	var schemaDef map[string]any
 	if err := json.Unmarshal(schemaBytes, &schemaDef); err != nil {
+		log.Printf("[Fragment] Error parsing schema JSON: %v", err)
 		return fmt.Errorf("failed to parse schema JSON: %w", err)
 	}
 
 	// Compile the schema
 	if err := fl.schemaCompiler.AddResource("schema.json", schemaDef); err != nil {
+		log.Printf("[Fragment] Error adding schema resource: %v", err)
 		return fmt.Errorf("failed to add schema resource: %w", err)
 	}
 
 	schema, err := fl.schemaCompiler.Compile("schema.json")
 	if err != nil {
+		log.Printf("[Fragment] Error compiling schema: %v", err)
 		return fmt.Errorf("failed to compile schema: %w", err)
 	}
+
+	log.Printf("[Fragment] Schema loaded successfully, validating %d fragments", len(fl.fragments))
+
+	validCount := 0
+	quarantinedCount := 0
 
 	// Validate each fragment
 	for _, fragment := range fl.fragments {
 		if err := fl.validateFragment(fragment, schema); err != nil {
 			fragment.QueuedForQuarantine = true
 			fragment.QuarantineReasons = append(fragment.QuarantineReasons, err.Error())
+			quarantinedCount++
+			log.Printf("[Fragment] Fragment quarantined: %s - %v", fragment.SourceFile, err)
+		} else {
+			validCount++
+			log.Printf("[Fragment] Fragment validated successfully: %s", fragment.SourceFile)
 		}
 	}
 
@@ -177,6 +211,8 @@ func (fl *FragmentLoader) ValidateFragments(schemaPath string) error {
 		}
 	}
 	fl.fragments = kept
+
+	log.Printf("[Fragment] Validation complete: %d valid, %d quarantined", validCount, quarantinedCount)
 
 	return nil
 }
@@ -235,7 +271,10 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 
 // MergeFragments merges all valid fragments into a single OpenAPI document
 func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
+	log.Printf("[Fragment] Merging %d fragments into single OpenAPI 3.1 spec", len(fl.fragments))
+
 	if len(fl.fragments) == 0 {
+		log.Printf("[Fragment] No fragments to merge, creating minimal empty document")
 		// Return minimal empty document
 		emptyDoc := map[string]any{
 			"openapi": "3.1.0",
@@ -255,6 +294,8 @@ func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
 		return json.MarshalIndent(emptyDoc, "", "  ")
 	}
 
+	log.Printf("[Fragment] Building merged OpenAPI 3.1 document with base URL: %s", baseURL)
+
 	// Build merged document
 	merged := map[string]any{
 		"openapi": "3.1.0",
@@ -273,8 +314,13 @@ func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
 		},
 	}
 
+	totalPaths := 0
+	skippedPaths := 0
+
 	// Merge all fragments
 	for _, fragment := range fl.fragments {
+		log.Printf("[Fragment] Merging fragment from: %s (owner: %s)", fragment.SourceFile, fragment.Owner)
+
 		// Merge paths
 		if paths, ok := fragment.ParsedFragment["paths"].(map[string]any); ok {
 			mergedPaths := merged["paths"].(map[string]any)
@@ -282,10 +328,13 @@ func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
 				// Check for collisions (same path, method, version)
 				if _, exists := mergedPaths[path]; exists {
 					// Collision detected - skip this fragment's path
-					fmt.Printf("Warning: path collision detected for %s, skipping fragment %s\n", path, fragment.SourceFile)
+					log.Printf("[Fragment] Warning: path collision detected for %s, skipping fragment %s", path, fragment.SourceFile)
+					skippedPaths++
 					continue
 				}
 				mergedPaths[path] = pathItem
+				totalPaths++
+				log.Printf("[Fragment] Added path: %s from %s", path, fragment.SourceFile)
 			}
 		}
 
@@ -300,16 +349,28 @@ func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
 							for k, v := range valueMap {
 								existingMap[k] = v
 							}
+							log.Printf("[Fragment] Merged component section: %s", key)
 						}
 					}
 				} else {
 					mergedComponents[key] = value
+					log.Printf("[Fragment] Added component section: %s", key)
 				}
 			}
 		}
 	}
 
-	return json.MarshalIndent(merged, "", "  ")
+	log.Printf("[Fragment] Merge complete: %d paths added, %d paths skipped due to collisions", totalPaths, skippedPaths)
+
+	mergedJSON, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		log.Printf("[Fragment] Error serializing merged document: %v", err)
+		return nil, fmt.Errorf("failed to serialize merged document: %w", err)
+	}
+
+	log.Printf("[Fragment] Successfully merged %d fragments into OpenAPI 3.1 spec (%d bytes)", len(fl.fragments), len(mergedJSON))
+
+	return mergedJSON, nil
 }
 
 // GetQuarantined returns all quarantined fragments

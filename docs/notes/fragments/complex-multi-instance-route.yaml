@@ -1,0 +1,174 @@
+x-seam-schema: v1
+x-seam-owner: k8s-fleet
+x-api-version: v1
+x-instance-param: cluster
+x-upstream-map:
+  prod-us-east:
+    url: https://k8s-prod-us-east.ardenone.svc.cluster.local:6443
+    vaultPath: seam/routes/k8s-fleet/prod-us-east
+    injectAs:
+      kind: bearer
+    tls:
+      caBundle: k8s-prod-ca
+      serverName: k8s-prod-us-east.ardenone.svc
+    probeInterval: 5m
+    requiredScope:
+      - k8s-prod:read
+    breaker:
+      threshold: 15
+      openSeconds: 60
+
+  prod-us-west:
+    url: https://k8s-prod-us-west.ardenone.svc.cluster.local:6443
+    vaultPath: seam/routes/k8s-fleet/prod-us-west
+    injectAs:
+      kind: bearer
+    tls:
+      caBundle: k8s-prod-ca
+      serverName: k8s-prod-us-west.ardenone.svc
+    probeInterval: 5m
+    requiredScope:
+      - k8s-prod:read
+    breaker:
+      threshold: 15
+      openSeconds: 60
+
+  staging:
+    url: https://k8s-staging.ardenone.svc.cluster.local:6443
+    vaultPath: seam/routes/k8s-fleet/staging
+    injectAs:
+      kind: bearer
+    tls:
+      caBundle: k8s-staging-ca
+      serverName: k8s-staging.ardenone.svc
+    probeInterval: 10m
+    requiredScope:
+      - k8s-staging:read
+
+  _all:
+    url: https://k8s-fanout-aggregator.ardenone.svc.cluster.local:8443
+    vaultPath: seam/routes/k8s-fleet/fanout
+    injectAs:
+      kind: bearer
+
+x-fanout-scope:
+  - k8s-fleet:fanout
+
+paths:
+  /k8s/{cluster}/pods:
+    get:
+      operationId: listPods
+      summary: List pods in a cluster
+      tags:
+        - Pods
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Cluster name (maps to x-upstream-map key)
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by namespace
+      responses:
+        "200":
+          description: Pod list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - insufficient scope for this cluster instance
+        "503":
+          description: Service unavailable - circuit breaker open
+
+  /k8s/{cluster}/pods/{name}:
+    get:
+      operationId: getPod
+      summary: Get pod details
+      tags:
+        - Pods
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespace
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pod details
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "404":
+          description: Pod not found
+
+  /k8s/{cluster}/nodes:
+    get:
+      operationId: listNodes
+      summary: List nodes in a cluster
+      tags:
+        - Nodes
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Node list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "401":
+          description: Unauthorized
+
+  /k8s/{cluster}/namespaces:
+    get:
+      operationId: listNamespaces
+      summary: List namespaces in a cluster
+      tags:
+        - Namespaces
+      x-required-scope: k8s-ro:list
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Namespace list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - requires k8s-ro:list scope
