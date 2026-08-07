@@ -223,7 +223,7 @@
       "description": "Colon-delimited service:action (e.g. k8s-ro:get, argocd:sync) including three-segment control-plane scopes (seam:ops:read, seam:scopes:read-all). At least two segments."
     },
     "scopeArray": {
-      "description": "Conjunctive set of scopes a caller must hold. A bare string is sugar for a one-element array.",
+      "description": "Conjunctive set of OAuth2 scopes a caller must hold. A bare string is sugar for a one-element array. Example scopes: read:users, write:users, k8s-ro:get, argocd:sync, seam:ops:read.",
       "oneOf": [
         { "$ref": "#/$defs/scopeString" },
         { "type": "array", "items": { "$ref": "#/$defs/scopeString" }, "minItems": 1, "uniqueItems": true }
