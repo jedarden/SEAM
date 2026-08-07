@@ -328,11 +328,12 @@
       "type": "object",
       "required": ["path", "method", "interval"],
       "properties": {
-        "path": { "type": "string", "pattern": "^/", "description": "A designated safe upstream path. Must be a route the fragment serves (validator-side, cross-path)." },
-        "method": { "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
-        "interval": { "$ref": "#/$defs/duration", "description": "Per-fragment default; an x-upstream-map entry may override per instance." }
+        "path": { "type": "string", "pattern": "^/", "description": "A designated safe upstream path used for credential health checks. Must be a route the fragment serves (validator-side, cross-path)." },
+        "method": { "enum": ["GET", "HEAD"], "default": "GET", "description": "HTTP method for credential probe requests. Defaults to GET; HEAD is preferred for minimal overhead." },
+        "interval": { "type": "integer", "minimum": 1, "description": "Probe frequency in seconds. Must be at least 1 second. Per-fragment default; an x-upstream-map entry may override per instance via probeInterval." }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Credential health check configuration for fragments with injected credentials (x-vault-path/x-inject-as). Probes run at the configured interval against the upstream path using the injected credential to detect liveness and authentication failures. Forbidden on pass-through fragments (those without credential injection)."
     },
     "upstreamMapEntry": {
       "type": "object",
