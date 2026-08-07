@@ -1,0 +1,15 @@
+{
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy"
+          }
+        }
+      }
+    }
+  }
+}
