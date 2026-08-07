@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ .Title }}</title>
+  <meta name="description" content="{{ .Description }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/docs/static/redoc.css">
+</head>
+<body>
+  <div id="api-doc"></div>
+  <script src="/docs/static/redoc.js"></script>
+  <script>
+    Redoc.init(
+      "{{ .SpecURL }}",
+      {
+        expandResponses: "200,201,204",
+        requiredPropsFirst: true,
+        sortPropsAlphabetically: true,
+        hideHostname: true,
+        noAutoAuth: false,
+        theme: {
+          colors: {
+            primary: {
+              main: "#3f51b5"
+            },
+            success: {
+              main: "#4caf50"
+            },
+            warning: {
+              main: "#ff9800"
+            },
+            error: {
+              main: "#f44336"
+            }
+          }
+        }
+      },
+      document.getElementById("api-doc")
+    );
+  </script>
+</body>
+</html>

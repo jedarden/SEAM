@@ -1,17 +1,25 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/ardenone/seam/internal/spec"
 )
+
+//go:embed redoc.html
+var redocHTMLTemplate string
 
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
 // Requests matching these paths (or their prefixes) are handled by the control-plane
@@ -140,6 +148,7 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
+	s.callerMux.HandleFunc("/docs/static/", s.staticAssetHandler)
 
 	// Operator-only routes
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
@@ -311,8 +320,7 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(specJSON)
 }
 
-// docsHandler returns the API documentation
-// In Phase 1a, this returns minimal HTML rendering of the spec
+// docsHandler returns the API documentation using ReDoc
 func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -328,79 +336,21 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to HTML rendering
-	specJSON, err := s.specLoader.GetRawJSON()
+	// Render the ReDoc UI with embedded JavaScript
+	html, err := s.renderReDocHTML()
 	if err != nil {
-		log.Printf("Failed to get spec JSON: %v", err)
-		http.Error(w, "Failed to load spec", http.StatusInternalServerError)
+		log.Printf("[docs] Failed to render ReDoc HTML: %v", err)
+		http.Error(w, "Failed to render documentation", http.StatusInternalServerError)
 		return
 	}
 
 	// Set headers
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
-
-	// Minimal HTML rendering
-	html := `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SEAM API Documentation</title>
-    <style>
-        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-        h2 { color: #555; margin-top: 30px; }
-        .meta { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .meta p { margin: 5px 0; }
-        .endpoint { background: #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
-        .endpoint .method { font-weight: bold; color: #007bff; }
-        .endpoint .path { font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 3px; }
-        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; }
-        code { background: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <h1>SEAM API Documentation</h1>
-    <div class="meta">
-        <p><strong>Version:</strong> ` + s.specLoader.GetVersion() + `</p>
-        <p><strong>API Version:</strong> ` + s.specLoader.GetAPIVersion() + `</p>
-        <p><a href="/openapi.json">Download OpenAPI Spec (JSON)</a></p>
-    </div>
-    <h2>Available Endpoints</h2>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/openapi.json</span>
-        <p>Returns the complete OpenAPI 3.1 specification for SEAM</p>
-    </div>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/docs</span>
-        <p>Returns this API documentation (HTML or JSON)</p>
-    </div>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/_seam/healthz</span>
-        <p>Kubernetes liveness endpoint. Always returns 200 OK when the server is running.</p>
-    </div>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/_seam/readyz</span>
-        <p>Kubernetes readiness endpoint. Returns readiness status.</p>
-    </div>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/_seam/metrics</span>
-        <p>Prometheus-style metrics endpoint (operator-only port).</p>
-    </div>
-    <div class="endpoint">
-        <span class="method">GET</span> <span class="path">/config/status</span>
-        <p>Returns configuration fragment status.</p>
-    </div>
-    <h2>OpenAPI Specification</h2>
-    <pre><code>` + string(specJSON) + `</code></pre>
-</body>
-</html>`
-
-	_, _ = w.Write([]byte(html))
+	_, _ = w.Write(html)
 }
 
 // docsRouteHandler returns route documentation for a specific endpoint
@@ -586,6 +536,118 @@ func indexOf(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+// renderReDocHTML renders the ReDoc documentation page
+func (s *Server) renderReDocHTML() ([]byte, error) {
+	tmpl, err := template.New("redoc").Parse(redocHTMLTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	buf := &bytes.Buffer{}
+	data := struct {
+		Title       string
+		Description string
+		SpecURL     string
+	}{
+		Title:       "SEAM API Documentation",
+		Description: "SEAM (Semantic Endpoint Access and Management) is an API gateway that provides OpenAPI 3.1 specification validation, route fragment merging, and request/response validation.",
+		SpecURL:     "/openapi.json",
+	}
+
+	if err := tmpl.Execute(buf, data); err != nil {
+		return nil, fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// staticAssetHandler serves static assets (CSS, JS) for the docs UI
+func (s *Server) staticAssetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract the filename from the path
+	// Path format: /docs/static/filename.ext
+	requestPath := r.URL.Path
+	if !strings.HasPrefix(requestPath, "/docs/static/") {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	filename := strings.TrimPrefix(requestPath, "/docs/static/")
+
+	// Security: prevent directory traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid path", http.StatusForbidden)
+		return
+	}
+
+	// Determine content type based on file extension
+	var contentType string
+	switch {
+	case strings.HasSuffix(filename, ".css"):
+		contentType = "text/css; charset=utf-8"
+	case strings.HasSuffix(filename, ".js"):
+		contentType = "application/javascript; charset=utf-8"
+	case strings.HasSuffix(filename, ".json"):
+		contentType = "application/json; charset=utf-8"
+	case strings.HasSuffix(filename, ".png"):
+		contentType = "image/png"
+	case strings.HasSuffix(filename, ".jpg"), strings.HasSuffix(filename, ".jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasSuffix(filename, ".svg"):
+		contentType = "image/svg+xml"
+	case strings.HasSuffix(filename, ".woff"):
+		contentType = "font/woff"
+	case strings.HasSuffix(filename, ".woff2"):
+		contentType = "font/woff2"
+	case strings.HasSuffix(filename, ".ttf"):
+		contentType = "font/ttf"
+	case strings.HasSuffix(filename, ".eot"):
+		contentType = "application/vnd.ms-fontobject"
+	default:
+		contentType = "application/octet-stream"
+	}
+
+	// Try to read the file from the assets directory
+	content, err := readAssetFile(filename)
+	if err != nil {
+		log.Printf("[static] Failed to read asset %s: %v", filename, err)
+		http.Error(w, "Asset not found", http.StatusNotFound)
+		return
+	}
+
+	// Set caching headers for better performance
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(content); err != nil {
+		log.Printf("[static] Error writing asset %s: %v", filename, err)
+	}
+}
+
+// readAssetFile reads a file from the assets directory
+func readAssetFile(filename string) ([]byte, error) {
+	// In production, this could use go:embed for assets
+	// For now, read from the filesystem
+	return readFromFile(filename)
+}
+
+// readFromFile reads a file from the filesystem
+func readFromFile(filepath string) ([]byte, error) {
+	file, err := http.Dir("internal/server/assets").Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return io.ReadAll(file)
 }
 
 // Start begins listening on both ports
