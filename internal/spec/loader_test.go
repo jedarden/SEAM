@@ -174,14 +174,14 @@ func TestExtractExpectedShape(t *testing.T) {
 // TestFormatValidationErrorTo400 tests the FormatValidationErrorTo400 helper function
 func TestFormatValidationErrorTo400(t *testing.T) {
 	tests := []struct {
-		name  string
-		errs  []*errors.ValidationError
-		path  string
+		name   string
+		errs   []*errors.ValidationError
+		path   string
 		method string
-		check func(map[string]interface{}) bool
+		check  func(map[string]interface{}) bool
 	}{
 		{
-			name:  "Single validation error",
+			name: "Single validation error",
 			errs: []*errors.ValidationError{
 				{
 					SpecPath:    "#/components/schemas/User/required",
@@ -242,7 +242,7 @@ func TestFormatValidationErrorTo400(t *testing.T) {
 				{
 					SpecPath:    "#/components/schemas/User/properties/name",
 					RequestPath: "string",
-					HowToFix:     "Should be string",
+					HowToFix:    "Should be string",
 					Reason:      "Type mismatch",
 				},
 				{
@@ -271,9 +271,9 @@ func TestFormatValidationErrorTo400(t *testing.T) {
 			},
 		},
 		{
-			name:  "Empty validation errors",
-			errs:  []*errors.ValidationError{},
-			path:  "/api/test",
+			name:   "Empty validation errors",
+			errs:   []*errors.ValidationError{},
+			path:   "/api/test",
 			method: "GET",
 			check: func(result map[string]interface{}) bool {
 				valErrors, ok := result["validation_errors"].([]map[string]interface{})
@@ -287,7 +287,7 @@ func TestFormatValidationErrorTo400(t *testing.T) {
 			name: "Validation error with all types",
 			errs: []*errors.ValidationError{
 				{
-					SpecPath:         "#/paths/~1api~1users/post/requestBody/content/application~1json/schema",
+					SpecPath:          "#/paths/~1api~1users/post/requestBody/content/application~1json/schema",
 					ValidationType:    "request",
 					ValidationSubType: "schema",
 					HowToFix:          "Object with required fields",
@@ -396,7 +396,7 @@ func TestConvertToStructured400(t *testing.T) {
 					{
 						SpecPath:    "#/components/schemas/User/properties/name",
 						RequestPath: "integer",
-						HowToFix:     "Should be string",
+						HowToFix:    "Should be string",
 						Reason:      "Type mismatch",
 					},
 					{
@@ -477,12 +477,12 @@ func TestConvertToStructured400(t *testing.T) {
 // TestValidationFieldErrorJSON tests the JSON serialization of ValidationFieldError
 func TestValidationFieldErrorJSON(t *testing.T) {
 	err := ValidationFieldError{
-		Field:          "#/components/schemas/User/required",
-		ExpectedShape:  "Request validation: Add 'name' field",
-		Actual:         "POST /api/users",
-		Reason:         "Missing required field",
-		Line:           20,
-		Column:         10,
+		Field:         "#/components/schemas/User/required",
+		ExpectedShape: "Request validation: Add 'name' field",
+		Actual:        "POST /api/users",
+		Reason:        "Missing required field",
+		Line:          20,
+		Column:        10,
 	}
 
 	// This test ensures the struct can be serialized to JSON correctly
@@ -513,12 +513,12 @@ func TestStructured400ResponseJSON(t *testing.T) {
 		DocsURL: "/docs/route?path=/api/users&method=POST&version=_unversioned",
 		ValidationErrors: []ValidationFieldError{
 			{
-				Field:          "#/components/schemas/User/required",
-				ExpectedShape:  "Request validation: Add 'name' field",
-				Actual:         "POST /api/users",
-				Reason:         "Missing required field",
-				Line:           20,
-				Column:         10,
+				Field:         "#/components/schemas/User/required",
+				ExpectedShape: "Request validation: Add 'name' field",
+				Actual:        "POST /api/users",
+				Reason:        "Missing required field",
+				Line:          20,
+				Column:        10,
 			},
 		},
 	}
@@ -596,7 +596,7 @@ func TestStructured400ResponseWithVariousHTTPMethods(t *testing.T) {
 				Errors: []*errors.ValidationError{
 					{
 						SpecPath: "#/paths/~1api~1users/" + strings.ToLower(method),
-						Reason:  "Some error",
+						Reason:   "Some error",
 					},
 				},
 			}

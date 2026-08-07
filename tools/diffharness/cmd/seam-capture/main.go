@@ -54,9 +54,9 @@ func main() {
 	}
 
 	cap := &capturer{
-		target:     target,
-		service:    *service,
-		corpusPath: *corpusPath,
+		target:      target,
+		service:     *service,
+		corpusPath:  *corpusPath,
 		description: *description,
 	}
 
@@ -96,12 +96,12 @@ func main() {
 }
 
 type capturer struct {
-	target       *url.URL
-	service      string
-	corpusPath   string
-	description  string
-	cp           *corpus.Corpus
-	mu           chan struct{} // serializes corpus mutations
+	target      *url.URL
+	service     string
+	corpusPath  string
+	description string
+	cp          *corpus.Corpus
+	mu          chan struct{} // serializes corpus mutations
 }
 
 func (c *capturer) loadCorpus() error {
@@ -241,7 +241,7 @@ func canonHeaders(h http.Header) map[string][]string {
 // responseRecorder wraps ResponseWriter to capture the status code and headers.
 type responseRecorder struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
 	wroteHeader bool
 }
 

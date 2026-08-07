@@ -839,8 +839,8 @@ func TestValidationMiddlewareSkipsReservedPaths(t *testing.T) {
 	// Test that reserved paths skip validation and return normally
 	// Each path is paired with its required query parameters (if any)
 	reservedPaths := []struct {
-	path   string
-	query  string
+		path  string
+		query string
 	}{
 		{"/_seam/healthz", ""},
 		{"/_seam/readyz", ""},
@@ -999,10 +999,10 @@ func TestCaptureMiddlewareDisabledBehavior(t *testing.T) {
 
 func TestCaptureStatusEndpointWhenDisabled(t *testing.T) {
 	cfg := &Config{
-		CallerPort:   8080,
-		OperatorPort: 8081,
-		BaseURL:      "http://localhost:8080",
-		SpecDir:      "../../spec",
+		CallerPort:     8080,
+		OperatorPort:   8081,
+		BaseURL:        "http://localhost:8080",
+		SpecDir:        "../../spec",
 		CaptureEnabled: false,
 	}
 

@@ -32,21 +32,21 @@ const SchemaVersion = "seam-diff-corpus/v1"
 
 // Corpus is one service's captured differential corpus.
 type Corpus struct {
-	Schema      string  `json:"schema"`           // always SchemaVersion
-	Service     string  `json:"service"`          // the <svc> owner token
-	Incumbent   string  `json:"incumbent"`        // base URL of the incumbent proxy captured against
-	CapturedAt  string  `json:"capturedAt"`       // RFC3339, set on first capture
-	Description string  `json:"description"`      // free-form, surfaces in the report header
+	Schema      string  `json:"schema"`      // always SchemaVersion
+	Service     string  `json:"service"`     // the <svc> owner token
+	Incumbent   string  `json:"incumbent"`   // base URL of the incumbent proxy captured against
+	CapturedAt  string  `json:"capturedAt"`  // RFC3339, set on first capture
+	Description string  `json:"description"` // free-form, surfaces in the report header
 	Entries     []Entry `json:"entries"`
 }
 
 // Entry is a single captured request plus the expectations for its replay.
 type Entry struct {
-	ID          string   `json:"id"`                     // stable, human-readable (e.g. "list-apps")
-	Description string   `json:"description,omitempty"`  // what this entry exercises
-	Request     Request  `json:"request"`                // the caller's request, replayed verbatim
-	Secrets     []Secret `json:"secrets,omitempty"`      // injected-credential refs (never values)
-	Expect      *Expect  `json:"expect,omitempty"`       // per-entry comparison overrides
+	ID          string   `json:"id"`                    // stable, human-readable (e.g. "list-apps")
+	Description string   `json:"description,omitempty"` // what this entry exercises
+	Request     Request  `json:"request"`               // the caller's request, replayed verbatim
+	Secrets     []Secret `json:"secrets,omitempty"`     // injected-credential refs (never values)
+	Expect      *Expect  `json:"expect,omitempty"`      // per-entry comparison overrides
 }
 
 // Request is the caller-supplied request, recorded at the incumbent and
@@ -54,10 +54,10 @@ type Entry struct {
 // credential: both the incumbent and SEAM inject server-side.
 type Request struct {
 	Method          string              `json:"method"`
-	Path            string              `json:"path"`                    // path only, no query
-	Query           string              `json:"query,omitempty"`         // query without the leading '?'
-	Headers         map[string][]string `json:"headers,omitempty"`       // canonicalized keys
-	BodyB64         string              `json:"bodyB64,omitempty"`       // base64 of the body; "" == empty
+	Path            string              `json:"path"`              // path only, no query
+	Query           string              `json:"query,omitempty"`   // query without the leading '?'
+	Headers         map[string][]string `json:"headers,omitempty"` // canonicalized keys
+	BodyB64         string              `json:"bodyB64,omitempty"` // base64 of the body; "" == empty
 	BodyContentType string              `json:"bodyContentType,omitempty"`
 }
 
@@ -65,9 +65,9 @@ type Request struct {
 // only in memory during a replay (Secret.Bare, never serialized) and is
 // resolved by internal/secref from a local secrets source.
 type Secret struct {
-	Ref      string   `json:"ref"`               // e.g. "vault:seam/routes/argocd/ro-token"
-	InjectAs InjectAs `json:"injectAs"`          // how SEAM injects this credential
-	Bare     string   `json:"-"`                 // resolved at replay time; never written to disk
+	Ref      string   `json:"ref"`      // e.g. "vault:seam/routes/argocd/ro-token"
+	InjectAs InjectAs `json:"injectAs"` // how SEAM injects this credential
+	Bare     string   `json:"-"`        // resolved at replay time; never written to disk
 }
 
 // InjectAs mirrors the route-fragment x-inject-as shape ({kind, name}).

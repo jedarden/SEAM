@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // Loader handles loading and serving OpenAPI specs
@@ -420,7 +420,7 @@ func (ve *ValidationError) ToJSON(path, method string) map[string]interface{} {
 		"error":             "validation_failed",
 		"message":           "Request does not conform to the OpenAPI specification",
 		"validation_errors": errorDetails,
-		"docs_url": fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method),
+		"docs_url":          fmt.Sprintf("/docs/route?path=%s&method=%s&version=_unversioned", path, method),
 	}
 }
 
@@ -511,20 +511,20 @@ func extractExpectedShape(err *errors.ValidationError) string {
 
 // ValidationFieldError represents a single field error in the structured 400 response
 type ValidationFieldError struct {
-	Field          string `json:"field"`
-	ExpectedShape  string `json:"expected_shape"`
-	Actual         string `json:"actual,omitempty"`
-	Reason         string `json:"reason"`
-	Line           int    `json:"line,omitempty"`
-	Column         int    `json:"column,omitempty"`
+	Field         string `json:"field"`
+	ExpectedShape string `json:"expected_shape"`
+	Actual        string `json:"actual,omitempty"`
+	Reason        string `json:"reason"`
+	Line          int    `json:"line,omitempty"`
+	Column        int    `json:"column,omitempty"`
 }
 
 // Structured400Response represents the complete structured 400 error response
 type Structured400Response struct {
-	Error            string                  `json:"error"`
-	Message          string                  `json:"message"`
-	ValidationErrors []ValidationFieldError  `json:"validation_errors"`
-	DocsURL          string                  `json:"docs_url"`
+	Error            string                 `json:"error"`
+	Message          string                 `json:"message"`
+	ValidationErrors []ValidationFieldError `json:"validation_errors"`
+	DocsURL          string                 `json:"docs_url"`
 }
 
 // ConvertToStructured400 converts a ValidationError to Structured400Response
@@ -537,12 +537,12 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 
 	for _, err := range ve.Errors {
 		response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
-			Field:          err.SpecPath,
-			ExpectedShape:  extractExpectedShape(err),
-			Actual:         err.RequestPath,
-			Reason:         err.Reason,
-			Line:           err.SpecLine,
-			Column:         err.SpecCol,
+			Field:         err.SpecPath,
+			ExpectedShape: extractExpectedShape(err),
+			Actual:        err.RequestPath,
+			Reason:        err.Reason,
+			Line:          err.SpecLine,
+			Column:        err.SpecCol,
 		})
 	}
 
@@ -589,10 +589,10 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"fragments_loaded":   true,
-		"valid_count":        validCount,
-		"quarantined_count":  len(quarantined),
-		"conditions":         conditions,
+		"fragments_loaded":  true,
+		"valid_count":       validCount,
+		"quarantined_count": len(quarantined),
+		"conditions":        conditions,
 	}
 }
 
@@ -613,9 +613,10 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 //   - The loader's document, model, and validator are atomically updated
 //
 // Usage:
-//   if err := loader.LoadFragments(); err != nil {
-//       log.Printf("Fragment reload failed: %v", err)
-//   }
+//
+//	if err := loader.LoadFragments(); err != nil {
+//	    log.Printf("Fragment reload failed: %v", err)
+//	}
 func (l *Loader) LoadFragments() error {
 	// TODO(bf-3q12): Implement fragment reloading
 	// This placeholder ensures the method exists and compiles
@@ -627,4 +628,3 @@ func (l *Loader) LoadFragments() error {
 
 	return nil
 }
-

@@ -93,7 +93,7 @@ type Options struct {
 var DefaultSeamAddedHeaders = []string{
 	"Deprecation",
 	"Sunset",
-	"Link",       // rel="deprecation" pointers SEAM emits on deprecated routes
+	"Link",        // rel="deprecation" pointers SEAM emits on deprecated routes
 	"Retry-After", // SEAM-derived on breaker 503 / budget 402 / loop 429
 }
 
@@ -120,10 +120,10 @@ type Result struct {
 	LeakedWhere  string `json:"leakedWhere,omitempty"`  // body | header:Name | trailer:Name
 
 	// Structural diffs. Nil/zero valued when that dimension is equivalent.
-	StatusDiff   *StatusDiff   `json:"statusDiff,omitempty"`
-	HeaderDiffs  []HeaderDiff  `json:"headerDiffs,omitempty"`
-	TrailerDiffs []HeaderDiff  `json:"trailerDiffs,omitempty"`
-	BodyDiff     *BodyDiff     `json:"bodyDiff,omitempty"`
+	StatusDiff   *StatusDiff  `json:"statusDiff,omitempty"`
+	HeaderDiffs  []HeaderDiff `json:"headerDiffs,omitempty"`
+	TrailerDiffs []HeaderDiff `json:"trailerDiffs,omitempty"`
+	BodyDiff     *BodyDiff    `json:"bodyDiff,omitempty"`
 
 	// BodyIgnored is set when body comparison was suppressed by Options.IgnoreBody
 	// for a non-deterministic payload. Informational — never a failure on its own.
@@ -406,7 +406,7 @@ func bodyPreview(a, b []byte) string {
 	for i < n && a[i] == b[i] {
 		i++
 	}
-	start := i - window / 2
+	start := i - window/2
 	if start < 0 {
 		start = 0
 	}

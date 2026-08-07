@@ -24,7 +24,7 @@ type Fragment struct {
 	Hash       string // Stable content hash for change detection
 
 	// Content
-	RawContent    []byte          // Original YAML/JSON content
+	RawContent     []byte         // Original YAML/JSON content
 	ParsedFragment map[string]any // Unmarshaled fragment content
 
 	// Quarantine status
@@ -142,12 +142,12 @@ func (fl *FragmentLoader) loadFragmentFile(path string) (*Fragment, error) {
 	}
 
 	fragment := &Fragment{
-		Owner:       owner,
-		SchemaVer:   schemaVer,
-		APIVersion:  apiVersion,
-		SourceFile:  path,
-		Hash:        hashStr,
-		RawContent:  content,
+		Owner:          owner,
+		SchemaVer:      schemaVer,
+		APIVersion:     apiVersion,
+		SourceFile:     path,
+		Hash:           hashStr,
+		RawContent:     content,
 		ParsedFragment: parsed,
 	}
 

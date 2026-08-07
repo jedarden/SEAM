@@ -7,20 +7,20 @@ import (
 
 // ValidationErrorResponse is the structured error response for validation failures
 type ValidationErrorResponse struct {
-	Error            string                `json:"error"`
-	Message          string                `json:"message"`
+	Error            string                 `json:"error"`
+	Message          string                 `json:"message"`
 	ValidationErrors []ValidationFieldError `json:"validation_errors"`
-	DocsURL          string               `json:"docs_url"`
+	DocsURL          string                 `json:"docs_url"`
 }
 
 // ValidationFieldError represents a single field validation error
 type ValidationFieldError struct {
-	Field          string `json:"field"`
-	ExpectedShape  string `json:"expected_shape"`
-	Actual         string `json:"actual"`
-	Reason         string `json:"reason"`
-	Line           int    `json:"line,omitempty"`
-	Column         int    `json:"column,omitempty"`
+	Field         string `json:"field"`
+	ExpectedShape string `json:"expected_shape"`
+	Actual        string `json:"actual"`
+	Reason        string `json:"reason"`
+	Line          int    `json:"line,omitempty"`
+	Column        int    `json:"column,omitempty"`
 }
 
 // validationMiddleware returns a middleware that validates requests against the OpenAPI spec
