@@ -1,0 +1,540 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seam.ardenone.com/schemas/fragment-v1.json",
+  "title": "SEAM Route Fragment v1",
+  "description": "Complete schema for SEAM route fragments: OpenAPI 3.1 paths/components fragments plus SEAM extension fields. This schema is used by both seam lint (Phase 9) and the gateway's runtime quarantine (Phase 1).",
+  "type": "object",
+  "required": ["x-seam-owner", "x-seam-schema", "paths"],
+  "properties": {
+    "openapi": {
+      "type": "string",
+      "pattern": "^3\\.[1-9]\\.[0-9]+$",
+      "description": "OpenAPI version string (informational in fragments, synthesized by merge layer)"
+    },
+    "info": {
+      "$ref": "#/$defs/info"
+    },
+    "paths": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^/"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/pathItem"
+      }
+    },
+    "components": {
+      "$ref": "#/$defs/components"
+    },
+    "x-seam-owner": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Owning service <svc>. Must match mounted parent directory name."
+    },
+    "x-seam-schema": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Fragment schema version marker. Allows detectable evolution (v2, v3, ...)."
+    },
+    "x-api-version": {
+      "type": "string",
+      "pattern": "^v[1-9][0-9]*$",
+      "description": "Route contract version (v1, v2, v10, ...). Absent → '_unversioned' (sorts oldest)."
+    },
+    "x-upstream": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "description": "Single upstream base URL. Mutually exclusive with x-upstream-map."
+    },
+    "x-upstream-map": {
+      "type": "object",
+      "description": "Multi-instance mapping. Required when x-instance-param present. Mutually exclusive with x-upstream.",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/$defs/instance"
+        }
+      }
+    },
+    "x-instance-param": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Path parameter name for instance selection. Required with x-upstream-map, forbidden without it."
+    },
+    "x-vault-path": {
+      "type": "string",
+      "pattern": "^seam/routes/[a-z][a-z0-9_-]+",
+      "description": "OpenBao secret path. Must be inside seam/routes/<x-seam-owner>/* (co-ownership rule)."
+    },
+    "x-inject-as": {
+      "$ref": "#/$defs/injectAs",
+      "description": "How credential is injected. Paired with x-vault-path (both-or-neither)."
+    },
+    "x-required-scope": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-:]+$"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-:]+$"
+          }
+        }
+      ],
+      "description": "OIDC scope(s) caller must hold (conjunctive). Fragment-root default overridden by operation-level."
+    },
+    "x-fanout-scope": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-:]+$"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-:]+$"
+          }
+        }
+      ],
+      "description": "Additional scope requirement for _all multi-instance fan-out."
+    },
+    "x-credential-probe": {
+      "$ref": "#/$defs/credentialProbe",
+      "description": "Credential health probe configuration."
+    },
+    "x-upstream-tls": {
+      "$ref": "#/$defs/upstreamTLS",
+      "description": "Upstream TLS verification configuration."
+    },
+    "x-upstream-strip-prefix": {
+      "type": "string",
+      "pattern": "^/[^/]+$",
+      "description": "Literal path prefix to strip before forwarding. Must be prefix of ALL paths."
+    },
+    "x-upstream-plaintext": {
+      "type": "string",
+      "enum": ["acknowledged"],
+      "description": "Opt-out of TLS to upstream (http:// instead of https://). Lint-flagged."
+    },
+    "x-breaker": {
+      "$ref": "#/$defs/circuitBreaker",
+      "description": "Per-upstream circuit breaker configuration."
+    },
+    "x-seam-deprecated": {
+      "$ref": "#/$defs/deprecation",
+      "description": "Deprecation marker for entire fragment (since, sunset, optional brownout)."
+    },
+    "x-adapter": {
+      "$ref": "#/$defs/adapter",
+      "description": "Declarative request/response transforms for version migration."
+    },
+    "x-unscrubbable": {
+      "type": "string",
+      "enum": ["acknowledged"],
+      "description": "Opt-out of response scrubbing. Allowed at fragment-root or operation-level."
+    },
+    "x-requires-approval": {
+      "type": "boolean",
+      "description": "Reserved field for future approval-gated routes."
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["x-upstream"],
+      "not": {
+        "anyOf": [
+          {"required": ["x-upstream-map"]},
+          {"required": ["x-instance-param"]}
+        ]
+      }
+    },
+    {
+      "required": ["x-upstream-map", "x-instance-param"],
+      "not": {
+        "required": ["x-upstream"]
+      }
+    }
+  ],
+  "$defs": {
+    "info": {
+      "type": "object",
+      "required": ["title", "version"],
+      "properties": {
+        "title": {"type": "string"},
+        "version": {"type": "string"},
+        "description": {"type": "string"}
+      }
+    },
+    "pathItem": {
+      "type": "object",
+      "properties": {
+        "summary": {"type": "string"},
+        "description": {"type": "string"},
+        "get": {"$ref": "#/$defs/operation"},
+        "put": {"$ref": "#/$defs/operation"},
+        "post": {"$ref": "#/$defs/operation"},
+        "delete": {"$ref": "#/$defs/operation"},
+        "options": {"$ref": "#/$defs/operation"},
+        "head": {"$ref": "#/$defs/operation"},
+        "patch": {"$ref": "#/$defs/operation"},
+        "trace": {"$ref": "#/$defs/operation"},
+        "parameters": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/parameter"}
+        },
+        "x-upstream-path-template": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Explicit upstream path template. Wins over x-upstream-strip-prefix."
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "required": ["responses"],
+      "properties": {
+        "summary": {"type": "string"},
+        "description": {"type": "string"},
+        "operationId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._-]+$"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/parameter"}
+        },
+        "requestBody": {"$ref": "#/$defs/requestBody"},
+        "responses": {
+          "type": "object",
+          "minProperties": 1,
+          "patternProperties": {
+            "^(default|[1-5][0-9]{2})$": {
+              "$ref": "#/$defs/response"
+            }
+          }
+        },
+        "deprecated": {"type": "boolean"},
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "x-required-scope": {
+          "oneOf": [
+            {"type": "string", "pattern": "^[a-z][a-z0-9_-:]+$"},
+            {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-:]+$"}}
+          ],
+          "description": "Overrides fragment-root default."
+        },
+        "x-loop-guard": {"$ref": "#/$defs/loopGuard"},
+        "x-cost-per-call": {"$ref": "#/$defs/costPerCall"},
+        "x-quota": {"$ref": "#/$defs/quota"},
+        "x-unscrubbable": {"type": "string", "enum": ["acknowledged"]},
+        "x-requires-approval": {"type": "boolean"}
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "in"],
+      "properties": {
+        "name": {"type": "string"},
+        "in": {"type": "string", "enum": ["query", "header", "path", "cookie"]},
+        "description": {"type": "string"},
+        "required": {"type": "boolean"},
+        "deprecated": {"type": "boolean"},
+        "allowEmptyValue": {"type": "boolean"},
+        "style": {"type": "string"},
+        "explode": {"type": "boolean"},
+        "allowReserved": {"type": "boolean"},
+        "schema": true,
+        "content": {"type": "object"},
+        "example": true,
+        "examples": {"type": "object"}
+      }
+    },
+    "requestBody": {
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "description": {"type": "string"},
+        "required": {"type": "boolean"},
+        "content": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"$ref": "#/$defs/mediaType"}
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {"type": "string"},
+        "headers": {"type": "object"},
+        "content": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/mediaType"}
+        },
+        "links": {"type": "object"}
+      }
+    },
+    "mediaType": {
+      "type": "object",
+      "properties": {
+        "schema": true,
+        "encoding": {"type": "object"},
+        "example": true,
+        "examples": {"type": "object"}
+      }
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "schemas": {"type": "object"},
+        "parameters": {"type": "object"},
+        "responses": {"type": "object"},
+        "examples": {"type": "object"},
+        "requestBodies": {"type": "object"},
+        "headers": {"type": "object"},
+        "securitySchemes": {"type": "object"},
+        "links": {"type": "object"},
+        "callbacks": {"type": "object"},
+        "pathItems": {"type": "object"}
+      }
+    },
+    "instance": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "vaultPath": {
+          "type": "string",
+          "pattern": "^seam/routes/[a-z][a-z0-9_-]+"
+        },
+        "injectAs": {"$ref": "#/$defs/injectAs"},
+        "tls": {"$ref": "#/$defs/instanceTLS"},
+        "plaintext": {"type": "string", "enum": ["acknowledged"]},
+        "probeInterval": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$"
+        },
+        "breaker": {"$ref": "#/$defs/circuitBreaker"},
+        "requiredScope": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-:]+$"}
+        }
+      }
+    },
+    "injectAs": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["header", "bearer", "query"]
+        },
+        "name": {"type": "string"}
+      }
+    },
+    "credentialProbe": {
+      "type": "object",
+      "required": ["path", "method", "interval"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "HEAD", "OPTIONS"]
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$"
+        }
+      }
+    },
+    "upstreamTLS": {
+      "type": "object",
+      "properties": {
+        "caBundle": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]+$"
+        },
+        "serverName": {
+          "type": "string",
+          "format": "hostname"
+        },
+        "insecureSkipVerify": {
+          "type": "string",
+          "enum": ["acknowledged"]
+        }
+      }
+    },
+    "instanceTLS": {
+      "type": "object",
+      "properties": {
+        "caBundle": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]+$"
+        },
+        "serverName": {
+          "type": "string",
+          "format": "hostname"
+        },
+        "insecureSkipVerify": {
+          "type": "string",
+          "enum": ["acknowledged"]
+        }
+      }
+    },
+    "circuitBreaker": {
+      "type": "object",
+      "properties": {
+        "threshold": {"type": "integer", "minimum": 1},
+        "openSeconds": {"type": "integer", "minimum": 1},
+        "maxOpenSeconds": {"type": "integer", "minimum": 1},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "deprecation": {
+      "type": "object",
+      "required": ["since"],
+      "properties": {
+        "since": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "sunset": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "brownout": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["start", "end"],
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["targetVersion"],
+      "properties": {
+        "targetVersion": {
+          "type": "string",
+          "pattern": "^v[1-9][0-9]*$"
+        },
+        "request": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transform"}
+        },
+        "response": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transform"}
+        }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "renameField",
+            "defaultField",
+            "dropField",
+            "unwrapEnvelope",
+            "wrapEnvelope",
+            "renameParam",
+            "renameHeader"
+          ]
+        },
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "jsonPointer": {"type": "string"},
+        "value": true,
+        "envelope": {"type": "string"},
+        "paramName": {"type": "string"},
+        "headerName": {"type": "string"}
+      }
+    },
+    "loopGuard": {
+      "type": "object",
+      "required": ["maxRepeats", "window"],
+      "properties": {
+        "maxRepeats": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "window": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$"
+        }
+      }
+    },
+    "costPerCall": {
+      "type": "object",
+      "required": ["amount", "unit"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["USD", "credits", "quota", "calls"]
+        }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "required": ["amount", "unit", "window"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["USD", "credits", "quota", "calls"]
+        },
+        "window": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$"
+        }
+      }
+    }
+  }
+}
