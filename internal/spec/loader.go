@@ -506,3 +506,35 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 	}
 }
 
+// LoadFragments reloads fragments from the fragments directory
+// This is a placeholder for future hot-reload functionality
+//
+// TODO(bf-3q12): Implement fragment reloading with the following features:
+//   - Watch fragments directory for changes (new, modified, deleted files)
+//   - Validate new/modified fragments against the schema
+//   - Merge fragments and rebuild the OpenAPI document
+//   - Update the validator with the new document
+//   - Provide atomic update (don't serve partial specs)
+//   - Emit metrics on reload success/failure
+//
+// Expected behavior when implemented:
+//   - Returns nil on successful reload
+//   - Returns error if fragments fail validation or merge
+//   - The loader's document, model, and validator are atomically updated
+//
+// Usage:
+//   if err := loader.LoadFragments(); err != nil {
+//       log.Printf("Fragment reload failed: %v", err)
+//   }
+func (l *Loader) LoadFragments() error {
+	// TODO(bf-3q12): Implement fragment reloading
+	// This placeholder ensures the method exists and compiles
+	// Future implementation will:
+	// 1. Re-scan the fragments directory
+	// 2. Load and validate changed fragments
+	// 3. Merge fragments into a new document
+	// 4. Atomically swap the loader's document, model, and validator
+
+	return nil
+}
+
