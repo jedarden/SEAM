@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ardenone.com/seam/route-fragment-schema/v1.json",
   "title": "SEAM Route Fragment (x-seam-schema v1)",
-  "description": "Concrete JSON Schema for a SEAM route fragment (x-seam-schema: v1). A fragment is a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields. Authored alongside its companion design note docs/notes/route-fragment-schema.md, which is the authority on placement decisions and on the cross-field constraints that this schema cannot express and the Go validator (seam lint + runtime quarantine) must enforce on top. References docs/plan/plan.md Data Models, Architecture, Open Questions and ADR-001.",
+  "description": "Concrete JSON Schema for a SEAM route fragment (x-seam-schema: v1). A fragment is a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields. Authored alongside its companion design note docs/notes/route-fragment-schema.md, which is the authority on placement decisions and on the cross-field constraints that this schema cannot express and the Go validator (seam lint + runtime quarantine) must enforce on top. References docs/plan/plan.md Data Models, Architecture, Open Questions and ADR-001. Schema version: v1, compatible with x-seam-schema=v1.",
   "type": "object",
   "required": ["x-seam-schema", "x-seam-owner", "paths"],
   "additionalProperties": true,
@@ -22,7 +22,11 @@
     },
     "components": { "type": "object", "$comment": "Optional reusable OpenAPI components (schemas, parameters, ...). Not SEAM-validated beyond being an object; libopenapi owns OpenAPI validity." },
 
-    "x-seam-schema": { "type": "string", "$comment": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. A version marker (e.g., 'v1', 'v2')." },
+    "x-seam-schema": {
+      "type": "string",
+      "pattern": "^v[0-9]+$",
+      "$comment": "Fragment-root only. Versions the fragment FORMAT SEAM parses; distinct from x-api-version which versions the contract SEAM serves. A version marker (e.g., 'v1', 'v2'). Required field - all valid SEAM fragments MUST include this."
+    },
     "x-seam-owner": { "$ref": "#/$defs/ownerToken", "$comment": "Fragment-root only; required day one. Redundant in-file declaration of the owning service, checked against the mounted parent directory at runtime (validator-side: must equal the directory the fragment was loaded from)." },
     "x-api-version": { "$ref": "#/$defs/apiVersion", "$comment": "Fragment-root only. The literal _unversioned is rejected here (the pattern requires v then a non-zero digit); it is SEAM-assigned, never authored." },
 
@@ -44,7 +48,11 @@
     "x-seam-deprecated": { "$ref": "#/$defs/seamDeprecated", "$comment": "Fragment-root object marking every route deprecated. Feeds Deprecation/Sunset headers and the retirement metric." },
     "x-adapter": { "$ref": "#/$defs/adapter", "$comment": "Fragment-root. Declarative request/response transforms delegating to a live targetVersion. Mutually exclusive with x-upstream/x-upstream-map and every upstream-facing field." },
     "x-unscrubbable": { "$ref": "#/$defs/acknowledged", "$comment": "Allowed at fragment-root OR operation level. Acknowledgement that a route runs unscrubbed (response cannot be scanned for echoed secrets)." },
-    "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." }
+    "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." },
+
+    "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for loop protection. Applied to all operations unless overridden at operation level. Prevents infinite recursion and excessive redirect chains." },
+    "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default cost per call in USD. Applied to all operations unless overridden at operation level. Used for quota tracking and cost monitoring. Must be non-negative with max 2 decimal places." },
+    "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default quota for rate limiting based on accumulated cost. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." }
   },
 
   "allOf": [
@@ -167,26 +175,37 @@
     },
     "loopGuard": {
       "type": "object",
-      "required": ["max_iterations", "backoff_ms"],
+      "description": "Rate limiting and monitoring field for loop protection. Applied at fragment-root default or operation-level override.",
+      "required": ["max_depth", "max_redirects"],
       "properties": {
-        "max_iterations": { "type": "integer", "minimum": 1, "$comment": "Maximum number of iterations allowed before the loop guard intervenes." },
-        "backoff_ms": { "type": "integer", "minimum": 0, "$comment": "Backoff delay in milliseconds between iterations. Zero means no backoff." }
+        "max_depth": { "type": "integer", "minimum": 1, "description": "Maximum recursion depth allowed before the loop guard intervenes. Must be at least 1." },
+        "max_redirects": { "type": "integer", "minimum": 0, "description": "Maximum number of HTTP redirects allowed before the loop guard intervenes. Zero means no redirects allowed." }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$comment": "Fragment-root default applied to all operations unless overridden at operation level. Prevents infinite loops and excessive redirect chains."
     },
     "costPerCall": {
       "type": "number",
       "minimum": 0,
-      "$comment": "Cost per call in arbitrary cost units. Must be non-negative (negative costs rejected)."
+      "description": "Cost per call in USD. Used for quota tracking and cost monitoring. Must be non-negative with maximum 2 decimal places.",
+      "pattern": "^\\d+(\\.\\d{1,2})?$",
+      "$comment": "Cost per call in USD with max 2 decimal places. Must be non-negative (negative costs rejected). Pattern enforces max 2 decimal places."
     },
     "quota": {
       "type": "object",
-      "required": ["limit", "window_seconds"],
+      "description": "Rate limiting quota for controlling request volume based on cost. Requires x-cost-per-call when specified at fragment-root or operation level.",
+      "required": ["limit", "window"],
       "properties": {
-        "limit": { "type": "integer", "minimum": 1, "$comment": "Maximum number of cost units allowed within the window. Must be at least 1." },
-        "window_seconds": { "type": "integer", "minimum": 1, "$comment": "Time window in seconds. Must be positive (zero or negative rejected)." }
+        "limit": { "type": "integer", "minimum": 1, "description": "Maximum number of cost units allowed within the time window. Must be at least 1." },
+        "window": { "$ref": "#/$defs/duration", "description": "Time window as RFC3339 duration (e.g., '60s', '5m', '1h'). Tumbling window anchored at process start." },
+        "scope": {
+          "type": "string",
+          "enum": ["global", "per-token", "per-user", "per-route"],
+          "description": "Scope of quota enforcement. Default is 'global' if not specified."
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$comment": "Fragment-root default applied to all operations unless overridden at operation level. Requires x-cost-per-call to be meaningful."
     },
     "credentialProbe": {
       "type": "object",
