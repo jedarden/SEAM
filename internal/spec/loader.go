@@ -150,10 +150,42 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 	}, nil
 }
 
+// validateFragmentsDir checks if the fragments directory exists and is readable
+func validateFragmentsDir(fragmentsDir string) error {
+	// Check if directory exists
+	info, err := os.Stat(fragmentsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("fragments directory does not exist: %s", fragmentsDir)
+		}
+		return fmt.Errorf("failed to access fragments directory: %s: %w", fragmentsDir, err)
+	}
+
+	// Check if path is actually a directory
+	if !info.IsDir() {
+		return fmt.Errorf("fragments path is not a directory: %s", fragmentsDir)
+	}
+
+	// Check if directory is readable by attempting to open it
+	file, err := os.Open(fragmentsDir)
+	if err != nil {
+		return fmt.Errorf("fragments directory is not readable: %s: %w", fragmentsDir, err)
+	}
+	file.Close()
+
+	return nil
+}
+
 // NewLoader creates a new spec loader using SEAM_FRAGMENTS_DIR environment variable
 // Reads SEAM_FRAGMENTS_DIR from environment, defaults to "./fragments" if not set
 func NewLoader(baseURL string) (*Loader, error) {
 	fragmentsDir := getFragmentsDir()
+
+	// Validate the fragments directory before proceeding
+	if err := validateFragmentsDir(fragmentsDir); err != nil {
+		return nil, err
+	}
+
 	return NewWithFragments("", baseURL, "", fragmentsDir)
 }
 
