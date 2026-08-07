@@ -311,8 +311,18 @@ func TestOpenAPIJSONHandler(t *testing.T) {
 	if specVersion == "" {
 		t.Error("expected X-SEAM-Spec-Version header to be set")
 	}
-	if len(specVersion) != 16 { // SHA256 first 16 hex chars
-		t.Errorf("expected X-SEAM-Spec-Version to be 16 chars, got %d", len(specVersion))
+	if len(specVersion) != 64 { // Full SHA256 hash
+		t.Errorf("expected X-SEAM-Spec-Version to be 64 chars (full SHA256), got %d", len(specVersion))
+	}
+	// Verify all characters are valid hex
+	for _, c := range specVersion {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			t.Errorf("X-SEAM-Spec-Version contains invalid hex character: %c", c)
+		}
+	}
+	// Verify the hash matches what the loader reports
+	if specVersion != s.specLoader.GetHash() {
+		t.Errorf("X-SEAM-Spec-Version header %s doesn't match loader hash %s", specVersion, s.specLoader.GetHash())
 	}
 
 	apiVersion := resp.Header.Get("X-SEAM-API-Version")
@@ -344,6 +354,52 @@ func TestOpenAPIJSONHandler(t *testing.T) {
 				t.Errorf("expected server.url to be http://localhost:8080, got %v", server["url"])
 			}
 		}
+	}
+}
+
+func TestOpenAPIJSONHashHeader(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Check X-Spec-Version header is present
+	specHash := resp.Header.Get("X-Spec-Version")
+	if specHash == "" {
+		t.Fatal("expected X-Spec-Version header to be set")
+	}
+
+	// Verify it's a valid 64-character hex string (SHA256)
+	if len(specHash) != 64 {
+		t.Errorf("expected X-Spec-Version to be 64 chars (full SHA256), got %d", len(specHash))
+	}
+
+	// Verify all characters are valid hex
+	for _, c := range specHash {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			t.Errorf("X-Spec-Version contains invalid hex character: %c", c)
+		}
+	}
+
+	// Verify the hash matches what the loader reports
+	if specHash != s.specLoader.GetHash() {
+		t.Errorf("X-Spec-Version header %s doesn't match loader hash %s", specHash, s.specLoader.GetHash())
 	}
 }
 
@@ -480,15 +536,15 @@ func TestSpecVersionStability(t *testing.T) {
 	s1 := New(cfg)
 	s2 := New(cfg)
 
-	// Both loaders should produce the same spec version for the same spec
-	v1 := s1.specLoader.GetVersion()
-	v2 := s2.specLoader.GetVersion()
+	// Both loaders should produce the same spec hash for the same spec
+	h1 := s1.specLoader.GetHash()
+	h2 := s2.specLoader.GetHash()
 
-	if v1 != v2 {
-		t.Errorf("spec version not stable: %s != %s", v1, v2)
+	if h1 != h2 {
+		t.Errorf("spec hash not stable: %s != %s", h1, h2)
 	}
 
-	// Verify the version is used in responses
+	// Verify the hash is used in responses
 	req1 := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
 	w1 := httptest.NewRecorder()
 	s1.callerMux.ServeHTTP(w1, req1)
@@ -497,8 +553,8 @@ func TestSpecVersionStability(t *testing.T) {
 	defer func() { _ = resp1.Body.Close() }()
 
 	headerVersion1 := resp1.Header.Get("X-SEAM-Spec-Version")
-	if headerVersion1 != v1 {
-		t.Errorf("header version %s doesn't match loader version %s", headerVersion1, v1)
+	if headerVersion1 != h1 {
+		t.Errorf("header version %s doesn't match loader hash %s", headerVersion1, h1)
 	}
 
 	// Second request should have the same version
@@ -510,8 +566,8 @@ func TestSpecVersionStability(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 
 	headerVersion2 := resp2.Header.Get("X-SEAM-Spec-Version")
-	if headerVersion2 != v2 {
-		t.Errorf("header version %s doesn't match loader version %s", headerVersion2, v2)
+	if headerVersion2 != h2 {
+		t.Errorf("header version %s doesn't match loader hash %s", headerVersion2, h2)
 	}
 
 	if headerVersion1 != headerVersion2 {

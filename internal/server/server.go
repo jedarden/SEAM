@@ -303,7 +303,8 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set headers
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 
@@ -338,6 +339,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	// Set headers
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 
@@ -565,6 +567,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Set headers and return response
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
