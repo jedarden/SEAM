@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ardenone.com/seam/route-fragment-schema/v1.json",
   "title": "SEAM Route Fragment (x-seam-schema v1)",
-  "description": "Complete JSON Schema for a SEAM route fragment (x-seam-schema: v1). A fragment is a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields. This extends the base OpenAPI 3.1 fragment schema with comprehensive SEAM extension validation.",
+  "description": "Complete JSON Schema for a SEAM route fragment (x-seam-schema: v1). A fragment is a per-service OpenAPI 3.1 paths/components fragment plus SEAM extension fields. This extends the base OpenAPI 3.1 fragment schema with comprehensive SEAM extension validation.\n\nSee docs/notes/route-fragment-credential-example.json for a complete example demonstrating all four credential extensions (x-vault-path, x-inject-as, x-required-scope, x-credential-probe).",
   "type": "object",
   "required": ["x-seam-schema", "x-seam-owner", "paths"],
   "additionalProperties": true,
@@ -142,15 +142,15 @@
     },
     "x-vault-path": {
       "$ref": "#/$defs/vaultPath",
-      "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (prefix seam/routes/<owner>/*) and allowlist membership are validator-side."
+      "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (prefix seam/routes/<owner>/*) and allowlist membership are validator-side. Example: seam/routes/user-service/api-key fetches an API key credential for the user-service owner."
     },
     "x-inject-as": {
       "$ref": "#/$defs/injectAs",
-      "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither)."
+      "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither). Example: {kind: bearer} injects as Authorization: Bearer <secret>. See route-fragment-credential-example.json for complete usage."
     },
     "x-credential-probe": {
       "$ref": "#/$defs/credentialProbe",
-      "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as)."
+      "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as). Example: {path: /health, method: HEAD, interval: 30} probes health endpoint every 30 seconds using injected credentials."
     },
     "x-breaker": {
       "$ref": "#/$defs/breaker",
@@ -159,7 +159,7 @@
 
     "x-required-scope": {
       "$ref": "#/$defs/scopeArray",
-      "$comment": "Optional fragment-root DEFAULT; any operation-level x-required-scope REPLACES it (validator-side), never merges. Conjunctive array; bare string sugar for one element."
+      "$comment": "Optional fragment-root DEFAULT; any operation-level x-required-scope REPLACES it (validator-side), never merges. Conjunctive array; bare string sugar for one element. Example: [\"read:users\", \"profile:view\"] requires both scopes for access."
     },
     "x-fanout-scope": {
       "$ref": "#/$defs/scopeArray",
