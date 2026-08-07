@@ -1,0 +1,95 @@
+x-seam-schema: v1
+x-seam-owner: argocd
+x-api-version: v1
+x-upstream: https://argocd-server.ardenone.svc.cluster.local:8080
+x-vault-path: seam/routes/argocd/readonly
+x-inject-as:
+  kind: bearer
+x-upstream-strip-prefix: /argocd
+x-credential-probe:
+  path: /api/v1/version
+  method: GET
+  interval: 5m
+x-breaker:
+  threshold: 10
+  openSeconds: 30
+  maxOpenSeconds: 300
+
+paths:
+  /argocd/api/v1/applications:
+    get:
+      operationId: listApplications
+      summary: List all applications (read-only)
+      tags:
+        - Applications
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - insufficient scopes
+
+  /argocd/api/v1/applications/{name}:
+    get:
+      operationId: getApplication
+      summary: Get application details (read-only)
+      tags:
+        - Applications
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "404":
+          description: Application not found
+
+  /argocd/api/v1/clusters:
+    get:
+      operationId: listClusters
+      summary: List all clusters (read-only)
+      tags:
+        - Clusters
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "401":
+          description: Unauthorized
+
+  /argocd/api/v1/repositories:
+    get:
+      operationId: listRepositories
+      summary: List all repositories (read-only)
+      tags:
+        - Repositories
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "401":
+          description: Unauthorized
