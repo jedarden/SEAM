@@ -75,13 +75,13 @@ func main() {
 	ignoreHeaders = append(ignoreHeaders, defaultIgnore...)
 
 	r := &replayer{
-		incumbentURL: *incumbentURL,
-		seamURL:      *seamURL,
-		corpusPath:   *corpusPath,
-		cp:           cp,
-		resolver:     resolver,
+		incumbentURL:  *incumbentURL,
+		seamURL:       *seamURL,
+		corpusPath:    *corpusPath,
+		cp:            cp,
+		resolver:      resolver,
 		ignoreHeaders: ignoreHeaders,
-		verbose:      *verbose,
+		verbose:       *verbose,
 	}
 
 	report := r.run()
@@ -114,14 +114,14 @@ func (s *stringSlice) Set(v string) error {
 }
 
 type replayer struct {
-	incumbentURL string
-	seamURL      string
-	corpusPath   string
-	cp           *corpus.Corpus
-	resolver     *secref.Resolver
+	incumbentURL  string
+	seamURL       string
+	corpusPath    string
+	cp            *corpus.Corpus
+	resolver      *secref.Resolver
 	ignoreHeaders []string
-	verbose      bool
-	client       *http.Client
+	verbose       bool
+	client        *http.Client
 }
 
 func (r *replayer) run() *Report {
@@ -135,12 +135,12 @@ func (r *replayer) run() *Report {
 	}
 
 	report := &Report{
-		Corpus:      r.cp.Service,
-		CorpusPath:  r.corpusPath,
-		Incumbent:   r.cp.Incumbent,
-		Seam:        r.seamURL,
-		RunAt:       time.Now().Format(time.RFC3339),
-		Entries:     make([]EntryReport, len(r.cp.Entries)),
+		Corpus:     r.cp.Service,
+		CorpusPath: r.corpusPath,
+		Incumbent:  r.cp.Incumbent,
+		Seam:       r.seamURL,
+		RunAt:      time.Now().Format(time.RFC3339),
+		Entries:    make([]EntryReport, len(r.cp.Entries)),
 	}
 
 	for i, entry := range r.cp.Entries {
@@ -314,33 +314,33 @@ func (r *replayer) replayOne(baseURL string, entry corpus.Entry) (*compare.Respo
 
 // Report is the top-level report written to JSON.
 type Report struct {
-	Corpus     string         `json:"corpus"`
-	CorpusPath string         `json:"corpusPath"`
-	Incumbent  string         `json:"incumbent"`
-	Seam       string         `json:"seam"`
-	RunAt      string         `json:"runAt"`
-	Duration   float64        `json:"durationSeconds"`
-	PassCount  int            `json:"passCount"`
-	FailCount  int            `json:"failCount"`
-	SkipCount  int            `json:"skipCount"`
-	Entries    []EntryReport  `json:"entries"`
+	Corpus     string        `json:"corpus"`
+	CorpusPath string        `json:"corpusPath"`
+	Incumbent  string        `json:"incumbent"`
+	Seam       string        `json:"seam"`
+	RunAt      string        `json:"runAt"`
+	Duration   float64       `json:"durationSeconds"`
+	PassCount  int           `json:"passCount"`
+	FailCount  int           `json:"failCount"`
+	SkipCount  int           `json:"skipCount"`
+	Entries    []EntryReport `json:"entries"`
 }
 
 // EntryReport is the per-entry result.
 type EntryReport struct {
-	ID           string                  `json:"id"`
-	Description  string                  `json:"description"`
-	Verdict      compare.Verdict         `json:"verdict"`
-	SkipReason   string                  `json:"skipReason,omitempty"`
-	SecretLeaked bool                    `json:"secretLeaked,omitempty"`
-	LeakedSecret string                  `json:"leakedSecret,omitempty"`
-	LeakedWhere  string                  `json:"leakedWhere,omitempty"`
-	Reasons      []string                `json:"reasons,omitempty"`
-	StatusDiff   *compare.StatusDiff     `json:"statusDiff,omitempty"`
-	HeaderDiffs  []compare.HeaderDiff    `json:"headerDiffs,omitempty"`
-	TrailerDiffs []compare.HeaderDiff    `json:"trailerDiffs,omitempty"`
-	BodyDiff     *compare.BodyDiff       `json:"bodyDiff,omitempty"`
-	BodyIgnored  bool                    `json:"bodyIgnored,omitempty"`
+	ID           string               `json:"id"`
+	Description  string               `json:"description"`
+	Verdict      compare.Verdict      `json:"verdict"`
+	SkipReason   string               `json:"skipReason,omitempty"`
+	SecretLeaked bool                 `json:"secretLeaked,omitempty"`
+	LeakedSecret string               `json:"leakedSecret,omitempty"`
+	LeakedWhere  string               `json:"leakedWhere,omitempty"`
+	Reasons      []string             `json:"reasons,omitempty"`
+	StatusDiff   *compare.StatusDiff  `json:"statusDiff,omitempty"`
+	HeaderDiffs  []compare.HeaderDiff `json:"headerDiffs,omitempty"`
+	TrailerDiffs []compare.HeaderDiff `json:"trailerDiffs,omitempty"`
+	BodyDiff     *compare.BodyDiff    `json:"bodyDiff,omitempty"`
+	BodyIgnored  bool                 `json:"bodyIgnored,omitempty"`
 }
 
 func writeReport(report *Report, path string) error {

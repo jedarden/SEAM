@@ -70,15 +70,15 @@ type Config struct {
 
 // Server represents the SEAM gateway server with two listeners
 type Server struct {
-	config           *Config
-	callerMux        *http.ServeMux
-	operatorMux      *http.ServeMux
-	callerServer     *http.Server
-	operatorServer   *http.Server
-	callerListener   net.Listener
-	operatorListener net.Listener
-	wg               sync.WaitGroup
-	specLoader       *spec.Loader
+	config            *Config
+	callerMux         *http.ServeMux
+	operatorMux       *http.ServeMux
+	callerServer      *http.Server
+	operatorServer    *http.Server
+	callerListener    net.Listener
+	operatorListener  net.Listener
+	wg                sync.WaitGroup
+	specLoader        *spec.Loader
 	captureMiddleware *CaptureMiddleware
 }
 
@@ -249,7 +249,7 @@ func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":     "saved",
+		"status":      "saved",
 		"entry_count": s.captureMiddleware.GetEntryCount(),
 	})
 }
@@ -267,7 +267,7 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
 		"enabled":     s.captureMiddleware != nil && s.captureMiddleware.IsEnabled(),
 		"entry_count": 0,
-		"corpus_dir":   "",
+		"corpus_dir":  "",
 	}
 
 	if s.captureMiddleware != nil {
@@ -403,9 +403,10 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 
 // docsRouteHandler returns route documentation for a specific endpoint
 // Query parameters:
-//   path - the OpenAPI path template (required)
-//   method - the HTTP method (optional, if omitted returns all methods)
-//   version - the API version (optional, defaults to _unversioned)
+//
+//	path - the OpenAPI path template (required)
+//	method - the HTTP method (optional, if omitted returns all methods)
+//	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -452,12 +453,12 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Build the response
 	response := map[string]interface{}{
-		"path":     routeInfo.Path,
-		"version":  routeInfo.Version,
+		"path":    routeInfo.Path,
+		"version": routeInfo.Version,
 		"metadata": map[string]interface{}{
-			"description": "Route documentation for SEAM API",
+			"description":  "Route documentation for SEAM API",
 			"spec_version": s.specLoader.GetVersion(),
-			"api_version": s.specLoader.GetAPIVersion(),
+			"api_version":  s.specLoader.GetAPIVersion(),
 		},
 	}
 

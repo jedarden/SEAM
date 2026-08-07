@@ -18,23 +18,23 @@ import (
 
 // CaptureMiddleware handles HTTP request/response capture for corpus collection
 type CaptureMiddleware struct {
-	enabled    bool
-	corpusDir  string
-	service    string
-	incumbent  string
-	mu         sync.Mutex
-	entries    []CorpusEntry
-	autoSave   bool
-	saveCount  int
-	saveFile   *os.File
-	savePath   string
+	enabled   bool
+	corpusDir string
+	service   string
+	incumbent string
+	mu        sync.Mutex
+	entries   []CorpusEntry
+	autoSave  bool
+	saveCount int
+	saveFile  *os.File
+	savePath  string
 }
 
 // CorpusEntry represents a single captured request/response pair
 type CorpusEntry struct {
-	ID          string       `json:"id"`
-	Timestamp   string       `json:"timestamp"`
-	Description string       `json:"description,omitempty"`
+	ID          string           `json:"id"`
+	Timestamp   string           `json:"timestamp"`
+	Description string           `json:"description,omitempty"`
 	Request     CapturedRequest  `json:"request"`
 	Response    CapturedResponse `json:"response,omitempty"`
 }
@@ -59,12 +59,12 @@ type CapturedResponse struct {
 
 // CorpusFile represents the complete corpus file structure
 type CorpusFile struct {
-	Schema      string         `json:"schema"`
-	Service     string         `json:"service"`
-	Incumbent   string         `json:"incumbent"`
-	CapturedAt  string         `json:"capturedAt"`
-	Description string         `json:"description"`
-	Entries     []CorpusEntry  `json:"entries"`
+	Schema      string        `json:"schema"`
+	Service     string        `json:"service"`
+	Incumbent   string        `json:"incumbent"`
+	CapturedAt  string        `json:"capturedAt"`
+	Description string        `json:"description"`
+	Entries     []CorpusEntry `json:"entries"`
 }
 
 // NewCaptureMiddleware creates a new capture middleware instance
