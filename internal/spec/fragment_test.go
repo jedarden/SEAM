@@ -266,6 +266,124 @@ func BenchmarkComputeSpecHash(b *testing.B) {
 	})
 }
 
+// TestComputeSpecHash_JSONEncodingConsistency verifies that JSON marshaling produces
+// consistent bytes across multiple marshal operations of the same spec object
+func TestComputeSpecHash_JSONEncodingConsistency(t *testing.T) {
+	// Create a spec structure
+	spec := map[string]interface{}{
+		"openapi": "3.1.0",
+		"info": map[string]interface{}{
+			"title":   "Test API",
+			"version": "1.0.0",
+		},
+		"paths": map[string]interface{}{
+			"/users": map[string]interface{}{
+				"get": map[string]interface{}{
+					"summary":  "List users",
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{
+							"description": "Success",
+						},
+					},
+				},
+			},
+		},
+		"components": map[string]interface{}{
+			"schemas": map[string]interface{}{
+				"User": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"id":   map[string]interface{}{"type": "integer"},
+						"name": map[string]interface{}{"type": "string"},
+					},
+				},
+			},
+		},
+	}
+
+	// Marshal the spec 100 times and collect hashes
+	const iterations = 100
+	hashes := make(map[string]bool)
+
+	for i := 0; i < iterations; i++ {
+		// Marshal using the same format as loader.go (json.MarshalIndent)
+		data, err := json.MarshalIndent(spec, "", "  ")
+		if err != nil {
+			t.Fatalf("Marshal failed on iteration %d: %v", i, err)
+		}
+
+		hash := ComputeSpecHash(data)
+		hashes[hash] = true
+	}
+
+	// All marshals should produce identical bytes and thus identical hashes
+	if len(hashes) != 1 {
+		t.Errorf("JSON marshaling produced %d different hashes across %d iterations", len(hashes), iterations)
+		for hash := range hashes {
+			t.Logf("  Hash: %s", hash)
+		}
+	}
+
+	// Get the single hash
+	var singleHash string
+	for hash := range hashes {
+		singleHash = hash
+		break
+	}
+	t.Logf("JSON encoding consistency verified: %d marshal operations produced identical hash %s", iterations, singleHash)
+}
+
+// TestComputeSpecHash_StabilityIterations verifies hash stability across 100 iterations
+// This tests the core stability guarantee: same input → same output, always
+func TestComputeSpecHash_StabilityIterations(t *testing.T) {
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "Empty JSON",
+			data: []byte("{}"),
+		},
+		{
+			name: "Simple OpenAPI spec",
+			data: []byte(`{"openapi":"3.1.0","info":{"title":"Test API"},"paths":{}}`),
+		},
+		{
+			name: "Complex spec with multiple paths",
+			data: []byte(`{
+				"openapi": "3.1.0",
+				"info": {"title": "Test", "version": "1.0.0"},
+				"paths": {
+					"/users": {"get": {"summary": "List users"}},
+					"/posts": {"get": {"summary": "List posts"}}
+				}
+			}`),
+		},
+		{
+			name: "Large spec (10KB)",
+			data: make([]byte, 10240),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// First hash
+			firstHash := ComputeSpecHash(tc.data)
+
+			// Compute hash 100 times and verify all are identical
+			const iterations = 100
+			for i := 0; i < iterations; i++ {
+				hash := ComputeSpecHash(tc.data)
+				if hash != firstHash {
+					t.Errorf("Iteration %d: hash %s differs from first hash %s", i, hash, firstHash)
+				}
+			}
+
+			t.Logf("Stability verified: %d iterations produced identical hash %s", iterations, firstHash)
+		})
+	}
+}
+
 // TestComputeSpecHash_KnownValues tests hash computation against known SHA256 values
 func TestComputeSpecHash_KnownValues(t *testing.T) {
 	tests := []struct {
