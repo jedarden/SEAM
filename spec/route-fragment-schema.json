@@ -52,7 +52,8 @@
 
     "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for loop protection. Applied to all operations unless overridden at operation level. Prevents infinite recursion and excessive redirect chains." },
     "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default cost per call in USD. Applied to all operations unless overridden at operation level. Used for quota tracking and cost monitoring. Must be non-negative with max 2 decimal places." },
-    "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default quota for rate limiting based on accumulated cost. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." }
+    "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default quota for rate limiting based on accumulated cost. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." },
+    "x-cache-ttl": { "$ref": "#/$defs/cacheTtl", "$comment": "Fragment-root field marking GET responses as cacheable. Specified as non-negative integer seconds. Absence means no caching. Only GET requests are cached; other methods bypass cache. Enables single-flight coalescing regardless of TTL value." }
   },
 
   "allOf": [
@@ -206,6 +207,12 @@
       },
       "additionalProperties": false,
       "$comment": "Fragment-root default applied to all operations unless overridden at operation level. Requires x-cost-per-call to be meaningful."
+    },
+    "cacheTtl": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Cache time-to-live in seconds for GET responses. Applied at fragment-root only. Absence means no caching. Only GET requests are cached; POST/PUT/PATCH/DELETE always bypass cache. Value of 0 enables single-flight coalescing without caching (dedup only).",
+      "$comment": "Fragment-root field marking GET responses as cacheable. Non-negative integer seconds. Cache key is (route, normalized request parameters). In-memory per-process store lost on restart. Cache hits do not count against quota. Probe-originated requests bypass cache on both read and write. 5xx responses are not cached and evict existing entries; 4xx cached normally."
     },
     "credentialProbe": {
       "type": "object",

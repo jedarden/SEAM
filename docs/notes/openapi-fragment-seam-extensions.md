@@ -269,6 +269,14 @@ components:
 - **Relationships:** Upstream-facing → forbidden on adapter fragments
 - **Purpose:** Circuit breaker tuning per upstream
 
+#### x-cache-ttl
+- **Type:** integer (non-negative)
+- **Required:** No
+- **Constraints:** Must be >= 0 (integer); absence means no caching
+- **Example:** `"x-cache-ttl": 60` or `"x-cache-ttl": 0` (dedup-only mode)
+- **Relationships:** Fragment-root only; operation-level usage must be rejected by Go validator
+- **Purpose:** Cache time-to-live in seconds for GET responses. Value of 0 enables single-flight coalescing without caching (dedup-only mode). Only GET requests are cached; other methods bypass cache. Cache hits do not count against quota. Probe-originated requests bypass cache on both read and write.
+
 #### x-required-scope (fragment-root)
 - **Type:** array of strings or single string
 - **Required:** No
