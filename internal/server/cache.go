@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -34,9 +35,9 @@ type ResponseCache struct {
 	mu    sync.RWMutex
 	store map[CacheKey]*CacheEntry
 
-	// Metrics
-	hits   int64
-	misses int64
+	// Metrics (atomic access only)
+	hits      int64
+	misses    int64
 	evictions int64
 }
 
@@ -54,18 +55,18 @@ func (c *ResponseCache) Get(key CacheKey) (*cachedResponse, bool) {
 
 	entry, exists := c.store[key]
 	if !exists {
-		c.misses++
+		atomic.AddInt64(&c.misses, 1)
 		return nil, false
 	}
 
 	// Check if expired
 	if time.Now().After(entry.ExpiresAt) {
 		// Entry expired, will be cleaned up on next cleanup pass
-		c.misses++
+		atomic.AddInt64(&c.misses, 1)
 		return nil, false
 	}
 
-	c.hits++
+	atomic.AddInt64(&c.hits, 1)
 	return entry.Response, true
 }
 
@@ -78,7 +79,7 @@ func (c *ResponseCache) Set(key CacheKey, response *cachedResponse, ttlSeconds i
 	if response.StatusCode >= 500 {
 		if _, exists := c.store[key]; exists {
 			delete(c.store, key)
-			c.evictions++
+			atomic.AddInt64(&c.evictions, 1)
 		}
 		return
 	}
@@ -102,7 +103,7 @@ func (c *ResponseCache) Delete(key CacheKey) {
 
 	if _, exists := c.store[key]; exists {
 		delete(c.store, key)
-		c.evictions++
+		atomic.AddInt64(&c.evictions, 1)
 	}
 }
 
@@ -116,7 +117,7 @@ func (c *ResponseCache) Cleanup() {
 	for key, entry := range c.store {
 		if now.After(entry.ExpiresAt) {
 			delete(c.store, key)
-			c.evictions++
+			atomic.AddInt64(&c.evictions, 1)
 		}
 	}
 }
@@ -128,9 +129,9 @@ func (c *ResponseCache) Stats() CacheStats {
 
 	return CacheStats{
 		Size:      len(c.store),
-		Hits:      c.hits,
-		Misses:    c.misses,
-		Evictions: c.evictions,
+		Hits:      atomic.LoadInt64(&c.hits),
+		Misses:    atomic.LoadInt64(&c.misses),
+		Evictions: atomic.LoadInt64(&c.evictions),
 	}
 }
 

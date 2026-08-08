@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
@@ -336,4 +337,421 @@ func TestCacheEntry_CreatedAt(t *testing.T) {
 // testTime returns a fixed time for testing
 func testTime() time.Time {
 	return time.Date(2026, 8, 7, 12, 0, 0, 0, time.UTC)
+}
+
+// TestCache_ConcurrentReads tests that multiple goroutines can read simultaneously without blocking
+func TestCache_ConcurrentReads(t *testing.T) {
+	cache := NewResponseCache()
+
+	// Pre-populate cache with entries
+	for i := 0; i < 100; i++ {
+		key := CacheKey(fmt.Sprintf("key-%d", i))
+		response := &cachedResponse{
+			StatusCode: 200,
+			Header:     make(map[string][]string),
+			Body:       []byte(fmt.Sprintf("response-%d", i)),
+		}
+		cache.Set(key, response, 300)
+	}
+
+	// Launch many concurrent readers
+	numGoroutines := 100
+	readsPerGoroutine := 100
+	done := make(chan bool, numGoroutines)
+	errors := make(chan error, numGoroutines*readsPerGoroutine)
+
+	start := make(chan struct{})
+
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			<-start // Wait for signal to start all goroutines at once
+
+			for i := 0; i < readsPerGoroutine; i++ {
+				key := CacheKey(fmt.Sprintf("key-%d", i%100))
+				response, found := cache.Get(key)
+
+				if !found {
+					errors <- fmt.Errorf("goroutine %d: key %s not found", goroutineID, key)
+					return
+				}
+
+				if response == nil {
+					errors <- fmt.Errorf("goroutine %d: got nil response for key %s", goroutineID, key)
+					return
+				}
+
+				expectedBody := fmt.Sprintf("response-%d", i%100)
+				if string(response.Body) != expectedBody {
+					errors <- fmt.Errorf("goroutine %d: body mismatch for key %s: got %s, want %s",
+						goroutineID, key, response.Body, expectedBody)
+					return
+				}
+			}
+
+			done <- true
+		}(g)
+	}
+
+	// Start all goroutines simultaneously
+	close(start)
+
+	// Wait for all goroutines to complete with timeout
+	timeout := time.After(10 * time.Second)
+	completed := 0
+	for completed < numGoroutines {
+		select {
+		case <-done:
+			completed++
+		case err := <-errors:
+			t.Fatalf("Concurrent read error: %v", err)
+		case <-timeout:
+			t.Fatalf("Timeout waiting for concurrent reads to complete (%d/%d done)", completed, numGoroutines)
+		}
+	}
+
+	t.Logf("Successfully completed %d concurrent read operations (%d goroutines × %d reads each)",
+		numGoroutines*readsPerGoroutine, numGoroutines, readsPerGoroutine)
+}
+
+// TestCache_ConcurrentWrites tests that multiple goroutines can write safely without data races
+func TestCache_ConcurrentWrites(t *testing.T) {
+	cache := NewResponseCache()
+
+	numGoroutines := 50
+	writesPerGoroutine := 50
+	done := make(chan bool, numGoroutines)
+	start := make(chan struct{})
+
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			<-start // Wait for signal to start all goroutines at once
+
+			for i := 0; i < writesPerGoroutine; i++ {
+				key := CacheKey(fmt.Sprintf("writer-%d-key-%d", goroutineID, i))
+				response := &cachedResponse{
+					StatusCode: 200,
+					Header:     make(map[string][]string),
+					Body:       []byte(fmt.Sprintf("writer-%d-response-%d", goroutineID, i)),
+				}
+				cache.Set(key, response, 300)
+			}
+
+			done <- true
+		}(g)
+	}
+
+	close(start)
+
+	// Wait for completion with timeout
+	timeout := time.After(10 * time.Second)
+	completed := 0
+	for completed < numGoroutines {
+		select {
+		case <-done:
+			completed++
+		case <-timeout:
+			t.Fatalf("Timeout waiting for concurrent writes to complete (%d/%d done)", completed, numGoroutines)
+		}
+	}
+
+	// Verify all entries were written correctly
+	expectedCount := numGoroutines * writesPerGoroutine
+	stats := cache.Stats()
+	if stats.Size != expectedCount {
+		t.Errorf("Expected %d entries in cache, got %d", expectedCount, stats.Size)
+	}
+
+	// Verify a sample of entries
+	for g := 0; g < numGoroutines; g++ {
+		for i := 0; i < writesPerGoroutine; i += 10 { // Check every 10th entry
+			key := CacheKey(fmt.Sprintf("writer-%d-key-%d", g, i))
+			response, found := cache.Get(key)
+
+			if !found {
+				t.Errorf("Entry not found: %s", key)
+				continue
+			}
+
+			expectedBody := fmt.Sprintf("writer-%d-response-%d", g, i)
+			if string(response.Body) != expectedBody {
+				t.Errorf("Body mismatch for key %s: got %s, want %s", key, response.Body, expectedBody)
+			}
+		}
+	}
+
+	t.Logf("Successfully completed %d concurrent write operations (%d goroutines × %d writes each)",
+		numGoroutines*writesPerGoroutine, numGoroutines, writesPerGoroutine)
+}
+
+// TestCache_ConcurrentReadsAndWrites tests mixed concurrent access pattern
+func TestCache_ConcurrentReadsAndWrites(t *testing.T) {
+	cache := NewResponseCache()
+
+	// Pre-populate some initial data
+	for i := 0; i < 50; i++ {
+		key := CacheKey(fmt.Sprintf("initial-key-%d", i))
+		response := &cachedResponse{
+			StatusCode: 200,
+			Header:     make(map[string][]string),
+			Body:       []byte(fmt.Sprintf("initial-response-%d", i)),
+		}
+		cache.Set(key, response, 600)
+	}
+
+	done := make(chan bool, 3) // 3 types of operations: readers, writers, deleters
+	start := make(chan struct{})
+	errors := make(chan error, 100)
+
+	// Launch readers
+	numReaders := 20
+	readsPerReader := 100
+	for r := 0; r < numReaders; r++ {
+		go func(readerID int) {
+			<-start
+
+			for i := 0; i < readsPerReader; i++ {
+				// Read from different key ranges
+				keyNum := (readerID + i) % 100
+				key := CacheKey(fmt.Sprintf("key-%d", keyNum))
+				_, found := cache.Get(key)
+
+				// We don't care if found or not - just that reads don't crash
+				_ = found
+			}
+
+			done <- true
+		}(r)
+	}
+
+	// Launch writers
+	numWriters := 10
+	writesPerWriter := 50
+	for w := 0; w < numWriters; w++ {
+		go func(writerID int) {
+			<-start
+
+			for i := 0; i < writesPerWriter; i++ {
+				key := CacheKey(fmt.Sprintf("writer-%d-key-%d", writerID, i))
+				response := &cachedResponse{
+					StatusCode: 200,
+					Header:     make(map[string][]string),
+					Body:       []byte(fmt.Sprintf("data-%d-%d", writerID, i)),
+				}
+				cache.Set(key, response, 300)
+			}
+
+			done <- true
+		}(w)
+	}
+
+	// Launch deleters
+	numDeleters := 5
+	deletesPerDeleter := 20
+	for d := 0; d < numDeleters; d++ {
+		go func(deleterID int) {
+			<-start
+
+			for i := 0; i < deletesPerDeleter; i++ {
+				// Try to delete some keys (may or may not exist)
+				key := CacheKey(fmt.Sprintf("writer-%d-key-%d", i%numWriters, i))
+				cache.Delete(key)
+			}
+
+			done <- true
+		}(d)
+	}
+
+	close(start)
+
+	totalOperations := numReaders + numWriters + numDeleters
+	completed := 0
+	timeout := time.After(15 * time.Second)
+
+	for completed < totalOperations {
+		select {
+		case <-done:
+			completed++
+		case err := <-errors:
+			t.Fatalf("Concurrent operation error: %v", err)
+		case <-timeout:
+			t.Fatalf("Timeout waiting for mixed concurrent operations to complete (%d/%d done)", completed, totalOperations)
+		}
+	}
+
+	// Verify cache is still in consistent state
+	stats := cache.Stats()
+	t.Logf("Cache stats after mixed operations: %d entries, %d hits, %d misses",
+		stats.Size, stats.Hits, stats.Misses)
+
+	// Verify we can still read from the cache without issues
+	for i := 0; i < 10; i++ {
+		key := CacheKey(fmt.Sprintf("initial-key-%d", i))
+		_, found := cache.Get(key)
+		if !found {
+			t.Logf("Initial key %s no longer in cache (may have been evicted or overwritten)", key)
+		}
+	}
+
+	t.Logf("Successfully completed mixed concurrent operations: %d readers, %d writers, %d deleters",
+		numReaders, numWriters, numDeleters)
+}
+
+// TestCache_ConcurrentDeletes tests concurrent delete operations
+func TestCache_ConcurrentDeletes(t *testing.T) {
+	cache := NewResponseCache()
+
+	// Pre-populate cache
+	numEntries := 200
+	for i := 0; i < numEntries; i++ {
+		key := CacheKey(fmt.Sprintf("delete-test-%d", i))
+		response := &cachedResponse{
+			StatusCode: 200,
+			Header:     make(map[string][]string),
+			Body:       []byte(fmt.Sprintf("data-%d", i)),
+		}
+		cache.Set(key, response, 300)
+	}
+
+	initialStats := cache.Stats()
+	if initialStats.Size != numEntries {
+		t.Errorf("Expected %d entries initially, got %d", numEntries, initialStats.Size)
+	}
+
+	numGoroutines := 20
+	deletesPerGoroutine := 10
+	done := make(chan bool, numGoroutines)
+	start := make(chan struct{})
+
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			<-start
+
+			for i := 0; i < deletesPerGoroutine; i++ {
+				// Each goroutine deletes from its own range to avoid overlap
+				keyNum := goroutineID*deletesPerGoroutine + i
+				if keyNum < numEntries {
+					key := CacheKey(fmt.Sprintf("delete-test-%d", keyNum))
+					cache.Delete(key)
+				}
+			}
+
+			done <- true
+		}(g)
+	}
+
+	close(start)
+
+	// Wait for completion
+	timeout := time.After(10 * time.Second)
+	completed := 0
+	for completed < numGoroutines {
+		select {
+		case <-done:
+			completed++
+		case <-timeout:
+			t.Fatalf("Timeout waiting for concurrent deletes to complete (%d/%d done)", completed, numGoroutines)
+		}
+	}
+
+	expectedDeletes := numGoroutines * deletesPerGoroutine
+	expectedRemaining := numEntries - expectedDeletes
+
+	finalStats := cache.Stats()
+	if finalStats.Size != expectedRemaining {
+		t.Errorf("Expected %d remaining entries, got %d", expectedRemaining, finalStats.Size)
+	}
+
+	// Verify deleted entries are gone
+	for i := 0; i < expectedDeletes; i++ {
+		key := CacheKey(fmt.Sprintf("delete-test-%d", i))
+		_, found := cache.Get(key)
+		if found {
+			t.Errorf("Entry %s should have been deleted but still exists", key)
+		}
+	}
+
+	// Verify remaining entries still exist
+	for i := expectedDeletes; i < numEntries; i++ {
+		key := CacheKey(fmt.Sprintf("delete-test-%d", i))
+		_, found := cache.Get(key)
+		if !found {
+			t.Errorf("Entry %s should still exist but was deleted", key)
+		}
+	}
+
+	t.Logf("Successfully completed %d concurrent delete operations", expectedDeletes)
+}
+
+// TestCache_NoRaceOnSameKey tests that concurrent operations on the same key are handled correctly
+func TestCache_NoRaceOnSameKey(t *testing.T) {
+	cache := NewResponseCache()
+
+	key := CacheKey("shared-key")
+	initialResponse := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("initial"),
+	}
+	cache.Set(key, initialResponse, 300)
+
+	done := make(chan bool, 3)
+	start := make(chan struct{})
+	errors := make(chan error, 10)
+
+	// Goroutine that constantly writes
+	go func() {
+		<-start
+		for i := 0; i < 100; i++ {
+			response := &cachedResponse{
+				StatusCode: 200,
+				Header:     make(map[string][]string),
+				Body:       []byte(fmt.Sprintf("write-%d", i)),
+			}
+			cache.Set(key, response, 300)
+		}
+		done <- true
+	}()
+
+	// Goroutine that constantly reads
+	go func() {
+		<-start
+		for i := 0; i < 100; i++ {
+			response, found := cache.Get(key)
+			// When concurrently deleting, it's normal for the key to not be found
+			// The important thing is that when found, the response is valid
+			if found && response == nil {
+				errors <- fmt.Errorf("got nil response when key was found")
+				return
+			}
+		}
+		done <- true
+	}()
+
+	// Goroutine that constantly deletes
+	go func() {
+		<-start
+		for i := 0; i < 50; i++ {
+			cache.Delete(key)
+		}
+		done <- true
+	}()
+
+	close(start)
+
+	totalGoroutines := 3
+	completed := 0
+	timeout := time.After(10 * time.Second)
+
+	for completed < totalGoroutines {
+		select {
+		case <-done:
+			completed++
+		case err := <-errors:
+			t.Fatalf("Error during concurrent same-key operations: %v", err)
+		case <-timeout:
+			t.Fatalf("Timeout waiting for same-key concurrent operations to complete")
+		}
+	}
+
+	t.Log("No race conditions detected with concurrent reads/writes/deletes on same key")
 }
