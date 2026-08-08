@@ -755,3 +755,392 @@ func TestCache_NoRaceOnSameKey(t *testing.T) {
 
 	t.Log("No race conditions detected with concurrent reads/writes/deletes on same key")
 }
+
+// TestCache_TTL_Zero tests that zero TTL entries are stored but expire immediately
+func TestCache_TTL_Zero(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	key := CacheKey("zero-ttl-key")
+
+	// Set with zero TTL
+	cache.Set(key, response, 0)
+
+	// Verify entry was stored
+	cache.mu.RLock()
+	_, exists := cache.store[key]
+	cache.mu.RUnlock()
+
+	if !exists {
+		t.Errorf("Entry with zero TTL should be stored initially")
+	}
+
+	// Try to retrieve immediately - should be expired
+	cached, found := cache.Get(key)
+	if found {
+		t.Errorf("Entry with zero TTL should be expired immediately: got status=%d", cached.StatusCode)
+	}
+
+	// Verify it was removed via lazy cleanup
+	cache.mu.RLock()
+	_, exists = cache.store[key]
+	cache.mu.RUnlock()
+
+	if exists {
+		t.Errorf("Expired zero-TTL entry should be removed on access (lazy cleanup)")
+	}
+
+	// Verify miss was recorded
+	stats := cache.Stats()
+	if stats.Misses == 0 {
+		t.Errorf("Miss counter should be incremented for expired entry")
+	}
+}
+
+// TestCache_TTL_Negative tests that negative TTL is handled gracefully
+func TestCache_TTL_Negative(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	key := CacheKey("negative-ttl-key")
+
+	// Set with negative TTL (expires in the past)
+	cache.Set(key, response, -100)
+
+	// Try to retrieve - should be expired immediately
+	cached, found := cache.Get(key)
+	if found {
+		t.Errorf("Entry with negative TTL should be expired: got status=%d", cached.StatusCode)
+	}
+
+	// Verify it was removed via lazy cleanup
+	cache.mu.RLock()
+	_, exists := cache.store[key]
+	cache.mu.RUnlock()
+
+	if exists {
+		t.Errorf("Negative-TTL entry should be removed on access (lazy cleanup)")
+	}
+}
+
+// TestCache_TTL_VeryLarge tests that very large TTL values work correctly
+func TestCache_TTL_VeryLarge(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	key := CacheKey("large-ttl-key")
+
+	// Set with very large TTL (100 years in seconds)
+	veryLargeTTL := 100 * 365 * 24 * 60 * 60 // 100 years
+	cache.Set(key, response, veryLargeTTL)
+
+	// Verify entry exists and is accessible
+	cached, found := cache.Get(key)
+	if !found {
+		t.Errorf("Entry with very large TTL should be found")
+	}
+
+	if cached == nil {
+		t.Errorf("Cached response should not be nil")
+	}
+
+	if string(cached.Body) != "test response" {
+		t.Errorf("Body mismatch: got %s, want %s", cached.Body, "test response")
+	}
+
+	// Verify ExpiresAt is far in the future
+	cache.mu.RLock()
+	entry, exists := cache.store[key]
+	cache.mu.RUnlock()
+
+	if !exists {
+		t.Errorf("Entry should still exist in store")
+	}
+
+	expectedExpiry := time.Now().Add(time.Duration(veryLargeTTL) * time.Second)
+	timeDiff := expectedExpiry.Sub(entry.ExpiresAt)
+
+	// Allow 1 second tolerance for test execution time
+	if timeDiff < -1*time.Second || timeDiff > 1*time.Second {
+		t.Errorf("ExpiresAt calculation incorrect: got %v, expected ~%v (diff=%v)",
+			entry.ExpiresAt, expectedExpiry, timeDiff)
+	}
+}
+
+// TestCache_TTL_ExpirationAndLazyCleanup tests that entries expire correctly and are cleaned up on access
+func TestCache_TTL_ExpirationAndLazyCleanup(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	key := CacheKey("expire-test-key")
+	ttl := 1 // 1 second TTL
+
+	// Set entry with short TTL
+	beforeSet := time.Now()
+	cache.Set(key, response, ttl)
+	afterSet := time.Now()
+
+	// Verify entry exists and is accessible immediately
+	cached, found := cache.Get(key)
+	if !found {
+		t.Errorf("Entry should be found immediately after set")
+	}
+
+	if cached.StatusCode != 200 {
+		t.Errorf("Status code mismatch: got %d, want 200", cached.StatusCode)
+	}
+
+	// Verify CreatedAt and ExpiresAt were set correctly
+	cache.mu.RLock()
+	entry, exists := cache.store[key]
+	cache.mu.RUnlock()
+
+	if !exists {
+		t.Errorf("Entry should exist in store")
+	}
+
+	if entry.CreatedAt.Before(beforeSet) || entry.CreatedAt.After(afterSet) {
+		t.Errorf("CreatedAt should be between beforeSet and afterSet")
+	}
+
+	// Check ExpiresAt = CreatedAt + TTL
+	expectedExpiresAt := entry.CreatedAt.Add(time.Duration(ttl) * time.Second)
+	if entry.ExpiresAt.Unix() != expectedExpiresAt.Unix() {
+		t.Errorf("ExpiresAt should be CreatedAt + TTL: got %v, expected %v",
+			entry.ExpiresAt, expectedExpiresAt)
+	}
+
+	// Wait for entry to expire
+	time.Sleep(2 * time.Second)
+
+	// Try to retrieve expired entry - should return not found
+	cached, found = cache.Get(key)
+	if found {
+		t.Errorf("Expired entry should not be found: got status=%d", cached.StatusCode)
+	}
+
+	// Verify entry was removed from store via lazy cleanup
+	cache.mu.RLock()
+	_, exists = cache.store[key]
+	cache.mu.RUnlock()
+
+	if exists {
+		t.Errorf("Expired entry should be removed from store on access (lazy cleanup)")
+	}
+
+	// Verify eviction counter was incremented
+	stats := cache.Stats()
+	if stats.Evictions == 0 {
+		t.Errorf("Eviction counter should be incremented for expired entry cleanup")
+	}
+
+	// Verify miss counter was incremented
+	if stats.Misses == 0 {
+		t.Errorf("Miss counter should be incremented for expired entry")
+	}
+}
+
+// TestCache_TTL_MultipleExpiryOnAccess tests multiple expired entries are cleaned up on access
+func TestCache_TTL_MultipleExpiryOnAccess(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	// Create multiple entries with different TTLs
+	entries := []struct {
+		key    CacheKey
+		ttl    int
+		delay  time.Duration
+		expect bool // expected to be found after delay
+	}{
+		{CacheKey("expired-1"), 1, 2 * time.Second, false},
+		{CacheKey("expired-2"), 1, 2 * time.Second, false},
+		{CacheKey("valid-1"), 10, 2 * time.Second, true},
+		{CacheKey("valid-2"), 10, 2 * time.Second, true},
+	}
+
+	// Set all entries
+	for _, e := range entries {
+		cache.Set(e.key, response, e.ttl)
+	}
+
+	// Verify all entries exist initially
+	stats := cache.Stats()
+	if stats.Size != len(entries) {
+		t.Errorf("Expected %d entries initially, got %d", len(entries), stats.Size)
+	}
+
+	// Wait for short-TTL entries to expire
+	time.Sleep(2 * time.Second)
+
+	// Access each entry and verify behavior
+	for _, e := range entries {
+		cached, found := cache.Get(e.key)
+
+		if e.expect && !found {
+			t.Errorf("Entry %s should be found but was not", e.key)
+		}
+
+		if !e.expect && found {
+			t.Errorf("Entry %s should be expired but was found (status=%d)", e.key, cached.StatusCode)
+		}
+	}
+
+	// Verify expired entries were removed via lazy cleanup
+	finalStats := cache.Stats()
+	expectedValidCount := 0
+	for _, e := range entries {
+		if e.expect {
+			expectedValidCount++
+		}
+	}
+
+	if finalStats.Size != expectedValidCount {
+		t.Errorf("Expected %d valid entries after cleanup, got %d",
+			expectedValidCount, finalStats.Size)
+	}
+}
+
+// TestCache_TTL_CreatedAtCalculation tests that TTL is correctly calculated from CreatedAt
+func TestCache_TTL_CreatedAtCalculation(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	testCases := []struct {
+		ttl               int
+		name              string
+		allowToleranceSec int
+	}{
+		{1, "one-second", 1},
+		{60, "one-minute", 1},
+		{300, "five-minutes", 1},
+		{3600, "one-hour", 1},
+		{86400, "one-day", 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := CacheKey(fmt.Sprintf("ttl-test-%s", tc.name))
+
+			beforeSet := time.Now()
+			cache.Set(key, response, tc.ttl)
+			afterSet := time.Now()
+
+			// Access entry to retrieve CreatedAt
+			cache.mu.RLock()
+			entry, exists := cache.store[key]
+			cache.mu.RUnlock()
+
+			if !exists {
+				t.Errorf("Entry should exist in store")
+			}
+
+			// Verify CreatedAt is reasonable
+			if entry.CreatedAt.Before(beforeSet) || entry.CreatedAt.After(afterSet) {
+				t.Errorf("CreatedAt should be between beforeSet and afterSet: got %v, expected between %v and %v",
+					entry.CreatedAt, beforeSet, afterSet)
+			}
+
+			// Verify ExpiresAt = CreatedAt + TTL
+			expectedExpiresAt := entry.CreatedAt.Add(time.Duration(tc.ttl) * time.Second)
+			timeDiff := expectedExpiresAt.Sub(entry.ExpiresAt)
+
+			// Allow tolerance for test execution time
+			allowedTolerance := time.Duration(tc.allowToleranceSec) * time.Second
+			if timeDiff < -allowedTolerance || timeDiff > allowedTolerance {
+				t.Errorf("ExpiresAt should be CreatedAt + TTL: got %v, expected %v (diff=%v, allowed=%v)",
+					entry.ExpiresAt, expectedExpiresAt, timeDiff, allowedTolerance)
+			}
+
+			// Verify TTLSeconds field
+			if entry.TTLSeconds != tc.ttl {
+				t.Errorf("TTLSeconds field mismatch: got %d, want %d", entry.TTLSeconds, tc.ttl)
+			}
+		})
+	}
+}
+
+// TestCache_LazyCleanupIntegration tests lazy cleanup in realistic scenario
+func TestCache_LazyCleanupIntegration(t *testing.T) {
+	cache := NewResponseCache()
+
+	response := &cachedResponse{
+		StatusCode: 200,
+		Header:     make(map[string][]string),
+		Body:       []byte("test response"),
+	}
+
+	// Create many short-lived entries
+	numEntries := 100
+	keys := make([]CacheKey, numEntries)
+
+	for i := 0; i < numEntries; i++ {
+		keys[i] = CacheKey(fmt.Sprintf("lazy-cleanup-%d", i))
+		cache.Set(keys[i], response, 1) // 1 second TTL
+	}
+
+	initialStats := cache.Stats()
+	if initialStats.Size != numEntries {
+		t.Errorf("Expected %d entries initially, got %d", numEntries, initialStats.Size)
+	}
+
+	// Wait for all entries to expire
+	time.Sleep(2 * time.Second)
+
+	// Access each entry - lazy cleanup should remove them all
+	removedCount := 0
+	for i := 0; i < numEntries; i++ {
+		_, found := cache.Get(keys[i])
+		if !found {
+			removedCount++
+		}
+	}
+
+	// Verify all entries were removed (lazy cleanup)
+	if removedCount != numEntries {
+		t.Errorf("Expected all %d entries to be removed via lazy cleanup, only %d removed",
+			numEntries, removedCount)
+	}
+
+	// Verify cache is now empty
+	finalStats := cache.Stats()
+	if finalStats.Size != 0 {
+		t.Errorf("Cache should be empty after lazy cleanup, got %d entries", finalStats.Size)
+	}
+
+	// Verify evictions were recorded
+	if finalStats.Evictions == 0 {
+		t.Errorf("Evictions should be recorded for lazy cleanup")
+	}
+
+	t.Logf("Successfully cleaned up %d expired entries via lazy cleanup", removedCount)
+}

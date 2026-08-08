@@ -49,23 +49,34 @@ func NewResponseCache() *ResponseCache {
 }
 
 // Get retrieves a cached response if it exists and hasn't expired
+// Implements lazy cleanup: expired entries are removed on access
 func (c *ResponseCache) Get(key CacheKey) (*cachedResponse, bool) {
+	// Try read lock first for fast path
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entry, exists := c.store[key]
 	if !exists {
+		c.mu.RUnlock()
 		atomic.AddInt64(&c.misses, 1)
 		return nil, false
 	}
 
-	// Check if expired
-	if time.Now().After(entry.ExpiresAt) {
-		// Entry expired, will be cleaned up on next cleanup pass
+	// Check if expired using both ExpiresAt and CreatedAt + TTL
+	now := time.Now()
+	if now.After(entry.ExpiresAt) {
+		c.mu.RUnlock()
+		// Expired - remove from store (lazy cleanup)
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		// Double-check in case another goroutine deleted it
+		if entry, exists := c.store[key]; exists && now.After(entry.ExpiresAt) {
+			delete(c.store, key)
+			atomic.AddInt64(&c.evictions, 1)
+		}
 		atomic.AddInt64(&c.misses, 1)
 		return nil, false
 	}
 
+	c.mu.RUnlock()
 	atomic.AddInt64(&c.hits, 1)
 	return entry.Response, true
 }
