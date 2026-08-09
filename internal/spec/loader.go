@@ -23,6 +23,7 @@ type Loader struct {
 	baseURL        string
 	rawDocument    []byte
 	specVersion    string // Stable hash of the spec
+	specHash       string // Full SHA256 hash (64 hex chars)
 	loadedDoc      libopenapi.Document
 	model          *libopenapi.DocumentModel[v3.Document]
 	validator      validator.Validator
@@ -47,7 +48,8 @@ func New(specDir, baseURL string) (*Loader, error) {
 
 	// Compute stable hash of the spec for X-SEAM-Spec-Version
 	hash := sha256.Sum256(rawDocument)
-	specVersion := hex.EncodeToString(hash[:])[:16] // Use first 16 hex chars (64 bits)
+	specHash := hex.EncodeToString(hash[:])
+	specVersion := specHash[:16]
 
 	// Load the document using libopenapi
 	loadedDoc, err := libopenapi.NewDocument(rawDocument)
@@ -74,6 +76,7 @@ func New(specDir, baseURL string) (*Loader, error) {
 		baseURL:      baseURL,
 		rawDocument:  rawDocument,
 		specVersion:  specVersion,
+		specHash:     specHash,
 		loadedDoc:    loadedDoc,
 		model:        model,
 		validator:    v,
@@ -131,8 +134,9 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 
 	// Compute stable hash of the merged spec
 	hash := sha256.Sum256(mergedJSON)
-	specVersion := hex.EncodeToString(hash[:])[:16] // Use first 16 hex chars (64 bits)
-	log.Printf("[Loader] Generated spec version hash: %s", specVersion)
+	specHash := hex.EncodeToString(hash[:])
+	specVersion := specHash[:16]
+	log.Printf("[Loader] Generated spec hash: %s (version: %s)", specHash, specVersion)
 
 	// Load the merged document using libopenapi
 	log.Printf("[Loader] Loading merged document with libopenapi")
@@ -168,6 +172,7 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		baseURL:        baseURL,
 		rawDocument:    mergedJSON,
 		specVersion:    specVersion,
+		specHash:       specHash,
 		loadedDoc:      loadedDoc,
 		model:          model,
 		validator:      v,
@@ -229,6 +234,11 @@ func NewLoader(baseURL string) (*Loader, error) {
 // GetVersion returns the stable spec version hash
 func (l *Loader) GetVersion() string {
 	return l.specVersion
+}
+
+// GetHash returns the full SHA256 hash (64 hex characters)
+func (l *Loader) GetHash() string {
+	return l.specHash
 }
 
 // GetAPIVersion returns the API version (constant _unversioned in Phase 1a)
