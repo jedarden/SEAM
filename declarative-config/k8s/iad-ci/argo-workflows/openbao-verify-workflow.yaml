@@ -19,7 +19,7 @@ spec:
           log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
           error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
 
-          OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
+          OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
           export VAULT_ADDR=$OPENBAO_ADDR
 
           log "=== OpenBao Access Verification for seam-retirement-evaluator ==="
@@ -117,6 +117,6 @@ spec:
 
           log "=== All verification tests passed ==="
           log "Setup is ready for seam-retirement-evaluator deployment"
-    serviceAccountName: argocd-manager
+    serviceAccountName: argo-workflow
     retryStrategy:
       limit: 2
