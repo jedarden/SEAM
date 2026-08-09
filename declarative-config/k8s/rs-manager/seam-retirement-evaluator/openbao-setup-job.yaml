@@ -8,6 +8,7 @@ metadata:
     app: seam-retirement-evaluator
     component: openbao-provisioning
 spec:
+  entrypoint: setup-openbao-resources
   templates:
   - name: setup-openbao-resources
     inputs:
