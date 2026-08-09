@@ -23,6 +23,12 @@ func (s *Server) cacheMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Skip caching for reserved paths (control plane endpoints)
+		// Health Sentinel Integration:
+		// Health sentinel probes (/_seam/health, /health/*) and other control-plane
+		// endpoints bypass caching entirely. This ensures:
+		//   - Health checks always execute fresh (no stale cached responses)
+		//   - Control plane responses are never cached (cache pollution prevention)
+		//   - No cache metrics are recorded for infrastructure traffic
 		if isReservedPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return

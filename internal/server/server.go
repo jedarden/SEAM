@@ -18,6 +18,19 @@ import (
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
 // Requests matching these paths (or their prefixes) are handled by the control-plane
 // branch at stage-1 and never reach the route table.
+//
+// Health Sentinel Integration:
+// These paths bypass BOTH caching and quota enforcement to ensure infrastructure
+// health checks operate reliably without consuming quota or polluting the cache.
+// Health probes from Kubernetes, load balancers, and orchestrators expect instant
+// responses and should never be rate-limited or cached.
+//
+// Paths with /health/ prefix are health sentinel probes (liveness/readiness checks).
+// Paths with /_seam/ prefix are internal SEAM control plane endpoints.
+// Both categories are excluded from:
+//   - Cache middleware (no cache lookup, no cache storage)
+//   - Quota middleware (no quota checking, no cost deduction)
+//   - Metrics (no cache/quota metrics recorded for these paths)
 var reservedPaths = struct {
 	exact    map[string]bool
 	prefixes []string
@@ -29,19 +42,36 @@ var reservedPaths = struct {
 		"/whoami":             true,
 		"/scopes":             true,
 		"/changes":            true,
-		"/health/credentials": true,
-		"/health/upstreams":   true,
+		"/health/credentials": true, // Health sentinel: credential status check
+		"/health/upstreams":   true, // Health sentinel: upstream connectivity check
 		"/config/status":      true,
 	},
 	prefixes: []string{
-		"/health/",
-		"/config/",
-		"/approvals/",
-		"/_seam/",
+		"/health/",     // Health sentinel: all health check endpoints
+		"/config/",     // Configuration management endpoints
+		"/approvals/",  // Approval workflow endpoints
+		"/_seam/",      // Internal SEAM endpoints (metrics, health, ready)
 	},
 }
 
 // isReservedPath checks if a given path is in the reserved control-plane set.
+//
+// Health Sentinel and Cache/Quota Integration:
+// This function is the central gatekeeper for determining whether a request
+// bypasses caching and quota enforcement. It is called by both the cache
+// middleware and quota middleware to identify health sentinel probes and
+// other control-plane traffic.
+//
+// Returns true for:
+//   - Health sentinel probes (/_seam/health, /_seam/healthz, /_seam/readyz, /health/*)
+//   - Control plane endpoints (/docs, /openapi.json, /config/*, /_seam/*)
+//
+// Integration points:
+//   - Cache middleware: Bypasses cache lookup and storage for reserved paths
+//   - Quota middleware: Bypasses quota checking and cost deduction for reserved paths
+//   - Metrics: No cache or quota metrics are recorded for reserved paths
+//
+// For cache hit bypass logic (different from reserved path bypass), see quota middleware.
 func isReservedPath(path string) bool {
 	// Check exact matches first
 	if reservedPaths.exact[path] {
