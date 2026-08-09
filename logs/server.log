@@ -1,0 +1,54 @@
+2026/08/09 01:02:56.347370 Starting SEAM gateway server:
+2026/08/09 01:02:56.347445   Caller-facing port: 8888
+2026/08/09 01:02:56.347452   Operator-only port: 8889
+2026/08/09 01:02:56.347455   Base URL: http://localhost:8080
+2026/08/09 01:02:56.347458   Spec directory: ./spec
+2026/08/09 01:02:56.347460   Fragment mode: true
+2026/08/09 01:02:56.347463   Fragments directory: ./fragments
+2026/08/09 01:02:56.347465   Schema path: ./spec/route-fragment-schema.json
+2026/08/09 01:02:56.347471   Capture enabled: false
+2026/08/09 01:02:56.347474 [Loader] Creating new fragment-mode loader
+2026/08/09 01:02:56.347476 [Loader] Base URL: http://localhost:8080
+2026/08/09 01:02:56.347478 [Loader] Spec directory: ./spec
+2026/08/09 01:02:56.347481 [Loader] Fragments directory: ./fragments
+2026/08/09 01:02:56.347483 [Loader] Schema path: ./spec/route-fragment-schema.json
+2026/08/09 01:02:56.347486 [Loader] Loading fragments from directory: ./fragments
+2026/08/09 01:02:56.347488 [Fragment] Loading fragments from directory: ./fragments
+2026/08/09 01:02:56.347560 [Fragment] Loading fragment file: fragments/argocd-ro/1-argocd-read-only-proxy.yaml
+2026/08/09 01:02:56.347596 [Fragment] Warning: failed to load fragment fragments/argocd-ro/1-argocd-read-only-proxy.yaml: failed to parse JSON: invalid character '#' looking for beginning of value
+2026/08/09 01:02:56.347630 [Fragment] Loading fragment file: fragments/test-service/test-route.json
+2026/08/09 01:02:56.347731 [Fragment] Successfully loaded fragment: fragments/test-service/test-route.json (owner: test-service, schema: v1)
+2026/08/09 01:02:56.347741 [Fragment] Loading fragment file: fragments/test-service/test-route.yaml
+2026/08/09 01:02:56.347762 [Fragment] Warning: failed to load fragment fragments/test-service/test-route.yaml: failed to parse JSON: invalid character '#' looking for beginning of value
+2026/08/09 01:02:56.347767 [Fragment] Fragment loading complete: 1 loaded, 2 errors
+2026/08/09 01:02:56.347771 [Loader] Validating fragments against schema: ./spec/route-fragment-schema.json
+2026/08/09 01:02:56.347773 [Fragment] Validating fragments against schema: ./spec/route-fragment-schema.json
+2026/08/09 01:02:56.351942 [Fragment] Schema loaded successfully, validating 1 fragments
+2026/08/09 01:02:56.352025 [Fragment] Fragment validated successfully: fragments/test-service/test-route.json
+2026/08/09 01:02:56.352030 [Fragment] Validation complete: 1 valid, 0 quarantined
+2026/08/09 01:02:56.352033 [Loader] Merging fragments into single OpenAPI document
+2026/08/09 01:02:56.352035 [Fragment] Merging 1 fragments into single OpenAPI 3.1 spec
+2026/08/09 01:02:56.352037 [Fragment] Building merged OpenAPI 3.1 document with base URL: http://localhost:8080
+2026/08/09 01:02:56.352041 [Fragment] Merging fragment from: fragments/test-service/test-route.json (owner: test-service)
+2026/08/09 01:02:56.352043 [Fragment] Added path: /test/get from fragments/test-service/test-route.json
+2026/08/09 01:02:56.352046 [Fragment] Added path: /test/post from fragments/test-service/test-route.json
+2026/08/09 01:02:56.352048 [Fragment] Added path: /test/{id} from fragments/test-service/test-route.json
+2026/08/09 01:02:56.352049 [Fragment] Added component section: schemas
+2026/08/09 01:02:56.352051 [Fragment] Merge complete: 3 paths added, 0 paths skipped due to collisions
+2026/08/09 01:02:56.352141 [Fragment] Successfully merged 1 fragments into OpenAPI 3.1 spec (4052 bytes)
+2026/08/09 01:02:56.352148 [Loader] Generated spec hash: 617ded7d98945e601bacd4cc4fc67de973a368c5e77e323d1a5d5a795f5a0439 (version: 617ded7d98945e60)
+2026/08/09 01:02:56.352150 [Loader] Loading merged document with libopenapi
+2026/08/09 01:02:56.352383 [Loader] Building OpenAPI v3 model
+2026/08/09 01:02:56.353848 [Loader] Creating validator from v3 model
+2026/08/09 01:02:56.355836 [Loader] Fragment-mode loader created successfully
+2026/08/09 01:02:56.355889 [Loader] Valid fragments: 1, Quarantined: 0
+2026/08/09 01:02:56.355895 Loaded spec from fragments in ./fragments
+2026/08/09 01:02:56.355906 Loaded 0 route cache TTL configurations
+2026/08/09 01:02:56.356034 Starting caller-facing listener on :8888
+2026/08/09 01:02:56.356058 Starting operator-only listener on :8889
+2026/08/09 01:02:56.356321 Cache cleanup goroutine started
+2026/08/09 01:02:56.356331 Cache middleware active on caller-facing port
+2026/08/09 01:02:56.356334 Quota middleware active on caller-facing port
+2026/08/09 01:02:56.356337 Validation middleware active on caller-facing port
+2026/08/09 01:02:56.356367 Operator-only server listening on :8889
+2026/08/09 01:02:56.356354 Caller-facing server listening on :8888

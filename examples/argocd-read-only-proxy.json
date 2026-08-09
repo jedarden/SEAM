@@ -1,0 +1,94 @@
+{
+  "$comment": "ArgoCD read-only proxy - Phase 3 migration target. Forwards read-only ArgoCD API calls over Tailscale to the read-only API proxy on ardenone-manager.",
+  "description": "Production ArgoCD read-only proxy route fragment. This is the actual Phase 3 migration target - a read-only proxy to ArgoCD's API over Tailscale, used for fleet observability and automation.",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "argocd",
+  "x-api-version": "v1",
+  "x-upstream": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
+  "x-upstream-tls": {
+    "insecureSkipVerify": "acknowledged"
+  },
+  "x-upstream-plaintext": "acknowledged",
+  "paths": {
+    "/api/v1/applications": {
+      "get": {
+        "summary": "List all ArgoCD applications",
+        "description": "Returns a list of all applications visible to the read-only token. Used for fleet observability dashboards.",
+        "operationId": "listApplications",
+        "x-required-scope": "argocd:applications:read",
+        "responses": {
+          "200": {
+            "description": "List of applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{name}": {
+      "get": {
+        "summary": "Get a specific application",
+        "description": "Returns detailed information about a single ArgoCD application.",
+        "operationId": "getApplication",
+        "x-required-scope": "argocd:applications:read",
+        "responses": {
+          "200": {
+            "description": "Application details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "metadata": { "type": "object" },
+                    "status": { "type": "object" },
+                    "spec": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        }
+      }
+    },
+    "/api/v1/clusters": {
+      "get": {
+        "summary": "List ArgoCD-managed clusters",
+        "description": "Returns all clusters registered with ArgoCD.",
+        "operationId": "listClusters",
+        "x-required-scope": "argocd:clusters:read",
+        "responses": {
+          "200": {
+            "description": "List of clusters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

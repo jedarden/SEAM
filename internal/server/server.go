@@ -1,25 +1,19 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
-	"runtime"
-	"strings"
 	"sync"
-	"text/template"
 
 	"github.com/ardenone/seam/internal/spec"
+	openapiui "github.com/oaswrap/openapi-ui"
+	"github.com/oaswrap/openapi-ui/config"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-//go:embed redoc.html
-var redocHTMLTemplate string
 
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
 // Requests matching these paths (or their prefixes) are handled by the control-plane
@@ -40,7 +34,6 @@ var reservedPaths = struct {
 		"/config/status":      true,
 	},
 	prefixes: []string{
-		"/docs/",
 		"/health/",
 		"/config/",
 		"/approvals/",
@@ -88,6 +81,12 @@ type Server struct {
 	wg                sync.WaitGroup
 	specLoader        *spec.Loader
 	captureMiddleware *CaptureMiddleware
+	cache             *ResponseCache
+	singleFlight      *SingleFlight
+	cacheTTLs         map[string]int // route path -> cache TTL in seconds
+	quotaTracker      *QuotaTracker
+	costPerCalls      map[string]float64 // route -> cost per call
+	mu                sync.RWMutex
 }
 
 // New creates a new Server with the given configuration
@@ -115,10 +114,15 @@ func New(cfg *Config) *Server {
 	}
 
 	s := &Server{
-		config:      cfg,
-		callerMux:   http.NewServeMux(),
-		operatorMux: http.NewServeMux(),
-		specLoader:  specLoader,
+		config:       cfg,
+		callerMux:    http.NewServeMux(),
+		operatorMux:  http.NewServeMux(),
+		specLoader:   specLoader,
+		cache:        NewResponseCache(),
+		singleFlight: NewSingleFlight(),
+		cacheTTLs:    make(map[string]int),
+		quotaTracker: NewQuotaTracker(),
+		costPerCalls: make(map[string]float64),
 	}
 
 	// Initialize capture middleware if enabled
@@ -135,8 +139,24 @@ func New(cfg *Config) *Server {
 		log.Printf("Capture middleware enabled, corpus directory: %s", corpusDir)
 	}
 
+	// Load cache TTL configuration from fragments
+	s.cacheTTLs = s.specLoader.GetCacheTTLs()
+	log.Printf("Loaded %d route cache TTL configurations", len(s.cacheTTLs))
+
 	s.setupRoutes()
 	return s
+}
+
+// loadCacheTTLs extracts cache TTL configuration from loaded fragments
+func (s *Server) loadCacheTTLs() {
+	if !s.config.FragmentMode {
+		return
+	}
+
+	// Access fragment loader to get cache TTL settings
+	// This will be called after fragment loading
+	// For now, we'll extract this from the merged spec
+	log.Printf("[Cache] Loading cache TTL configuration from fragments")
 }
 
 // setupRoutes configures the HTTP routes for both listeners
@@ -146,15 +166,24 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/_seam/healthz", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
-	s.callerMux.HandleFunc("/docs", s.docsHandler)
+
+	// Setup OpenAPI UI handler using the openapi-ui library
+	docsHandler := openapiui.NewHandler(openapiui.Redoc(config.Redoc{
+		Title:       "SEAM API Documentation",
+		OpenAPIYAML: "/openapi.json",
+		BasePath:    "/docs",
+	}))
+	s.callerMux.Handle("/docs", docsHandler)
+
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
-	s.callerMux.HandleFunc("/docs/static/", s.staticAssetHandler)
 
 	// Operator-only routes
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
 	s.operatorMux.HandleFunc("/config/status", s.configStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/capture/save", s.captureSaveHandler)
 	s.operatorMux.HandleFunc("/_seam/capture/status", s.captureStatusHandler)
+	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
+	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
 }
 
 // healthzHandler returns 200 OK for liveness checks
@@ -181,45 +210,18 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // metricsHandler returns Prometheus-style metrics
-// In Phase 1a, exposes Go runtime/build basics.
-// Phase 8 (bf-4ks8) will add per-route-version series.
+// Exposes Go runtime metrics, cache metrics (hits, misses, hit rate, size, evictions),
+// and quota metrics via the Prometheus handler.
 func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	// Go runtime metrics
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	_, _ = fmt.Fprintf(w, "# HELP go_goroutines Number of goroutines that currently exist.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE go_goroutines gauge\n")
-	_, _ = fmt.Fprintf(w, "go_goroutines %d\n\n", runtime.NumGoroutine())
-
-	_, _ = fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes gauge\n")
-	_, _ = fmt.Fprintf(w, "go_memstats_alloc_bytes %d\n\n", m.Alloc)
-
-	_, _ = fmt.Fprintf(w, "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes_total counter\n")
-	_, _ = fmt.Fprintf(w, "go_memstats_alloc_bytes_total %d\n\n", m.TotalAlloc)
-
-	_, _ = fmt.Fprintf(w, "# HELP go_memstats_sys_bytes Number of bytes obtained from system.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE go_memstats_sys_bytes gauge\n")
-	_, _ = fmt.Fprintf(w, "go_memstats_sys_bytes %d\n\n", m.Sys)
-
-	_, _ = fmt.Fprintf(w, "# HELP go_threads Number of OS threads created.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE go_threads gauge\n")
-	_, _ = fmt.Fprintf(w, "go_threads %d\n\n", runtime.NumCPU())
-
-	// Build info
-	_, _ = fmt.Fprintf(w, "# HELP seam_build_info Build information about the seam binary.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE seam_build_info gauge\n")
-	_, _ = fmt.Fprintf(w, "seam_build_info{version=\"dev\"} 1\n")
+	// Use Prometheus handler to expose all registered metrics
+	// This includes cache metrics (seam_cache_hits_total, seam_cache_misses_total, etc.)
+	// and quota metrics (seam_quota_cost_total, seam_quota_remaining, etc.)
+	promhttp.Handler().ServeHTTP(w, r)
 }
 
 // configStatusHandler returns configuration fragment status
@@ -318,39 +320,6 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	_, _ = w.Write(specJSON)
-}
-
-// docsHandler returns the API documentation using ReDoc
-func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Check Accept header for content negotiation
-	accept := r.Header.Get("Accept")
-
-	// If client wants JSON, return the spec as JSON
-	if contains(accept, "application/json") {
-		s.openapiJSONHandler(w, r)
-		return
-	}
-
-	// Render the ReDoc UI with embedded JavaScript
-	html, err := s.renderReDocHTML()
-	if err != nil {
-		log.Printf("[docs] Failed to render ReDoc HTML: %v", err)
-		http.Error(w, "Failed to render documentation", http.StatusInternalServerError)
-		return
-	}
-
-	// Set headers
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(html)
 }
 
 // docsRouteHandler returns route documentation for a specific endpoint
@@ -523,133 +492,6 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-// contains checks if a string contains a substring (case-insensitive)
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || indexOf(s, substr) >= 0))
-}
-
-// indexOf finds the index of a substring
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-// renderReDocHTML renders the ReDoc documentation page
-func (s *Server) renderReDocHTML() ([]byte, error) {
-	tmpl, err := template.New("redoc").Parse(redocHTMLTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	buf := &bytes.Buffer{}
-	data := struct {
-		Title       string
-		Description string
-		SpecURL     string
-	}{
-		Title:       "SEAM API Documentation",
-		Description: "SEAM (Semantic Endpoint Access and Management) is an API gateway that provides OpenAPI 3.1 specification validation, route fragment merging, and request/response validation.",
-		SpecURL:     "/openapi.json",
-	}
-
-	if err := tmpl.Execute(buf, data); err != nil {
-		return nil, fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-// staticAssetHandler serves static assets (CSS, JS) for the docs UI
-func (s *Server) staticAssetHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract the filename from the path
-	// Path format: /docs/static/filename.ext
-	requestPath := r.URL.Path
-	if !strings.HasPrefix(requestPath, "/docs/static/") {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	filename := strings.TrimPrefix(requestPath, "/docs/static/")
-
-	// Security: prevent directory traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "\\") {
-		http.Error(w, "Invalid path", http.StatusForbidden)
-		return
-	}
-
-	// Determine content type based on file extension
-	var contentType string
-	switch {
-	case strings.HasSuffix(filename, ".css"):
-		contentType = "text/css; charset=utf-8"
-	case strings.HasSuffix(filename, ".js"):
-		contentType = "application/javascript; charset=utf-8"
-	case strings.HasSuffix(filename, ".json"):
-		contentType = "application/json; charset=utf-8"
-	case strings.HasSuffix(filename, ".png"):
-		contentType = "image/png"
-	case strings.HasSuffix(filename, ".jpg"), strings.HasSuffix(filename, ".jpeg"):
-		contentType = "image/jpeg"
-	case strings.HasSuffix(filename, ".svg"):
-		contentType = "image/svg+xml"
-	case strings.HasSuffix(filename, ".woff"):
-		contentType = "font/woff"
-	case strings.HasSuffix(filename, ".woff2"):
-		contentType = "font/woff2"
-	case strings.HasSuffix(filename, ".ttf"):
-		contentType = "font/ttf"
-	case strings.HasSuffix(filename, ".eot"):
-		contentType = "application/vnd.ms-fontobject"
-	default:
-		contentType = "application/octet-stream"
-	}
-
-	// Try to read the file from the assets directory
-	content, err := readAssetFile(filename)
-	if err != nil {
-		log.Printf("[static] Failed to read asset %s: %v", filename, err)
-		http.Error(w, "Asset not found", http.StatusNotFound)
-		return
-	}
-
-	// Set caching headers for better performance
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err := w.Write(content); err != nil {
-		log.Printf("[static] Error writing asset %s: %v", filename, err)
-	}
-}
-
-// readAssetFile reads a file from the assets directory
-func readAssetFile(filename string) ([]byte, error) {
-	// In production, this could use go:embed for assets
-	// For now, read from the filesystem
-	return readFromFile(filename)
-}
-
-// readFromFile reads a file from the filesystem
-func readFromFile(filepath string) ([]byte, error) {
-	file, err := http.Dir("internal/server/assets").Open(filepath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	return io.ReadAll(file)
-}
-
 // Start begins listening on both ports
 func (s *Server) Start(ctx context.Context) error {
 	callerAddr := fmt.Sprintf(":%d", s.config.CallerPort)
@@ -674,8 +516,20 @@ func (s *Server) Start(ctx context.Context) error {
 	s.callerListener = callerListener
 	s.operatorListener = operatorListener
 
-	// Wrap caller mux with validation middleware (always active for caller port)
-	callerHandler := s.validationMiddleware(s.callerMux)
+	// Start cache cleanup goroutine
+	s.startCacheCleanup()
+	log.Printf("Cache cleanup goroutine started")
+
+	// Wrap caller mux with quota middleware (inner layer)
+	callerHandler := s.quotaMiddleware(s.callerMux)
+	log.Printf("Quota middleware active on caller-facing port")
+
+	// Wrap with cache middleware (outer layer - checks cache first, bypasses quota on hits)
+	callerHandler = s.cacheMiddleware(callerHandler)
+	log.Printf("Cache middleware active on caller-facing port")
+
+	// Wrap with validation middleware (always active for caller port)
+	callerHandler = s.validationMiddleware(callerHandler)
 	log.Printf("Validation middleware active on caller-facing port")
 
 	// Wrap with capture middleware if enabled
@@ -749,4 +603,63 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	log.Println("Server shut down complete")
 	return nil
+}
+
+// cacheStatusHandler returns cache statistics
+func (s *Server) cacheStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	stats := s.cache.Stats()
+	sfStats := s.singleFlight.Stats()
+
+	// Calculate hit rate safely (avoid division by zero)
+	hitRate := 0.0
+	total := stats.Hits + stats.Misses
+	if total > 0 {
+		hitRate = float64(stats.Hits) / float64(total)
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled":     true,
+		"size":        stats.Size,
+		"hits":        stats.Hits,
+		"misses":      stats.Misses,
+		"evictions":   stats.Evictions,
+		"hit_rate":    hitRate,
+		"routes_with_cache": len(s.cacheTTLs),
+		"single_flight": map[string]interface{}{
+			"active_requests": sfStats.ActiveRequests,
+			"total_calls":     sfStats.TotalCalls,
+			"deduped_calls":   sfStats.DedupedCalls,
+			"coalesce_rate":   sfStats.CoalesceRate,
+		},
+	})
+}
+
+// cacheCleanupHandler manually triggers cache cleanup
+func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.cache.Cleanup()
+
+	// Update metrics after cleanup
+	stats := s.cache.Stats()
+	updateCacheMetrics(stats)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "cleanup_complete",
+		"size":        stats.Size,
+		"evictions":   stats.Evictions,
+	})
 }

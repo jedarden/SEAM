@@ -1,0 +1,159 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test API for OpenUI Verification",
+    "version": "1.0.0",
+    "description": "A minimal test fragment to verify OpenAPI spec parsing and docs UI display"
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "x-upstream": "https://httpbin.org",
+  "paths": {
+    "/test/get": {
+      "get": {
+        "summary": "Test GET endpoint",
+        "description": "A simple GET endpoint for testing docs UI",
+        "operationId": "testGet",
+        "tags": ["test"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Test parameter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/post": {
+      "post": {
+        "summary": "Test POST endpoint",
+        "description": "A simple POST endpoint for testing docs UI",
+        "operationId": "testPost",
+        "tags": ["test"],
+        "requestBody": {
+          "description": "Test request body",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Test name field"
+                  },
+                  "value": {
+                    "type": "integer",
+                    "description": "Test value field"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test/{id}": {
+      "get": {
+        "summary": "Test endpoint with path parameter",
+        "description": "Tests path parameter display in docs UI",
+        "operationId": "testGetById",
+        "tags": ["test"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Test path parameter",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Test DELETE endpoint",
+        "description": "Tests DELETE method display",
+        "operationId": "testDelete",
+        "tags": ["test"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TestModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

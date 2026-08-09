@@ -1,0 +1,177 @@
+# Example 4: Route with Cost and Quota Limits
+# This fragment demonstrates cost tracking and quota enforcement
+# Use case: Expensive external API that needs rate limiting and cost controls
+
+x-seam-schema: v1
+x-seam-owner: premium-api
+x-api-version: v1
+x-upstream: https://api.premium-provider.com
+x-vault-path: seam/routes/premium-api/subscription-key
+x-inject-as:
+  kind: header
+  name: X-Subscription-Key
+x-credential-probe:
+  path: /v1/status
+  method: GET
+  interval: 15m
+x-breaker:
+  threshold: 15
+  openSeconds: 45
+x-required-scope: premium-api:usage
+x-fanout-scope: premium-api:fanout
+
+openapi: 3.1.0
+info:
+  title: Premium API with Cost Controls
+  version: 1.0.0
+  description: Premium API proxy with cost tracking and quota enforcement
+
+paths:
+  /premium/v1/analysis:
+    post:
+      summary: Perform expensive data analysis
+      operationId: performAnalysis
+      x-cost-per-call: 5
+      x-quota:
+        limit: 100
+        window_seconds: 3600
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dataset:
+                  type: string
+                  description: Dataset identifier to analyze
+                options:
+                  type: object
+                  properties:
+                    depth:
+                      type: integer
+                      enum: [1, 2, 3]
+                      description: Analysis depth level
+                    include_raw:
+                      type: boolean
+                      default: false
+              required:
+                - dataset
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analysis_id:
+                    type: string
+                  results:
+                    type: object
+                  cost_units:
+                    type: integer
+                    description: Actual cost units consumed
+        '402':
+          description: Quota exceeded - insufficient cost units available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  quota_limit:
+                    type: integer
+                  window_reset_seconds:
+                    type: integer
+        '429':
+          description: Too Many Requests - rate limit exceeded
+        '503':
+          description: Service unavailable
+
+  /premium/v1/batch:
+    post:
+      summary: Batch analysis requests
+      operationId: batchAnalysis
+      x-cost-per-call: 15
+      x-quota:
+        limit: 100
+        window_seconds: 3600
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requests:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      dataset:
+                        type: string
+                      options:
+                        type: object
+                  minItems: 1
+                  maxItems: 10
+              required:
+                - requests
+      responses:
+        '200':
+          description: Batch analysis completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch_id:
+                    type: string
+                  results:
+                    type: array
+                  total_cost_units:
+                    type: integer
+        '402':
+          description: Quota exceeded
+        '400':
+          description: Invalid batch request
+
+  /premium/v1/export:
+    get:
+      summary: Export large dataset
+      operationId: exportDataset
+      x-cost-per-call: 25
+      x-quota:
+        limit: 100
+        window_seconds: 3600
+      parameters:
+        - name: dataset_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, csv, parquet]
+            default: json
+      responses:
+        '200':
+          description: Export data streaming
+          content:
+            application/json:
+              schema:
+                type: object
+        '402':
+          description: Quota exceeded
+        '404':
+          description: Dataset not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer

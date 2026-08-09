@@ -1,0 +1,96 @@
+{
+  "$comment": "Example fragment demonstrating all rate limiting and monitoring extensions (x-seam-schema, x-loop-guard, x-cost-per-call, x-quota, x-upstream-map)",
+  "title": "Rate Limiting and Monitoring Example Fragment",
+  "description": "This example shows a complete SEAM fragment with all rate limiting, loop protection, cost tracking, and upstream mapping fields configured. Demonstrates fragment-root defaults and operation-level overrides.",
+
+  "x-seam-schema": "v1",
+  "x-seam-owner": "weather-service",
+
+  "x-loop-guard": {
+    "max_depth": 10,
+    "max_redirects": 5
+  },
+
+  "x-cost-per-call": 0.001,
+
+  "x-quota": {
+    "limit": 1000,
+    "window": "1h",
+    "scope": "per-token"
+  },
+
+  "x-upstream-map": {
+    "production": {
+      "url": "https://weather-api.production.svc.cluster.local",
+      "vaultPath": "seam/routes/weather-service/prod-credentials",
+      "injectAs": { "kind": "bearer" }
+    },
+    "staging": {
+      "url": "https://weather-api.staging.svc.cluster.local",
+      "vaultPath": "seam/routes/weather-service/staging-credentials",
+      "injectAs": { "kind": "bearer" }
+    }
+  },
+
+  "x-instance-param": "environment",
+
+  "paths": {
+    "/weather/{environment}/forecast": {
+      "get": {
+        "summary": "Get weather forecast with standard rate limits",
+        "operationId": "getForecast",
+        "x-required-scope": ["weather:read"],
+
+        "responses": {
+          "200": {
+            "description": "Weather forecast retrieved successfully"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      },
+      "post": {
+        "summary": "Update forecast data with higher cost and stricter limits",
+        "operationId": "updateForecast",
+        "x-required-scope": ["weather:write"],
+        "x-cost-per-call": 0.01,
+        "x-quota": {
+          "limit": 100,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "x-loop-guard": {
+          "max_depth": 5,
+          "max_redirects": 3
+        },
+
+        "responses": {
+          "200": {
+            "description": "Forecast updated successfully"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/weather/{environment}/current": {
+      "get": {
+        "summary": "Get current weather conditions",
+        "operationId": "getCurrentConditions",
+        "x-required-scope": ["weather:read"],
+        "x-cost-per-call": 0.002,
+
+        "responses": {
+          "200": {
+            "description": "Current conditions retrieved successfully"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    }
+  }
+}

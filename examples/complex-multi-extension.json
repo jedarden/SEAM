@@ -1,0 +1,201 @@
+{
+  "$comment": "Complex route with multiple SEAM extensions - Demonstrates x-upstream-map, x-instance-param, x-loop-guard, x-cost-per-call, and x-quota working together.",
+  "description": "Complete example showing all five SEAM extensions working together in a single multi-instance fragment. This is a weather forecast service that routes to multiple regional backends, each with different credentials, costs, and rate limits.",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "weather-service",
+  "x-api-version": "v1",
+  "x-instance-param": "region",
+  "x-upstream-map": {
+    "us-east": {
+      "url": "https://weather.api.example.com",
+      "vaultPath": "seam/routes/weather-service/api-token-us-east",
+      "injectAs": {
+        "kind": "bearer"
+      },
+      "target_host": "weather.api.example.com",
+      "rewrite_path": "/api/v1/forecast",
+      "requiredScope": "weather:read:us-east",
+      "probeInterval": "300s",
+      "breaker": {
+        "threshold": 5,
+        "openSeconds": 60,
+        "enabled": true
+      }
+    },
+    "eu-west": {
+      "url": "https://weather.eu.example.com",
+      "vaultPath": "seam/routes/weather-service/api-token-eu-west",
+      "injectAs": {
+        "kind": "bearer"
+      },
+      "target_host": "weather.eu.example.com",
+      "rewrite_path": "/api/v1/forecast",
+      "requiredScope": "weather:read:eu-west",
+      "probeInterval": "300s",
+      "breaker": {
+        "threshold": 3,
+        "openSeconds": 120,
+        "enabled": true
+      }
+    },
+    "ap-southeast": {
+      "url": "https://weather.ap.example.com",
+      "vaultPath": "seam/routes/weather-service/api-token-ap-southeast",
+      "injectAs": {
+        "kind": "bearer"
+      },
+      "target_host": "weather.ap.example.com",
+      "rewrite_path": "/api/v1/forecast",
+      "requiredScope": "weather:read:ap-southeast",
+      "probeInterval": "600s",
+      "breaker": {
+        "threshold": 10,
+        "openSeconds": 30,
+        "enabled": true
+      }
+    }
+  },
+  "x-required-scope": "weather:query:data",
+  "paths": {
+    "/{region}/forecast": {
+      "get": {
+        "summary": "Get weather forecast with comprehensive rate limiting and cost tracking",
+        "description": "Multi-instance weather forecast endpoint. The region parameter selects the upstream instance. Loop guard prevents runaway iteration. Cost and quota are enforced per-caller.",
+        "operationId": "getForecast",
+        "x-loop-guard": {
+          "max_iterations": 10,
+          "backoff_ms": 100
+        },
+        "x-cost-per-call": 0.001,
+        "x-quota": {
+          "limit": 1000,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Successful forecast response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "temperature": { "type": "number" },
+                    "conditions": { "type": "string" },
+                    "humidity": { "type": "number" },
+                    "windSpeed": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid region parameter"
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Service unavailable (circuit breaker open)"
+          }
+        }
+      }
+    },
+    "/{region}/current": {
+      "get": {
+        "summary": "Get current weather conditions",
+        "description": "Multi-instance current conditions endpoint. Lower per-call cost (0.0005) and higher quota limit (2000) than forecast.",
+        "operationId": "getCurrentConditions",
+        "x-loop-guard": {
+          "max_iterations": 5,
+          "backoff_ms": 50
+        },
+        "x-cost-per-call": 0.0005,
+        "x-quota": {
+          "limit": 2000,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Current conditions response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "temp": { "type": "number" },
+                    "condition": { "type": "string" },
+                    "humidity": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid region parameter"
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/{region}/alerts": {
+      "get": {
+        "summary": "Get weather alerts",
+        "description": "Weather alerts endpoint. Higher cost (0.002) due to upstream pricing, with proportional quota limit.",
+        "operationId": "getAlerts",
+        "x-loop-guard": {
+          "max_iterations": 3,
+          "backoff_ms": 200
+        },
+        "x-cost-per-call": 0.002,
+        "x-quota": {
+          "limit": 500,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Weather alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "severity": { "type": "string" },
+                          "title": { "type": "string" },
+                          "description": { "type": "string" },
+                          "startTime": { "type": "string", "format": "date-time" },
+                          "endTime": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    }
+  }
+}

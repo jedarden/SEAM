@@ -1,0 +1,338 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Complex Multi-Feature Route",
+    "version": "1.0.0",
+    "description": "Demonstrates multiple SEAM extensions working together: loop guards, deprecation with sunset, per-operation scope overrides, and response scrubbing acknowledgment."
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "complex-example",
+  "x-api-version": "v2",
+  "x-upstream": "https://api.example.com",
+  "x-vault-path": "seam/routes/complex-example/token",
+  "x-inject-as": {
+    "kind": "bearer"
+  },
+  "x-credential-probe": {
+    "path": "/v2/health",
+    "method": "GET",
+    "interval": "10m"
+  },
+  "x-breaker": {
+    "threshold": 20,
+    "openSeconds": 60,
+    "maxOpenSeconds": 600,
+    "enabled": true
+  },
+  "x-seam-deprecated": {
+    "since": "2026-01-15",
+    "sunset": "2026-07-01",
+    "brownout": [
+      {
+        "start": "2026-06-01T00:00:00Z",
+        "end": "2026-06-07T23:59:59Z"
+      },
+      {
+        "start": "2026-06-15T00:00:00Z",
+        "end": "2026-06-21T23:59:59Z"
+      }
+    ]
+  },
+  "x-required-scope": "example:read",
+  "paths": {
+    "/v2/resources": {
+      "get": {
+        "summary": "List resources (deprecated)",
+        "description": "This endpoint is deprecated. Use /v3/resources instead. Responses are not scrubbed - may contain echoed secrets.",
+        "operationId": "listResources",
+        "deprecated": true,
+        "x-unscrubbable": "acknowledged",
+        "x-loop-guard": {
+          "max_iterations": 100,
+          "backoff_ms": 100
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Pagination cursor for next page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated resource list",
+            "headers": {
+              "X-Deprecation": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Deprecation notice"
+              },
+              "X-Sunset": {
+                "schema": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "description": "Sunset date"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "status": { "type": "string" },
+                          "createdAt": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "description": "Cursor for next page, null if last page"
+                    },
+                    "totalCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - loop guard triggered"
+          }
+        }
+      }
+    },
+    "/v2/resources/{id}": {
+      "get": {
+        "summary": "Get single resource",
+        "operationId": "getResource",
+        "x-required-scope": "example:admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resource details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "configuration": {
+                      "type": "object",
+                      "description": "May contain sensitive data - responses are not scrubbed"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires example:admin scope (example:read is insufficient)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": ["insufficient_scope"]
+                    },
+                    "required_scope": {
+                      "type": "string",
+                      "enum": ["example:admin"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a resource",
+        "description": "Higher scope requirement for destructive operations",
+        "operationId": "deleteResource",
+        "x-required-scope": ["example:read", "example:delete"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Resource deleted successfully"
+          },
+          "403": {
+            "description": "Requires both example:read AND example:delete scopes"
+          },
+          "404": {
+            "description": "Resource not found"
+          }
+        }
+      }
+    },
+    "/v2/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Used for credential probing. Does not require authentication.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/batch": {
+      "post": {
+        "summary": "Batch operation with loop guard protection",
+        "description": "Process multiple items in one request. Protected by loop guard to prevent runaway iterations.",
+        "operationId": "batchOperation",
+        "x-loop-guard": {
+          "max_iterations": 500,
+          "backoff_ms": 50
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["operations"],
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["action", "target"],
+                      "properties": {
+                        "action": {
+                          "type": "string",
+                          "enum": ["create", "update", "delete"]
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "maxItems": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "success": { "type": "boolean" },
+                          "action": { "type": "string" },
+                          "target": { "type": "string" },
+                          "error": {
+                            "type": "string",
+                            "description": "Present only if success is false"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "completedCount": {
+                    "type": "integer"
+                  },
+                  "failedCount": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid batch request"
+          },
+          "429": {
+            "description": "Loop guard triggered - too many iterations"
+          }
+        }
+      }
+    }
+  }
+}

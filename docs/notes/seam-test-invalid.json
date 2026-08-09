@@ -1,0 +1,30 @@
+{
+  "$comment": "Invalid SEAM fragment - should fail validation for multiple reasons",
+  "description": "This example demonstrates validation failures by breaking multiple schema rules",
+  "x-seam-schema": "v2",
+  "x-seam-owner": "invalid owner with spaces!",
+  "x-upstream": "not-a-valid-url",
+  "x-vault-path": "invalid vault path",
+  "x-instance-param": "valid-param-name",
+  "paths": {
+    "invalid-path-no-leading-slash": {
+      "get": {
+        "summary": "Invalid operation",
+        "x-loop-guard": {
+          "max_iterations": -1,
+          "backoff_ms": "not a number"
+        },
+        "x-cost-per-call": -5,
+        "x-quota": {
+          "limit": 0,
+          "window_seconds": -100
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}

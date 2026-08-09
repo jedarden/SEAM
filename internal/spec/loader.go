@@ -15,6 +15,7 @@ import (
 	"github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"gopkg.in/yaml.v3"
 )
 
 // Loader handles loading and serving OpenAPI specs
@@ -22,7 +23,7 @@ type Loader struct {
 	specPath       string
 	baseURL        string
 	rawDocument    []byte
-	specVersion    string // Stable hash of the spec
+	specVersion    string // Stable hash of the spec (truncated to 16 chars)
 	specHash       string // Full SHA256 hash (64 hex chars)
 	loadedDoc      libopenapi.Document
 	model          *libopenapi.DocumentModel[v3.Document]
@@ -46,10 +47,10 @@ func New(specDir, baseURL string) (*Loader, error) {
 		return nil, fmt.Errorf("failed to read spec file: %w", err)
 	}
 
-	// Compute stable hash of the spec for X-SEAM-Spec-Version
+	// Compute stable hash of the spec
 	hash := sha256.Sum256(rawDocument)
-	specHash := hex.EncodeToString(hash[:])
-	specVersion := specHash[:16]
+	specHash := hex.EncodeToString(hash[:]) // Full 64-character SHA256 hash
+	specVersion := specHash[:16]            // Use first 16 hex chars (64 bits) for version
 
 	// Load the document using libopenapi
 	loadedDoc, err := libopenapi.NewDocument(rawDocument)
@@ -134,8 +135,8 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 
 	// Compute stable hash of the merged spec
 	hash := sha256.Sum256(mergedJSON)
-	specHash := hex.EncodeToString(hash[:])
-	specVersion := specHash[:16]
+	specHash := hex.EncodeToString(hash[:]) // Full 64-character SHA256 hash
+	specVersion := specHash[:16]            // Use first 16 hex chars (64 bits) for version
 	log.Printf("[Loader] Generated spec hash: %s (version: %s)", specHash, specVersion)
 
 	// Load the merged document using libopenapi
@@ -257,10 +258,22 @@ func (l *Loader) GetRawJSON() ([]byte, error) {
 	}
 	l.model.Model.Servers = []*v3.Server{server}
 
-	// Serialize back to JSON
-	docJSON, err := json.MarshalIndent(l.model.Model, "", "  ")
+	// Serialize the document to YAML (libopenapi handles this correctly)
+	yamlBytes, err := l.loadedDoc.Serialize()
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize spec to JSON: %w", err)
+		return nil, fmt.Errorf("failed to serialize document to YAML: %w", err)
+	}
+
+	// Parse YAML into a generic map
+	var yamlMap map[string]interface{}
+	if err := yaml.Unmarshal(yamlBytes, &yamlMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	// Convert to JSON
+	docJSON, err := json.MarshalIndent(yamlMap, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal to JSON: %w", err)
 	}
 
 	return docJSON, nil
@@ -603,6 +616,61 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 		"valid_count":       validCount,
 		"quarantined_count": len(quarantined),
 		"conditions":        conditions,
+	}
+}
+
+// GetCacheTTLs returns a map of route paths to their cache TTL values
+// This extracts x-cache-ttl from all loaded fragments
+func (l *Loader) GetCacheTTLs() map[string]int {
+	cacheTTLs := make(map[string]int)
+
+	if !l.fragmentMode || l.fragmentLoader == nil {
+		return cacheTTLs
+	}
+
+	// Iterate through all fragments and extract cache TTL
+	for _, fragment := range l.fragmentLoader.fragments {
+		if fragment.QueuedForQuarantine {
+			continue
+		}
+
+		// Extract x-cache-ttl from fragment root
+		ttl := extractCacheTTLFromFragment(fragment.ParsedFragment)
+		if ttl > 0 {
+			// Apply this TTL to all paths in this fragment
+			if paths, ok := fragment.ParsedFragment["paths"].(map[string]interface{}); ok {
+				for path := range paths {
+					cacheTTLs[path] = ttl
+					log.Printf("[Cache] Route %s has cache TTL: %d seconds", path, ttl)
+				}
+			}
+		}
+	}
+
+	return cacheTTLs
+}
+
+// extractCacheTTLFromFragment extracts the x-cache-ttl value from a fragment
+func extractCacheTTLFromFragment(fragmentData map[string]interface{}) int {
+	if fragmentData == nil {
+		return 0
+	}
+
+	ttlValue, exists := fragmentData["x-cache-ttl"]
+	if !exists {
+		return 0
+	}
+
+	// Convert to int based on actual type
+	switch v := ttlValue.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case int64:
+		return int(v)
+	default:
+		return 0
 	}
 }
 

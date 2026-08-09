@@ -14,8 +14,8 @@ const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
 const yaml = require('js-yaml');
 
-// Load the schema
-const schemaPath = path.join(__dirname, '../docs/notes/route-fragment-schema.json');
+// Load the schema (use spec schema as it's the canonical source)
+const schemaPath = path.join(__dirname, '../spec/route-fragment-schema.json');
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
 
 // Initialize AJV with JSON Schema 2020-12 support
