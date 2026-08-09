@@ -8,6 +8,7 @@ metadata:
     app: seam-retirement-evaluator
     component: openbao-verification
 spec:
+  entrypoint: verify-evaluator-access
   templates:
   - name: verify-evaluator-access
     container:
