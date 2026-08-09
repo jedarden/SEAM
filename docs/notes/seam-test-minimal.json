@@ -1,0 +1,19 @@
+{
+  "$comment": "Minimal SEAM fragment with one extension - demonstrates basic SEAM route configuration",
+  "description": "Minimal valid SEAM fragment with the simplest possible extension configuration",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "echo",
+  "x-upstream": "https://echo.example.svc.cluster.local",
+  "paths": {
+    "/echo": {
+      "get": {
+        "summary": "Echo endpoint",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}

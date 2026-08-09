@@ -1,0 +1,221 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Multi-Region Database Proxy",
+    "version": "1.0.0",
+    "description": "Multi-instance database proxy with region selection via path parameter. Demonstrates x-upstream-map with per-instance overrides for credentials, TLS, and authorization scopes."
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "db-proxy",
+  "x-api-version": "v1",
+  "x-upstream-map": {
+    "iad": {
+      "url": "https://db-iad.example.com",
+      "vaultPath": "seam/routes/db-proxy/iad-credentials",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-DB-Token"
+      },
+      "tls": {
+        "caBundle": "db-iad-ca",
+        "serverName": "db-iad.example.com"
+      },
+      "probeInterval": "5m",
+      "breaker": {
+        "threshold": 15,
+        "openSeconds": 45,
+        "maxOpenSeconds": 600,
+        "enabled": true
+      },
+      "requiredScope": "db:iad:read"
+    },
+    "ord": {
+      "url": "https://db-ord.example.com",
+      "vaultPath": "seam/routes/db-proxy/ord-credentials",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-DB-Token"
+      },
+      "tls": {
+        "caBundle": "db-ord-ca",
+        "serverName": "db-ord.example.com"
+      },
+      "probeInterval": "5m",
+      "breaker": {
+        "threshold": 15,
+        "openSeconds": 45,
+        "maxOpenSeconds": 600,
+        "enabled": true
+      },
+      "requiredScope": "db:ord:read"
+    },
+    "dfw": {
+      "url": "https://db-dfw.example.com",
+      "vaultPath": "seam/routes/db-proxy/dfw-credentials",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-DB-Token"
+      },
+      "tls": {
+        "caBundle": "db-dfw-ca",
+        "serverName": "db-dfw.example.com"
+      },
+      "probeInterval": "5m",
+      "breaker": {
+        "threshold": 15,
+        "openSeconds": 45,
+        "maxOpenSeconds": 600,
+        "enabled": true
+      },
+      "requiredScope": "db:dfw:read"
+    },
+    "_all": {
+      "url": "https://db-iad.example.com",
+      "vaultPath": "seam/routes/db-proxy/iad-credentials",
+      "injectAs": {
+        "kind": "header",
+        "name": "X-DB-Token"
+      },
+      "tls": {
+        "caBundle": "db-iad-ca",
+        "serverName": "db-iad.example.com"
+      },
+      "probeInterval": "5m",
+      "breaker": {
+        "threshold": 50,
+        "openSeconds": 30,
+        "maxOpenSeconds": 300,
+        "enabled": true
+      }
+    }
+  },
+  "x-instance-param": "region",
+  "x-fanout-scope": "db:fanout",
+  "x-upstream-strip-prefix": "/proxy",
+  "paths": {
+    "/proxy/{region}/query": {
+      "post": {
+        "summary": "Execute database query",
+        "description": "Execute a read-only query against the specified region's database instance. The region path parameter selects the instance.",
+        "operationId": "executeQuery",
+        "parameters": [
+          {
+            "name": "region",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["iad", "ord", "dfw"]
+            },
+            "description": "Database region selector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "SQL SELECT query only"
+                  },
+                  "params": {
+                    "type": "object",
+                    "description": "Query parameters for prepared statements"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 30000,
+                    "default": 5000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "type": { "type": "string" }
+                        }
+                      }
+                    },
+                    "rowCount": { "type": "integer" },
+                    "executionTimeMs": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query or parameters"
+          },
+          "403": {
+            "description": "Missing required region-specific scope"
+          },
+          "503": {
+            "description": "Database circuit breaker is open or instance unhealthy"
+          }
+        }
+      }
+    },
+    "/proxy/{region}/health": {
+      "get": {
+        "summary": "Check database instance health",
+        "operationId": "healthCheck",
+        "parameters": [
+          {
+            "name": "region",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["iad", "ord", "dfw"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instance is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "enum": ["healthy"] },
+                    "region": { "type": "string" },
+                    "latency_ms": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Instance is unhealthy or circuit breaker is open"
+          }
+        }
+      }
+    }
+  }
+}

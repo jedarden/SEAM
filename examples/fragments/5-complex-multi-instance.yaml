@@ -1,0 +1,257 @@
+# Example 5: Complex Multi-Instance Route with Multiple Extensions
+# This fragment demonstrates multi-instance routing with per-instance overrides,
+# deprecation, and advanced security controls
+# Use case: Multi-region service deployment with different credentials per region
+
+x-seam-schema: v1
+x-seam-owner: geo-service
+x-api-version: v1
+x-upstream-map:
+  us-east:
+    url: https://geo-service.us-east.ardenone.internal
+    vaultPath: seam/routes/geo-service/us-east-key
+    injectAs:
+      kind: header
+      name: X-Region-Key
+    probeInterval: 5m
+    breaker:
+      threshold: 8
+      openSeconds: 30
+    requiredScope: geo-service:us-east
+  us-west:
+    url: https://geo-service.us-west.ardenone.internal
+    vaultPath: seam/routes/geo-service/us-west-key
+    injectAs:
+      kind: header
+      name: X-Region-Key
+    probeInterval: 5m
+    breaker:
+      threshold: 8
+      openSeconds: 30
+    requiredScope: geo-service:us-west
+  eu-central:
+    url: https://geo-service.eu-central.ardenone.internal
+    vaultPath: seam/routes/geo-service/eu-central-key
+    injectAs:
+      kind: header
+      name: X-Region-Key
+    tls:
+      caBundle: eu-central-ca
+      serverName: geo-service.eu-central.ardenone.internal
+    probeInterval: 10m
+    breaker:
+      threshold: 5
+      openSeconds: 60
+    requiredScope: geo-service:eu-central
+  _default:
+    url: https://geo-service.us-east.ardenone.internal
+    vaultPath: seam/routes/geo-service/us-east-key
+    injectAs:
+      kind: header
+      name: X-Region-Key
+x-instance-param: region
+x-breaker:
+  threshold: 10
+  openSeconds: 45
+  maxOpenSeconds: 600
+x-seam-deprecated:
+  since: "2025-12-01"
+  sunset: "2026-06-30"
+x-required-scope: geo-service:query
+
+openapi: 3.1.0
+info:
+  title: Geo Service Multi-Instance Router
+  version: 1.0.0
+  description: |
+    Multi-region geo-service with per-instance credentials and controls.
+    DEPRECATED: This API is deprecated as of 2025-12-01 and will sunset on 2026-06-30.
+    Migration to geo-v2 service is required.
+
+paths:
+  /geo/{region}/location:
+    get:
+      summary: Geocode location to coordinates
+      operationId: geocode
+      deprecated: true
+      parameters:
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [us-east, us-west, eu-central]
+          description: Target region for the request
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Address to geocode
+        - name: country_code:
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[A-Z]{2}$"
+      responses:
+        '200':
+          description: Geocoding successful
+          headers:
+            X-Deprecation:
+              description: API deprecation notice
+              schema:
+                type: string
+            X-Sunset:
+              description: Sunset date
+              schema:
+                type: string
+                format: date
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coordinates:
+                    type: object
+                    properties:
+                      latitude:
+                        type: number
+                        format: float
+                      longitude:
+                        type: number
+                        format: float
+                  address:
+                    type: object
+                  region:
+                    type: string
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: Address not found
+        '410':
+          description: Region deprecated or unavailable
+      x-unscrubbable: acknowledged
+
+  /geo/{region}/reverse:
+    get:
+      summary: Reverse geocode coordinates to address
+      operationId: reverseGeocode
+      deprecated: true
+      parameters:
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [us-east, us-west, eu-central]
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+            minimum: -90
+            maximum: 90
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+            minimum: -180
+            maximum: 180
+      responses:
+        '200':
+          description: Reverse geocoding successful
+          headers:
+            X-Deprecation:
+              schema:
+                type: string
+            X-Sunset:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid coordinates
+        '410':
+          description: Region deprecated
+
+  /geo/{region}/distance:
+    post:
+      summary: Calculate distance between two points
+      operationId: calculateDistance
+      deprecated: true
+      parameters:
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [us-east, us-west, eu-central]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origin:
+                  type: object
+                  properties:
+                    latitude:
+                      type: number
+                      format: float
+                    longitude:
+                      type: number
+                      format: float
+                destination:
+                  type: object
+                  properties:
+                    latitude:
+                      type: number
+                      format: float
+                    longitude:
+                      type: number
+                      format: float
+                unit:
+                  type: string
+                  enum: [km, miles, nautical]
+                  default: km
+              required:
+                - origin
+                - destination
+      responses:
+        '200':
+          description: Distance calculated successfully
+          headers:
+            X-Deprecation:
+              schema:
+                type: string
+            X-Sunset:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  distance:
+                    type: number
+                  unit:
+                    type: string
+                  region:
+                    type: string
+        '400':
+          description: Invalid request body
+        '410':
+          description: Region deprecated
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer

@@ -75,8 +75,8 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 			return nil
 		}
 
-		// Only process .yaml and .yml files
-		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+		// Only process .yaml, .yml, and .json files
+		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".json") {
 			log.Printf("[Fragment] Loading fragment file: %s", path)
 			fragment, err := fl.loadFragmentFile(path)
 			if err != nil {

@@ -1,0 +1,208 @@
+{
+  "$comment": "Rate limiting and monitoring extensions example - Demonstrates x-seam-schema, x-loop-guard, x-cost-per-call, x-quota, and x-upstream-map working together.",
+  "description": "Complete example showing all SEAM rate limiting and monitoring extensions in a single multi-instance fragment. This is an external API service that routes to multiple regional backends with different costs, quotas, and loop protection settings.",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "external-api",
+  "x-api-version": "v1",
+  "x-instance-param": "region",
+  "x-upstream-map": {
+    "us-east": {
+      "url": "https://api.us-east.example.com",
+      "vaultPath": "seam/routes/external-api/api-key-us-east",
+      "injectAs": {
+        "kind": "header",
+        "name": "x-api-key"
+      },
+      "target_host": "api.us-east.example.com",
+      "rewrite_path": "/v1/external",
+      "requiredScope": "external:read:us-east",
+      "probeInterval": "300s",
+      "breaker": {
+        "threshold": 5,
+        "openSeconds": 60,
+        "enabled": true
+      }
+    },
+    "eu-west": {
+      "url": "https://api.eu-west.example.com",
+      "vaultPath": "seam/routes/external-api/api-key-eu-west",
+      "injectAs": {
+        "kind": "header",
+        "name": "x-api-key"
+      },
+      "target_host": "api.eu-west.example.com",
+      "rewrite_path": "/v1/external",
+      "requiredScope": "external:read:eu-west",
+      "probeInterval": "300s",
+      "breaker": {
+        "threshold": 3,
+        "openSeconds": 120,
+        "enabled": true
+      }
+    },
+    "ap-southeast": {
+      "url": "https://api.ap-southeast.example.com",
+      "vaultPath": "seam/routes/external-api/api-key-ap-southeast",
+      "injectAs": {
+        "kind": "header",
+        "name": "x-api-key"
+      },
+      "target_host": "api.ap-southeast.example.com",
+      "rewrite_path": "/v1/external",
+      "requiredScope": "external:read:ap-southeast",
+      "probeInterval": "600s",
+      "breaker": {
+        "threshold": 10,
+        "openSeconds": 30,
+        "enabled": true
+      }
+    }
+  },
+  "x-required-scope": "external:query:data",
+  "x-cost-per-call": 0.001,
+  "x-quota": {
+    "limit": 1000,
+    "window": "1h",
+    "scope": "per-token"
+  },
+  "paths": {
+    "/{region}/query": {
+      "get": {
+        "summary": "Query external API with comprehensive rate limiting and cost tracking",
+        "description": "Multi-instance query endpoint with loop protection. The region parameter selects the upstream instance. Loop guard prevents infinite recursion. Cost tracking and quota enforced per-token.",
+        "operationId": "queryExternal",
+        "x-loop-guard": {
+          "max_depth": 10,
+          "max_redirects": 5
+        },
+        "x-cost-per-call": 0.002,
+        "x-quota": {
+          "limit": 500,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful query response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "data": { "type": "object" },
+                    "quotaRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid region parameter"
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Service unavailable (circuit breaker open)"
+          }
+        }
+      }
+    },
+    "/{region}/search": {
+      "get": {
+        "summary": "Search external API with lower cost and higher quota",
+        "description": "Multi-instance search endpoint. Lower per-call cost and higher quota limit than query endpoint. Reduced loop guard limits for faster failover.",
+        "operationId": "searchExternal",
+        "x-loop-guard": {
+          "max_depth": 5,
+          "max_redirects": 3
+        },
+        "x-cost-per-call": 0.001,
+        "x-quota": {
+          "limit": 2000,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "results": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "quotaRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search parameters"
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/{region}/batch": {
+      "post": {
+        "summary": "Batch endpoint with higher cost and quota",
+        "description": "Batch processing endpoint with higher per-call cost due to resource intensity. Correspondingly higher quota limit for bulk operations. Stricter loop guard limits.",
+        "operationId": "batchExternal",
+        "x-loop-guard": {
+          "max_depth": 3,
+          "max_redirects": 2
+        },
+        "x-cost-per-call": 0.005,
+        "x-quota": {
+          "limit": 200,
+          "window": "1h",
+          "scope": "per-token"
+        },
+        "responses": {
+          "200": {
+            "description": "Batch results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "region": { "type": "string" },
+                    "results": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "quotaRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid batch request"
+          },
+          "401": {
+            "description": "Invalid credentials for region"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    }
+  }
+}

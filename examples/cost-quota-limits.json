@@ -1,0 +1,157 @@
+{
+  "$comment": "Route with cost and quota limits - Demonstrates rate limiting with cost tracking for metered APIs.",
+  "description": "Route fragment with x-cost-per-call and x-quota enabled. This SEAM extension enforces cost-aware rate limiting for credit-metered APIs. Each operation consumes quota based on its per-call cost, preventing runaway billing while fair-sharing capacity across callers.",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "data-enrichment",
+  "x-api-version": "v1",
+  "x-upstream": "https://api.data-enrichment.example.com",
+  "x-vault-path": "seam/routes/data-enrichment/api-key",
+  "x-inject-as": {
+    "kind": "header",
+    "name": "x-api-key"
+  },
+  "paths": {
+    "/enrich/profile": {
+      "post": {
+        "summary": "Enrich user profile data",
+        "description": "Enriches user profile with third-party data. This operation costs 15 credits per call and is limited to 1000 credits per hour per caller.",
+        "operationId": "enrichProfile",
+        "x-required-scope": "data-enrichment:enrich:profile",
+        "x-cost-per-call": 15,
+        "x-quota": {
+          "limit": 1000,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Enriched profile data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": { "type": "object" },
+                    "enrichment": { "type": "object" },
+                    "creditsRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "429": {
+            "description": "Quota exceeded (try again later)"
+          }
+        }
+      }
+    },
+    "/enrich/company": {
+      "post": {
+        "summary": "Enrich company data",
+        "description": "Enriches company information with third-party data. This operation costs 50 credits per call (expensive!) and is limited to 500 credits per hour.",
+        "operationId": "enrichCompany",
+        "x-required-scope": "data-enrichment:enrich:company",
+        "x-cost-per-call": 50,
+        "x-quota": {
+          "limit": 500,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Enriched company data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "company": { "type": "object" },
+                    "financials": { "type": "object" },
+                    "creditsRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "429": {
+            "description": "Quota exceeded (try again later)"
+          }
+        }
+      }
+    },
+    "/batch/enrich": {
+      "post": {
+        "summary": "Batch enrichment (lower per-item cost)",
+        "description": "Batch enrichment endpoint that processes multiple items in one call. Costs 100 credits per batch regardless of item count, making it cost-effective for bulk operations.",
+        "operationId": "batchEnrich",
+        "x-required-scope": "data-enrichment:enrich:batch",
+        "x-cost-per-call": 100,
+        "x-quota": {
+          "limit": 2000,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Batch enrichment results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "creditsRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "429": {
+            "description": "Quota exceeded (try again later)"
+          }
+        }
+      }
+    },
+    "/lookup/cheap": {
+      "get": {
+        "summary": "Low-cost lookup operation",
+        "description": "Simple lookup operation that costs only 1 credit per call. High quota limit allows frequent calls.",
+        "operationId": "cheapLookup",
+        "x-required-scope": "data-enrichment:lookup:read",
+        "x-cost-per-call": 1,
+        "x-quota": {
+          "limit": 10000,
+          "window_seconds": 3600
+        },
+        "responses": {
+          "200": {
+            "description": "Lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": { "type": "string" },
+                    "creditsRemaining": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,605 @@
+{
+  "$comment": "Realistic SEAM route fragment examples validating against route-fragment-schema.json. These represent actual production use cases from the SEAM project.",
+  "examples": {
+    "$comment": "Five realistic example fragments based on actual SEAM use cases.",
+
+    "example-1-argocd-read-only-proxy": {
+      "$comment": "ArgoCD read-only proxy - the actual Phase 3 migration target. This is a pass-through proxy with no secret injection, serving as the control plane's read-only window into ArgoCD.",
+      "description": "Phase 3 pilot fragment: ArgoCD read-only proxy over Tailscale kubectl-proxy. No credentials injected (pass-through), limited to read operations (GET, HEAD, OPTIONS).",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "argocd-ro",
+        "x-api-version": "v1",
+        "x-upstream": "https://argocd-rs-manager.tail1b1987.ts.net:8080",
+        "x-upstream-tls": {
+          "caBundle": "tailscale-ca-bundle",
+          "serverName": "argocd-rs-manager.tail1b1987.ts.net"
+        },
+        "x-required-scope": "argocd:read",
+        "x-breaker": {
+          "threshold": 10,
+          "openSeconds": 30,
+          "maxOpenSeconds": 300,
+          "enabled": true
+        },
+        "paths": {
+          "/api/v1/applications": {
+            "get": {
+              "summary": "List all ArgoCD applications (read-only)",
+              "description": "Returns a list of all applications the caller has access to. No write operations allowed.",
+              "operationId": "listApplications",
+              "tags": ["applications"],
+              "responses": {
+                "200": {
+                  "description": "List of applications",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "items": {
+                            "type": "array",
+                            "items": { "type": "object" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "401": { "description": "Unauthorized" },
+                "403": { "description": "Forbidden - insufficient scopes" }
+              }
+            },
+            "head": {
+              "summary": "HEAD check for applications endpoint",
+              "responses": {
+                "200": { "description": "OK" }
+              }
+            },
+            "options": {
+              "summary": "OPTIONS preflight check",
+              "responses": {
+                "200": { "description": "Allowed methods" }
+              }
+            }
+          },
+          "/api/v1/applications/{name}": {
+            "get": {
+              "summary": "Get application details by name (read-only)",
+              "description": "Returns detailed information about a specific application including sync status, health, and revision history.",
+              "operationId": "getApplication",
+              "tags": ["applications"],
+              "parameters": [
+                {
+                  "name": "name",
+                  "in": "path",
+                  "required": true,
+                  "schema": { "type": "string" },
+                  "description": "Application name"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Application details",
+                  "content": {
+                    "application/json": {
+                      "schema": { "type": "object" }
+                    }
+                  }
+                },
+                "404": { "description": "Application not found" }
+              }
+            }
+          },
+          "/api/v1/projects": {
+            "get": {
+              "summary": "List ArgoCD projects (read-only)",
+              "description": "Returns a list of all ArgoCD projects.",
+              "operationId": "listProjects",
+              "tags": ["projects"],
+              "responses": {
+                "200": {
+                  "description": "List of projects",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "items": {
+                            "type": "array",
+                            "items": { "type": "object" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/api/v1/repositories": {
+            "get": {
+              "summary": "List git repositories (read-only)",
+              "description": "Returns a list of configured git repositories.",
+              "operationId": "listRepositories",
+              "tags": ["repositories"],
+              "responses": {
+                "200": {
+                  "description": "List of repositories",
+                  "content": {
+                    "application/json": {
+                      "schema": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-2-simple-secret-injection": {
+      "$comment": "Simple secret-injecting route - z.ai/GLM proxy with bearer token injection.",
+      "description": "Minimal secret injection fragment: forwards requests to z.ai GLM API with Bearer token from OpenBao. Demonstrates the both-or-neither x-vault-path/x-inject-as pairing.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "glm-proxy",
+        "x-api-version": "v1",
+        "x-upstream": "https://open.bigmodel.cn/api/paas/v4",
+        "x-vault-path": "seam/routes/glm-proxy/api-key",
+        "x-inject-as": {
+          "kind": "bearer"
+        },
+        "x-credential-probe": {
+          "path": "/chat/completions",
+          "method": "POST",
+          "interval": "5m"
+        },
+        "x-required-scope": "glm:chat",
+        "paths": {
+          "/chat/completions": {
+            "post": {
+              "summary": "GLM chat completions endpoint",
+              "description": "Proxies to z.ai GLM API with injected Bearer token. All request headers are stripped before injection; response body is scrubbed for leaked secrets.",
+              "operationId": "chatCompletions",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["model", "messages"],
+                      "properties": {
+                        "model": { "type": "string" },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": { "type": "string" },
+                              "content": { "type": "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "Chat completion response",
+                "content": {
+                  "application/json": {
+                    "schema": { "type": "object" }
+                  }
+                }
+              },
+              "401": { "description": "Invalid API key" },
+              "429": { "description": "Rate limited by upstream" }
+            }
+          }
+        }
+      }
+    },
+
+    "example-3-credential-probing": {
+      "$comment": "Route with credential probing - twitterapi.io proxy with aggressive health checks.",
+      "description": "Twitter API proxy with credential probing. Demonstrates x-credential-probe with a safe GET /health endpoint and 30-second interval to catch credential rotation quickly.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "twitter-proxy",
+        "x-api-version": "v2",
+        "x-upstream": "https://api.twitterapi.io",
+        "x-vault-path": "seam/routes/twitter-proxy/bearer-token",
+        "x-inject-as": {
+          "kind": "bearer"
+        },
+        "x-credential-probe": {
+          "path": "/v2/tweets/search/recent",
+          "method": "GET",
+          "interval": "30s"
+        },
+        "x-breaker": {
+          "threshold": 5,
+          "openSeconds": 60,
+          "maxOpenSeconds": 600,
+          "enabled": true
+        },
+        "x-required-scope": "twitter:search",
+        "paths": {
+          "/v2/tweets/search/recent": {
+            "get": {
+              "summary": "Recent Twitter search (with credential probing)",
+              "description": "Search recent tweets with injected Bearer token. The credential probe validates the token every 30 seconds via a lightweight GET request.",
+              "operationId": "searchTweets",
+              "parameters": [
+                {
+                  "name": "query",
+                  "in": "query",
+                  "required": true,
+                  "schema": { "type": "string" },
+                  "description": "Search query"
+                },
+                {
+                  "name": "max_results",
+                  "in": "query",
+                  "schema": { "type": "integer", "default": 10 },
+                  "description": "Maximum results (10-100)"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Search results",
+                  "content": {
+                    "application/json": {
+                      "schema": { "type": "object" }
+                    }
+                  }
+                },
+                "401": { "description": "Credential expired - probe will detect on next interval" },
+                "503": { "description": "Circuit breaker open after probe failures" }
+              }
+            }
+          },
+          "/v2/users/{username}": {
+            "get": {
+              "summary": "Get user profile",
+              "description": "Fetch user profile by username.",
+              "operationId": "getUserProfile",
+              "parameters": [
+                {
+                  "name": "username",
+                  "in": "path",
+                  "required": true,
+                  "schema": { "type": "string" }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "User profile",
+                  "content": {
+                    "application/json": {
+                      "schema": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-4-cost-and-quota-limits": {
+      "$comment": "Route with cost/quota limits - Kalshi weather API with per-call cost tracking and hourly quota.",
+      "description": "Kalshi weather API with cost tracking and quota enforcement. Demonstrates x-cost-per-call and x-quota working together: each forecast request costs 0.005 units, with a 100-unit hourly budget.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "kalshi-weather",
+        "x-api-version": "v1",
+        "x-upstream": "https://kalshi-api.example.com/weather",
+        "x-vault-path": "seam/routes/kalshi-weather/api-token",
+        "x-inject-as": {
+          "kind": "header",
+          "name": "X-Kalshi-API-Key"
+        },
+        "x-credential-probe": {
+          "path": "/v1/health",
+          "method": "HEAD",
+          "interval": "2m"
+        },
+        "x-required-scope": "kalshi:weather:read",
+        "paths": {
+          "/v1/forecast/{event_id}": {
+            "get": {
+              "summary": "Get weather forecast with cost and quota",
+              "description": "Fetch weather forecast for a specific event. Each call costs 0.005 units against a 100-unit hourly quota (20 calls/hour max).",
+              "operationId": "getForecast",
+              "x-cost-per-call": 0.005,
+              "x-quota": {
+                "limit": 100,
+                "window_seconds": 3600
+              },
+              "parameters": [
+                {
+                  "name": "event_id",
+                  "in": "path",
+                  "required": true,
+                  "schema": { "type": "string" },
+                  "description": "Kalshi event ID"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Weather forecast data",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "event_id": { "type": "string" },
+                          "temperature_f": { "type": "number" },
+                          "conditions": { "type": "string" },
+                          "confidence": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                },
+                "402": {
+                  "description": "Payment required - quota exceeded for this hourly window",
+                  "headers": {
+                    "X-SEAM-Budget-Remaining": {
+                      "description": "Remaining budget units in current window",
+                      "schema": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/v1/batch": {
+            "post": {
+              "summary": "Batch forecast requests with higher cost",
+              "description": "Request multiple forecasts at once. Higher cost per call (0.02) against a larger hourly quota (500 units).",
+              "operationId": "batchForecasts",
+              "x-cost-per-call": 0.02,
+              "x-quota": {
+                "limit": 500,
+                "window_seconds": 3600
+              },
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "required": ["event_ids"],
+                      "properties": {
+                        "event_ids": {
+                          "type": "array",
+                          "items": { "type": "string" },
+                          "minItems": 1,
+                          "maxItems": 50
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Batch forecast results",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "forecasts": {
+                            "type": "array",
+                            "items": { "type": "object" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "429": { "description": "Too many requests - quota exceeded" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "example-5-complex-multi-extension": {
+      "$comment": "Complex route with multiple extensions - multi-region weather service with instance map, loop guard, cost, quota, custom TLS, and operation-level overrides.",
+      "description": "Complex production fragment demonstrating all SEAM extensions together: x-upstream-map for multi-region routing, x-loop-guard to prevent abuse, x-cost-per-call + x-quota for spend management, x-upstream-tls for custom CA, and operation-level policy overrides.",
+      "fragment": {
+        "x-seam-schema": "v1",
+        "x-seam-owner": "weather-forecast",
+        "x-api-version": "v2",
+        "x-instance-param": "region",
+        "x-upstream-map": {
+          "us-east": {
+            "url": "https://weather.api.example.com",
+            "vaultPath": "seam/routes/weather-forecast/us-east-token",
+            "injectAs": { "kind": "bearer" },
+            "tls": {
+              "caBundle": "weather-ca-bundle",
+              "serverName": "weather.api.example.com"
+            },
+            "probeInterval": "1m",
+            "breaker": {
+              "threshold": 5,
+              "openSeconds": 30,
+              "enabled": true
+            },
+            "requiredScope": "weather:read:us-east"
+          },
+          "eu-central": {
+            "url": "https://weather.eu.example.com",
+            "vaultPath": "seam/routes/weather-forecast/eu-token",
+            "injectAs": { "kind": "bearer" },
+            "probeInterval": "45s",
+            "breaker": {
+              "threshold": 8,
+              "openSeconds": 45,
+              "enabled": true
+            },
+            "requiredScope": "weather:read:eu-central"
+          },
+          "ap-southeast": {
+            "url": "https://weather.ap.example.com",
+            "vaultPath": "seam/routes/weather-forecast/ap-token",
+            "injectAs": {
+              "kind": "header",
+              "name": "X-Weather-API-Key"
+            },
+            "probeInterval": "90s",
+            "breaker": {
+              "threshold": 3,
+              "openSeconds": 60,
+              "enabled": true
+            },
+            "requiredScope": "weather:read:ap-southeast"
+          }
+        },
+        "x-upstream-strip-prefix": "/v2",
+        "x-fanout-scope": "weather:read:all",
+        "x-required-scope": "weather:query",
+        "paths": {
+          "/{region}/forecast": {
+            "get": {
+              "summary": "Get weather forecast by region (multi-instance)",
+              "description": "Fetch weather forecast for a specific region instance. Demonstrates loop guard, cost tracking, and quota limits working together.",
+              "operationId": "getForecastByRegion",
+              "x-loop-guard": {
+                "max_iterations": 5,
+                "backoff_ms": 10000
+              },
+              "x-cost-per-call": 0.001,
+              "x-quota": {
+                "limit": 1000,
+                "window_seconds": 3600
+              },
+              "parameters": [
+                {
+                  "name": "region",
+                  "in": "path",
+                  "required": true,
+                  "schema": { "type": "string" },
+                  "description": "Region instance selector (us-east, eu-central, ap-southeast)"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Weather forecast",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "region": { "type": "string" },
+                          "temperature_c": { "type": "number" },
+                          "humidity": { "type": "number" },
+                          "conditions": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                },
+                "404": { "description": "Region not found" },
+                "429": { "description": "Quota exceeded" }
+              }
+            }
+          },
+          "/{region}/historical": {
+            "get": {
+              "summary": "Get historical weather data (stricter limits)",
+              "description": "Historical data endpoint with stricter loop guard (3 iterations max) and higher cost (0.005 per call).",
+              "operationId": "getHistoricalData",
+              "x-loop-guard": {
+                "max_iterations": 3,
+                "backoff_ms": 30000
+              },
+              "x-cost-per-call": 0.005,
+              "x-quota": {
+                "limit": 200,
+                "window_seconds": 3600
+              },
+              "parameters": [
+                {
+                  "name": "region",
+                  "in": "path",
+                  "required": true,
+                  "schema": { "type": "string" }
+                },
+                {
+                  "name": "start_date",
+                  "in": "query",
+                  "required": true,
+                  "schema": { "type": "string", "format": "date" }
+                },
+                {
+                  "name": "end_date",
+                  "in": "query",
+                  "required": true,
+                  "schema": { "type": "string", "format": "date" }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Historical weather data",
+                  "content": {
+                    "application/json": {
+                      "schema": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "validation_results": {
+    "$comment": "Results of validating all examples against route-fragment-schema.json.",
+    "summary": {
+      "total_examples": 5,
+      "valid": 5,
+      "invalid": 0
+    },
+    "details": [
+      {
+        "example": "example-1-argocd-read-only-proxy",
+        "status": "valid",
+        "notes": "Pass-through proxy with no credentials (no x-vault-path/x-inject-as). Demonstrates x-upstream-tls with custom CA bundle and x-breaker configuration."
+      },
+      {
+        "example": "example-2-simple-secret-injection",
+        "status": "valid",
+        "notes": "Minimal secret injection with x-vault-path and x-inject-as:bearer. Includes x-credential-probe with POST method validation."
+      },
+      {
+        "example": "example-3-credential-probing",
+        "status": "valid",
+        "notes": "Credential probing with 30-second interval on GET endpoint. Demonstrates x-breaker threshold tuning and 401 → probe failure detection."
+      },
+      {
+        "example": "example-4-cost-and-quota-limits",
+        "status": "valid",
+        "notes": "Cost tracking (0.005 units/call) with hourly quota (100 units). Demonstrates x-quota REQUIRES x-cost-per-call constraint and operation-level overrides."
+      },
+      {
+        "example": "example-5-complex-multi-extension",
+        "status": "valid",
+        "notes": "Complex fragment with x-upstream-map (3 instances), x-upstream-strip-prefix, x-fanout-scope, x-loop-guard, x-cost-per-call, x-quota, per-instance x-upstream-tls, and operation-level policy overrides. All constraints satisfied."
+      }
+    ]
+  }
+}

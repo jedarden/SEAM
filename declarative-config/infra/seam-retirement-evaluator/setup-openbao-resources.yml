@@ -1,0 +1,32 @@
+---
+# OpenBao Kubernetes Authentication Role for seam-retirement-evaluator
+# This resource must be created in OpenBao using the API or CLI with admin access
+apiVersion: openbao.org/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: seam-retirement-evaluator
+  namespace: openbao
+spec:
+  # Kubernetes authentication method configuration
+  kubernetes:
+    # Bind to specific ServiceAccount in seam namespace
+    boundServiceAccountNames:
+      - seam-retirement-evaluator
+    boundServiceAccountNamespaces:
+      - seam
+
+    # Token policies
+    policies:
+      - seam-retirement-evaluator-policy
+
+    # Token TTL settings
+    tokenTTL: 24h
+    tokenMaxTTL: 72h
+
+    # Token settings
+    tokenDefaultPolicies:
+      - seam-retirement-evaluator-policy
+---
+# Policy definition (for reference - must be loaded into OpenBao)
+# This policy should be loaded using: vault policy write seam-retirement-evaluator-policy openbao-policy.hcl
+# File: openbao-policy.hcl (see separate file)

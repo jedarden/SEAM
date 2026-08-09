@@ -1,0 +1,19 @@
+{
+  "$comment": "Test Example 1: Minimal fragment with one SEAM extension",
+  "x-seam-schema": "v1",
+  "x-seam-owner": "echo-service",
+  "x-upstream": "https://echo.example.com",
+  "paths": {
+    "/echo": {
+      "get": {
+        "summary": "Echo endpoint",
+        "operationId": "echo",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}
