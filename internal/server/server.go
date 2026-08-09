@@ -7,11 +7,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/ardenone/seam/internal/spec"
-	openapiui "github.com/oaswrap/openapi-ui"
-	"github.com/oaswrap/openapi-ui/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -197,13 +196,8 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
 
-	// Setup OpenAPI UI handler using the openapi-ui library
-	docsHandler := openapiui.NewHandler(openapiui.Redoc(config.Redoc{
-		Title:       "SEAM API Documentation",
-		OpenAPIYAML: "/openapi.json",
-		BasePath:    "/docs",
-	}))
-	s.callerMux.Handle("/docs", docsHandler)
+	// Setup docs handler - fetches spec internally and serves ReDoc UI
+	s.callerMux.HandleFunc("/docs", s.docsHandler)
 
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
 
@@ -350,6 +344,86 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	_, _ = w.Write(specJSON)
+}
+
+// docsHandler serves the OpenAPI documentation UI with embedded spec
+// Fetches the merged OpenAPI spec from the spec loader and serves it with Scalar API Reference
+func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Fetch the merged OpenAPI spec from internal spec loader
+	specJSON, err := s.specLoader.GetRawJSON()
+	if err != nil {
+		log.Printf("[/docs] Failed to fetch merged spec: %v", err)
+		http.Error(w, "Failed to load API specification", http.StatusInternalServerError)
+		return
+	}
+
+	// Validate that the spec is valid JSON
+	var specJSONCheck interface{}
+	if err := json.Unmarshal(specJSON, &specJSONCheck); err != nil {
+		log.Printf("[/docs] Spec validation failed - invalid JSON: %v", err)
+		http.Error(w, "API specification is not valid JSON", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[/docs] Successfully fetched and validated merged spec (%d bytes)", len(specJSON))
+
+	// Check if no fragments were loaded (fragment mode only) - log warning
+	fragmentStatus := s.specLoader.GetFragmentStatus()
+	if fragmentsLoaded, ok := fragmentStatus["fragments_loaded"].(bool); ok && fragmentsLoaded {
+		if validCount, ok := fragmentStatus["valid_count"].(int); ok && validCount == 0 {
+			log.Printf("[/docs] Warning: No valid fragments loaded, serving empty spec")
+		}
+	}
+
+	// Serve the documentation UI with the spec embedded
+	// Using Scalar API Reference with the spec embedded in a script tag
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+
+	// Embed the spec JSON in the HTML page
+	specJSONEscaped := string(specJSON)
+	// Escape the JSON for safe embedding in HTML script tag
+	specJSONEscaped = strings.ReplaceAll(specJSONEscaped, "</script>", `<\/script>`)
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+  <title>SEAM API Documentation</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { margin: 0; padding: 0; }
+    #scalar-app { height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="scalar-app"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  <script>
+    var specData = ` + specJSONEscaped + `;
+    Scalar.createApiReference('#scalar-app', {
+      spec: {
+        content: specData
+      },
+      theme: 'default',
+      metaData: {
+        title: 'SEAM API Documentation',
+        description: 'Interactive API documentation for SEAM Gateway'
+      }
+    });
+  </script>
+</body>
+</html>`
+
+	_, _ = w.Write([]byte(html))
 }
 
 // docsRouteHandler returns route documentation for a specific endpoint
