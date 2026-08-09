@@ -417,6 +417,27 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
       metaData: {
         title: 'SEAM API Documentation',
         description: 'Interactive API documentation for SEAM Gateway'
+      },
+      // Enable interactive features
+      isEditable: false,
+      hideTryIt: false,
+      tryItCorsProxy: false,
+      showSidebar: true,
+      matchPaths: [],
+      allowedLabels: [],
+      baseServerURL: '',
+      defaultShowAllExamples: true,
+      darkMode: false,
+      layout: 'classic',
+      search: {
+        open: true
+      },
+      seo: {
+        title: 'SEAM API Documentation',
+        description: 'Interactive API documentation for SEAM Gateway'
+      },
+      routing: {
+        basePath: '/docs'
       }
     });
   </script>
