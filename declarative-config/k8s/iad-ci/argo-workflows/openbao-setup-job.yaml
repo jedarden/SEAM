@@ -127,4 +127,3 @@ spec:
     serviceAccountName: argo-workflow
     retryStrategy:
       limit: 3
-  entrypoint: setup-openbao-resources
