@@ -1,32 +1,71 @@
 ---
-# OpenBao Kubernetes Authentication Role for seam-retirement-evaluator
-# This resource must be created in OpenBao using the API or CLI with admin access
-apiVersion: openbao.org/v1alpha1
-kind: OpenBaoKubernetesAuthRole
-metadata:
-  name: seam-retirement-evaluator
-  namespace: openbao
-spec:
-  # Kubernetes authentication method configuration
-  kubernetes:
-    # Bind to specific ServiceAccount in seam namespace
-    boundServiceAccountNames:
-      - seam-retirement-evaluator
-    boundServiceAccountNamespaces:
-      - seam
+# OpenBao Kubernetes Authentication Role Documentation
+# Role: seam-retirement-evaluator
+#
+# This file documents the OpenBao Kubernetes authentication role that is created
+# by the Argo WorkflowTemplate: seam-retirement-evaluator-openbao-setup
+#
+# The role is NOT managed via Kubernetes CRD (OpenBao does not provide such CRDs).
+# Instead, it is created via the OpenBao CLI during the workflow execution.
+#
+# Role Configuration (as created in OpenBao):
+#   bao write auth/kubernetes/role/seam-retirement-evaluator \
+#     bound_service_account_names=seam-retirement-evaluator \
+#     bound_service_account_namespaces=seam \
+#     policies=seam-retirement-evaluator-policy \
+#     token_ttl=24h \
+#     token_max_ttl=72h \
+#     token_default_policies=seam-retirement-evaluator-policy
 
-    # Token policies
-    policies:
-      - seam-retirement-evaluator-policy
+# Service Account Binding
+boundServiceAccountNames:
+  - seam-retirement-evaluator
 
-    # Token TTL settings
-    tokenTTL: 24h
-    tokenMaxTTL: 72h
+boundServiceAccountNamespaces:
+  - seam
 
-    # Token settings
-    tokenDefaultPolicies:
-      - seam-retirement-evaluator-policy
+# Policies
+policies:
+  - seam-retirement-evaluator-policy
+
+tokenDefaultPolicies:
+  - seam-retirement-evaluator-policy
+
+# Token TTL Settings
+tokenTTL: 24h
+tokenMaxTTL: 72h
+
 ---
-# Policy definition (for reference - must be loaded into OpenBao)
-# This policy should be loaded using: vault policy write seam-retirement-evaluator-policy openbao-policy.hcl
-# File: openbao-policy.hcl (see separate file)
+# Policy Reference: seam-retirement-evaluator-policy
+#
+# # Allow reading evaluator's own GitHub token
+# path "secret/data/seam-retirement-evaluator/*" {
+#   capabilities = ["read"]
+# }
+#
+# # Allow reading VictoriaMetrics credentials
+# path "secret/data/monitoring/victoriametrics/*" {
+#   capabilities = ["read"]
+# }
+#
+# # Explicitly deny access to SEAM's route secrets
+# path "secret/data/seam/routes/*" {
+#   capabilities = ["deny"]
+# }
+#
+# # Deny access to all other secrets
+# path "secret/data/*" {
+#   capabilities = ["deny"]
+# }
+---
+# Distinction from SEAM's OpenBao Role
+#
+# SEAM uses a different OpenBao role with the following differences:
+# - Role name: seam (or seam-openbao-role)
+# - Policy: seam-openbao-policy (allows access to secret/data/seam/routes/*)
+# - Service Account: seam (not seam-retirement-evaluator)
+#
+# This separation ensures:
+# - The evaluator cannot read SEAM's route secrets (enforced by deny rule)
+# - SEAM cannot read the evaluator's GitHub token (different policy)
+# - Each service has its own identity and access boundaries
