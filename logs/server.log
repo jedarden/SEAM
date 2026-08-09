@@ -52,3 +52,27 @@
 2026/08/09 01:02:56.356337 Validation middleware active on caller-facing port
 2026/08/09 01:02:56.356367 Operator-only server listening on :8889
 2026/08/09 01:02:56.356354 Caller-facing server listening on :8888
+2026/08/09 02:06:50.506191 [Quota] Route /test/get has cost per call: $0.00
+2026/08/09 02:06:50.506224 [QuotaTracker] CheckAndRecordQuota: route=/test/get, cost=$0.00, token=, user=
+2026/08/09 02:06:50.506228 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:06:50.520587 [Quota] Route /test/456 has cost per call: $0.00
+2026/08/09 02:06:50.520625 [QuotaTracker] CheckAndRecordQuota: route=/test/456, cost=$0.00, token=, user=
+2026/08/09 02:06:50.520632 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:06:50.551807 [Quota] Route /test/789 has cost per call: $0.00
+2026/08/09 02:06:50.551843 [QuotaTracker] CheckAndRecordQuota: route=/test/789, cost=$0.00, token=, user=
+2026/08/09 02:06:50.551850 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:08:01.301866 [Quota] Route /test/get has cost per call: $0.00
+2026/08/09 02:08:01.301912 [QuotaTracker] CheckAndRecordQuota: route=/test/get, cost=$0.00, token=, user=
+2026/08/09 02:08:01.301919 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:08:01.309135 [Quota] Route /test/abc456 has cost per call: $0.00
+2026/08/09 02:08:01.309155 [QuotaTracker] CheckAndRecordQuota: route=/test/abc456, cost=$0.00, token=, user=
+2026/08/09 02:08:01.309160 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:08:01.316328 [Quota] Route /test/post has cost per call: $0.00
+2026/08/09 02:08:01.316358 [QuotaTracker] CheckAndRecordQuota: route=/test/post, cost=$0.00, token=, user=
+2026/08/09 02:08:01.316362 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:08:01.323269 [Quota] Route /test/123 has cost per call: $0.00
+2026/08/09 02:08:01.323301 [QuotaTracker] CheckAndRecordQuota: route=/test/123, cost=$0.00, token=, user=
+2026/08/09 02:08:01.323305 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00
+2026/08/09 02:08:08.177941 [Quota] Route /test/get has cost per call: $0.00
+2026/08/09 02:08:08.177997 [QuotaTracker] CheckAndRecordQuota: route=/test/get, cost=$0.00, token=, user=
+2026/08/09 02:08:08.178001 [QuotaTracker] Cache hit path: allowed=true, remaining=$0.00

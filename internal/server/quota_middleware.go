@@ -113,6 +113,9 @@ func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, route string,
 	}
 
 	_ = json.NewEncoder(w).Encode(response)
+
+	// Record quota exceeded metric
+	recordQuotaExceeded(route)
 }
 
 // formatCost formats a cost value as USD string

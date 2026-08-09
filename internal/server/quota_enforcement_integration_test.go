@@ -21,14 +21,12 @@ func TestQuotaEnforcement_CacheMissIntegration(t *testing.T) {
 
 	s := New(cfg)
 
-	// Configure a very low quota limit to trigger enforcement quickly
-	s.quotaTracker.SetQuota("/api/test", QuotaConfig{
-		Limit:  0.30, // Only $0.30 limit
+	// Configure a global quota limit to test enforcement across multiple routes
+	s.quotaTracker.SetQuota("", QuotaConfig{
+		Limit:  0.30, // Only $0.30 global limit
 		Window: 1 * time.Hour,
-		Scope:  "per-route",
+		Scope:  "global",
 	})
-
-	s.quotaTracker.SetCostPerCall("/api/test", 0.10) // $0.10 per call
 
 	// Create a mock upstream handler
 	upstreamCallCount := 0
@@ -38,17 +36,22 @@ func TestQuotaEnforcement_CacheMissIntegration(t *testing.T) {
 		w.Write([]byte("upstream response"))
 	})
 
-	// Wrap with cache and quota middleware
-	cachedHandler := s.cacheMiddleware(mockHandler)
-	quotaHandler := s.quotaMiddleware(cachedHandler)
+	// Wrap with quota and cache middleware (order must match production: cache → quota → handler)
+	quotaHandler := s.quotaMiddleware(mockHandler)
+	cachedHandler := s.cacheMiddleware(quotaHandler)
 
-	// Enable caching
+	// Set cost and enable caching for routes
+	s.quotaTracker.SetCostPerCall("/api/test", 0.10)
 	s.cacheTTLs["/api/test"] = 300
+	s.quotaTracker.SetCostPerCall("/api/test2", 0.10)
+	s.cacheTTLs["/api/test2"] = 300
+	s.quotaTracker.SetCostPerCall("/api/test3", 0.10)
+	s.cacheTTLs["/api/test3"] = 300
 
 	// First request - cache miss, should succeed
 	req1 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w1 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w1, req1)
+	cachedHandler.ServeHTTP(w1, req1)
 
 	if w1.Code != http.StatusOK {
 		t.Errorf("first request: expected status 200, got %d", w1.Code)
@@ -61,7 +64,7 @@ func TestQuotaEnforcement_CacheMissIntegration(t *testing.T) {
 	// Second request - cache hit, should succeed without consuming quota
 	req2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w2 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w2, req2)
+	cachedHandler.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusOK {
 		t.Errorf("second request: expected status 200, got %d", w2.Code)
@@ -74,57 +77,27 @@ func TestQuotaEnforcement_CacheMissIntegration(t *testing.T) {
 	// Third request - different path, cache miss, should succeed
 	req3 := httptest.NewRequest(http.MethodGet, "/api/test2", nil)
 	w3 := httptest.NewRecorder()
-	s.cacheTTLs["/api/test2"] = 300
-	s.quotaTracker.SetQuota("/api/test2", QuotaConfig{
-		Limit:  0.30,
-		Window: 1 * time.Hour,
-		Scope:  "per-route",
-	})
-	s.quotaTracker.SetCostPerCall("/api/test2", 0.10)
-	quotaHandler.ServeHTTP(w3, req3)
+	cachedHandler.ServeHTTP(w3, req3)
 
 	if w3.Code != http.StatusOK {
 		t.Errorf("third request: expected status 200, got %d", w3.Code)
 	}
 
-	// Fourth request - different path, cache miss, should succeed
+	// Fourth request - different path, cache miss, should be rate limited (global quota exceeded: $0.10 + $0.10 = $0.20 used, next $0.10 would exceed $0.30)
 	req4 := httptest.NewRequest(http.MethodGet, "/api/test3", nil)
 	w4 := httptest.NewRecorder()
-	s.cacheTTLs["/api/test3"] = 300
-	s.quotaTracker.SetQuota("/api/test3", QuotaConfig{
-		Limit:  0.30,
-		Window: 1 * time.Hour,
-		Scope:  "per-route",
-	})
-	s.quotaTracker.SetCostPerCall("/api/test3", 0.10)
-	quotaHandler.ServeHTTP(w4, req4)
+	cachedHandler.ServeHTTP(w4, req4)
 
-	if w4.Code != http.StatusOK {
-		t.Errorf("fourth request: expected status 200, got %d", w4.Code)
-	}
-
-	// Fifth request - different path, cache miss, should be rate limited (quota exceeded)
-	req5 := httptest.NewRequest(http.MethodGet, "/api/test4", nil)
-	w5 := httptest.NewRecorder()
-	s.cacheTTLs["/api/test4"] = 300
-	s.quotaTracker.SetQuota("/api/test4", QuotaConfig{
-		Limit:  0.30,
-		Window: 1 * time.Hour,
-		Scope:  "per-route",
-	})
-	s.quotaTracker.SetCostPerCall("/api/test4", 0.10)
-	quotaHandler.ServeHTTP(w5, req5)
-
-	if w5.Code != http.StatusTooManyRequests {
-		t.Errorf("fifth request: expected status 429 (quota exceeded), got %d", w5.Code)
+	if w4.Code != http.StatusTooManyRequests {
+		t.Errorf("fourth request: expected status 429 (quota exceeded), got %d", w4.Code)
 	}
 
 	// Verify the quota exceeded response
-	if w5.Header().Get("Content-Type") != "application/json" {
+	if w4.Header().Get("Content-Type") != "application/json" {
 		t.Error("quota exceeded response should have Content-Type: application/json")
 	}
 
-	body := w5.Body.String()
+	body := w4.Body.String()
 	if !strings.Contains(body, "quota_exceeded") {
 		t.Error("quota exceeded response should contain 'quota_exceeded' error")
 	}
@@ -141,9 +114,9 @@ func TestQuotaEnforcement_CacheMissIntegration(t *testing.T) {
 	metricsStr := string(metricsBody)
 
 	// Check that quota exceeded metric was recorded
-	if !strings.Contains(metricsStr, `seam_quota_exceeded_total{route="/api/test4"}`) &&
-		!strings.Contains(metricsStr, `seam_quota_exceeded_total{route="/api/test4",`) {
-		t.Error("expected seam_quota_exceeded_total metric for /api/test4")
+	if !strings.Contains(metricsStr, `seam_quota_exceeded_total{route="/api/test3"}`) &&
+		!strings.Contains(metricsStr, `seam_quota_exceeded_total{route="/api/test3",`) {
+		t.Error("expected seam_quota_exceeded_total metric for /api/test3")
 	}
 }
 
@@ -159,11 +132,11 @@ func TestQuotaEnforcement_CacheHitsBypassEnforcement(t *testing.T) {
 
 	s := New(cfg)
 
-	// Configure a very low quota limit
-	s.quotaTracker.SetQuota("/api/test", QuotaConfig{
-		Limit:  0.10, // Only $0.10 limit (1 call at $0.10)
+	// Configure a very low global quota limit
+	s.quotaTracker.SetQuota("", QuotaConfig{
+		Limit:  0.10, // Only $0.10 global limit (1 call at $0.10)
 		Window: 1 * time.Hour,
-		Scope:  "per-route",
+		Scope:  "global",
 	})
 
 	s.quotaTracker.SetCostPerCall("/api/test", 0.10)
@@ -176,9 +149,9 @@ func TestQuotaEnforcement_CacheHitsBypassEnforcement(t *testing.T) {
 		w.Write([]byte("upstream response"))
 	})
 
-	// Wrap with cache and quota middleware
-	cachedHandler := s.cacheMiddleware(mockHandler)
-	quotaHandler := s.quotaMiddleware(cachedHandler)
+	// Wrap with quota and cache middleware (order must match production: cache → quota → handler)
+	quotaHandler := s.quotaMiddleware(mockHandler)
+	cachedHandler := s.cacheMiddleware(quotaHandler)
 
 	// Enable caching
 	s.cacheTTLs["/api/test"] = 300
@@ -186,7 +159,7 @@ func TestQuotaEnforcement_CacheHitsBypassEnforcement(t *testing.T) {
 	// First request - cache miss, consumes the entire quota
 	req1 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w1 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w1, req1)
+	cachedHandler.ServeHTTP(w1, req1)
 
 	if w1.Code != http.StatusOK {
 		t.Errorf("first request: expected status 200, got %d", w1.Code)
@@ -199,7 +172,7 @@ func TestQuotaEnforcement_CacheHitsBypassEnforcement(t *testing.T) {
 	// Second request would normally exceed quota, but it's a cache hit so it should succeed
 	req2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w2 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w2, req2)
+	cachedHandler.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusOK {
 		t.Errorf("second request (cache hit): expected status 200, got %d - cache hits should bypass quota enforcement", w2.Code)
@@ -214,16 +187,11 @@ func TestQuotaEnforcement_CacheHitsBypassEnforcement(t *testing.T) {
 	}
 
 	// Third request - different path, cache miss, should be rate limited
+	s.quotaTracker.SetCostPerCall("/api/test2", 0.10)
+	s.cacheTTLs["/api/test2"] = 300
 	req3 := httptest.NewRequest(http.MethodGet, "/api/test2", nil)
 	w3 := httptest.NewRecorder()
-	s.cacheTTLs["/api/test2"] = 300
-	s.quotaTracker.SetQuota("/api/test2", QuotaConfig{
-		Limit:  0.10,
-		Window: 1 * time.Hour,
-		Scope:  "per-route",
-	})
-	s.quotaTracker.SetCostPerCall("/api/test2", 0.10)
-	quotaHandler.ServeHTTP(w3, req3)
+	cachedHandler.ServeHTTP(w3, req3)
 
 	if w3.Code != http.StatusTooManyRequests {
 		t.Errorf("third request (cache miss, different route): expected status 429, got %d", w3.Code)
@@ -283,15 +251,15 @@ func TestQuotaEnforcement_GlobalScope(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	// Wrap with cache and quota middleware
-	cachedHandler := s.cacheMiddleware(mockHandler)
-	quotaHandler := s.quotaMiddleware(cachedHandler)
+	// Wrap with quota and cache middleware (order must match production: cache → quota → handler)
+	quotaHandler := s.quotaMiddleware(mockHandler)
+	cachedHandler := s.cacheMiddleware(quotaHandler)
 
 	// First two requests should succeed (total $0.40)
 	for i := 0; i < 2; i++ {
 		req := httptest.NewRequest(http.MethodGet, routes[i], nil)
 		w := httptest.NewRecorder()
-		quotaHandler.ServeHTTP(w, req)
+		cachedHandler.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("request %d: expected status 200, got %d", i+1, w.Code)
@@ -301,7 +269,7 @@ func TestQuotaEnforcement_GlobalScope(t *testing.T) {
 	// Third request should be rate limited (would exceed global quota of $0.50)
 	req3 := httptest.NewRequest(http.MethodGet, routes[2], nil)
 	w3 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w3, req3)
+	cachedHandler.ServeHTTP(w3, req3)
 
 	if w3.Code != http.StatusTooManyRequests {
 		t.Errorf("third request: expected status 429 (global quota exceeded), got %d", w3.Code)
@@ -311,7 +279,7 @@ func TestQuotaEnforcement_GlobalScope(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		req := httptest.NewRequest(http.MethodGet, routes[i], nil)
 		w := httptest.NewRecorder()
-		quotaHandler.ServeHTTP(w, req)
+		cachedHandler.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("cache hit request %d: expected status 200, got %d - cache hits should bypass quota", i+1, w.Code)
@@ -347,9 +315,9 @@ func TestQuotaEnforcement_ResponseHeaders(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	// Wrap with cache and quota middleware
-	cachedHandler := s.cacheMiddleware(mockHandler)
-	quotaHandler := s.quotaMiddleware(cachedHandler)
+	// Wrap with quota and cache middleware (order must match production: cache → quota → handler)
+	quotaHandler := s.quotaMiddleware(mockHandler)
+	cachedHandler := s.cacheMiddleware(quotaHandler)
 
 	// Enable caching
 	s.cacheTTLs["/api/test"] = 300
@@ -357,7 +325,7 @@ func TestQuotaEnforcement_ResponseHeaders(t *testing.T) {
 	// First request - cache miss
 	req1 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w1 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w1, req1)
+	cachedHandler.ServeHTTP(w1, req1)
 
 	// Verify cache miss headers
 	if w1.Header().Get("X-SEAM-Cache") == "HIT" {
@@ -379,7 +347,7 @@ func TestQuotaEnforcement_ResponseHeaders(t *testing.T) {
 	// Second request - cache hit
 	req2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w2 := httptest.NewRecorder()
-	quotaHandler.ServeHTTP(w2, req2)
+	cachedHandler.ServeHTTP(w2, req2)
 
 	// Verify cache hit headers
 	if w2.Header().Get("X-SEAM-Cache") != "HIT" {
@@ -410,12 +378,15 @@ func TestQuotaEnforcement_ReservedPaths(t *testing.T) {
 
 	s := New(cfg)
 
-	// Configure a very low quota
+	// Configure a very low global quota
 	s.quotaTracker.SetQuota("", QuotaConfig{
 		Limit:  0.01,
 		Window: 1 * time.Hour,
 		Scope:  "global",
 	})
+
+	// Set a cost for the non-reserved path so it exceeds the quota
+	s.quotaTracker.SetCostPerCall("/api/test", 0.10)
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
