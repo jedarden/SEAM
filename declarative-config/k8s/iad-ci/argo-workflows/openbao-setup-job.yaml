@@ -43,8 +43,8 @@ spec:
           # Allows read access to evaluator's own GitHub token path and VictoriaMetrics credentials
           # Explicitly denies access to seam/routes/* to ensure SEAM cannot read evaluator's token
 
-          # Allow reading evaluator's own GitHub token
-          path "secret/data/seam-retirement-evaluator/*" {
+          # Allow reading evaluator's own GitHub token from dedicated evaluators path
+          path "secret/data/evaluators/seam-retirement-evaluator/*" {
             capabilities = ["read"]
           }
 
@@ -78,24 +78,24 @@ spec:
 
           log "Kubernetes auth role configured"
 
-          # Step 3: Create the GitHub token path
+          # Step 3: Create the GitHub token path at dedicated evaluators namespace
           GITHUB_TOKEN="{{inputs.parameters.github-token}}"
           if [ -n "$GITHUB_TOKEN" ]; then
             log "Creating GitHub token with provided value..."
-            bao kv put secret/seam-retirement-evaluator/github-token \
+            bao kv put secret/evaluators/seam-retirement-evaluator/github-token \
               token="$GITHUB_TOKEN" \
               created_by="seam-retirement-evaluator-setup-workflow" \
               created_on=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           else
             log "Creating GitHub token placeholder (no token provided)..."
-            bao kv put secret/seam-retirement-evaluator/github-token \
+            bao kv put secret/evaluators/seam-retirement-evaluator/github-token \
               token="REPLACE_WITH_ACTUAL_GITHUB_PAT" \
               note="This is a placeholder. Replace with actual GitHub PAT from https://github.com/settings/tokens with repo scope" \
               created_by="seam-retirement-evaluator-setup-workflow" \
               created_on=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           fi
 
-          log "GitHub token path created"
+          log "GitHub token path created at secret/evaluators/seam-retirement-evaluator/github-token"
 
           # Step 4: Verify SEAM policy doesn't have access to evaluator path
           log "Verifying SEAM policy isolation..."
@@ -122,7 +122,7 @@ spec:
           log "=== OpenBao setup complete ==="
           log "Next steps:"
           log "1. If token was not provided, create GitHub PAT at https://github.com/settings/tokens"
-          log "2. Update the token: bao kv put secret/seam-retirement-evaluator/github-token token=ghp_..."
+          log "2. Update the token: bao kv put secret/evaluators/seam-retirement-evaluator/github-token token=ghp_..."
           log "3. Run verification workflow to test access"
     serviceAccountName: argo-workflow
     retryStrategy:
