@@ -39,7 +39,7 @@ tokenMaxTTL: 72h
 # Policy Reference: seam-retirement-evaluator-policy
 #
 # # Allow reading evaluator's own GitHub token
-# path "secret/data/seam-retirement-evaluator/*" {
+# path "secret/data/evaluators/seam-retirement-evaluator/*" {
 #   capabilities = ["read"]
 # }
 #
