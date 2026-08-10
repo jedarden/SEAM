@@ -7,7 +7,7 @@ log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
 OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
 EVALUATOR_SA="seam-retirement-evaluator"
 EVALUATOR_NS="seam"
-GITHUB_TOKEN_PATH="secret/data/seam-retirement-evaluator/github-token"
+GITHUB_TOKEN_PATH="secret/data/evaluators/seam-retirement-evaluator/github-token"
 
 log "== Starting OpenBao provisioning for seam-retirement-evaluator =="
 
@@ -27,8 +27,8 @@ POLICY_HCL=$(cat <<'EOF'
 # Allows read access to evaluator's own GitHub token path and VictoriaMetrics credentials
 # Explicitly denies access to seam/routes/* to ensure SEAM cannot read evaluator's token
 
-# Allow reading evaluator's own GitHub token
-path "secret/data/seam-retirement-evaluator/*" {
+# Allow reading evaluator's own GitHub token from dedicated evaluators path
+path "secret/data/evaluators/seam-retirement-evaluator/*" {
   capabilities = ["read"]
 }
 

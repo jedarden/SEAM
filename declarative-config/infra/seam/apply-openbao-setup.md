@@ -22,7 +22,7 @@ path "secret/data/seam/routes/*" {
 }
 
 # Deny access to evaluator's secrets (explicit separation)
-path "secret/data/seam-retirement-evaluator/*" {
+path "secret/data/evaluators/seam-retirement-evaluator/*" {
   capabilities = ["deny"]
 }
 

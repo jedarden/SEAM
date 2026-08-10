@@ -2,8 +2,8 @@
 # Allows read access to evaluator's own GitHub token path and VictoriaMetrics credentials
 # Explicitly denies access to seam/routes/* to ensure SEAM cannot read evaluator's token
 
-# Allow reading evaluator's own GitHub token
-path "secret/data/seam-retirement-evaluator/*" {
+# Allow reading evaluator's own GitHub token from dedicated evaluators path
+path "secret/data/evaluators/seam-retirement-evaluator/*" {
   capabilities = ["read"]
 }
 
