@@ -57,12 +57,12 @@ spec:
 
           log "Successfully authenticated to OpenBao"
 
-          # Test 1: Read evaluator's own GitHub token
+          # Test 1: Read evaluator's own GitHub token from dedicated evaluators path
           log "Test 1: Verifying evaluator can read own GitHub token..."
-          TOKEN_TEST=$(bao kv get -field=token secret/seam-retirement-evaluator/github-token 2>&1)
+          TOKEN_TEST=$(bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token 2>&1)
 
           if echo "$TOKEN_TEST" | grep -qi "permission denied\|Invalid"; then
-            error "FAIL: Cannot read own GitHub token at secret/seam-retirement-evaluator/github-token"
+            error "FAIL: Cannot read own GitHub token at secret/evaluators/seam-retirement-evaluator/github-token"
           elif echo "$TOKEN_TEST" | grep -qi "REPLACE_WITH_ACTUAL_GITHUB_PAT"; then
             log "WARNING: GitHub token path exists but contains placeholder"
             log "This is expected during initial setup - update with actual token"
