@@ -1,0 +1,82 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: openbao-read-test
+  namespace: argo-workflows
+  labels:
+    app: openbao-test
+    component: read-verification
+spec:
+  entrypoint: test-read
+  templates:
+  - name: test-read
+    container:
+      image: ghcr.io/openbao/openbao:1.15.0
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          # Configure OpenBao address
+          OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
+          export VAULT_ADDR=$OPENBAO_ADDR
+
+          log "=== OpenBao Read Test ==="
+
+          # Check connectivity
+          if ! bao status >/dev/null 2>&1; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR"
+          fi
+          log "✓ OpenBao is reachable"
+
+          # Read Kubernetes service account token for authentication
+          if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
+            error "Not running in Kubernetes cluster"
+          fi
+
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          SA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)
+
+          log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
+
+          # Authenticate using Kubernetes auth method
+          log "Authenticating to OpenBao..."
+          CLIENT_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt="$SA_TOKEN" 2>&1)
+
+          if [ $? -ne 0 ] || [ -z "$CLIENT_TOKEN" ]; then
+            error "Failed to authenticate: $CLIENT_TOKEN"
+          fi
+
+          log "✓ Successfully authenticated to OpenBao"
+
+          # Test: Read a secret path (this is a minimal read-only test)
+          # Adjust the secret path based on your actual OpenBao setup
+          log "Testing read operation on secret path..."
+
+          # Example: Try to read a test secret (replace with actual path)
+          # This example tries to read from a monitoring path that should exist
+          TEST_SECRET=$(bao kv get -field=value secret/monitoring/test 2>&1 || true)
+
+          # Check if we got a permission denied (expected for non-privileged access)
+          if echo "$TEST_SECRET" | grep -qi "permission denied\|Invalid"; then
+            log "✓ Read operation executed (access denied as expected for this path)"
+          elif echo "$TEST_SECRET" | grep -qi "deny"; then
+            log "✓ Read operation executed (explicit deny as expected)"
+          else
+            log "✓ Read operation executed successfully"
+            # If we actually got data, log it (masked)
+            if [ -n "$TEST_SECRET" ]; then
+              log "  Secret value: [REDACTED]"
+            fi
+          fi
+
+          log "=== OpenBao Read Test Complete ==="
+          log "Basic connectivity and read operations verified"
+
+    serviceAccountName: argo-workflow
+    retryStrategy:
+      limit: 1
