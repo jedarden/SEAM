@@ -118,6 +118,6 @@ spec:
 
           log "=== All verification tests passed ==="
           log "Setup is ready for seam-retirement-evaluator deployment"
-    serviceAccountName: argocd-manager
+    serviceAccountName: argo-workflow
     retryStrategy:
       limit: 2
