@@ -12,7 +12,7 @@ spec:
   templates:
   - name: test-read
     container:
-      image: ghcr.io/openbao/openbao:1.15.0
+      image: openbao/openbao:2.6.1
       command: ["/bin/sh", "-c"]
       args:
         - |
