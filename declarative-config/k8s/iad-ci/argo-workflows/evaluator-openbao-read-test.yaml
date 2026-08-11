@@ -1,0 +1,187 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: evaluator-openbao-read-test
+  namespace: argo-workflows
+  labels:
+    app: seam-retirement-evaluator
+    component: openbao-read-test
+spec:
+  entrypoint: test-evaluator-token-read
+  templates:
+  - name: test-evaluator-token-read
+    container:
+      image: curlimages/curl:8.6.0
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          # Configure OpenBao address
+          OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
+
+          log "=== Evaluator OpenBao Token Read Test ==="
+
+          # Check basic connectivity to OpenBao
+          log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$OPENBAO_ADDR/v1/sys/health" 2>&1 || echo "000")
+
+          if [ "$STATUS_CODE" = "000" ]; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR (connection failed)"
+          elif [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "429" ] && [ "$STATUS_CODE" != "503" ]; then
+            log "⚠ OpenBao returned unexpected status code: $STATUS_CODE"
+          else
+            log "✓ OpenBao is reachable (HTTP $STATUS_CODE)"
+          fi
+
+          # Read Kubernetes service account token for authentication
+          if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
+            error "Not running in Kubernetes cluster"
+          fi
+
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          SA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)
+
+          log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
+
+          # Verify we're running as the correct service account
+          if [ "$SA_NAME" != "seam-retirement-evaluator" ]; then
+            log "⚠ WARNING: Not running as seam-retirement-evaluator service account"
+            log "  Current SA: $SA_NAME (expected: seam-retirement-evaluator)"
+            log "  This test will attempt authentication anyway, but may fail"
+          else
+            log "✓ Running as correct service account: seam-retirement-evaluator"
+          fi
+
+          if [ "$SA_NS" != "seam" ]; then
+            log "⚠ WARNING: Not running in seam namespace"
+            log "  Current namespace: $SA_NS (expected: seam)"
+            log "  This test will attempt authentication anyway, but may fail"
+          else
+            log "✓ Running in correct namespace: seam"
+          fi
+
+          # Authenticate using Kubernetes auth method with evaluator role
+          log "Authenticating to OpenBao via Kubernetes auth as seam-retirement-evaluator..."
+          AUTH_RESPONSE=$(curl -s -X POST \
+            --connect-timeout 5 \
+            --data "{\"role\": \"seam-retirement-evaluator\", \"jwt\": \"$SA_TOKEN\"}" \
+            "$OPENBAO_ADDR/v1/auth/kubernetes/login" 2>&1)
+
+          # Check if authentication succeeded
+          if echo "$AUTH_RESPONSE" | grep -q "errors"; then
+            error "Authentication failed: $AUTH_RESPONSE"
+          elif ! echo "$AUTH_RESPONSE" | grep -q "client_token"; then
+            error "Authentication response missing token: $AUTH_RESPONSE"
+          fi
+
+          # Extract token (masked in logs)
+          CLIENT_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"client_token":"[^"]*"' | cut -d'"' -f4)
+          log "✓ Successfully authenticated to OpenBao as seam-retirement-evaluator (token: ${CLIENT_TOKEN:0:12}...)"
+
+          # Read the evaluator's GitHub token
+          log "Reading GitHub token from secret/evaluators/seam-retirement-evaluator/github-token..."
+          READ_RESPONSE=$(curl -s -X GET \
+            -H "X-Vault-Token: $CLIENT_TOKEN" \
+            --connect-timeout 5 \
+            "$OPENBAO_ADDR/v1/secret/data/evaluators/seam-retirement-evaluator/github-token" 2>&1)
+
+          # Check for errors
+          if echo "$READ_RESPONSE" | grep -qi "permission denied"; then
+            error "FAIL: Permission denied reading evaluator's own GitHub token"
+          elif echo "$READ_RESPONSE" | grep -qi "Invalid"; then
+            error "FAIL: Invalid token or path when reading GitHub token"
+          elif echo "$READ_RESPONSE" | grep -q "errors"; then
+            error "FAIL: Error reading GitHub token: $READ_RESPONSE"
+          elif ! echo "$READ_RESPONSE" | grep -q "data"; then
+            error "FAIL: No data in response when reading GitHub token"
+          fi
+
+          # Extract the token value
+          GITHUB_TOKEN=$(echo "$READ_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "$GITHUB_TOKEN" ]; then
+            error "FAIL: Could not extract token from response"
+          fi
+
+          log "✓ Successfully retrieved GitHub token (length: ${#GITHUB_TOKEN} characters)"
+
+          # Validate token format
+          log "Validating GitHub token format..."
+
+          # Check if token is empty
+          if [ -z "$GITHUB_TOKEN" ]; then
+            error "FAIL: GitHub token is empty"
+          fi
+
+          # Check if token contains placeholder value
+          if [ "$GITHUB_TOKEN" = "REPLACE_WITH_ACTUAL_GITHUB_PAT" ]; then
+            error "FAIL: GitHub token contains placeholder value - not yet configured"
+          fi
+
+          # Check if token looks like a GitHub token
+          # GitHub PATs typically start with 'ghp_', 'gho_', 'ghu_', or are 40 hex characters (older format)
+          if echo "$GITHUB_TOKEN" | grep -q "^ghp_[a-zA-Z0-9_]\{36\}$"; then
+            log "✓ Token format valid (GitHub PAT: ghp_ prefix, 36 characters)"
+          elif echo "$GITHUB_TOKEN" | grep -q "^gho_[a-zA-Z0-9_]\{36\}$"; then
+            log "✓ Token format valid (GitHub OAuth token: gho_ prefix, 36 characters)"
+          elif echo "$GITHUB_TOKEN" | grep -q "^ghu_[a-zA-Z0-9_]\{36\}$"; then
+            log "✓ Token format valid (GitHub user token: ghu_ prefix, 36 characters)"
+          elif echo "$GITHUB_TOKEN" | grep -q "^[a-f0-9]\{40\}$"; then
+            log "✓ Token format valid (Legacy GitHub token: 40 hex characters)"
+          elif echo "$GITHUB_TOKEN" | grep -q "^github_pat_[a-zA-Z0-9_]\{82\}$"; then
+            log "✓ Token format valid (Fine-grained PAT: github_pat_ prefix, 82 characters)"
+          else
+            log "⚠ WARNING: Token format doesn't match standard GitHub PAT patterns"
+            log "  Token starts with: ${GITHUB_TOKEN:0:10}..."
+            log "  This may be a test token or custom format"
+          fi
+
+          # Verify we cannot access SEAM routes (security boundary check)
+          log "Verifying security boundaries (cannot access SEAM routes)..."
+          SEAM_TEST=$(curl -s -X GET \
+            -H "X-Vault-Token: $CLIENT_TOKEN" \
+            --connect-timeout 5 \
+            "$OPENBAO_ADDR/v1/secret/data/seam/routes/" 2>&1)
+
+          if echo "$SEAM_TEST" | grep -qi "permission denied\|deny"; then
+            log "✓ Correctly denied access to SEAM routes"
+          else
+            error "FAIL: Can access SEAM routes - security violation!"
+          fi
+
+          # Verify we cannot access other secret paths
+          log "Verifying cannot access other secret paths..."
+          OTHER_TEST=$(curl -s -X GET \
+            -H "X-Vault-Token: $CLIENT_TOKEN" \
+            --connect-timeout 5 \
+            "$OPENBAO_ADDR/v1/secret/data/armor/" 2>&1)
+
+          if echo "$OTHER_TEST" | grep -qi "permission denied\|Invalid"; then
+            log "✓ Correctly denied access to other secret paths"
+          else
+            error "FAIL: Can access other secret paths - policy too permissive!"
+          fi
+
+          log "=== Evaluator OpenBao Token Read Test Complete ==="
+          log ""
+          log "✓ All tests passed:"
+          log "  - OpenBao connectivity verified"
+          log "  - Evaluator authentication successful"
+          log "  - GitHub token retrieved successfully"
+          log "  - Token format validated"
+          log "  - Security boundaries verified (cannot access SEAM routes)"
+          log "  - Policy isolation verified (cannot access other paths)"
+          log ""
+          log "The seam-retirement-evaluator role can successfully read its GitHub token."
+
+    # Use the evaluator service account from the seam namespace
+    serviceAccountName: seam-retirement-evaluator
+    # Argo Workflows needs to know which namespace the SA exists in
+    serviceAccountNamespace: seam
+    retryStrategy:
+      limit: 2
