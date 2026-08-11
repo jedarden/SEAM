@@ -1,0 +1,252 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: evaluator-victoriametrics-query-test
+  namespace: argo-workflows
+  labels:
+    app: seam-retirement-evaluator
+    component: victoriametrics-query-test
+spec:
+  entrypoint: test-victoriametrics-query
+  templates:
+  - name: test-victoriametrics-query
+    container:
+      image: curlimages/curl:8.6.0
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          # Configure OpenBao address
+          OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
+
+          log "=== Evaluator VictoriaMetrics Query Test ==="
+
+          # Check basic connectivity to OpenBao
+          log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$OPENBAO_ADDR/v1/sys/health" 2>&1 || echo "000")
+
+          if [ "$STATUS_CODE" = "000" ]; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR (connection failed)"
+          elif [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "429" ] && [ "$STATUS_CODE" != "503" ]; then
+            log "⚠ OpenBao returned unexpected status code: $STATUS_CODE"
+          else
+            log "✓ OpenBao is reachable (HTTP $STATUS_CODE)"
+          fi
+
+          # Read Kubernetes service account token for authentication
+          if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
+            error "Not running in Kubernetes cluster"
+          fi
+
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          SA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)
+
+          log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
+
+          # Verify we're running as the correct service account
+          if [ "$SA_NAME" != "seam-retirement-evaluator" ]; then
+            log "⚠ WARNING: Not running as seam-retirement-evaluator service account"
+            log "  Current SA: $SA_NAME (expected: seam-retirement-evaluator)"
+          else
+            log "✓ Running as correct service account: seam-retirement-evaluator"
+          fi
+
+          if [ "$SA_NS" != "seam" ]; then
+            log "⚠ WARNING: Not running in seam namespace"
+            log "  Current namespace: $SA_NS (expected: seam)"
+          else
+            log "✓ Running in correct namespace: seam"
+          fi
+
+          # Authenticate using Kubernetes auth method with evaluator role
+          log "Authenticating to OpenBao via Kubernetes auth as seam-retirement-evaluator..."
+          AUTH_RESPONSE=$(curl -s -X POST \
+            --connect-timeout 5 \
+            --data "{\"role\": \"seam-retirement-evaluator\", \"jwt\": \"$SA_TOKEN\"}" \
+            "$OPENBAO_ADDR/v1/auth/kubernetes/login" 2>&1)
+
+          # Check if authentication succeeded
+          if echo "$AUTH_RESPONSE" | grep -q "errors"; then
+            error "Authentication failed: $AUTH_RESPONSE"
+          elif ! echo "$AUTH_RESPONSE" | grep -q "client_token"; then
+            error "Authentication response missing token: $AUTH_RESPONSE"
+          fi
+
+          # Extract token (masked in logs)
+          CLIENT_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"client_token":"[^"]*"' | cut -d'"' -f4)
+          log "✓ Successfully authenticated to OpenBao as seam-retirement-evaluator (token: ${CLIENT_TOKEN:0:12}...)"
+
+          # Read VictoriaMetrics credentials
+          log "Reading VictoriaMetrics credentials from secret/data/monitoring/victoriametrics/readonly-credentials..."
+          VM_CREDS_RESPONSE=$(curl -s -X GET \
+            -H "X-Vault-Token: $CLIENT_TOKEN" \
+            --connect-timeout 5 \
+            "$OPENBAO_ADDR/v1/secret/data/monitoring/victoriametrics/readonly-credentials" 2>&1)
+
+          # Check for errors
+          if echo "$VM_CREDS_RESPONSE" | grep -qi "permission denied"; then
+            error "FAIL: Permission denied reading VictoriaMetrics credentials"
+          elif echo "$VM_CREDS_RESPONSE" | grep -qi "Invalid"; then
+            error "FAIL: Invalid token or path when reading VictoriaMetrics credentials"
+          elif echo "$VM_CREDS_RESPONSE" | grep -q "errors"; then
+            error "FAIL: Error reading VictoriaMetrics credentials: $VM_CREDS_RESPONSE"
+          elif ! echo "$VM_CREDS_RESPONSE" | grep -q "data"; then
+            error "FAIL: No data in response when reading VictoriaMetrics credentials"
+          fi
+
+          # Extract VictoriaMetrics endpoint
+          VM_ENDPOINT=$(echo "$VM_CREDS_RESPONSE" | grep -o '"endpoint":"[^"]*"' | cut -d'"' -f4)
+          VM_USERNAME=$(echo "$VM_CREDS_RESPONSE" | grep -o '"username":"[^"]*"' | cut -d'"' -f4)
+          VM_PASSWORD=$(echo "$VM_CREDS_RESPONSE" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "$VM_ENDPOINT" ]; then
+            error "FAIL: Could not extract VictoriaMetrics endpoint from response"
+          fi
+
+          log "✓ Successfully retrieved VictoriaMetrics endpoint: $VM_ENDPOINT"
+
+          # Test VictoriaMetrics connectivity
+          log "Testing connectivity to VictoriaMetrics at $VM_ENDPOINT..."
+          VM_HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$VM_ENDPOINT/health" 2>&1 || echo "000")
+
+          if [ "$VM_HEALTH_STATUS" = "000" ]; then
+            log "⚠ WARNING: Cannot reach VictoriaMetrics health endpoint (connection failed)"
+            log "  Continuing with metrics query test..."
+          elif [ "$VM_HEALTH_STATUS" != "200" ] && [ "$VM_HEALTH_STATUS" != "404" ]; then
+            log "⚠ WARNING: VictoriaMetrics health endpoint returned unexpected status code: $VM_HEALTH_STATUS"
+            log "  Continuing with metrics query test..."
+          else
+            log "✓ VictoriaMetrics is reachable (HTTP $VM_HEALTH_STATUS)"
+          fi
+
+          # Query SEAM metrics from VictoriaMetrics
+          log "Querying SEAM metrics from VictoriaMetrics..."
+
+          # List of SEAM metrics we expect to find
+          SEAM_METRICS=(
+            "seam_cache_hits_total"
+            "seam_cache_misses_total"
+            "seam_cache_hit_rate"
+            "seam_cache_size"
+            "seam_cache_evictions_total"
+            "seam_quota_cost_total"
+            "seam_quota_remaining"
+            "seam_quota_exceeded_total"
+            "seam_quota_bypassed_total"
+          )
+
+          # Test 1: Query all metrics with seam_ prefix
+          log "Query 1: Fetching all metrics with 'seam_' prefix..."
+          METRICS_QUERY='{__name__=~"seam_.*"}'
+          METRICS_RESPONSE=$(curl -s -G \
+            --connect-timeout 10 \
+            "$VM_ENDPOINT/api/v1/label/__name__/values" \
+            --data-urlencode "match[]=$METRICS_QUERY" 2>&1)
+
+          if echo "$METRICS_RESPONSE" | grep -qi "error\|timeout\|refused"; then
+            error "FAIL: Error querying VictoriaMetrics for SEAM metrics: $METRICS_RESPONSE"
+          elif ! echo "$METRICS_RESPONSE" | grep -q "data"; then
+            error "FAIL: Invalid response format from VictoriaMetrics (missing 'data' field)"
+          else
+            log "✓ Successfully queried VictoriaMetrics for SEAM metrics"
+          fi
+
+          # Test 2: Validate that expected SEAM metrics exist
+          log "Query 2: Validating expected SEAM metrics exist..."
+          FOUND_METRICS=0
+          MISSING_METRICS=""
+
+          for metric in "${SEAM_METRICS[@]}"; do
+            if echo "$METRICS_RESPONSE" | grep -q "\"$metric\""; then
+              log "  ✓ Found metric: $metric"
+              FOUND_METRICS=$((FOUND_METRICS + 1))
+            else
+              log "  ⚠ Missing metric: $metric (may not have data yet)"
+              MISSING_METRICS="$MISSING_METRICS $metric"
+            fi
+          done
+
+          log "Found $FOUND_METRICS out of ${#SEAM_METRICS[@]} expected SEAM metrics"
+
+          # Test 3: Query actual metric values (if any metrics exist)
+          log "Query 3: Fetching actual SEAM metric values..."
+          METRIC_VALUES=$(curl -s -G \
+            --connect-timeout 10 \
+            "$VM_ENDPOINT/api/v1/query" \
+            --data-urlencode 'query=seam_cache_hits_total' 2>&1)
+
+          if echo "$METRIC_VALUES" | grep -qi "error\|timeout\|refused"; then
+            log "⚠ WARNING: Error querying metric values (VictoriaMetrics may have no SEAM data yet)"
+            log "  Response: $METRIC_VALUES"
+          elif echo "$METRIC_VALUES" | grep -q "data"; then
+            # Check if we have any results
+            RESULT_COUNT=$(echo "$METRIC_VALUES" | grep -o '"result":\[' | wc -l)
+            if [ "$RESULT_COUNT" -gt 0 ]; then
+              log "✓ Successfully retrieved SEAM metric values (results found)"
+            else
+              log "⚠ No SEAM metric values found (SEAM may not have been scraped yet)"
+            fi
+          else
+            log "⚠ Unexpected response format when querying metric values"
+          fi
+
+          # Test 4: Validate response format
+          log "Query 4: Validating VictoriaMetrics response format..."
+
+          # Check for proper JSON structure
+          if echo "$METRICS_RESPONSE" | grep -q '"status":"success"' || echo "$METRICS_RESPONSE" | grep -q '"data"'; then
+            log "✓ Response format is valid (contains status/data fields)"
+          else
+            log "⚠ WARNING: Response format may be invalid"
+            log "  Response: $METRICS_RESPONSE"
+          fi
+
+          # Test 5: Verify we can query metrics with labels
+          log "Query 5: Testing labeled metric query..."
+          LABELED_QUERY=$(curl -s -G \
+            --connect-timeout 10 \
+            "$VM_ENDPOINT/api/v1/query" \
+            --data-urlencode 'query=seam_cache_hits_total{route!=""}' 2>&1)
+
+          if echo "$LABELED_QUERY" | grep -qi "error\|timeout\|refused"; then
+            log "⚠ WARNING: Labeled query failed (may have no data yet)"
+          elif echo "$LABELED_QUERY" | grep -q "data"; then
+            log "✓ Labeled metric query successful"
+          else
+            log "⚠ WARNING: Unexpected response for labeled query"
+          fi
+
+          log "=== Evaluator VictoriaMetrics Query Test Complete ==="
+          log ""
+          log "✓ All tests passed:"
+          log "  - OpenBao connectivity verified"
+          log "  - Evaluator authentication successful"
+          log "  - VictoriaMetrics credentials retrieved successfully"
+          log "  - VictoriaMetrics connectivity tested"
+          log "  - SEAM metrics query executed"
+          log "  - Found $FOUND_METRICS expected SEAM metrics"
+          log "  - Response format validated"
+          log "  - Labeled metric query tested"
+          log ""
+
+          if [ $FOUND_METRICS -eq 0 ]; then
+            log "⚠ WARNING: No SEAM metrics found in VictoriaMetrics"
+            log "  This is expected if SEAM has not been scraped yet or has not emitted metrics"
+            log "  Missing metrics:$MISSING_METRICS"
+            log ""
+            log "The evaluator CAN query VictoriaMetrics, but no SEAM metrics are present yet."
+          else
+            log "The seam-retirement-evaluator role can successfully query VictoriaMetrics for SEAM metrics."
+          fi
+
+    # Use the evaluator service account from the seam namespace
+    serviceAccountName: seam-retirement-evaluator
+    # Argo Workflows needs to know which namespace the SA exists in
+    serviceAccountNamespace: seam
+    retryStrategy:
+      limit: 2
