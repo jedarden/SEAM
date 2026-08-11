@@ -125,6 +125,10 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		log.Printf("[Loader] No schema provided, skipping fragment validation")
 	}
 
+	// Detect path collisions and quarantine conflicting fragments
+	log.Printf("[Loader] Detecting path collisions between fragments")
+	fragmentLoader.DetectPathCollisions()
+
 	// Merge fragments into a single document
 	log.Printf("[Loader] Merging fragments into single OpenAPI document")
 	mergedJSON, err := fragmentLoader.MergeFragments(baseURL)
@@ -588,35 +592,17 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 	if !l.fragmentMode || l.fragmentLoader == nil {
 		return map[string]interface{}{
 			"fragments_loaded": false,
-			"conditions":       []string{},
+			"fragment_mode":    false,
+			"conditions":       []interface{}{}, // Empty conditions in static mode
 		}
 	}
 
-	conditions := []string{}
-	quarantined := l.fragmentLoader.GetQuarantined()
+	// Get detailed status from fragment loader
+	status := l.fragmentLoader.GetFragmentStatus()
+	status["fragments_loaded"] = true
+	status["fragment_mode"] = true
 
-	if len(quarantined) > 0 {
-		conditions = append(conditions, fmt.Sprintf("%d fragments quarantined", len(quarantined)))
-		for _, q := range quarantined {
-			for _, reason := range q.QuarantineReasons {
-				conditions = append(conditions, fmt.Sprintf("  - %s: %s", q.SourceFile, reason))
-			}
-		}
-	}
-
-	validCount := l.fragmentLoader.GetValidFragmentCount()
-	if validCount == 0 {
-		conditions = append(conditions, "No valid fragments loaded")
-	} else {
-		conditions = append(conditions, fmt.Sprintf("%d valid fragments loaded", validCount))
-	}
-
-	return map[string]interface{}{
-		"fragments_loaded":  true,
-		"valid_count":       validCount,
-		"quarantined_count": len(quarantined),
-		"conditions":        conditions,
-	}
+	return status
 }
 
 // GetCacheTTLs returns a map of route paths to their cache TTL values
