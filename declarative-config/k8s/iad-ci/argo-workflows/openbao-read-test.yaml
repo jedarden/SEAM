@@ -12,7 +12,7 @@ spec:
   templates:
   - name: test-read
     container:
-      image: openbao/openbao:2.6.1
+      image: curlimages/curl:8.6.0
       command: ["/bin/sh", "-c"]
       args:
         - |
@@ -22,15 +22,26 @@ spec:
 
           # Configure OpenBao address
           OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
-          export VAULT_ADDR=$OPENBAO_ADDR
 
           log "=== OpenBao Read Test ==="
 
-          # Check connectivity
-          if ! bao status >/dev/null 2>&1; then
-            error "Cannot reach OpenBao at $OPENBAO_ADDR"
+          # Check basic connectivity to OpenBao
+          log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$OPENBAO_ADDR/v1/sys/health" 2>&1 || echo "000")
+
+          if [ "$STATUS_CODE" = "000" ]; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR (connection failed)"
+          elif [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "429" ] && [ "$STATUS_CODE" != "503" ]; then
+            # 429 = standby, 503 = sealed (both are reachable states)
+            log "⚠ OpenBao returned unexpected status code: $STATUS_CODE"
+          else
+            log "✓ OpenBao is reachable (HTTP $STATUS_CODE)"
           fi
-          log "✓ OpenBao is reachable"
+
+          # Get health status details
+          log "Fetching OpenBao health status..."
+          HEALTH=$(curl -s --connect-timeout 5 "$OPENBAO_ADDR/v1/sys/health" 2>&1)
+          log "Health response: $HEALTH"
 
           # Read Kubernetes service account token for authentication
           if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
@@ -44,34 +55,40 @@ spec:
           log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
 
           # Authenticate using Kubernetes auth method
-          log "Authenticating to OpenBao..."
-          CLIENT_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt="$SA_TOKEN" 2>&1)
+          log "Authenticating to OpenBao via Kubernetes auth..."
+          AUTH_RESPONSE=$(curl -s -X POST \
+            --connect-timeout 5 \
+            --data "{\"role\": \"argo-workflow\", \"jwt\": \"$SA_TOKEN\"}" \
+            "$OPENBAO_ADDR/v1/auth/kubernetes/login" 2>&1)
 
-          if [ $? -ne 0 ] || [ -z "$CLIENT_TOKEN" ]; then
-            error "Failed to authenticate: $CLIENT_TOKEN"
+          # Check if authentication succeeded
+          if echo "$AUTH_RESPONSE" | grep -q "errors"; then
+            error "Authentication failed: $AUTH_RESPONSE"
+          elif ! echo "$AUTH_RESPONSE" | grep -q "client_token"; then
+            error "Authentication response missing token: $AUTH_RESPONSE"
           fi
 
-          log "✓ Successfully authenticated to OpenBao"
+          # Extract token (masked in logs)
+          CLIENT_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"client_token":"[^"]*"' | cut -d'"' -f4)
+          log "✓ Successfully authenticated to OpenBao (token: ${CLIENT_TOKEN:0:12}...)"
 
-          # Test: Read a secret path (this is a minimal read-only test)
-          # Adjust the secret path based on your actual OpenBao setup
+          # Test: Read a secret path
           log "Testing read operation on secret path..."
+          READ_RESPONSE=$(curl -s -X GET \
+            -H "X-Vault-Token: $CLIENT_TOKEN" \
+            --connect-timeout 5 \
+            "$OPENBAO_ADDR/v1/secret/data/monitoring/test" 2>&1)
 
-          # Example: Try to read a test secret (replace with actual path)
-          # This example tries to read from a monitoring path that should exist
-          TEST_SECRET=$(bao kv get -field=value secret/monitoring/test 2>&1 || true)
-
-          # Check if we got a permission denied (expected for non-privileged access)
-          if echo "$TEST_SECRET" | grep -qi "permission denied\|Invalid"; then
+          # Check response
+          if echo "$READ_RESPONSE" | grep -qi "permission denied\|Invalid"; then
             log "✓ Read operation executed (access denied as expected for this path)"
-          elif echo "$TEST_SECRET" | grep -qi "deny"; then
+          elif echo "$READ_RESPONSE" | grep -qi "deny"; then
             log "✓ Read operation executed (explicit deny as expected)"
+          elif echo "$READ_RESPONSE" | grep -q "errors"; then
+            log "⚠ Read operation returned error: $READ_RESPONSE"
           else
             log "✓ Read operation executed successfully"
-            # If we actually got data, log it (masked)
-            if [ -n "$TEST_SECRET" ]; then
-              log "  Secret value: [REDACTED]"
-            fi
+            log "  Response: (data masked)"
           fi
 
           log "=== OpenBao Read Test Complete ==="
