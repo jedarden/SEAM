@@ -1,2 +1,7 @@
 {"last_strand":null,"state":"idle","ts":"2026-08-06T14:40:43.913083054+00:00","worker":"mike"}
 {"last_strand":null,"state":"idle","ts":"2026-08-09T02:26:11.723648659+00:00","worker":"seam-1"}
+{"last_strand":null,"state":"idle","ts":"2026-08-10T14:10:55.330897309+00:00","worker":"seam-2"}
+{"last_strand":null,"state":"idle","ts":"2026-08-10T14:41:50.715005594+00:00","worker":"seam-2"}
+{"last_strand":null,"state":"idle","ts":"2026-08-11T04:34:31.450605009+00:00","worker":"glm-seam"}
+{"last_strand":null,"state":"idle","ts":"2026-08-12T03:33:13.887921548+00:00","worker":"seam-1"}
+{"last_strand":null,"state":"idle","ts":"2026-08-12T03:33:19.826806039+00:00","worker":"seam-2"}
