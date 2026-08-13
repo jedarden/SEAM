@@ -1,0 +1,94 @@
+# Build artifacts - Go binaries
+/seam
+/seam-test
+*.test
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Logs
+logs/*.log
+logs/*.txt
+logs/*.md
+
+# Node modules
+node_modules/
+
+# Package manager files (npm, yarn, pnpm)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Dependency directories
+vendor/
+bower_components/
+
+# Test coverage
+coverage/
+*.out
+*.cover
+*.coverprofile
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# Editor files
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.sublime-*
+.DS_Store
+Thumbs.db
+
+# Debug files
+debug
+*.debug
+__debug_bin*
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build output directories
+dist/
+build/
+out/
+
+# Generated files
+generated/
+*.gen.go
+*.generated.*
+
+# Race detector output
+*.testrace
+
+# Benchmark old files
+*.txt.bak
+*.log.bak
