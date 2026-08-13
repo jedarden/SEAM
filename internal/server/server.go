@@ -46,10 +46,11 @@ var reservedPaths = struct {
 		"/config/status":      true,
 	},
 	prefixes: []string{
-		"/health/",     // Health sentinel: all health check endpoints
-		"/config/",     // Configuration management endpoints
-		"/approvals/",  // Approval workflow endpoints
-		"/_seam/",      // Internal SEAM endpoints (metrics, health, ready)
+		"/docs/",      // Documentation endpoints (reserved namespace)
+		"/health/",    // Health sentinel: all health check endpoints
+		"/config/",    // Configuration management endpoints
+		"/approvals/", // Approval workflow endpoints
+		"/_seam/",     // Internal SEAM endpoints (metrics, health, ready)
 	},
 }
 
@@ -410,9 +411,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
   <script>
     var specData = ` + specJSONEscaped + `;
     Scalar.createApiReference('#scalar-app', {
-      spec: {
-        content: specData
-      },
+      spec: specData,
       theme: 'default',
       metaData: {
         title: 'SEAM API Documentation',
@@ -451,11 +450,32 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 // Query parameters:
 //
 //	path - the OpenAPI path template (required)
-//	method - the HTTP method (optional, if omitted returns all methods)
+//	method - the HTTP method (required)
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check Accept header for HTML redirect
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "text/html") {
+		// Generate route anchor and redirect to /docs
+		query := r.URL.Query()
+		path := query.Get("path")
+		method := query.Get("method")
+
+		// Create route anchor identifier
+		// Format: /path/method -> path-method (e.g., /test/get -> test-get)
+		routeAnchor := strings.TrimPrefix(path, "/")
+		routeAnchor = strings.ReplaceAll(routeAnchor, "/", "-")
+		if method != "" {
+			routeAnchor = routeAnchor + "-" + strings.ToLower(method)
+		}
+
+		redirectURL := "/docs#" + routeAnchor
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 		return
 	}
 
@@ -477,10 +497,12 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "missing_required_parameter",
 			"message": "The 'path' query parameter is required",
-			"example": "/docs/route?path=/openapi.json&method=GET",
+			"example": "/docs/route?path=/test/get&method=GET",
 		})
 		return
 	}
+
+	// Note: method parameter is optional - if not provided, returns all methods for the path
 
 	// Get route information from the spec loader
 	routeInfo, err := s.specLoader.GetRoute(path, method, version)
@@ -573,34 +595,115 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		if len(routeInfo.Operation.Parameters) > 0 {
 			params := []map[string]interface{}{}
 			for _, param := range routeInfo.Operation.Parameters {
-				params = append(params, map[string]interface{}{
+				paramData := map[string]interface{}{
 					"name":        param.Name,
 					"in":          param.In,
 					"description": param.Description,
 					"required":    param.Required,
 					"schema":      param.Schema,
-				})
+				}
+				// Include example if present
+				if param.Example != nil {
+					paramData["example"] = param.Example
+				}
+				if param.Examples != nil {
+					examples := map[string]interface{}{}
+					for name, ex := range param.Examples.FromOldest() {
+						if ex != nil && ex.Value != nil {
+							examples[name] = ex.Value
+						}
+					}
+					if len(examples) > 0 {
+						paramData["examples"] = examples
+					}
+				}
+				params = append(params, paramData)
 			}
 			methodData["parameters"] = params
 		}
 
 		// Add request body if present
 		if routeInfo.Operation.RequestBody != nil {
-			methodData["request_body"] = map[string]interface{}{
+			requestBodyData := map[string]interface{}{
 				"description": routeInfo.Operation.RequestBody.Description,
 				"required":    routeInfo.Operation.RequestBody.Required,
 				"content":     routeInfo.Operation.RequestBody.Content,
 			}
+
+			// Extract examples from request body content
+			if routeInfo.Operation.RequestBody.Content != nil {
+				contentWithExamples := map[string]interface{}{}
+				for mediaType, mediaTypeObj := range routeInfo.Operation.RequestBody.Content.FromOldest() {
+					contentData := map[string]interface{}{
+						"schema": mediaTypeObj.Schema,
+					}
+
+					// Add examples if present
+					if mediaTypeObj.Examples != nil {
+						examples := map[string]interface{}{}
+						for name, ex := range mediaTypeObj.Examples.FromOldest() {
+							if ex != nil && ex.Value != nil {
+								examples[name] = ex.Value
+							}
+						}
+						if len(examples) > 0 {
+							contentData["examples"] = examples
+						}
+					}
+
+					// Add single example if present
+					if mediaTypeObj.Example != nil {
+						contentData["example"] = mediaTypeObj.Example
+					}
+
+					contentWithExamples[mediaType] = contentData
+				}
+				requestBodyData["content"] = contentWithExamples
+			}
+
+			methodData["request_body"] = requestBodyData
 		}
 
 		// Add responses if present
 		if routeInfo.Operation.Responses != nil && routeInfo.Operation.Responses.Codes != nil {
 			responses := map[string]interface{}{}
 			for code, response := range routeInfo.Operation.Responses.Codes.FromOldest() {
-				responses[code] = map[string]interface{}{
+				responseData := map[string]interface{}{
 					"description": response.Description,
-					"content":     response.Content,
 				}
+
+				// Extract examples from response content
+				if response.Content != nil {
+					contentWithExamples := map[string]interface{}{}
+					for mediaType, mediaTypeObj := range response.Content.FromOldest() {
+						contentData := map[string]interface{}{
+							"schema": mediaTypeObj.Schema,
+						}
+
+						// Add examples if present
+						if mediaTypeObj.Examples != nil {
+							examples := map[string]interface{}{}
+							for name, ex := range mediaTypeObj.Examples.FromOldest() {
+								if ex != nil && ex.Value != nil {
+									examples[name] = ex.Value
+								}
+							}
+							if len(examples) > 0 {
+								contentData["examples"] = examples
+							}
+						}
+
+						// Add single example if present
+						if mediaTypeObj.Example != nil {
+							contentData["example"] = mediaTypeObj.Example
+						}
+
+						contentWithExamples[mediaType] = contentData
+					}
+					responseData["content"] = contentWithExamples
+				}
+
+				responses[code] = responseData
 			}
 			methodData["responses"] = responses
 		}
@@ -653,9 +756,13 @@ func (s *Server) Start(ctx context.Context) error {
 	callerHandler = s.cacheMiddleware(callerHandler)
 	log.Printf("Cache middleware active on caller-facing port")
 
-	// Wrap with validation middleware (always active for caller port)
+	// Wrap with header-stripping middleware (stage 2 - strips X-SEAM-* headers)
+	callerHandler = s.headerStrippingMiddleware(callerHandler)
+	log.Printf("Header-stripping middleware active on caller-facing port (stage 2)")
+
+	// Wrap with validation middleware (stage 1 - control-plane detection)
 	callerHandler = s.validationMiddleware(callerHandler)
-	log.Printf("Validation middleware active on caller-facing port")
+	log.Printf("Validation middleware active on caller-facing port (stage 1)")
 
 	// Wrap with capture middleware if enabled
 	if s.captureMiddleware != nil {
@@ -751,12 +858,12 @@ func (s *Server) cacheStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"enabled":     true,
-		"size":        stats.Size,
-		"hits":        stats.Hits,
-		"misses":      stats.Misses,
-		"evictions":   stats.Evictions,
-		"hit_rate":    hitRate,
+		"enabled":           true,
+		"size":              stats.Size,
+		"hits":              stats.Hits,
+		"misses":            stats.Misses,
+		"evictions":         stats.Evictions,
+		"hit_rate":          hitRate,
 		"routes_with_cache": len(s.cacheTTLs),
 		"single_flight": map[string]interface{}{
 			"active_requests": sfStats.ActiveRequests,
@@ -783,8 +890,8 @@ func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":      "cleanup_complete",
-		"size":        stats.Size,
-		"evictions":   stats.Evictions,
+		"status":    "cleanup_complete",
+		"size":      stats.Size,
+		"evictions": stats.Evictions,
 	})
 }

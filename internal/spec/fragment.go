@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -33,9 +34,10 @@ type Fragment struct {
 
 // FragmentLoader loads and validates SEAM route fragments
 type FragmentLoader struct {
-	schemaCompiler *jsonschema.Compiler
-	fragments      []*Fragment
-	quarantined    []*Fragment
+	schemaCompiler      *jsonschema.Compiler
+	fragments           []*Fragment
+	quarantined         []*Fragment
+	lastLoadedTimestamp time.Time
 }
 
 // NewFragmentLoader creates a new fragment loader
@@ -44,9 +46,10 @@ func NewFragmentLoader() (*FragmentLoader, error) {
 	compiler := jsonschema.NewCompiler()
 
 	return &FragmentLoader{
-		schemaCompiler: compiler,
-		fragments:      []*Fragment{},
-		quarantined:    []*Fragment{},
+		schemaCompiler:      compiler,
+		fragments:           []*Fragment{},
+		quarantined:         []*Fragment{},
+		lastLoadedTimestamp: time.Time{},
 	}, nil
 }
 
@@ -54,6 +57,9 @@ func NewFragmentLoader() (*FragmentLoader, error) {
 // Expected layout: fragments.d/<service>/<fragment-name>.yaml
 func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 	log.Printf("[Fragment] Loading fragments from directory: %s", fragmentsDir)
+
+	// Set the timestamp when loading starts
+	fl.lastLoadedTimestamp = time.Now()
 
 	if _, err := os.Stat(fragmentsDir); os.IsNotExist(err) {
 		// Directory doesn't exist - not an error, just no fragments
@@ -267,6 +273,65 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 	return nil
 }
 
+// DetectPathCollisions detects path collisions between fragments and quarantines conflicting fragments
+// This should be called after ValidateFragments but before MergeFragments
+func (fl *FragmentLoader) DetectPathCollisions() {
+	log.Printf("[Fragment] Detecting path collisions between %d fragments", len(fl.fragments))
+
+	// Track which paths are claimed by which fragments
+	pathClaims := make(map[string]string) // path -> fragment source file
+
+	for _, fragment := range fl.fragments {
+		if fragment.QueuedForQuarantine {
+			continue // Skip already quarantined fragments
+		}
+
+		// Extract paths from fragment
+		paths, ok := fragment.ParsedFragment["paths"].(map[string]any)
+		if !ok {
+			continue // No paths in this fragment
+		}
+
+		// Check each path for collisions
+		for path := range paths {
+			if existingFragment, exists := pathClaims[path]; exists {
+				// Collision detected - quarantine both fragments
+				log.Printf("[Fragment] Path collision detected: %s is claimed by both %s and %s", path, existingFragment, fragment.SourceFile)
+
+				// Quarantine the current fragment
+				fragment.QueuedForQuarantine = true
+				fragment.QuarantineReasons = append(fragment.QuarantineReasons, fmt.Sprintf("path_collision: %s already claimed by %s", path, existingFragment))
+
+				// Find and quarantine the existing fragment
+				for _, f := range fl.fragments {
+					if f.SourceFile == existingFragment && !f.QueuedForQuarantine {
+						f.QueuedForQuarantine = true
+						f.QuarantineReasons = append(f.QuarantineReasons, fmt.Sprintf("path_collision: %s also claimed by %s", path, fragment.SourceFile))
+						log.Printf("[Fragment] Quarantined existing fragment %s due to collision", existingFragment)
+						break
+					}
+				}
+			} else {
+				// Claim this path
+				pathClaims[path] = fragment.SourceFile
+			}
+		}
+	}
+
+	// Move quarantined fragments to separate slice
+	var kept []*Fragment
+	for _, fragment := range fl.fragments {
+		if fragment.QueuedForQuarantine {
+			fl.quarantined = append(fl.quarantined, fragment)
+		} else {
+			kept = append(kept, fragment)
+		}
+	}
+	fl.fragments = kept
+
+	log.Printf("[Fragment] Path collision detection complete: %d fragments quarantined due to collisions", len(fl.quarantined))
+}
+
 // MergeFragments merges all valid fragments into a single OpenAPI document
 func (fl *FragmentLoader) MergeFragments(baseURL string) ([]byte, error) {
 	log.Printf("[Fragment] Merging %d fragments into single OpenAPI 3.1 spec", len(fl.fragments))
@@ -384,4 +449,56 @@ func (fl *FragmentLoader) GetValidFragmentCount() int {
 // GetQuarantinedCount returns the number of quarantined fragments
 func (fl *FragmentLoader) GetQuarantinedCount() int {
 	return len(fl.quarantined)
+}
+
+// FragmentStatus represents the status of a single fragment
+type FragmentStatus struct {
+	SourceFile        string   `json:"source_file"`
+	Owner             string   `json:"owner"`
+	SchemaVersion     string   `json:"schema_version"`
+	APIVersion        string   `json:"api_version"`
+	Status            string   `json:"status"` // "valid" or "quarantined"
+	QuarantineReasons []string `json:"quarantine_reasons,omitempty"`
+	Hash              string   `json:"hash"`
+}
+
+// GetFragmentStatus returns detailed status information about all fragments
+func (fl *FragmentLoader) GetFragmentStatus() map[string]interface{} {
+	// Collect all fragment statuses
+	allFragments := []FragmentStatus{}
+	for _, fragment := range fl.fragments {
+		allFragments = append(allFragments, FragmentStatus{
+			SourceFile:        fragment.SourceFile,
+			Owner:             fragment.Owner,
+			SchemaVersion:     fragment.SchemaVer,
+			APIVersion:        fragment.APIVersion,
+			Status:            "valid",
+			QuarantineReasons: []string{},
+			Hash:              fragment.Hash,
+		})
+	}
+	for _, fragment := range fl.quarantined {
+		allFragments = append(allFragments, FragmentStatus{
+			SourceFile:        fragment.SourceFile,
+			Owner:             fragment.Owner,
+			SchemaVersion:     fragment.SchemaVer,
+			APIVersion:        fragment.APIVersion,
+			Status:            "quarantined",
+			QuarantineReasons: fragment.QuarantineReasons,
+			Hash:              fragment.Hash,
+		})
+	}
+
+	// Build the response
+	validCount := len(fl.fragments)
+	quarantinedCount := len(fl.quarantined)
+
+	return map[string]interface{}{
+		"fragments":             allFragments,
+		"valid_count":           validCount,
+		"quarantined_count":     quarantinedCount,
+		"total_count":           validCount + quarantinedCount,
+		"last_loaded_timestamp": fl.lastLoadedTimestamp.Format(time.RFC3339),
+		"server_continues":      true, // Server continues even if all fragments are quarantined
+	}
 }
