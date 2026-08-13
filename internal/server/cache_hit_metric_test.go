@@ -175,23 +175,23 @@ func TestCacheHitMetric_HitDetection(t *testing.T) {
 
 	// Test scenarios that should result in cache hits
 	scenarios := []struct {
-		name             string
-		request          *http.Request
+		name               string
+		request            *http.Request
 		shouldCallUpstream bool
 	}{
 		{
-			name:             "second identical request (cache hit)",
-			request:          httptest.NewRequest(http.MethodGet, "/api/test", nil),
+			name:               "second identical request (cache hit)",
+			request:            httptest.NewRequest(http.MethodGet, "/api/test", nil),
 			shouldCallUpstream: false,
 		},
 		{
-			name:             "same path, same query params (cache hit)",
-			request:          httptest.NewRequest(http.MethodGet, "/api/test?foo=bar", nil),
+			name:               "same path, same query params (cache hit)",
+			request:            httptest.NewRequest(http.MethodGet, "/api/test?foo=bar", nil),
 			shouldCallUpstream: false,
 		},
 		{
-			name:             "same path, reordered query params (cache hit)",
-			request:          httptest.NewRequest(http.MethodGet, "/api/test?b=2&a=1", nil),
+			name:               "same path, reordered query params (cache hit)",
+			request:            httptest.NewRequest(http.MethodGet, "/api/test?b=2&a=1", nil),
 			shouldCallUpstream: false,
 		},
 	}

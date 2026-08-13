@@ -8,34 +8,34 @@ import (
 // TestComputeSpecHashBasic verifies the SHA256 hash computation function
 func TestComputeSpecHashBasic(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     []byte
-		wantLen  int
-		wantHex  bool
+		name    string
+		data    []byte
+		wantLen int
+		wantHex bool
 	}{
 		{
-			name:     "Empty input",
-			data:     []byte(""),
-			wantLen:  16,
-			wantHex:  true,
+			name:    "Empty input",
+			data:    []byte(""),
+			wantLen: 16,
+			wantHex: true,
 		},
 		{
-			name:     "Simple JSON",
-			data:     []byte(`{"openapi":"3.1.0","info":{"title":"Test API","version":"1.0.0"},"paths":{}}`),
-			wantLen:  16,
-			wantHex:  true,
+			name:    "Simple JSON",
+			data:    []byte(`{"openapi":"3.1.0","info":{"title":"Test API","version":"1.0.0"},"paths":{}}`),
+			wantLen: 16,
+			wantHex: true,
 		},
 		{
-			name:     "Larger spec",
-			data:     []byte(`{"openapi":"3.1.0","info":{"title":"Test API","version":"1.0.0","description":"A test API"},"paths":{"/test":{"get":{"summary":"Test endpoint","responses":{"200":{"description":"OK"}}}}}}`),
-			wantLen:  16,
-			wantHex:  true,
+			name:    "Larger spec",
+			data:    []byte(`{"openapi":"3.1.0","info":{"title":"Test API","version":"1.0.0","description":"A test API"},"paths":{"/test":{"get":{"summary":"Test endpoint","responses":{"200":{"description":"OK"}}}}}}`),
+			wantLen: 16,
+			wantHex: true,
 		},
 		{
-			name:     "Binary data",
-			data:     []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
-			wantLen:  16,
-			wantHex:  true,
+			name:    "Binary data",
+			data:    []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+			wantLen: 16,
+			wantHex: true,
 		},
 	}
 
@@ -173,9 +173,9 @@ func TestHashDeterminism(t *testing.T) {
 			sameHash: false,
 		},
 		{
-			name:     "trailing newline",
-			data1:    []byte(`{"test":true}`),
-			data2:    []byte(`{"test":true}
+			name:  "trailing newline",
+			data1: []byte(`{"test":true}`),
+			data2: []byte(`{"test":true}
 `),
 			sameHash: false,
 		},

@@ -208,7 +208,7 @@ func TestSingleFlight_ConcurrentTTLZero(t *testing.T) {
 // TestSingleFlight_ContextCancellation tests that context cancellation works correctly
 func TestSingleFlight_ContextCancellation(t *testing.T) {
 	sf := NewSingleFlight()
-	
+
 	// Function that takes a long time
 	executeFn := func(ctx context.Context) (*cachedResponse, error) {
 		select {
@@ -224,7 +224,7 @@ func TestSingleFlight_ContextCancellation(t *testing.T) {
 	defer cancel()
 
 	key := CacheKey("test-key")
-	
+
 	// This should timeout
 	_, err, _ := sf.Do(ctx, key, executeFn)
 	if err == nil {

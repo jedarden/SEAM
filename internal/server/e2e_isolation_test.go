@@ -46,19 +46,19 @@ type IsolationTestReport struct {
 
 // EvaluatorTestResults captures evaluator-specific test results
 type EvaluatorTestResults struct {
-	CanReadOwnToken         bool
-	CanReadVMAuthCreds      bool
-	CanQueryVM              bool
-	CannotAccessSEAMRoutes  bool
+	CanReadOwnToken          bool
+	CanReadVMAuthCreds       bool
+	CanQueryVM               bool
+	CannotAccessSEAMRoutes   bool
 	CannotAccessOtherSecrets bool
-	Details                 []string
+	Details                  []string
 }
 
 // SEAMTestResults captures SEAM-specific test results
 type SEAMTestResults struct {
-	CanReadOwnRoutes        bool
+	CanReadOwnRoutes         bool
 	CannotReadEvaluatorToken bool
-	Details                 []string
+	Details                  []string
 }
 
 // testCompleteIsolation implements the end-to-end isolation validation

@@ -112,9 +112,9 @@ path "secret/data/*" {
 	// Verify the error message indicates permission denied
 	errorMsg := err.Error()
 	if !strings.Contains(errorMsg, "403") &&
-	   !strings.Contains(errorMsg, "permission denied") &&
-	   !strings.Contains(errorMsg, "Permission denied") &&
-	   !strings.Contains(errorMsg, "code 403") {
+		!strings.Contains(errorMsg, "permission denied") &&
+		!strings.Contains(errorMsg, "Permission denied") &&
+		!strings.Contains(errorMsg, "code 403") {
 		t.Fatalf("Expected permission denied error (403), got: %v", err)
 	}
 

@@ -68,7 +68,7 @@ func TestCacheMissMetric_Recorded(t *testing.T) {
 	// Check that there's a metric entry for /api/test route
 	// The Prometheus format is: seam_cache_misses_total{route="/api/test"} <count>
 	if !strings.Contains(bodyStr, `seam_cache_misses_total{route="/api/test"}`) &&
-	   !strings.Contains(bodyStr, `seam_cache_misses_total{route="/api/test",`) {
+		!strings.Contains(bodyStr, `seam_cache_misses_total{route="/api/test",`) {
 		t.Error("expected seam_cache_misses_total metric for /api/test route")
 	}
 }
@@ -158,23 +158,23 @@ func TestCacheMissMetric_MissDetection(t *testing.T) {
 
 	// Test scenarios that should result in cache misses
 	scenarios := []struct {
-		name           string
-		request        *http.Request
+		name               string
+		request            *http.Request
 		shouldCallUpstream bool
 	}{
 		{
-			name:           "first request (cold cache)",
-			request:        httptest.NewRequest(http.MethodGet, "/api/test", nil),
+			name:               "first request (cold cache)",
+			request:            httptest.NewRequest(http.MethodGet, "/api/test", nil),
 			shouldCallUpstream: true,
 		},
 		{
-			name:           "different path",
-			request:        httptest.NewRequest(http.MethodGet, "/api/other", nil),
+			name:               "different path",
+			request:            httptest.NewRequest(http.MethodGet, "/api/other", nil),
 			shouldCallUpstream: true,
 		},
 		{
-			name:           "different query params",
-			request:        httptest.NewRequest(http.MethodGet, "/api/test?foo=bar", nil),
+			name:               "different query params",
+			request:            httptest.NewRequest(http.MethodGet, "/api/test?foo=bar", nil),
 			shouldCallUpstream: true,
 		},
 	}
