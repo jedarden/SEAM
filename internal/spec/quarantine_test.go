@@ -2,8 +2,10 @@ package spec
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -98,12 +100,13 @@ func TestFragmentQuarantineSchemaValidation(t *testing.T) {
 	}
 }
 
-// TestFragmentQuarantinePathCollisions tests that fragments with path collisions are quarantined
+// TestFragmentQuarantinePathCollisions tests that exact route/version collisions
+// quarantine only the later filename and retain the incumbent.
 func TestFragmentQuarantinePathCollisions(t *testing.T) {
 	tmpDir := t.TempDir()
 	fragmentsDir := filepath.Join(tmpDir, "fragments")
 
-	// Create two fragments with conflicting paths
+	// Create two fragments with the same (path, method, x-api-version) key.
 	fragment1 := `{
 		"openapi": "3.1.0",
 		"info": {"title": "Fragment 1"},
@@ -120,7 +123,7 @@ func TestFragmentQuarantinePathCollisions(t *testing.T) {
 	fragment2 := `{
 		"openapi": "3.1.0",
 		"info": {"title": "Fragment 2"},
-		"paths": {"/users": {"post": {"summary": "Create user"}}}
+		"paths": {"/users": {"get": {"summary": "Replacement users"}}}
 	}`
 	path2 := filepath.Join(fragmentsDir, "service2", "fragment2.yaml")
 	if err := os.MkdirAll(filepath.Dir(path2), 0755); err != nil {
@@ -143,18 +146,21 @@ func TestFragmentQuarantinePathCollisions(t *testing.T) {
 	// Detect path collisions (should happen before merge)
 	loader.DetectPathCollisions()
 
-	// Verify both fragments were quarantined due to collision
+	// Verify only the later filename was quarantined; the incumbent stays live.
 	validCount := loader.GetValidFragmentCount()
 	quarantinedCount := loader.GetQuarantinedCount()
 
-	if validCount != 0 {
-		t.Errorf("Expected 0 valid fragments due to collision, got %d", validCount)
+	if validCount != 1 {
+		t.Errorf("Expected 1 valid incumbent fragment, got %d", validCount)
 	}
-	if quarantinedCount != 2 {
-		t.Errorf("Expected 2 quarantined fragments due to collision, got %d", quarantinedCount)
+	if quarantinedCount != 1 {
+		t.Errorf("Expected 1 quarantined later fragment, got %d", quarantinedCount)
 	}
 
 	quarantined := loader.GetQuarantined()
+	if len(quarantined) != 1 || quarantined[0].SourceFile != path2 {
+		t.Fatalf("Expected later fragment %s to be quarantined, got %v", path2, quarantined)
+	}
 	for _, frag := range quarantined {
 		if !frag.QueuedForQuarantine {
 			t.Errorf("Fragment %s should be quarantined", frag.SourceFile)
@@ -169,6 +175,81 @@ func TestFragmentQuarantinePathCollisions(t *testing.T) {
 		if !hasCollisionReason {
 			t.Errorf("Fragment %s should have path_collision reason, got %v", frag.SourceFile, frag.QuarantineReasons)
 		}
+	}
+
+	status := loader.GetFragmentStatus()
+	fragmentStatuses, ok := status["fragments"].([]FragmentStatus)
+	if !ok {
+		t.Fatalf("Expected status fragments to be []FragmentStatus, got %T", status["fragments"])
+	}
+	var incumbentStatus, quarantinedStatus *FragmentStatus
+	for i := range fragmentStatuses {
+		switch fragmentStatuses[i].SourceFile {
+		case path1:
+			incumbentStatus = &fragmentStatuses[i]
+		case path2:
+			quarantinedStatus = &fragmentStatuses[i]
+		}
+	}
+	if incumbentStatus == nil || incumbentStatus.Status != "valid" {
+		t.Errorf("Expected incumbent status to be valid, got %+v", incumbentStatus)
+	}
+	if quarantinedStatus == nil || quarantinedStatus.Status != "quarantined" || len(quarantinedStatus.QuarantineReasons) == 0 {
+		t.Errorf("Expected collision status for later fragment, got %+v", quarantinedStatus)
+	}
+}
+
+// TestFragmentCollisionKeyAllowsMethodAndVersionCoexistence verifies that
+// different methods and API versions do not collide on the same path.
+func TestFragmentCollisionKeyAllowsMethodAndVersionCoexistence(t *testing.T) {
+	fragmentsDir := filepath.Join(t.TempDir(), "fragments")
+	fragments := []struct {
+		name    string
+		version string
+		method  string
+	}{
+		{name: "a/unversioned.json", method: "get"},
+		{name: "b/v1-get.json", version: "v1", method: "get"},
+		{name: "c/v1-post.json", version: "v1", method: "post"},
+		{name: "d/v1-get-duplicate.json", version: "v1", method: "get"},
+	}
+
+	for _, fragment := range fragments {
+		path := filepath.Join(fragmentsDir, fragment.name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatalf("Failed to create directory for %s: %v", path, err)
+		}
+		version := ""
+		if fragment.version != "" {
+			version = fmt.Sprintf(",\n\t\t\"x-api-version\": %q", fragment.version)
+		}
+		content := fmt.Sprintf(`{
+			"openapi": "3.1.0",
+			"info": {"title": %q},
+			"paths": {"/users": {%q: {"summary": %q}}}%s
+		}`, fragment.name, fragment.method, fragment.name, version)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to write %s: %v", path, err)
+		}
+	}
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+	loader.DetectPathCollisions()
+
+	if got := loader.GetValidFragmentCount(); got != 3 {
+		t.Errorf("Expected unversioned, v1 GET, and v1 POST fragments to remain valid; got %d", got)
+	}
+	if got := loader.GetQuarantinedCount(); got != 1 {
+		t.Errorf("Expected only the later v1 GET fragment to be quarantined; got %d", got)
+	}
+	if got := loader.GetQuarantined()[0].SourceFile; !strings.HasSuffix(got, "d/v1-get-duplicate.json") {
+		t.Errorf("Expected deterministic later filename to lose, got %s", got)
 	}
 }
 

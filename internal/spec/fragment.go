@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -273,48 +274,57 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 	return nil
 }
 
-// DetectPathCollisions detects path collisions between fragments and quarantines conflicting fragments
-// This should be called after ValidateFragments but before MergeFragments
+type fragmentCollisionKey struct {
+	path       string
+	method     string
+	apiVersion string
+}
+
+// DetectPathCollisions detects collisions on the (path, method, x-api-version)
+// key and quarantines the later fragment. Fragments are ordered by source
+// filename so that the incumbent is deterministic and is never evicted.
+// This should be called after ValidateFragments but before MergeFragments.
 func (fl *FragmentLoader) DetectPathCollisions() {
 	log.Printf("[Fragment] Detecting path collisions between %d fragments", len(fl.fragments))
 
-	// Track which paths are claimed by which fragments
-	pathClaims := make(map[string]string) // path -> fragment source file
+	// filepath.Walk currently visits files in lexical order, but make that
+	// ordering an explicit part of collision handling so callers that populate
+	// fragments directly get the same deterministic incumbent.
+	sort.SliceStable(fl.fragments, func(i, j int) bool {
+		return fl.fragments[i].SourceFile < fl.fragments[j].SourceFile
+	})
+
+	// Track which exact route/version triple is claimed by which fragment.
+	claims := make(map[fragmentCollisionKey]string)
 
 	for _, fragment := range fl.fragments {
 		if fragment.QueuedForQuarantine {
 			continue // Skip already quarantined fragments
 		}
 
-		// Extract paths from fragment
-		paths, ok := fragment.ParsedFragment["paths"].(map[string]any)
-		if !ok {
-			continue // No paths in this fragment
+		keys := fragmentCollisionKeys(fragment)
+		collisionReasons := make([]string, 0)
+		for _, key := range keys {
+			if incumbent, exists := claims[key]; exists {
+				reason := fmt.Sprintf(
+					"path_collision: %s %s x-api-version=%s already claimed by %s",
+					key.method, key.path, key.apiVersion, incumbent,
+				)
+				collisionReasons = append(collisionReasons, reason)
+				log.Printf("[Fragment] %s in %s", reason, fragment.SourceFile)
+			}
 		}
 
-		// Check each path for collisions
-		for path := range paths {
-			if existingFragment, exists := pathClaims[path]; exists {
-				// Collision detected - quarantine both fragments
-				log.Printf("[Fragment] Path collision detected: %s is claimed by both %s and %s", path, existingFragment, fragment.SourceFile)
+		if len(collisionReasons) > 0 {
+			// Quarantine the whole later fragment. Do not add any of its
+			// keys, so the incumbent remains the sole claimant.
+			fragment.QueuedForQuarantine = true
+			fragment.QuarantineReasons = append(fragment.QuarantineReasons, collisionReasons...)
+			continue
+		}
 
-				// Quarantine the current fragment
-				fragment.QueuedForQuarantine = true
-				fragment.QuarantineReasons = append(fragment.QuarantineReasons, fmt.Sprintf("path_collision: %s already claimed by %s", path, existingFragment))
-
-				// Find and quarantine the existing fragment
-				for _, f := range fl.fragments {
-					if f.SourceFile == existingFragment && !f.QueuedForQuarantine {
-						f.QueuedForQuarantine = true
-						f.QuarantineReasons = append(f.QuarantineReasons, fmt.Sprintf("path_collision: %s also claimed by %s", path, fragment.SourceFile))
-						log.Printf("[Fragment] Quarantined existing fragment %s due to collision", existingFragment)
-						break
-					}
-				}
-			} else {
-				// Claim this path
-				pathClaims[path] = fragment.SourceFile
-			}
+		for _, key := range keys {
+			claims[key] = fragment.SourceFile
 		}
 	}
 
@@ -330,6 +340,61 @@ func (fl *FragmentLoader) DetectPathCollisions() {
 	fl.fragments = kept
 
 	log.Printf("[Fragment] Path collision detection complete: %d fragments quarantined due to collisions", len(fl.quarantined))
+}
+
+// fragmentCollisionKeys returns the collision key for every OpenAPI operation
+// in a fragment. Path-item metadata such as parameters and summary is not a
+// route operation and therefore does not participate in collision detection.
+func fragmentCollisionKeys(fragment *Fragment) []fragmentCollisionKey {
+	paths, ok := fragment.ParsedFragment["paths"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	apiVersion := fragment.APIVersion
+	if apiVersion == "" {
+		apiVersion, _ = fragment.ParsedFragment["x-api-version"].(string)
+	}
+	if apiVersion == "" {
+		apiVersion = "_unversioned"
+	}
+
+	pathNames := make([]string, 0, len(paths))
+	for path := range paths {
+		pathNames = append(pathNames, path)
+	}
+	sort.Strings(pathNames)
+
+	keys := make([]fragmentCollisionKey, 0)
+	for _, path := range pathNames {
+		pathItem, ok := paths[path].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		methods := make([]string, 0, len(pathItem))
+		for method := range pathItem {
+			if isOpenAPIOperationMethod(method) {
+				methods = append(methods, method)
+			}
+		}
+		sort.Strings(methods)
+
+		for _, method := range methods {
+			keys = append(keys, fragmentCollisionKey{path: path, method: method, apiVersion: apiVersion})
+		}
+	}
+
+	return keys
+}
+
+func isOpenAPIOperationMethod(method string) bool {
+	switch method {
+	case "get", "put", "post", "delete", "options", "head", "patch", "trace":
+		return true
+	default:
+		return false
+	}
 }
 
 // MergeFragments merges all valid fragments into a single OpenAPI document
