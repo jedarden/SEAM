@@ -11,17 +11,17 @@ import (
 type inFlightRequest struct {
 	result   *cachedResponse
 	err      error
-	waiters  chan struct{} // Channel for goroutines waiting on this request
-	once     sync.Once     // Ensures result is broadcast only once
-	done     bool          // Whether the request has completed
+	waiters  chan struct{}      // Channel for goroutines waiting on this request
+	once     sync.Once          // Ensures result is broadcast only once
+	done     bool               // Whether the request has completed
 	cancelFn context.CancelFunc // Function to cancel the in-flight request
 }
 
 // SingleFlight manages in-flight request coalescing
 // Multiple concurrent requests with the same key will share a single upstream call
 type SingleFlight struct {
-	mu        sync.Mutex
-	inFlight  map[CacheKey]*inFlightRequest
+	mu       sync.Mutex
+	inFlight map[CacheKey]*inFlightRequest
 
 	// Metrics
 	totalCalls   int64
@@ -158,9 +158,9 @@ func (s *SingleFlight) Stats() SingleFlightStats {
 
 // SingleFlightStats holds single-flight statistics
 type SingleFlightStats struct {
-	ActiveRequests int    // Current number of in-flight requests
-	TotalCalls     int64  // Total number of calls to Do()
-	DedupedCalls   int64  // Number of calls that were deduped (waited for another)
+	ActiveRequests int     // Current number of in-flight requests
+	TotalCalls     int64   // Total number of calls to Do()
+	DedupedCalls   int64   // Number of calls that were deduped (waited for another)
 	CoalesceRate   float64 // Percentage of calls that were coalesced
 }
 

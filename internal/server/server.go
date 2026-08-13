@@ -490,6 +490,20 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		version = "_unversioned"
 	}
 
+	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
+	if version != "_unversioned" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":            "invalid_version_parameter",
+			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
+			"expected_version": "_unversioned",
+			"actual_version":   version,
+			"docs_url":         "/docs",
+		})
+		return
+	}
+
 	// Validate required parameters
 	if path == "" {
 		w.Header().Set("Content-Type", "application/json")

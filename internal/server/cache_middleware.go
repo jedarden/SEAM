@@ -194,7 +194,7 @@ func (r *cacheResponseRecorder) Write(b []byte) (int, error) {
 		r.written = true
 	}
 	r.body.Write(b)
-	return len(b), nil  // Only write to buffer, not underlying
+	return len(b), nil // Only write to buffer, not underlying
 }
 
 // startCacheCleanup starts a background goroutine to periodically clean expired entries and update metrics

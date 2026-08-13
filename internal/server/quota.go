@@ -9,30 +9,30 @@ import (
 
 // QuotaTracker manages quota enforcement based on accumulated cost
 type QuotaTracker struct {
-	mu               sync.RWMutex
-	quotas           map[string]*quotaState // keyed by scope (global, per-token, per-user, per-route)
-	costPerCall      map[string]float64      // route -> cost per call
-	globalCostAccum  float64                 // global accumulated cost
-	requestCosts     map[string]float64      // per-route accumulated cost
-	tokensCosts      map[string]float64      // per-token accumulated cost
-	usersCosts       map[string]float64      // per-user accumulated cost
-	windowStart      time.Time               // start of current quota window
-	windowDuration   time.Duration           // quota window duration
+	mu              sync.RWMutex
+	quotas          map[string]*quotaState // keyed by scope (global, per-token, per-user, per-route)
+	costPerCall     map[string]float64     // route -> cost per call
+	globalCostAccum float64                // global accumulated cost
+	requestCosts    map[string]float64     // per-route accumulated cost
+	tokensCosts     map[string]float64     // per-token accumulated cost
+	usersCosts      map[string]float64     // per-user accumulated cost
+	windowStart     time.Time              // start of current quota window
+	windowDuration  time.Duration          // quota window duration
 }
 
 // quotaState holds quota state for a specific scope
 type quotaState struct {
-	limit         float64       // maximum cost allowed in window
-	accumulated   float64       // accumulated cost in current window
-	windowStart   time.Time     // start of this scope's window
+	limit          float64       // maximum cost allowed in window
+	accumulated    float64       // accumulated cost in current window
+	windowStart    time.Time     // start of this scope's window
 	windowDuration time.Duration // window duration
 }
 
 // QuotaConfig holds quota configuration
 type QuotaConfig struct {
-	Limit       float64       // maximum cost allowed
-	Window      time.Duration // time window
-	Scope       string        // global, per-token, per-user, per-route
+	Limit  float64       // maximum cost allowed
+	Window time.Duration // time window
+	Scope  string        // global, per-token, per-user, per-route
 }
 
 // NewQuotaTracker creates a new quota tracker
@@ -74,9 +74,9 @@ func (qt *QuotaTracker) SetQuota(route string, config QuotaConfig) {
 
 	key := qt.scopeKey(config.Scope, route)
 	qt.quotas[key] = &quotaState{
-		limit:         config.Limit,
-		accumulated:   0,
-		windowStart:   time.Now(),
+		limit:          config.Limit,
+		accumulated:    0,
+		windowStart:    time.Now(),
 		windowDuration: config.Window,
 	}
 }
@@ -282,10 +282,10 @@ func (qt *QuotaTracker) GetQuotaStatus() map[string]interface{} {
 		}
 
 		quotas[key] = map[string]interface{}{
-			"limit":       state.limit,
-			"accumulated": accumulated,
-			"remaining":   state.limit - accumulated,
-			"window_start": state.windowStart,
+			"limit":           state.limit,
+			"accumulated":     accumulated,
+			"remaining":       state.limit - accumulated,
+			"window_start":    state.windowStart,
 			"window_duration": state.windowDuration.String(),
 		}
 	}

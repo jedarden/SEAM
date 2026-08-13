@@ -121,19 +121,19 @@ func TestGenerateCacheKey_EmptyQueryParams(t *testing.T) {
 // TestGenerateCacheKey_MultipleParams tests with multiple query parameters
 func TestGenerateCacheKey_MultipleParams(t *testing.T) {
 	query1 := url.Values{
-		"filter":  []string{"active"},
-		"sort":    []string{"name"},
-		"page":    []string{"2"},
-		"limit":   []string{"50"},
+		"filter": []string{"active"},
+		"sort":   []string{"name"},
+		"page":   []string{"2"},
+		"limit":  []string{"50"},
 		"search": []string{"test"},
 	}
 
 	query2 := url.Values{
-		"search":  []string{"test"},
-		"limit":   []string{"50"},
-		"page":    []string{"2"},
-		"sort":    []string{"name"},
-		"filter":  []string{"active"},
+		"search": []string{"test"},
+		"limit":  []string{"50"},
+		"page":   []string{"2"},
+		"sort":   []string{"name"},
+		"filter": []string{"active"},
 	}
 
 	key1 := GenerateCacheKey("GET", "/api/items", query1)
@@ -207,8 +207,8 @@ func TestGenerateCacheKey_SpecialCharacters(t *testing.T) {
 			expect: "consistent",
 		},
 		{
-			name:   "unicode characters",
-			query:  url.Values{"name": []string{"José"}},
+			name:  "unicode characters",
+			query: url.Values{"name": []string{"José"}},
 
 			expect: "consistent",
 		},
