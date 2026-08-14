@@ -446,8 +446,13 @@ func (ve *ValidationError) ToJSON(path, method string) map[string]interface{} {
 	errorDetails := []map[string]interface{}{}
 
 	for _, err := range ve.Errors {
+		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
+		field := err.SpecPath
+		if field == "" {
+			field = err.RequestPath
+		}
 		errorDetails = append(errorDetails, map[string]interface{}{
-			"field":          err.SpecPath,
+			"field":          field,
 			"expected_shape": err.HowToFix,
 			"actual":         err.RequestPath,
 			"reason":         err.Reason,
@@ -486,8 +491,13 @@ func FormatValidationErrorTo400(validationErrors []*errors.ValidationError, path
 	errorDetails := []map[string]interface{}{}
 
 	for _, err := range validationErrors {
+		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
+		field := err.SpecPath
+		if field == "" {
+			field = err.RequestPath
+		}
 		errorDetails = append(errorDetails, map[string]interface{}{
-			"field":          err.SpecPath,
+			"field":          field,
 			"expected_shape": extractExpectedShape(err),
 			"actual":         err.RequestPath,
 			"reason":         err.Reason,
@@ -576,8 +586,13 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 	}
 
 	for _, err := range ve.Errors {
+		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
+		field := err.SpecPath
+		if field == "" {
+			field = err.RequestPath
+		}
 		response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
-			Field:         err.SpecPath,
+			Field:         field,
 			ExpectedShape: extractExpectedShape(err),
 			Actual:        err.RequestPath,
 			Reason:        err.Reason,

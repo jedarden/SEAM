@@ -12,8 +12,8 @@ import (
 
 // TestValidationMiddleware_ValidRequest_PassesThrough tests that valid requests pass through to handlers
 func TestValidationMiddleware_ValidRequest_PassesThrough(t *testing.T) {
-	// This test uses fragments loaded from ./fragments directory
-	loader, err := spec.NewWithFragments("", "http://localhost:8080", "", "./fragments")
+	// This test uses fragments loaded from ../../fragments directory
+	loader, err := spec.NewWithFragments("", "http://localhost:8080", "", "../../fragments")
 	if err != nil {
 		t.Fatalf("Failed to create spec loader: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestValidationMiddleware_ValidRequest_PassesThrough(t *testing.T) {
 	}))
 
 	// Test valid request
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test/get", nil)
 	w := httptest.NewRecorder()
 	middleware.ServeHTTP(w, req)
 
@@ -43,11 +43,11 @@ func TestValidationMiddleware_ValidRequest_PassesThrough(t *testing.T) {
 
 // TestValidationMiddleware_InvalidRequest_Returns400 tests that invalid requests return 400 with structured errors
 func TestValidationMiddleware_InvalidRequest_Returns400(t *testing.T) {
-	// This test uses fragments loaded from ./fragments directory
+	// This test uses fragments loaded from ../../fragments directory
 	// Create a temporary fragments directory
 	// This test requires actual fragments to be loaded
 	// For now, we'll skip this if fragments aren't available
-	loader, err := spec.NewWithFragments("", "http://localhost:8080", "", "./fragments")
+	loader, err := spec.NewWithFragments("", "http://localhost:8080", "", "../../fragments")
 	if err != nil {
 		t.Skipf("Skipping test - fragments not available: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestValidationMiddleware_InvalidRequest_Returns400(t *testing.T) {
 
 	// Test invalid request - missing required field
 	invalidBody := `{"value": "test"}`
-	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(invalidBody))
+	req := httptest.NewRequest("POST", "/test/post", bytes.NewBufferString(invalidBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	middleware.ServeHTTP(w, req)
