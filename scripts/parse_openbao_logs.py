@@ -20,9 +20,11 @@ import re
 import json
 import sys
 import argparse
+import csv
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Iterator
+from io import StringIO
 
 
 class OpenBaoLogParser:
@@ -43,7 +45,7 @@ class OpenBaoLogParser:
     # Format 3: HTTP access log style
     # Example: 10.0.0.1 - - [13/Aug/2024:10:30:45 +0000] "GET /v1/secret/data/test HTTP/1.1" 200
     HTTP_PATTERN = re.compile(
-        r'(?P<timestamp>\[[^]]+\])\s+"(?P<method>\w+)\s+(?P<path>/v1/[^\s]+)\s+HTTP',
+        r'(?P<timestamp>\[[^]]+\])\s+"(?P<method>\w+)\s+(?P<path>/v1/[^\s]+)\s+HTTP[^"]+"\s+(?P<status>\d{3})',
         re.IGNORECASE
     )
 
@@ -59,7 +61,7 @@ class OpenBaoLogParser:
         Parse a single log line and extract API call information.
 
         Returns:
-            Dict with keys: timestamp, method, path (if line is a read API call)
+            Dict with keys: timestamp, method, path, status (if available, otherwise 'None')
             None: if line doesn't match expected format or is not a read call
         """
         if not line.strip():
@@ -72,13 +74,15 @@ class OpenBaoLogParser:
                 method = data.get('method', '')
                 path = data.get('path', '')
                 timestamp = data.get('time') or data.get('timestamp') or data.get('@timestamp')
+                status = data.get('status') or data.get('response_code') or data.get('code')
 
                 if method and path and timestamp:
                     if method.upper() in self.READ_METHODS and path.startswith('/v1/'):
                         return {
                             'timestamp': timestamp,
                             'method': method.upper(),
-                            'path': path
+                            'path': path,
+                            'status': str(status) if status else 'None'
                         }
         except json.JSONDecodeError:
             pass
@@ -94,7 +98,8 @@ class OpenBaoLogParser:
                 return {
                     'timestamp': timestamp,
                     'method': method.upper(),
-                    'path': path
+                    'path': path,
+                    'status': 'None'
                 }
 
         # Try HTTP access log format
@@ -103,12 +108,14 @@ class OpenBaoLogParser:
             method = match.group('method')
             path = match.group('path')
             timestamp = match.group('timestamp').strip('[]')
+            status = match.group('status')
 
             if method.upper() in self.READ_METHODS and path.startswith('/v1/'):
                 return {
                     'timestamp': timestamp,
                     'method': method.upper(),
-                    'path': path
+                    'path': path,
+                    'status': status
                 }
 
         return None
@@ -137,20 +144,67 @@ def format_output(calls: List[Dict[str, str]], format_type: str = 'text') -> str
     if format_type == 'json':
         return json.dumps(calls, indent=2)
 
-    # Text format
+    if format_type == 'json-compact':
+        return json.dumps(calls, separators=(',', ':'))
+
+    if format_type == 'csv':
+        # CSV format with proper escaping
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=['timestamp', 'method', 'path', 'status'])
+        writer.writeheader()
+        writer.writerows(calls)
+        return output.getvalue()
+
+    # Text format (default) with response code analysis
     lines = [
         "OpenBao API Read Calls",
         "=" * 80,
         f"Total read calls found: {len(calls)}",
-        "",
-        "{:<30} {:<10} {}".format("Timestamp", "Method", "Path"),
-        "-" * 80
+        ""
     ]
 
+    # Analyze response codes
+    if calls:
+        total = len(calls)
+        success = sum(1 for call in calls if call.get('status', 'None').startswith('2'))
+        client_errors = sum(1 for call in calls if call.get('status', 'None').startswith('4'))
+        server_errors = sum(1 for call in calls if call.get('status', 'None').startswith('5'))
+        no_status = sum(1 for call in calls if call.get('status') == 'None')
+        other_errors = total - success - client_errors - server_errors - no_status
+
+        success_rate = (success / total * 100) if total > 0 else 0
+
+        lines.extend([
+            "Response Code Analysis:",
+            "-" * 80,
+            f"  Success (2xx):     {success:3d} ({success_rate:.1f}%)",
+            f"  Client Errors (4xx): {client_errors:3d}",
+            f"  Server Errors (5xx): {server_errors:3d}",
+            f"  No Status Code:    {no_status:3d}",
+            f"  Other Errors:      {other_errors:3d}",
+            ""
+        ])
+
+        # Flag non-successful responses
+        if client_errors > 0 or server_errors > 0:
+            lines.append("⚠️  FLAGGED: Non-successful responses found:")
+            lines.append("-" * 80)
+            for call in calls:
+                status = call.get('status', 'None')
+                if status.startswith('4') or status.startswith('5'):
+                    lines.append(f"  [{status}] {call['timestamp'][:30]} {call['method']} {call['path']}")
+            lines.append("")
+
+    lines.extend([
+        "{:<30} {:<10} {:<10} {}".format("Timestamp", "Method", "Status", "Path"),
+        "-" * 80
+    ])
+
     for call in calls:
-        lines.append("{:<30} {:<10} {}".format(
+        lines.append("{:<30} {:<10} {:<10} {}".format(
             call['timestamp'][:30],  # Truncate long timestamps
             call['method'],
+            call.get('status', 'None'),
             call['path']
         ))
 
@@ -164,13 +218,20 @@ def main():
         epilog="""
 Examples:
   %(prog)s /var/log/openbao/openbao.log
-  %(prog)s /var/log/openbao/openbao.log --output results.json
+  %(prog)s /var/log/openbao/openbao.log --output results.json --format json
+  %(prog)s /var/log/openbao/openbao.log --output results.csv --format csv
   %(prog)s --example
 
 Supported log formats:
   1. Standard text: 2024-08-13T10:30:45.123Z [INFO] ... method=GET path=/v1/secret/data/test
   2. JSON: {"time":"2024-08-13T10:30:45.123Z","method":"GET","path":"/v1/secret/data/test"}
   3. HTTP access: [13/Aug/2024:10:30:45 +0000] "GET /v1/secret/data/test HTTP/1.1" 200
+
+Output formats:
+  - text: Human-readable table format (default)
+  - json: Pretty-printed JSON with indentation
+  - json-compact: Single-line JSON for programmatic consumption
+  - csv: CSV format with header row for spreadsheet/database import
         """
     )
 
@@ -189,9 +250,9 @@ Supported log formats:
 
     parser.add_argument(
         '--format', '-f',
-        choices=['text', 'json'],
+        choices=['text', 'json', 'json-compact', 'csv'],
         default='text',
-        help='Output format (default: text)'
+        help='Output format (default: text). json-compact outputs single-line JSON for parsing'
     )
 
     parser.add_argument(
