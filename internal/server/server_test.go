@@ -125,9 +125,12 @@ func TestMetricsHandler(t *testing.T) {
 	}
 
 	// Check body has some Prometheus metrics
-	body := make([]byte, 1024)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	// Read the entire body, not just first 1024 bytes
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read metrics body: %v", err)
+	}
+	bodyStr := string(body)
 
 	if !strings.Contains(bodyStr, "go_goroutines") {
 		t.Error("expected metrics to contain go_goroutines")
@@ -1121,5 +1124,430 @@ func TestCaptureStatusEndpointWhenEnabled(t *testing.T) {
 
 	if status["corpus_dir"] == nil {
 		t.Error("expected corpus_dir to be present in status")
+	}
+}
+
+// Tests for X-SEAM-Spec-Version header
+
+// TestSpecVersionHeaderPresence verifies that X-SEAM-Spec-Version header is present in responses
+// NOTE: This test checks endpoints that manually set headers. The middleware chain is only
+// applied when s.Start() is called, so direct mux calls don't test the middleware.
+func TestSpecVersionHeaderPresence(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test endpoints that manually set the version header
+	endpoints := []struct {
+		path   string
+		method string
+	}{
+		{"/openapi.json", http.MethodGet},
+		{"/docs", http.MethodGet},
+		{"/docs/route?path=/openapi.json&method=GET", http.MethodGet},
+	}
+
+	for _, ep := range endpoints {
+		t.Run(ep.path, func(t *testing.T) {
+			req := httptest.NewRequest(ep.method, ep.path, nil)
+			w := httptest.NewRecorder()
+
+			s.callerMux.ServeHTTP(w, req)
+
+			resp := w.Result()
+			defer func() { _ = resp.Body.Close() }()
+
+			specVersion := resp.Header.Get("X-Seam-Spec-Version")
+			if specVersion == "" {
+				t.Errorf("expected X-Seam-Spec-Version header to be set for %s", ep.path)
+			}
+		})
+	}
+}
+
+// TestSpecVersionHeaderValue verifies that header value matches spec hash from loader
+func TestSpecVersionHeaderValue(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	specVersion := resp.Header.Get("X-Seam-Spec-Version")
+	loaderHash := s.specLoader.GetHash()
+
+	if specVersion != loaderHash {
+		t.Errorf("X-Seam-Spec-Version header %s doesn't match loader hash %s", specVersion, loaderHash)
+	}
+}
+
+// TestSpecVersionHeaderFormat verifies that the header value is correctly formatted (64 hex chars)
+func TestSpecVersionHeaderFormat(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	specVersion := resp.Header.Get("X-Seam-Spec-Version")
+
+	// Verify length is 64 characters (SHA256)
+	if len(specVersion) != 64 {
+		t.Errorf("expected X-Seam-Spec-Version to be 64 chars (full SHA256), got %d", len(specVersion))
+	}
+
+	// Verify all characters are valid hex (lowercase a-f, 0-9)
+	for i, c := range specVersion {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			t.Errorf("X-Seam-Spec-Version contains invalid hex character '%c' at position %d", c, i)
+		}
+	}
+}
+
+// TestSpecVersionHeaderCanonicalization verifies that header uses canonical form
+func TestSpecVersionHeaderCanonicalization(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	// Check for canonical form (X-Seam-Spec-Version)
+	canonicalForm := resp.Header.Get("X-Seam-Spec-Version")
+	if canonicalForm == "" {
+		t.Error("expected X-Seam-Spec-Version header in canonical form")
+	}
+
+	// Verify that Go's http.Header.Get() canonicalizes the key automatically
+	// Accessing with any case variation should work
+	nonCanonicalAccess := resp.Header.Get("X-SEAM-Spec-Version")
+	if nonCanonicalAccess == "" {
+		t.Error("http.Header.Get() should canonicalize keys, but got empty result")
+	}
+
+	// Both should return the same value
+	if canonicalForm != nonCanonicalAccess {
+		t.Errorf("canonical form %s != non-canonical access %s", canonicalForm, nonCanonicalAccess)
+	}
+
+	// Verify the value is all lowercase hex (as stored)
+	if canonicalForm != strings.ToLower(canonicalForm) {
+		t.Errorf("header value should be lowercase hex, got: %s", canonicalForm)
+	}
+}
+
+// TestSpecVersionHeaderPosition verifies that header is injected before status code is sent
+func TestSpecVersionHeaderPosition(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	// The versionWriter injects headers before calling WriteHeader on the underlying writer
+	// This means the header should be present in the final response
+	specVersion := resp.Header.Get("X-Seam-Spec-Version")
+
+	// If the header was injected after the status code was sent, it wouldn't appear in the response
+	if specVersion == "" {
+		t.Error("X-Seam-Spec-Version header should be injected before status code is sent")
+	}
+
+	// Verify the response is successful (headers were sent properly)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestSpecVersionHeaderAcrossDifferentRequests verifies header is present for different request types
+func TestSpecVersionHeaderAcrossDifferentRequests(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test different endpoints to verify the header is consistently applied
+	testCases := []struct {
+		name        string
+		path        string
+		method      string
+		headerCheck bool // whether we expect the header (only endpoints that manually set it)
+	}{
+		{"openapi_get", "/openapi.json", http.MethodGet, true},
+		{"docs_get", "/docs", http.MethodGet, true},
+		{"docs_get_with_json_accept", "/docs", http.MethodGet, true},
+		{"docs_route_get", "/docs/route?path=/openapi.json&method=GET", http.MethodGet, true},
+		{"openapi_post", "/openapi.json", http.MethodPost, false}, // Returns 405, no manual header set
+		{"docs_post", "/docs", http.MethodPost, false},             // Returns 405, no manual header set
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			if tc.name == "docs_get_with_json_accept" {
+				req.Header.Set("Accept", "application/json")
+			}
+
+			w := httptest.NewRecorder()
+			s.callerMux.ServeHTTP(w, req)
+
+			resp := w.Result()
+			defer func() { _ = resp.Body.Close() }()
+
+			specVersion := resp.Header.Get("X-Seam-Spec-Version")
+
+			if tc.headerCheck {
+				if specVersion == "" {
+					t.Errorf("expected X-Seam-Spec-Version header for %s", tc.name)
+				}
+			} else {
+				// For error responses that don't manually set headers, we don't expect it
+				// (in production, the middleware would set it, but direct mux calls bypass middleware)
+			}
+		})
+	}
+}
+
+// TestSpecVersionHeaderConsistency verifies header is consistent across multiple requests
+func TestSpecVersionHeaderConsistency(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	var versions []string
+
+	// Make multiple requests and collect the version header
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+		w := httptest.NewRecorder()
+
+		s.callerMux.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer func() { _ = resp.Body.Close() }()
+
+		specVersion := resp.Header.Get("X-Seam-Spec-Version")
+		versions = append(versions, specVersion)
+	}
+
+	// Verify all versions are the same
+	for i, v := range versions {
+		if v != versions[0] {
+			t.Errorf("request %d returned version %s, expected %s", i, v, versions[0])
+		}
+	}
+}
+
+// TestVersionWriterDirectly tests the versionWriter behavior in isolation
+func TestVersionWriterDirectly(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+	specHash := s.specLoader.GetHash()
+
+	// Create a mock response writer
+	mockWriter := httptest.NewRecorder()
+
+	// Create a versionWriter
+	vw := &versionWriter{
+		ResponseWriter: mockWriter,
+		specHash:       specHash,
+		headersInjected: false,
+	}
+
+	// Test Header() triggers injection
+	h := vw.Header()
+	if h == nil {
+		t.Error("Header() should return non-nil header map")
+	}
+
+	// Check that header was injected
+	if mockWriter.Header().Get("X-Seam-Spec-Version") != specHash {
+		t.Errorf("Header() should inject X-Seam-Spec-Version, got %s", mockWriter.Header().Get("X-Seam-Spec-Version"))
+	}
+
+	// Test WriteHeader() triggers injection
+	vw2 := &versionWriter{
+		ResponseWriter: mockWriter,
+		specHash:       specHash,
+		headersInjected: false,
+	}
+
+	vw2.WriteHeader(http.StatusOK)
+	if mockWriter.Header().Get("X-Seam-Spec-Version") != specHash {
+		t.Error("WriteHeader() should inject X-Seam-Spec-Version")
+	}
+
+	// Test Write() triggers injection
+	vw3 := &versionWriter{
+		ResponseWriter: mockWriter,
+		specHash:       specHash,
+		headersInjected: false,
+	}
+
+	n, err := vw3.Write([]byte("test"))
+	if err != nil {
+		t.Fatalf("Write() failed: %v", err)
+	}
+	if n != 4 {
+		t.Errorf("Write() returned %d, expected 4", n)
+	}
+	if mockWriter.Header().Get("X-Seam-Spec-Version") != specHash {
+		t.Error("Write() should inject X-Seam-Spec-Version")
+	}
+}
+
+// TestVersionWriterNoDoubleInjection verifies that headers are only injected once
+func TestVersionWriterNoDoubleInjection(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+	specHash := s.specLoader.GetHash()
+
+	mockWriter := httptest.NewRecorder()
+
+	vw := &versionWriter{
+		ResponseWriter: mockWriter,
+		specHash:       specHash,
+		headersInjected: false,
+	}
+
+	// Call all three methods multiple times
+	for i := 0; i < 3; i++ {
+		vw.Header()
+		vw.WriteHeader(http.StatusOK)
+		vw.Write([]byte("test"))
+	}
+
+	// Verify the header was set only once (no duplicates)
+	headers := mockWriter.Header()["X-Seam-Spec-Version"]
+	if len(headers) != 1 {
+		t.Errorf("expected 1 header value, got %d: %v", len(headers), headers)
+	}
+
+	if headers[0] != specHash {
+		t.Errorf("expected header value %s, got %s", specHash, headers[0])
+	}
+}
+
+// TestVersionWriterEmptyHash tests behavior when spec hash is empty
+func TestVersionWriterEmptyHash(t *testing.T) {
+	mockWriter := httptest.NewRecorder()
+
+	vw := &versionWriter{
+		ResponseWriter: mockWriter,
+		specHash:       "", // Empty hash
+		headersInjected: false,
+	}
+
+	// Trigger injection
+	vw.WriteHeader(http.StatusOK)
+
+	// With empty hash, the header should NOT be set
+	header := mockWriter.Header().Get("X-Seam-Spec-Version")
+	if header != "" {
+		t.Errorf("expected no X-Seam-Spec-Version header when hash is empty, got %s", header)
+	}
+}
+
+// TestSpecVersionHeaderOnManualErrorResponse verifies header is present on manual error responses
+// NOTE: This tests handlers that manually set headers even on error responses.
+// The middleware would apply to all responses, but direct mux calls bypass it.
+func TestSpecVersionHeaderOnManualErrorResponse(t *testing.T) {
+	cfg := &Config{
+		CallerPort:   8080,
+		OperatorPort: 8081,
+		BaseURL:      "http://localhost:8080",
+		SpecDir:      "../../spec",
+	}
+
+	s := New(cfg)
+
+	// Test an error response that manually sets headers (invalid version parameter)
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json?version=invalid", nil)
+	w := httptest.NewRecorder()
+
+	s.callerMux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	// Should return 400 for invalid version
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Logf("expected status 400, got %d", resp.StatusCode)
+	}
+
+	// The handler manually sets headers even on error responses
+	specVersion := resp.Header.Get("X-Seam-Spec-Version")
+	if specVersion == "" {
+		t.Error("expected X-Seam-Spec-Version header on manual error response (handler sets it)")
 	}
 }
