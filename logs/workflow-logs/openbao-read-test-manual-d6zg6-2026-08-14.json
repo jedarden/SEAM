@@ -1,0 +1,68 @@
+{
+  "workflow_name": "openbao-read-test-manual-d6zg6",
+  "namespace": "argo-workflows",
+  "workflow_template": "openbao-read-test",
+  "timestamp_captured": "2026-08-14T06:53:42Z",
+  "completion_status": {
+    "phase": "Failed",
+    "message": "No more retries left",
+    "startedAt": "2026-08-14T06:53:22Z",
+    "finishedAt": "2026-08-14T06:53:42Z",
+    "duration_seconds": 20,
+    "exit_code": 1,
+    "progress": "0/2"
+  },
+  "retry_attempts": [
+    {
+      "attempt": 0,
+      "pod_name": "openbao-read-test-manual-d6zg6(0)",
+      "startedAt": "2026-08-14T06:53:22Z",
+      "finishedAt": "2026-08-14T06:53:27Z",
+      "phase": "Failed",
+      "message": "main: Error (exit code 1)",
+      "duration_seconds": 5
+    },
+    {
+      "attempt": 1,
+      "pod_name": "openbao-read-test-manual-d6zg6(1)",
+      "startedAt": "2026-08-14T06:53:32Z",
+      "finishedAt": "2026-08-14T06:53:37Z",
+      "phase": "Failed",
+      "message": "main: Error (exit code 1)",
+      "duration_seconds": 5
+    }
+  ],
+  "workflow_template_details": {
+    "container_image": "openbao/openbao:2.6.1",
+    "service_account": "argo-workflow",
+    "retry_strategy": {
+      "limit": 1
+    },
+    "test_description": "OpenBao connectivity and read operations test",
+    "target_address": "http://openbao.external-secrets.svc.cluster.local:8200",
+    "test_secret_path": "secret/monitoring/test",
+    "auth_method": "Kubernetes service account authentication"
+  },
+  "error_analysis": {
+    "both_attempts_failed": true,
+    "failure_pattern": "Consistent failure across all retry attempts",
+    "duration_per_attempt": "5 seconds per attempt",
+    "total_execution_time": "20 seconds",
+    "possible_causes": [
+      "OpenBao service unavailable at target address",
+      "Authentication failure with Kubernetes auth method",
+      "ServiceAccount permissions insufficient",
+      "Network connectivity issues between cluster and OpenBao",
+      "Secret path does not exist or access denied"
+    ]
+  },
+  "next_steps": [
+    "Check OpenBao service status in external-secrets namespace",
+    "Verify ServiceAccount 'argo-workflow' has proper Kubernetes auth role",
+    "Test network connectivity to OpenBao endpoint",
+    "Verify secret path exists and permissions are correct",
+    "Check OpenBao logs for authentication failures"
+  ],
+  "captured_by": "bf-2946c workflow log capture task",
+  "capture_note": "Pods were deleted by podGC: OnPodCompletion, so direct pod logs unavailable. Analysis based on workflow metadata and node status."
+}

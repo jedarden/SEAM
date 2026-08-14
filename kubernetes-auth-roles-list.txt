@@ -1,0 +1,30 @@
+OpenBao Kubernetes Auth Method Roles List
+==========================================
+
+Date: 2026-08-14
+
+Server: http://127.0.0.1:8200
+
+Enabled Auth Methods:
+- token/ (token based credentials)
+
+Kubernetes Auth Method Status:
+- NOT ENABLED - No Kubernetes auth method found at auth/kubernetes/ or kubernetes/
+
+Available Roles:
+- NONE - No Kubernetes auth method exists, therefore no roles can be listed
+
+Command History:
+1. bao auth list -address=http://127.0.0.1:8200
+   Result: Only token/ auth method is enabled
+
+2. bao list -address=http://127.0.0.1:8200 auth/kubernetes/roles
+   Result: "No value found at auth/kubernetes/roles"
+
+3. bao list -address=http://127.0.0.1:8200 kubernetes/roles
+   Result: "No value found at kubernetes/roles"
+
+Conclusion:
+The OpenBao server at http://127.0.0.1:8200 does not have a Kubernetes authentication
+method enabled. To use Kubernetes authentication, it would need to be enabled first
+using: bao auth enable kubernetes

@@ -1,0 +1,5 @@
+timestamp,method,path
+2024-08-13T10:30:45.123Z,GET,/v1/secret/data/seam/routes/test
+2024-08-13T10:30:47.789Z,GET,/v1/secret/data/seam/fragments/sample
+2024-08-13T10:30:48.012Z,GET,/v1/secret/data/seam/config
+13/Aug/2024:10:30:50 +0000,GET,/v1/secret/data/seam/keys

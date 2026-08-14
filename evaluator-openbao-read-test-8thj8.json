@@ -1,0 +1,91 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Workflow",
+    "metadata": {
+        "annotations": {
+            "workflows.argoproj.io/last-seen-version": "61886666",
+            "workflows.argoproj.io/pod-name-format": "v2"
+        },
+        "creationTimestamp": "2026-08-13T23:29:51Z",
+        "generateName": "evaluator-openbao-read-test-",
+        "generation": 2,
+        "labels": {
+            "workflows.argoproj.io/completed": "true",
+            "workflows.argoproj.io/phase": "Error"
+        },
+        "name": "evaluator-openbao-read-test-8thj8",
+        "namespace": "argo-workflows",
+        "resourceVersion": "61886670",
+        "uid": "a5740591-6d56-4400-b0ec-7799bf59d2a8"
+    },
+    "spec": {
+        "activeDeadlineSeconds": 3600,
+        "arguments": {},
+        "entrypoint": "test-evaluator-token-read",
+        "podGC": {
+            "strategy": "OnPodCompletion"
+        },
+        "serviceAccountName": "seam-retirement-evaluator",
+        "templates": [
+            {
+                "container": {
+                    "args": [
+                        "set -e\nlog() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1\"; }\nerror() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1\" \u003e\u00262; exit 1; }\n\n# Configure OpenBao address\nOPENBAO_ADDR=\"http://openbao-rs-manager.openbao.svc.cluster.local:8200\"\n\nlog \"=== Evaluator OpenBao Token Read Test ===\"\n\n# Check basic connectivity to OpenBao\nlog \"Testing connectivity to OpenBao at $OPENBAO_ADDR...\"\nSTATUS_CODE=$(curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout 5 \"$OPENBAO_ADDR/v1/sys/health\" 2\u003e\u00261 || echo \"000\")\n\nif [ \"$STATUS_CODE\" = \"000\" ]; then\n  error \"Cannot reach OpenBao at $OPENBAO_ADDR (connection failed)\"\nelif [ \"$STATUS_CODE\" != \"200\" ] \u0026\u0026 [ \"$STATUS_CODE\" != \"429\" ] \u0026\u0026 [ \"$STATUS_CODE\" != \"503\" ]; then\n  log \"⚠ OpenBao returned unexpected status code: $STATUS_CODE\"\nelse\n  log \"✓ OpenBao is reachable (HTTP $STATUS_CODE)\"\nfi\n\n# Read Kubernetes service account token for authentication\nif [ ! -f \"/var/run/secrets/kubernetes.io/serviceaccount/token\" ]; then\n  error \"Not running in Kubernetes cluster\"\nfi\n\nSA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\nSA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)\nSA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)\n\nlog \"Running as ServiceAccount: $SA_NAME in namespace: $SA_NS\"\n\n# Verify we're running as the correct service account\nif [ \"$SA_NAME\" != \"seam-retirement-evaluator\" ]; then\n  log \"⚠ WARNING: Not running as seam-retirement-evaluator service account\"\n  log \"  Current SA: $SA_NAME (expected: seam-retirement-evaluator)\"\n  log \"  This test will attempt authentication anyway, but may fail\"\nelse\n  log \"✓ Running as correct service account: seam-retirement-evaluator\"\nfi\n\nif [ \"$SA_NS\" != \"seam\" ]; then\n  log \"⚠ WARNING: Not running in seam namespace\"\n  log \"  Current namespace: $SA_NS (expected: seam)\"\n  log \"  This test will attempt authentication anyway, but may fail\"\nelse\n  log \"✓ Running in correct namespace: seam\"\nfi\n\n# Authenticate using Kubernetes auth method with evaluator role\nlog \"Authenticating to OpenBao via Kubernetes auth as seam-retirement-evaluator...\"\nAUTH_RESPONSE=$(curl -s -X POST \\\n  --connect-timeout 5 \\\n  --data \"{\\\"role\\\": \\\"seam-retirement-evaluator\\\", \\\"jwt\\\": \\\"$SA_TOKEN\\\"}\" \\\n  \"$OPENBAO_ADDR/v1/auth/kubernetes/login\" 2\u003e\u00261)\n\n# Check if authentication succeeded\nif echo \"$AUTH_RESPONSE\" | grep -q \"errors\"; then\n  error \"Authentication failed: $AUTH_RESPONSE\"\nelif ! echo \"$AUTH_RESPONSE\" | grep -q \"client_token\"; then\n  error \"Authentication response missing token: $AUTH_RESPONSE\"\nfi\n\n# Extract token (masked in logs)\nCLIENT_TOKEN=$(echo \"$AUTH_RESPONSE\" | grep -o '\"client_token\":\"[^\"]*\"' | cut -d'\"' -f4)\nlog \"✓ Successfully authenticated to OpenBao as seam-retirement-evaluator (token: ${CLIENT_TOKEN:0:12}...)\"\n\n# Read the evaluator's GitHub token\nlog \"Reading GitHub token from secret/evaluators/seam-retirement-evaluator/github-token...\"\nREAD_RESPONSE=$(curl -s -X GET \\\n  -H \"X-Vault-Token: $CLIENT_TOKEN\" \\\n  --connect-timeout 5 \\\n  \"$OPENBAO_ADDR/v1/secret/data/evaluators/seam-retirement-evaluator/github-token\" 2\u003e\u00261)\n\n# Check for errors\nif echo \"$READ_RESPONSE\" | grep -qi \"permission denied\"; then\n  error \"FAIL: Permission denied reading evaluator's own GitHub token\"\nelif echo \"$READ_RESPONSE\" | grep -qi \"Invalid\"; then\n  error \"FAIL: Invalid token or path when reading GitHub token\"\nelif echo \"$READ_RESPONSE\" | grep -q \"errors\"; then\n  error \"FAIL: Error reading GitHub token: $READ_RESPONSE\"\nelif ! echo \"$READ_RESPONSE\" | grep -q \"data\"; then\n  error \"FAIL: No data in response when reading GitHub token\"\nfi\n\n# Extract the token value\nGITHUB_TOKEN=$(echo \"$READ_RESPONSE\" | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)\n\nif [ -z \"$GITHUB_TOKEN\" ]; then\n  error \"FAIL: Could not extract token from response\"\nfi\n\nlog \"✓ Successfully retrieved GitHub token (length: ${#GITHUB_TOKEN} characters)\"\n\n# Validate token format\nlog \"Validating GitHub token format...\"\n\n# Check if token is empty\nif [ -z \"$GITHUB_TOKEN\" ]; then\n  error \"FAIL: GitHub token is empty\"\nfi\n\n# Check if token contains placeholder value\nif [ \"$GITHUB_TOKEN\" = \"REPLACE_WITH_ACTUAL_GITHUB_PAT\" ]; then\n  error \"FAIL: GitHub token contains placeholder value - not yet configured\"\nfi\n\n# Check if token looks like a GitHub token\nif echo \"$GITHUB_TOKEN\" | grep -q \"^ghp_[a-zA-Z0-9_]\\{36\\}$\"; then\n  log \"✓ Token format valid (GitHub PAT: ghp_ prefix, 36 characters)\"\nelif echo \"$GITHUB_TOKEN\" | grep -q \"^gho_[a-zA-Z0-9_]\\{36\\}$\"; then\n  log \"✓ Token format valid (GitHub OAuth token: gho_ prefix, 36 characters)\"\nelif echo \"$GITHUB_TOKEN\" | grep -q \"^ghu_[a-zA-Z0-9_]\\{36\\}$\"; then\n  log \"✓ Token format valid (GitHub user token: ghu_ prefix, 36 characters)\"\nelif echo \"$GITHUB_TOKEN\" | grep -q \"^[a-f0-9]\\{40\\}$\"; then\n  log \"✓ Token format valid (Legacy GitHub token: 40 hex characters)\"\nelif echo \"$GITHUB_TOKEN\" | grep -q \"^github_pat_[a-zA-Z0-9_]\\{82\\}$\"; then\n  log \"✓ Token format valid (Fine-grained PAT: github_pat_ prefix, 82 characters)\"\nelse\n  log \"⚠ WARNING: Token format doesn't match standard GitHub PAT patterns\"\n  log \"  Token starts with: ${GITHUB_TOKEN:0:10}...\"\n  log \"  This may be a test token or custom format\"\nfi\n\n# Verify we cannot access SEAM routes (security boundary check)\nlog \"Verifying security boundaries (cannot access SEAM routes)...\"\nSEAM_TEST=$(curl -s -X GET \\\n  -H \"X-Vault-Token: $CLIENT_TOKEN\" \\\n  --connect-timeout 5 \\\n  \"$OPENBAO_ADDR/v1/secret/data/seam/routes/\" 2\u003e\u00261)\n\nif echo \"$SEAM_TEST\" | grep -qi \"permission denied\\|deny\"; then\n  log \"✓ Correctly denied access to SEAM routes\"\nelse\n  error \"FAIL: Can access SEAM routes - security violation!\"\nfi\n\n# Verify we cannot access other secret paths\nlog \"Verifying cannot access other secret paths...\"\nOTHER_TEST=$(curl -s -X GET \\\n  -H \"X-Vault-Token: $CLIENT_TOKEN\" \\\n  --connect-timeout 5 \\\n  \"$OPENBAO_ADDR/v1/secret/data/armor/\" 2\u003e\u00261)\n\nif echo \"$OTHER_TEST\" | grep -qi \"permission denied\\|Invalid\"; then\n  log \"✓ Correctly denied access to other secret paths\"\nelse\n  error \"FAIL: Can access other secret paths - policy too permissive!\"\nfi\n\nlog \"=== Evaluator OpenBao Token Read Test Complete ===\"\nlog \"\"\nlog \"✓ All tests passed:\"\nlog \"  - OpenBao connectivity verified\"\nlog \"  - Evaluator authentication successful\"\nlog \"  - GitHub token retrieved successfully\"\nlog \"  - Token format validated\"\nlog \"  - Security boundaries verified (cannot access SEAM routes)\"\nlog \"  - Policy isolation verified (cannot access other paths)\"\nlog \"\"\nlog \"The seam-retirement-evaluator role can successfully read its GitHub token.\"\n"
+                    ],
+                    "command": [
+                        "/bin/sh",
+                        "-c"
+                    ],
+                    "image": "curlimages/curl:8.6.0",
+                    "name": "",
+                    "resources": {}
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "test-evaluator-token-read",
+                "outputs": {}
+            }
+        ],
+        "ttlStrategy": {
+            "secondsAfterCompletion": 3600,
+            "secondsAfterFailure": 7200,
+            "secondsAfterSuccess": 1800
+        }
+    },
+    "status": {
+        "artifactGCStatus": {
+            "notSpecified": true
+        },
+        "artifactRepositoryRef": {
+            "artifactRepository": {},
+            "default": true
+        },
+        "conditions": [
+            {
+                "status": "True",
+                "type": "Completed"
+            }
+        ],
+        "finishedAt": "2026-08-13T23:29:51Z",
+        "message": "error in entry template execution: pods \"evaluator-openbao-read-test-8thj8\" is forbidden: error looking up service account argo-workflows/seam-retirement-evaluator: serviceaccount \"seam-retirement-evaluator\" not found",
+        "nodes": {
+            "evaluator-openbao-read-test-8thj8": {
+                "displayName": "evaluator-openbao-read-test-8thj8",
+                "finishedAt": "2026-08-13T23:29:51Z",
+                "id": "evaluator-openbao-read-test-8thj8",
+                "message": "pods \"evaluator-openbao-read-test-8thj8\" is forbidden: error looking up service account argo-workflows/seam-retirement-evaluator: serviceaccount \"seam-retirement-evaluator\" not found",
+                "name": "evaluator-openbao-read-test-8thj8",
+                "phase": "Error",
+                "progress": "0/1",
+                "startedAt": "2026-08-13T23:29:51Z",
+                "taskResultSynced": true,
+                "templateName": "test-evaluator-token-read",
+                "templateScope": "local/evaluator-openbao-read-test-8thj8",
+                "type": "Pod"
+            }
+        },
+        "phase": "Error",
+        "progress": "0/1",
+        "startedAt": "2026-08-13T23:29:51Z"
+    }
+}

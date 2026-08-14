@@ -1,0 +1,106 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Workflow",
+    "metadata": {
+        "annotations": {
+            "workflows.argoproj.io/last-seen-version": "61895419",
+            "workflows.argoproj.io/pod-name-format": "v2"
+        },
+        "creationTimestamp": "2026-08-13T23:51:35Z",
+        "generateName": "openbao-connectivity-debug-",
+        "generation": 4,
+        "labels": {
+            "workflows.argoproj.io/completed": "true",
+            "workflows.argoproj.io/phase": "Succeeded"
+        },
+        "name": "openbao-connectivity-debug-jc6pd",
+        "namespace": "argo-workflows",
+        "resourceVersion": "61896048",
+        "uid": "14d787ea-ca2f-4a2d-9d43-a9eed29bc25b"
+    },
+    "spec": {
+        "activeDeadlineSeconds": 3600,
+        "arguments": {},
+        "entrypoint": "debug-test",
+        "podGC": {
+            "strategy": "OnPodCompletion"
+        },
+        "serviceAccountName": "argo-workflow-executor",
+        "templates": [
+            {
+                "container": {
+                    "args": [
+                        "log() { echo \"[2026-08-13T23:51:35Z] \"; }\n\nlog \"=== OpenBao Connectivity Debug ===\"\n\n# Test DNS resolution\nlog \"Testing DNS resolution for openbao.external-secrets.svc.cluster.local...\"\nnslookup openbao.external-secrets.svc.cluster.local || log \"DNS resolution failed\"\n\n# Test basic connectivity\nlog \"Testing TCP connectivity to openbao.external-secrets.svc.cluster.local:8200...\"\ntimeout 5 nc -zv openbao.external-secrets.svc.cluster.local 8200 || log \"TCP connection failed\"\n\n# Test HTTP connectivity\nlog \"Testing HTTP connectivity to OpenBao health endpoint...\"\ncurl -v --connect-timeout 5 http://openbao.external-secrets.svc.cluster.local:8200/v1/sys/health 2\u003e\u00261 || log \"HTTP connection failed\"\n\n# Check service account token\nlog \"Checking service account token...\"\nif [ -f \"/var/run/secrets/kubernetes.io/serviceaccount/token\" ]; then\n  SA_TOKEN=\n  log \"Service account token found (length: 0)\"\nelse\n  log \"No service account token found\"\nfi\n\nlog \"=== Debug Complete ===\"\nlog \"Sleeping for 60 seconds to allow log capture...\"\nsleep 60\n"
+                    ],
+                    "command": [
+                        "/bin/sh",
+                        "-c"
+                    ],
+                    "image": "curlimages/curl:8.6.0",
+                    "name": "",
+                    "resources": {}
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "debug-test",
+                "outputs": {},
+                "serviceAccountName": "argo-workflow"
+            }
+        ],
+        "ttlStrategy": {
+            "secondsAfterCompletion": 3600,
+            "secondsAfterFailure": 7200,
+            "secondsAfterSuccess": 1800
+        }
+    },
+    "status": {
+        "artifactGCStatus": {
+            "notSpecified": true
+        },
+        "artifactRepositoryRef": {
+            "artifactRepository": {},
+            "default": true
+        },
+        "conditions": [
+            {
+                "status": "False",
+                "type": "PodRunning"
+            },
+            {
+                "status": "True",
+                "type": "Completed"
+            }
+        ],
+        "finishedAt": "2026-08-13T23:52:58Z",
+        "nodes": {
+            "openbao-connectivity-debug-jc6pd": {
+                "displayName": "openbao-connectivity-debug-jc6pd",
+                "finishedAt": "2026-08-13T23:52:48Z",
+                "hostNodeName": "prod-instance-17864972011511202",
+                "id": "openbao-connectivity-debug-jc6pd",
+                "name": "openbao-connectivity-debug-jc6pd",
+                "outputs": {
+                    "exitCode": "0"
+                },
+                "phase": "Succeeded",
+                "progress": "1/1",
+                "resourcesDuration": {
+                    "cpu": 12,
+                    "memory": 163
+                },
+                "startedAt": "2026-08-13T23:51:35Z",
+                "taskResultSynced": true,
+                "templateName": "debug-test",
+                "templateScope": "local/openbao-connectivity-debug-jc6pd",
+                "type": "Pod"
+            }
+        },
+        "phase": "Succeeded",
+        "progress": "1/1",
+        "resourcesDuration": {
+            "cpu": 12,
+            "memory": 163
+        },
+        "startedAt": "2026-08-13T23:51:35Z"
+    }
+}

@@ -11,10 +11,12 @@
   "paths": {
     "/test/get": {
       "get": {
-        "summary": "Test GET endpoint",
-        "description": "A simple GET endpoint for testing docs UI",
+        "summary": "UPDATED TEST GET ENDPOINT",
+        "description": "Updated description for documentation update test - TEST timestamp: 1786380272",
         "operationId": "testGet",
-        "tags": ["test"],
+        "tags": [
+          "test"
+        ],
         "parameters": [
           {
             "name": "id",
@@ -50,7 +52,9 @@
         "summary": "Test POST endpoint",
         "description": "A simple POST endpoint for testing docs UI",
         "operationId": "testPost",
-        "tags": ["test"],
+        "tags": [
+          "test"
+        ],
         "requestBody": {
           "description": "Test request body",
           "required": true,
@@ -58,7 +62,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -100,7 +106,9 @@
         "summary": "Test endpoint with path parameter",
         "description": "Tests path parameter display in docs UI",
         "operationId": "testGetById",
-        "tags": ["test"],
+        "tags": [
+          "test"
+        ],
         "parameters": [
           {
             "name": "id",
@@ -122,7 +130,9 @@
         "summary": "Test DELETE endpoint",
         "description": "Tests DELETE method display",
         "operationId": "testDelete",
-        "tags": ["test"],
+        "tags": [
+          "test"
+        ],
         "parameters": [
           {
             "name": "id",

@@ -1,0 +1,105 @@
+/tmp/create_comprehensive_logs.py:77: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  all_logs.append(f"Generated: {datetime.utcnow().isoformat()}Z")
+OPENBAO WORKFLOW EXECUTION LOGS
+Generated: 2026-08-14T00:10:20.174439Z
+
+================================================================================
+WORKFLOW: openbao-connectivity-debug-jc6pd
+================================================================================
+Phase: Succeeded
+Message: 
+Started: 2026-08-13T23:51:35Z
+Finished: 2026-08-13T23:52:58Z
+
+CONTAINER SPEC:
+  Image: curlimages/curl:8.6.0
+  Command: ['/bin/sh', '-c']
+  Args (first 500 chars): log() { echo "[2026-08-13T23:51:35Z] "; }
+
+log "=== OpenBao Connectivity Debug ==="
+
+# Test DNS resolution
+log "Testing DNS resolution for openbao.external-secrets.svc.cluster.local..."
+nslookup openbao.external-secrets.svc.cluster.local || log "DNS resolution failed"
+
+# Test basic connectivity
+log "Testing TCP connectivity to openbao.external-secrets.svc.cluster.local:8200..."
+timeout 5 nc -zv openbao.external-secrets.svc.cluster.local 8200 || log "TCP connection failed"
+
+# Test HTTP connectivi
+
+EXECUTION NODES (1 total):
+
+  [Pod] openbao-connectivity-debug-jc6pd
+    Phase: Succeeded
+    Started: 2026-08-13T23:51:35Z
+    Finished: 2026-08-13T23:52:48Z
+    Exit Code: 0
+
+================================================================================
+WORKFLOW: openbao-auth-debug-rlcw9
+================================================================================
+Phase: Failed
+Message: main: Error (exit code 1)
+Started: 2026-08-13T23:53:41Z
+Finished: 2026-08-13T23:54:01Z
+
+CONTAINER SPEC:
+  Image: curlimages/curl:8.6.0
+  Command: ['/bin/sh', '-c']
+  Args (first 500 chars): set -x  # Enable debug output
+log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+log "=== OpenBao Authentication Debug ==="
+
+OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
+
+# Check SA token availability
+log "Checking service account files..."
+ls -la /var/run/secrets/kubernetes.io/serviceaccount/ || error "SA directory not found"
+
+if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token
+
+EXECUTION NODES (1 total):
+
+  [Pod] openbao-auth-debug-rlcw9
+    Phase: Failed
+    Started: 2026-08-13T23:53:41Z
+    Finished: 2026-08-13T23:53:52Z
+    Message: main: Error (exit code 1)
+    Exit Code: 1
+
+================================================================================
+WORKFLOW: openbao-read-test-p8w7m
+================================================================================
+Phase: Failed
+Message: No more retries left
+Started: 2026-08-13T23:47:20Z
+Finished: 2026-08-13T23:47:40Z
+
+Workflow Template: openbao-read-test
+
+EXECUTION NODES (3 total):
+
+  [Retry] openbao-read-test-p8w7m
+    Phase: Failed
+    Started: 2026-08-13T23:47:20Z
+    Finished: 2026-08-13T23:47:40Z
+    Message: No more retries left
+    Exit Code: 1
+
+  [Pod] openbao-read-test-p8w7m(0)
+    Phase: Failed
+    Started: 2026-08-13T23:47:20Z
+    Finished: 2026-08-13T23:47:26Z
+    Message: main: Error (exit code 1)
+    Exit Code: 1
+
+  [Pod] openbao-read-test-p8w7m(1)
+    Phase: Failed
+    Started: 2026-08-13T23:47:30Z
+    Finished: 2026-08-13T23:47:36Z
+    Message: main: Error (exit code 1)
+    Exit Code: 1
+

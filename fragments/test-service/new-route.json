@@ -1,0 +1,33 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test Service - New Route",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/test/new": {
+      "get": {
+        "operationId": "testNew",
+        "summary": "A new test endpoint",
+        "description": "This endpoint was added to test documentation updates",
+        "responses": {
+          "200": {
+            "description": "Success response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

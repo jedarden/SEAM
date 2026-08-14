@@ -1,0 +1,195 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Workflow",
+  "metadata": {
+    "annotations": {
+      "workflows.argoproj.io/last-seen-version": "60533076",
+      "workflows.argoproj.io/pod-name-format": "v2"
+    },
+    "creationTimestamp": "2026-08-11T15:37:04Z",
+    "generateName": "openbao-read-test-",
+    "generation": 6,
+    "labels": {
+      "workflows.argoproj.io/completed": "true",
+      "workflows.argoproj.io/phase": "Failed"
+    },
+    "name": "openbao-read-test-mj8s5",
+    "namespace": "argo-workflows",
+    "resourceVersion": "60533172",
+    "uid": "1319b9f4-df7f-4c51-9d02-240c5f2e6e38"
+  },
+  "spec": {
+    "arguments": {},
+    "workflowTemplateRef": {
+      "name": "openbao-read-test"
+    }
+  },
+  "status": {
+    "artifactGCStatus": {
+      "notSpecified": true
+    },
+    "artifactRepositoryRef": {
+      "artifactRepository": {},
+      "default": true
+    },
+    "conditions": [
+      {
+        "status": "False",
+        "type": "PodRunning"
+      },
+      {
+        "status": "True",
+        "type": "Completed"
+      }
+    ],
+    "finishedAt": "2026-08-11T15:37:45Z",
+    "message": "No more retries left",
+    "nodes": {
+      "openbao-read-test-mj8s5": {
+        "children": [
+          "openbao-read-test-mj8s5-2379977130",
+          "openbao-read-test-mj8s5-702068135"
+        ],
+        "displayName": "openbao-read-test-mj8s5",
+        "finishedAt": "2026-08-11T15:37:45Z",
+        "id": "openbao-read-test-mj8s5",
+        "message": "No more retries left",
+        "name": "openbao-read-test-mj8s5",
+        "outputs": {
+          "exitCode": "1"
+        },
+        "phase": "Failed",
+        "progress": "0/2",
+        "resourcesDuration": {
+          "cpu": 2,
+          "memory": 30
+        },
+        "startedAt": "2026-08-11T15:37:04Z",
+        "templateName": "test-read",
+        "templateScope": "local/",
+        "type": "Retry"
+      },
+      "openbao-read-test-mj8s5-2379977130": {
+        "displayName": "openbao-read-test-mj8s5(0)",
+        "finishedAt": "2026-08-11T15:37:23Z",
+        "hostNodeName": "prod-instance-17854697691870735",
+        "id": "openbao-read-test-mj8s5-2379977130",
+        "message": "main: Error (exit code 1)",
+        "name": "openbao-read-test-mj8s5(0)",
+        "nodeFlag": {
+          "retried": true
+        },
+        "outputs": {
+          "exitCode": "1"
+        },
+        "phase": "Failed",
+        "progress": "0/1",
+        "resourcesDuration": {
+          "cpu": 2,
+          "memory": 26
+        },
+        "startedAt": "2026-08-11T15:37:04Z",
+        "taskResultSynced": true,
+        "templateName": "test-read",
+        "templateScope": "local/",
+        "type": "Pod"
+      },
+      "openbao-read-test-mj8s5-702068135": {
+        "displayName": "openbao-read-test-mj8s5(1)",
+        "finishedAt": "2026-08-11T15:37:40Z",
+        "hostNodeName": "prod-instance-17854692298560732",
+        "id": "openbao-read-test-mj8s5-702068135",
+        "message": "main: Error (exit code 1)",
+        "name": "openbao-read-test-mj8s5(1)",
+        "nodeFlag": {
+          "retried": true
+        },
+        "outputs": {
+          "exitCode": "1"
+        },
+        "phase": "Failed",
+        "progress": "0/1",
+        "resourcesDuration": {
+          "cpu": 0,
+          "memory": 4
+        },
+        "startedAt": "2026-08-11T15:37:34Z",
+        "taskResultSynced": true,
+        "templateName": "test-read",
+        "templateScope": "local/",
+        "type": "Pod"
+      }
+    },
+    "phase": "Failed",
+    "progress": "0/2",
+    "resourcesDuration": {
+      "cpu": 2,
+      "memory": 30
+    },
+    "startedAt": "2026-08-11T15:37:04Z",
+    "storedTemplates": {
+      "namespaced/openbao-read-test/test-read": {
+        "container": {
+          "args": [
+            "set -e\nlog() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1\"; }\nerror() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1\" >&2; exit 1; }\n\n# Configure OpenBao address\nOPENBAO_ADDR=\"http://openbao.external-secrets.svc.cluster.local:8200\"\nexport VAULT_ADDR=$OPENBAO_ADDR\n\nlog \"=== OpenBao Read Test ===\"\n\n# Check connectivity\nif ! bao status >/dev/null 2>&1; then\n  error \"Cannot reach OpenBao at $OPENBAO_ADDR\"\nfi\nlog \"✓ OpenBao is reachable\"\n\n# Read Kubernetes service account token for authentication\nif [ ! -f \"/var/run/secrets/kubernetes.io/serviceaccount/token\" ]; then\n  error \"Not running in Kubernetes cluster\"\nfi\n\nSA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\nSA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)\nSA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)\n\nlog \"Running as ServiceAccount: $SA_NAME in namespace: $SA_NS\"\n\n# Authenticate using Kubernetes auth method\nlog \"Authenticating to OpenBao...\"\nCLIENT_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt=\"$SA_TOKEN\" 2>&1)\n\nif [ $? -ne 0 ] || [ -z \"$CLIENT_TOKEN\" ]; then\n  error \"Failed to authenticate: $CLIENT_TOKEN\"\nfi\n\nlog \"✓ Successfully authenticated to OpenBao\"\n\n# Test: Read a secret path (this is a minimal read-only test)\n# Adjust the secret path based on your actual OpenBao setup\nlog \"Testing read operation on secret path...\"\n\n# Example: Try to read a test secret (replace with actual path)\n# This example tries to read from a monitoring path that should exist\nTEST_SECRET=$(bao kv get -field=value secret/monitoring/test 2>&1 || true)\n\n# Check if we got a permission denied (expected for non-privileged access)\nif echo \"$TEST_SECRET\" | grep -qi \"permission denied\\|Invalid\"; then\n  log \"✓ Read operation executed (access denied as expected for this path)\"\nelif echo \"$TEST_SECRET\" | grep -qi \"deny\"; then\n  log \"✓ Read operation executed (explicit deny as expected)\"\nelse\n  log \"✓ Read operation executed successfully\"\n  # If we actually got data, log it (masked)\n  if [ -n \"$TEST_SECRET\" ]; then\n    log \"  Secret value: [REDACTED]\"\n  fi\nfi\n\nlog \"=== OpenBao Read Test Complete ===\"\nlog \"Basic connectivity and read operations verified\"\n"
+          ],
+          "command": [
+            "/bin/sh",
+            "-c"
+          ],
+          "image": "openbao/openbao:2.6.1",
+          "name": "",
+          "resources": {}
+        },
+        "inputs": {},
+        "metadata": {},
+        "name": "test-read",
+        "outputs": {},
+        "retryStrategy": {
+          "limit": 1
+        },
+        "serviceAccountName": "argo-workflow"
+      }
+    },
+    "storedWorkflowTemplateSpec": {
+      "arguments": {},
+      "entrypoint": "test-read",
+      "podGC": {
+        "strategy": "OnPodCompletion"
+      },
+      "serviceAccountName": "argo-workflow-executor",
+      "templates": [
+        {
+          "container": {
+            "args": [
+              "set -e\nlog() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1\"; }\nerror() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1\" >&2; exit 1; }\n\n# Configure OpenBao address\nOPENBAO_ADDR=\"http://openbao.external-secrets.svc.cluster.local:8200\"\nexport VAULT_ADDR=$OPENBAO_ADDR\n\nlog \"=== OpenBao Read Test ===\"\n\n# Check connectivity\nif ! bao status >/dev/null 2>&1; then\n  error \"Cannot reach OpenBao at $OPENBAO_ADDR\"\nfi\nlog \"✓ OpenBao is reachable\"\n\n# Read Kubernetes service account token for authentication\nif [ ! -f \"/var/run/secrets/kubernetes.io/serviceaccount/token\" ]; then\n  error \"Not running in Kubernetes cluster\"\nfi\n\nSA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\nSA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)\nSA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)\n\nlog \"Running as ServiceAccount: $SA_NAME in namespace: $SA_NS\"\n\n# Authenticate using Kubernetes auth method\nlog \"Authenticating to OpenBao...\"\nCLIENT_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt=\"$SA_TOKEN\" 2>&1)\n\nif [ $? -ne 0 ] || [ -z \"$CLIENT_TOKEN\" ]; then\n  error \"Failed to authenticate: $CLIENT_TOKEN\"\nfi\n\nlog \"✓ Successfully authenticated to OpenBao\"\n\n# Test: Read a secret path (this is a minimal read-only test)\n# Adjust the secret path based on your actual OpenBao setup\nlog \"Testing read operation on secret path...\"\n\n# Example: Try to read a test secret (replace with actual path)\n# This example tries to read from a monitoring path that should exist\nTEST_SECRET=$(bao kv get -field=value secret/monitoring/test 2>&1 || true)\n\n# Check if we got a permission denied (expected for non-privileged access)\nif echo \"$TEST_SECRET\" | grep -qi \"permission denied\\|Invalid\"; then\n  log \"✓ Read operation executed (access denied as expected for this path)\"\nelif echo \"$TEST_SECRET\" | grep -qi \"deny\"; then\n  log \"✓ Read operation executed (explicit deny as expected)\"\nelse\n  log \"✓ Read operation executed successfully\"\n  # If we actually got data, log it (masked)\n  if [ -n \"$TEST_SECRET\" ]; then\n    log \"  Secret value: [REDACTED]\"\n  fi\nfi\n\nlog \"=== OpenBao Read Test Complete ===\"\nlog \"Basic connectivity and read operations verified\"\n"
+            ],
+            "command": [
+              "/bin/sh",
+              "-c"
+            ],
+            "image": "openbao/openbao:2.6.1",
+            "name": "",
+            "resources": {}
+          },
+          "inputs": {},
+          "metadata": {},
+          "name": "test-read",
+          "outputs": {},
+          "retryStrategy": {
+            "limit": 1
+          },
+          "serviceAccountName": "argo-workflow"
+        }
+      ],
+      "ttlStrategy": {
+        "secondsAfterCompletion": 3600,
+        "secondsAfterFailure": 7200,
+        "secondsAfterSuccess": 1800
+      },
+      "workflowTemplateRef": {
+        "name": "openbao-read-test"
+      }
+    }
+  }
+}

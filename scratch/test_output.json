@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2024-08-13T10:30:45.123Z",
+    "method": "GET",
+    "path": "/v1/secret/data/seam/routes/test"
+  },
+  {
+    "timestamp": "2024-08-13T10:30:47.789Z",
+    "method": "GET",
+    "path": "/v1/secret/data/seam/fragments/sample"
+  },
+  {
+    "timestamp": "2024-08-13T10:30:48.012Z",
+    "method": "GET",
+    "path": "/v1/secret/data/seam/config"
+  },
+  {
+    "timestamp": "13/Aug/2024:10:30:50 +0000",
+    "method": "GET",
+    "path": "/v1/secret/data/seam/keys"
+  }
+]

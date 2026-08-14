@@ -1,0 +1,43 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Docs Update Test",
+    "version": "1.0.0",
+    "description": "Fragment to test if documentation updates when fragments change"
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "x-upstream": "https://httpbin.org",
+  "paths": {
+    "/test/docs-update": {
+      "get": {
+        "operationId": "testDocsUpdate",
+        "summary": "Docs Update Test Endpoint",
+        "description": "This endpoint was added to test if documentation updates when fragments change",
+        "tags": ["test"],
+        "responses": {
+          "200": {
+            "description": "Success response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Success message"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Update timestamp"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

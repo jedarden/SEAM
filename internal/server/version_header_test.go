@@ -54,10 +54,12 @@ func TestVersionInjectionMiddleware(t *testing.T) {
 		}
 	}
 
-	// Verify X-SEAM-API-Version header is NOT present (comes in next task)
+	// Verify X-SEAM-API-Version header is present and has value "_unversioned"
 	apiVersion := resp.Header.Get("X-Seam-Api-Version")
-	if apiVersion != "" {
-		t.Errorf("X-Seam-Api-Version should not be present yet, got '%s'", apiVersion)
+	if apiVersion != "_unversioned" {
+		t.Errorf("X-Seam-Api-Version should be '_unversioned', got '%s'", apiVersion)
+	} else {
+		t.Logf("X-Seam-Api-Version: %s", apiVersion)
 	}
 
 	// Verify the response body is still correct
@@ -104,10 +106,10 @@ func TestVersionInjectionMiddlewareWithStatusCode(t *testing.T) {
 		t.Errorf("X-Seam-Spec-Version header not found with WriteHeader")
 	}
 
-	// Verify X-SEAM-API-Version header is NOT present (comes in next task)
+	// Verify X-SEAM-API-Version header is present and has value "_unversioned"
 	apiVersion := resp.Header.Get("X-Seam-Api-Version")
-	if apiVersion != "" {
-		t.Errorf("X-Seam-Api-Version should not be present yet, got '%s'", apiVersion)
+	if apiVersion != "_unversioned" {
+		t.Errorf("X-Seam-Api-Version should be '_unversioned', got '%s'", apiVersion)
 	}
 
 	// Verify status code is preserved
