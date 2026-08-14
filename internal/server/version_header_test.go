@@ -154,10 +154,10 @@ func TestVersionInjectionMiddlewareHealthEndpoints(t *testing.T) {
 		t.Errorf("X-Seam-Spec-Version header not found on health endpoint")
 	}
 
-	// Verify X-SEAM-API-Version header is NOT present on health endpoint (comes in next task)
+	// Verify X-SEAM-API-Version header is present on health endpoint
 	apiVersion := resp.Header.Get("X-Seam-Api-Version")
-	if apiVersion != "" {
-		t.Errorf("X-Seam-Api-Version should not be present yet on health endpoint, got '%s'", apiVersion)
+	if apiVersion != "_unversioned" {
+		t.Errorf("X-Seam-Api-Version should be '_unversioned' on health endpoint, got '%s'", apiVersion)
 	}
 
 	t.Logf("Health endpoint response: status=%d, specVersion=%s", resp.StatusCode, specVersion)
