@@ -60,10 +60,20 @@ declarative-config directly.
 
 ## Beads
 
-Use `bf`, never the deprecated `br`. `beads.db` is the live store and
-`issues.jsonl` is only a checkpoint, so run `bf sync --flush-only` after
-creating or closing beads — otherwise they exist only in the db and a
-`bf doctor --repair` destroys them. Never hand-edit anything under `.beads/`.
+This workspace migrated from bead-forge to **bead-rs on 2026-08-14**. Use the
+**`bead`** CLI — `bf`/`br` do not work here and will fail with a schema
+mismatch (`no such column: status`) rather than a clean error, because
+`.beads/beads.db` is bead-rs-native, not bf-shaped. **If `bead <cmd>` fails
+with a workspace/schema error, do not reach for bf's corruption-recovery
+recipe (`rm .beads/beads.db && bf sync --import`) — running `bf` against this
+store creates a valid-looking but empty bf-schema database and silently
+destroys the live bead-rs state.** The correct recovery is:
+`bead init` (preserves the committed workspace identity) then
+`bead sync import-only --input .beads/checkpoint/forensic.jsonl
+--restore-into-empty --actor <you>`. `beads.db` is the live store;
+`.beads/checkpoint/` (git-tracked) is the durable checkpoint — flush with
+`bead sync flush-only` after creating or closing beads. Never hand-edit
+anything under `.beads/`.
 
 Check for a running fleet worker before touching this repo's git state
 (`pgrep -af "clau[d]e --print"` — the bracket avoids matching your own command).
