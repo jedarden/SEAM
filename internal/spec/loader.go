@@ -19,9 +19,22 @@ import (
 )
 
 // Loader handles loading and serving OpenAPI specs
+//
+// SERVER URL CONFIGURATION:
+// The base URL is passed as a parameter to the loader constructors (New, NewWithFragments, NewLoader)
+// and comes from runtime configuration (CLI flag or SEAM_BASE_URL environment variable).
+// This URL is used to populate the OpenAPI spec's servers array when serving the spec via GetRawJSON().
+//
+// Expected servers array format (OpenAPI 3.1):
+//   servers:
+//     - url: https://api.example.com
+//       description: SEAM caller-facing endpoint
+//
+// The base URL is NOT embedded in the source spec files - it's synthesized at runtime
+// to allow the same spec fragments to be served from different endpoints in different environments.
 type Loader struct {
 	specPath       string
-	baseURL        string
+	baseURL        string // Runtime-configured caller-facing endpoint URL (from SEAM_BASE_URL or -base-url flag)
 	rawDocument    []byte
 	specVersion    string // Stable hash of the spec (truncated to 16 chars)
 	specHash       string // Full SHA256 hash (64 hex chars)
@@ -253,16 +266,7 @@ func (l *Loader) GetAPIVersion() string {
 
 // GetRawJSON returns the spec as JSON with servers populated
 func (l *Loader) GetRawJSON() ([]byte, error) {
-	// Populate servers with the caller-facing base URL
-	// Clear any existing servers and add our caller-facing one
-	l.model.Model.Servers = nil
-	server := &v3.Server{
-		URL:         l.baseURL,
-		Description: "SEAM caller-facing endpoint",
-	}
-	l.model.Model.Servers = []*v3.Server{server}
-
-	// Serialize the document to YAML (libopenapi handles this correctly)
+	// Serialize the document to YAML
 	yamlBytes, err := l.loadedDoc.Serialize()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize document to YAML: %w", err)
@@ -272,6 +276,15 @@ func (l *Loader) GetRawJSON() ([]byte, error) {
 	var yamlMap map[string]interface{}
 	if err := yaml.Unmarshal(yamlBytes, &yamlMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	// Populate servers with the caller-facing base URL
+	// This modifies the YAML map directly
+	yamlMap["servers"] = []map[string]interface{}{
+		{
+			"url":         l.baseURL,
+			"description": "SEAM caller-facing endpoint",
+		},
 	}
 
 	// Convert to JSON
