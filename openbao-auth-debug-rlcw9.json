@@ -1,0 +1,108 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Workflow",
+    "metadata": {
+        "annotations": {
+            "workflows.argoproj.io/last-seen-version": "61896500",
+            "workflows.argoproj.io/pod-name-format": "v2"
+        },
+        "creationTimestamp": "2026-08-13T23:53:41Z",
+        "generateName": "openbao-auth-debug-",
+        "generation": 4,
+        "labels": {
+            "workflows.argoproj.io/completed": "true",
+            "workflows.argoproj.io/phase": "Failed"
+        },
+        "name": "openbao-auth-debug-rlcw9",
+        "namespace": "argo-workflows",
+        "resourceVersion": "61896574",
+        "uid": "0a56c1f7-b7d2-41c8-a653-f8d394de99bb"
+    },
+    "spec": {
+        "activeDeadlineSeconds": 3600,
+        "arguments": {},
+        "entrypoint": "auth-test",
+        "podGC": {
+            "strategy": "OnPodCompletion"
+        },
+        "serviceAccountName": "argo-workflow-executor",
+        "templates": [
+            {
+                "container": {
+                    "args": [
+                        "set -x  # Enable debug output\nlog() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1\"; }\nerror() { echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1\" \u003e\u00262; exit 1; }\n\nlog \"=== OpenBao Authentication Debug ===\"\n\nOPENBAO_ADDR=\"http://openbao.external-secrets.svc.cluster.local:8200\"\n\n# Check SA token availability\nlog \"Checking service account files...\"\nls -la /var/run/secrets/kubernetes.io/serviceaccount/ || error \"SA directory not found\"\n\nif [ ! -f \"/var/run/secrets/kubernetes.io/serviceaccount/token\" ]; then\n  error \"Service account token file not found\"\nfi\n\nSA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\nSA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)\nSA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)\n\nlog \"SA Token length: ${#SA_TOKEN}\"\nlog \"SA Namespace: $SA_NS\"\nlog \"SA Name: $SA_NAME\"\n\n# Test authentication\nlog \"Attempting authentication to OpenBao...\"\nAUTH_RESPONSE=$(curl -s -X POST \\\n  --connect-timeout 5 \\\n  --data \"{\\\"role\\\": \\\"argo-workflow\\\", \\\"jwt\\\": \\\"$SA_TOKEN\\\"}\" \\\n  \"$OPENBAO_ADDR/v1/auth/kubernetes/login\" 2\u003e\u00261)\n\nlog \"Authentication response: $AUTH_RESPONSE\"\n\n# Check for errors\nif echo \"$AUTH_RESPONSE\" | grep -q \"errors\"; then\n  error \"Authentication failed: $AUTH_RESPONSE\"\nfi\n\nif echo \"$AUTH_RESPONSE\" | grep -q \"client_token\"; then\n  log \"✓ Authentication successful!\"\nelse\n  error \"Authentication response missing client_token\"\nfi\n\nlog \"Sleeping for 30 seconds...\"\nsleep 30\n"
+                    ],
+                    "command": [
+                        "/bin/sh",
+                        "-c"
+                    ],
+                    "image": "curlimages/curl:8.6.0",
+                    "name": "",
+                    "resources": {}
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "auth-test",
+                "outputs": {},
+                "serviceAccountName": "argo-workflow"
+            }
+        ],
+        "ttlStrategy": {
+            "secondsAfterCompletion": 3600,
+            "secondsAfterFailure": 7200,
+            "secondsAfterSuccess": 1800
+        }
+    },
+    "status": {
+        "artifactGCStatus": {
+            "notSpecified": true
+        },
+        "artifactRepositoryRef": {
+            "artifactRepository": {},
+            "default": true
+        },
+        "conditions": [
+            {
+                "status": "False",
+                "type": "PodRunning"
+            },
+            {
+                "status": "True",
+                "type": "Completed"
+            }
+        ],
+        "finishedAt": "2026-08-13T23:54:01Z",
+        "message": "main: Error (exit code 1)",
+        "nodes": {
+            "openbao-auth-debug-rlcw9": {
+                "displayName": "openbao-auth-debug-rlcw9",
+                "finishedAt": "2026-08-13T23:53:52Z",
+                "hostNodeName": "prod-instance-17864972011511202",
+                "id": "openbao-auth-debug-rlcw9",
+                "message": "main: Error (exit code 1)",
+                "name": "openbao-auth-debug-rlcw9",
+                "outputs": {
+                    "exitCode": "1"
+                },
+                "phase": "Failed",
+                "progress": "0/1",
+                "resourcesDuration": {
+                    "cpu": 0,
+                    "memory": 13
+                },
+                "startedAt": "2026-08-13T23:53:41Z",
+                "taskResultSynced": true,
+                "templateName": "auth-test",
+                "templateScope": "local/openbao-auth-debug-rlcw9",
+                "type": "Pod"
+            }
+        },
+        "phase": "Failed",
+        "progress": "0/1",
+        "resourcesDuration": {
+            "cpu": 0,
+            "memory": 13
+        },
+        "startedAt": "2026-08-13T23:53:41Z"
+    }
+}

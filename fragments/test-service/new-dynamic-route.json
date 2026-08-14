@@ -1,0 +1,37 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test API for Dynamic Docs Update",
+    "version": "1.0.0",
+    "description": "Testing that docs update when fragments change"
+  },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "paths": {
+    "/test/new-dynamic-route": {
+      "get": {
+        "summary": "NEW Dynamic Route",
+        "description": "This route was added to test dynamic docs updates",
+        "operationId": "testDynamicNew",
+        "tags": ["test", "dynamic"],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dynamic": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

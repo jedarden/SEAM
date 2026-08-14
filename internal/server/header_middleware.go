@@ -14,14 +14,16 @@ import (
 // so these keys use the canonical form.
 var allowedSEAMHeaders = map[string]bool{
 	"X-Seam-Spec-Version": true,
+	"X-Seam-Api-Version":  true,
 }
 
 // versionInjectionMiddleware adds version headers to all HTTP responses.
 //
-// This middleware injects the X-SEAM-Spec-Version header into every response.
-// This header contains the full SHA256 hash (64 hex characters) of the loaded OpenAPI spec.
+// This middleware injects two headers into every response:
+//   - X-SEAM-Spec-Version: The full SHA256 hash (64 hex characters) of the loaded OpenAPI spec
+//   - X-SEAM-API-Version: The API version (currently "_unversioned")
 //
-// This header allows clients to identify which version of the spec they are
+// These headers allow clients to identify which version of the spec and API they are
 // communicating with, enabling version-dependent behavior and debugging.
 //
 // This middleware applies to ALL routes, including control-plane endpoints.
@@ -101,6 +103,7 @@ func (vw *versionWriter) Header() http.Header {
 //
 // This method is called once per request to add:
 //   - X-SEAM-Spec-Version: The stable hash identifying the loaded spec
+//   - X-SEAM-API-Version: The API version (currently "_unversioned")
 //
 // Headers are added using the canonical form required by Go's http package
 // (e.g., "X-Seam-Spec-Version" not "X-SEAM-Spec-Version").
@@ -109,12 +112,15 @@ func (vw *versionWriter) injectHeaders() {
 	if vw.specHash != "" {
 		vw.ResponseWriter.Header().Set("X-Seam-Spec-Version", vw.specHash)
 	}
+
+	// Add API version header (currently unversioned)
+	vw.ResponseWriter.Header().Set("X-Seam-Api-Version", "_unversioned")
 }
 
 // headerStrippingMiddleware implements Stage 2 of the control-plane pipeline.
 //
 // This middleware strips all X-SEAM-* headers from incoming requests EXCEPT
-// the allowed exception (X-SEAM-Spec-Version).
+// the allowed exceptions (X-SEAM-Spec-Version and X-SEAM-API-Version).
 //
 // Purpose: Prevent clients from injecting fake X-SEAM-* headers that could
 // interfere with control-plane operation or impersonate internal responses.

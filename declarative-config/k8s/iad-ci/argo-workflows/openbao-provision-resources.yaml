@@ -57,7 +57,7 @@ spec:
 
           # Check if we can reach OpenBao
           log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
-          if ! bao status >/dev/null 2>&1; then
+          if ! vault status >/dev/null 2>&1; then
             error "Cannot reach OpenBao at $OPENBAO_ADDR"
           fi
           log "✓ OpenBao is reachable"

@@ -1,0 +1,212 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Workflow",
+    "metadata": {
+        "annotations": {
+            "workflows.argoproj.io/last-seen-version": "62098121",
+            "workflows.argoproj.io/pod-name-format": "v2"
+        },
+        "creationTimestamp": "2026-08-14T08:37:11Z",
+        "generateName": "seam-ci-",
+        "generation": 4,
+        "labels": {
+            "workflows.argoproj.io/completed": "true",
+            "workflows.argoproj.io/phase": "Failed"
+        },
+        "name": "seam-ci-rgvzp",
+        "namespace": "argo-workflows",
+        "resourceVersion": "62098195",
+        "uid": "f44a5531-f3c5-49fd-8833-3b25ffa9b06d"
+    },
+    "spec": {
+        "arguments": {},
+        "podGC": {
+            "strategy": "OnWorkflowCompletion"
+        },
+        "workflowTemplateRef": {
+            "name": "seam-ci"
+        }
+    },
+    "status": {
+        "artifactGCStatus": {
+            "notSpecified": true
+        },
+        "artifactRepositoryRef": {
+            "artifactRepository": {},
+            "default": true
+        },
+        "conditions": [
+            {
+                "status": "False",
+                "type": "PodRunning"
+            },
+            {
+                "status": "True",
+                "type": "Completed"
+            }
+        ],
+        "finishedAt": "2026-08-14T08:37:31Z",
+        "message": "main: Error (exit code 1)",
+        "nodes": {
+            "seam-ci-rgvzp": {
+                "displayName": "seam-ci-rgvzp",
+                "finishedAt": "2026-08-14T08:37:24Z",
+                "hostNodeName": "prod-instance-17864971120751201",
+                "id": "seam-ci-rgvzp",
+                "message": "main: Error (exit code 1)",
+                "name": "seam-ci-rgvzp",
+                "outputs": {
+                    "exitCode": "1"
+                },
+                "phase": "Failed",
+                "progress": "0/1",
+                "resourcesDuration": {
+                    "cpu": 19,
+                    "memory": 198
+                },
+                "startedAt": "2026-08-14T08:37:11Z",
+                "taskResultSynced": true,
+                "templateName": "ci",
+                "templateScope": "local/",
+                "type": "Pod"
+            }
+        },
+        "phase": "Failed",
+        "progress": "0/1",
+        "resourcesDuration": {
+            "cpu": 19,
+            "memory": 198
+        },
+        "startedAt": "2026-08-14T08:37:11Z",
+        "storedTemplates": {
+            "namespaced/seam-ci/ci": {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates python3\nrm -rf /var/lib/apt/lists/*\n\n# Clone from trusted hardcoded source (ignore webhook payload),\n# matching the other CI templates' security posture.\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\necho \"Commit: $(git rev-parse HEAD)\"\ngo version\n\necho \"=== gofmt ===\"\nUNFORMATTED=\"$(gofmt -l .)\"\nif [ -n \"$UNFORMATTED\" ]; then\n  echo \"gofmt would reformat the following files:\"\n  echo \"$UNFORMATTED\"\n  exit 1\nfi\n\necho \"=== go vet ===\"\ngo vet ./...\n\necho \"=== golangci-lint ===\"\n# Installed via the Go module proxy, NOT upstream's install.sh.\n#\n# install.sh was fetched unpinned from master (a :latest-class\n# hazard: upstream can change it under us at any time) and then\n# downloaded a GitHub release tarball that this cluster's egress\n# corrupts deterministically -- two runs produced the identical\n# wrong sha256 fd3a137c... against the genuine 8df580d2..., so\n# the installer aborted and the gate never ran. Because the\n# corruption is reproducible rather than flaky, a retry loop\n# does not fix it; the download path itself has to go.\n#\n# `go install` uses the same module proxy that `go mod download`\n# already succeeds with in this very step, and verifies against\n# GOSUMDB, so it is both reachable and checksum-pinned.\ngo install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2\n# Report every finding. Default caps (max-issues-per-linter=50,\n# max-same-issues=3) silently truncate repeated findings, which\n# makes the printed count read as the total when it is not.\n\"$(go env GOPATH)/bin/golangci-lint\" run \\\n  --max-issues-per-linter=0 --max-same-issues=0 ./...\n\necho \"=== go test -race ===\"\ngo test -race ./...\n\necho \"=== benchmark gate (plan.md -\u003e Performance Budgets -\u003e CI-gated benchmarks) ===\"\ngo test -bench=. -benchmem -run=^$ ./... | tee /tmp/bench-new.txt\n\nif [ -f bench/baseline.txt ]; then\n  # x/perf carries no tagged releases — pin by commit for reproducibility.\n  go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d\n  benchstat bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt\n  python3 -c \"\nimport re, sys\nworst = 0.0\nfor line in open('/tmp/benchstat.txt'):\n    m = re.search(r'([+-]\\d+(?:\\.\\d+)?)%', line)\n    if m:\n        worst = max(worst, float(m.group(1)))\nprint(f'Worst regression: {worst:.1f}%')\nsys.exit(1 if worst \u003e 20.0 else 0)\n\"\nelse\n  echo \"No committed bench/baseline.txt yet - benchmark gate is inert until Phase 2 establishes one (plan.md CI-gated benchmarks).\"\nfi\n\necho \"CI passed!\"\n"
+                    ],
+                    "command": [
+                        "bash",
+                        "-c"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_CONFIG_COUNT",
+                            "value": "1"
+                        },
+                        {
+                            "name": "GIT_CONFIG_KEY_0",
+                            "value": "credential.helper"
+                        },
+                        {
+                            "name": "GIT_CONFIG_VALUE_0",
+                            "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                        },
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "golang:1.26",
+                    "name": "",
+                    "resources": {
+                        "limits": {
+                            "cpu": "3500m",
+                            "memory": "4Gi"
+                        },
+                        "requests": {
+                            "cpu": "2",
+                            "memory": "2Gi"
+                        }
+                    }
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "ci",
+                "outputs": {}
+            }
+        },
+        "storedWorkflowTemplateSpec": {
+            "activeDeadlineSeconds": 7200,
+            "arguments": {},
+            "entrypoint": "ci",
+            "podGC": {
+                "strategy": "OnWorkflowCompletion"
+            },
+            "serviceAccountName": "argo-workflow",
+            "synchronization": {
+                "mutexes": [
+                    {
+                        "name": "seam-ci-mutex"
+                    }
+                ]
+            },
+            "templates": [
+                {
+                    "activeDeadlineSeconds": 1800,
+                    "container": {
+                        "args": [
+                            "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates python3\nrm -rf /var/lib/apt/lists/*\n\n# Clone from trusted hardcoded source (ignore webhook payload),\n# matching the other CI templates' security posture.\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\necho \"Commit: $(git rev-parse HEAD)\"\ngo version\n\necho \"=== gofmt ===\"\nUNFORMATTED=\"$(gofmt -l .)\"\nif [ -n \"$UNFORMATTED\" ]; then\n  echo \"gofmt would reformat the following files:\"\n  echo \"$UNFORMATTED\"\n  exit 1\nfi\n\necho \"=== go vet ===\"\ngo vet ./...\n\necho \"=== golangci-lint ===\"\n# Installed via the Go module proxy, NOT upstream's install.sh.\n#\n# install.sh was fetched unpinned from master (a :latest-class\n# hazard: upstream can change it under us at any time) and then\n# downloaded a GitHub release tarball that this cluster's egress\n# corrupts deterministically -- two runs produced the identical\n# wrong sha256 fd3a137c... against the genuine 8df580d2..., so\n# the installer aborted and the gate never ran. Because the\n# corruption is reproducible rather than flaky, a retry loop\n# does not fix it; the download path itself has to go.\n#\n# `go install` uses the same module proxy that `go mod download`\n# already succeeds with in this very step, and verifies against\n# GOSUMDB, so it is both reachable and checksum-pinned.\ngo install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2\n# Report every finding. Default caps (max-issues-per-linter=50,\n# max-same-issues=3) silently truncate repeated findings, which\n# makes the printed count read as the total when it is not.\n\"$(go env GOPATH)/bin/golangci-lint\" run \\\n  --max-issues-per-linter=0 --max-same-issues=0 ./...\n\necho \"=== go test -race ===\"\ngo test -race ./...\n\necho \"=== benchmark gate (plan.md -\u003e Performance Budgets -\u003e CI-gated benchmarks) ===\"\ngo test -bench=. -benchmem -run=^$ ./... | tee /tmp/bench-new.txt\n\nif [ -f bench/baseline.txt ]; then\n  # x/perf carries no tagged releases — pin by commit for reproducibility.\n  go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d\n  benchstat bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt\n  python3 -c \"\nimport re, sys\nworst = 0.0\nfor line in open('/tmp/benchstat.txt'):\n    m = re.search(r'([+-]\\d+(?:\\.\\d+)?)%', line)\n    if m:\n        worst = max(worst, float(m.group(1)))\nprint(f'Worst regression: {worst:.1f}%')\nsys.exit(1 if worst \u003e 20.0 else 0)\n\"\nelse\n  echo \"No committed bench/baseline.txt yet - benchmark gate is inert until Phase 2 establishes one (plan.md CI-gated benchmarks).\"\nfi\n\necho \"CI passed!\"\n"
+                        ],
+                        "command": [
+                            "bash",
+                            "-c"
+                        ],
+                        "env": [
+                            {
+                                "name": "GIT_CONFIG_COUNT",
+                                "value": "1"
+                            },
+                            {
+                                "name": "GIT_CONFIG_KEY_0",
+                                "value": "credential.helper"
+                            },
+                            {
+                                "name": "GIT_CONFIG_VALUE_0",
+                                "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                            },
+                            {
+                                "name": "GH_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "github-webhook-secret"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "golang:1.26",
+                        "name": "",
+                        "resources": {
+                            "limits": {
+                                "cpu": "3500m",
+                                "memory": "4Gi"
+                            },
+                            "requests": {
+                                "cpu": "2",
+                                "memory": "2Gi"
+                            }
+                        }
+                    },
+                    "inputs": {},
+                    "metadata": {},
+                    "name": "ci",
+                    "outputs": {}
+                }
+            ],
+            "ttlStrategy": {
+                "secondsAfterCompletion": 3600,
+                "secondsAfterFailure": 7200,
+                "secondsAfterSuccess": 1800
+            },
+            "workflowTemplateRef": {
+                "name": "seam-ci"
+            }
+        }
+    }
+}
