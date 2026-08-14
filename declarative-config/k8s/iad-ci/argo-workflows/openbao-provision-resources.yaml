@@ -1,0 +1,212 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: openbao-provision-resources
+  namespace: argo-workflows
+  labels:
+    app: openbao
+    component: resource-provisioning
+spec:
+  entrypoint: provision-resources
+  templates:
+  - name: provision-resources
+    inputs:
+      parameters:
+      - name: operation
+        value: "create-secret"  # Options: create-secret, enable-engine, create-policy
+      - name: secret-path
+        value: ""
+      - name: secret-data
+        value: "{}"  # JSON format: '{"key1":"value1","key2":"value2"}'
+      - name: engine-path
+        value: ""
+      - name: engine-type
+        value: "kv-v2"
+      - name: policy-name
+        value: ""
+      - name: policy-rules
+        value: ""  # HCL format policy rules
+      - name: dry-run
+        value: "false"
+    container:
+      image: openbao/openbao:2.6.1
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          # Configure OpenBao address
+          OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
+          export VAULT_ADDR=$OPENBAO_ADDR
+
+          OPERATION="{{inputs.parameters.operation}}"
+          SECRET_PATH="{{inputs.parameters.secret-path}}"
+          SECRET_DATA="{{inputs.parameters.secret-data}}"
+          ENGINE_PATH="{{inputs.parameters.engine-path}}"
+          ENGINE_TYPE="{{inputs.parameters.engine-type}}"
+          POLICY_NAME="{{inputs.parameters.policy-name}}"
+          POLICY_RULES="{{inputs.parameters.policy-rules}}"
+          DRY_RUN="{{inputs.parameters.dry-run}}"
+
+          log "=== OpenBao Resource Provisioning ==="
+          log "Operation: $OPERATION"
+          log "Dry Run: $DRY_RUN"
+
+          # Check if we can reach OpenBao
+          log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
+          if ! bao status >/dev/null 2>&1; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR"
+          fi
+          log "✓ OpenBao is reachable"
+
+          # Read Kubernetes service account token for authentication
+          if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
+            error "Not running in Kubernetes cluster"
+          fi
+
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          SA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)
+
+          log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
+
+          # Authenticate using Kubernetes auth method
+          log "Authenticating to OpenBao via Kubernetes auth..."
+          AUTH_RESPONSE=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt="$SA_TOKEN" 2>&1)
+
+          if [ $? -ne 0 ] || [ -z "$AUTH_RESPONSE" ]; then
+            error "Failed to authenticate via Kubernetes auth: $AUTH_RESPONSE"
+          fi
+
+          export VAULT_TOKEN=$AUTH_RESPONSE
+          log "✓ Successfully authenticated to OpenBao (token: ${VAULT_TOKEN:0:12}...)"
+
+          # Execute based on operation type
+          case "$OPERATION" in
+            create-secret)
+              if [ -z "$SECRET_PATH" ]; then
+                error "create-secret operation requires secret-path parameter"
+              fi
+
+              log "=== Creating Secret ==="
+              log "Path: $SECRET_PATH"
+              log "Data: $SECRET_DATA"
+
+              if [ "$DRY_RUN" = "true" ]; then
+                log "DRY RUN: Would create secret at $SECRET_PATH"
+                log "DRY RUN: Data keys: $(echo "$SECRET_DATA" | grep -o '"[^"]*":' | tr -d '":' | tr '\n' ' ')"
+              else
+                # Parse JSON and create key=value pairs for bao kv put
+                KV_ARGS=""
+                echo "$SECRET_DATA" | grep -o '"[^"]*":"[^"]*"' | while IFS=: read -r key value; do
+                  key=$(echo "$key" | tr -d '"')
+                  value=$(echo "$value" | tr -d '"')
+                  KV_ARGS="$KV_ARGS $key=$value"
+                done
+
+                # Create secret with metadata
+                WRITE_RESPONSE=$(eval "bao kv put \"$SECRET_PATH\" \
+                  $KV_ARGS \
+                  created_by=openbao-provisioning-workflow \
+                  created_on=$(date -u +'\"%Y-%m-%dT%H:%M:%SZ\"') \
+                  namespace=$SA_NS \
+                  service_account=$SA_NAME" 2>&1)
+
+                if [ $? -ne 0 ]; then
+                  error "Failed to create secret: $WRITE_RESPONSE"
+                fi
+
+                log "✓ Successfully created secret at: $SECRET_PATH"
+
+                # Verify creation
+                log "Verifying secret creation..."
+                if bao kv get "$SECRET_PATH" >/dev/null 2>&1; then
+                  log "✓ Secret creation verified"
+                else
+                  error "Secret creation verification failed"
+                fi
+              fi
+              ;;
+
+            enable-engine)
+              if [ -z "$ENGINE_PATH" ]; then
+                error "enable-engine operation requires engine-path parameter"
+              fi
+
+              log "=== Enabling Secret Engine ==="
+              log "Path: $ENGINE_PATH"
+              log "Type: $ENGINE_TYPE"
+
+              if [ "$DRY_RUN" = "true" ]; then
+                log "DRY RUN: Would enable $ENGINE_TYPE engine at $ENGINE_PATH"
+              else
+                # Check if engine already exists
+                if bao secrets list -format=json 2>/dev/null | grep -q "\"$ENGINE_PATH\""; then
+                  log "⚠ Engine already exists at $ENGINE_PATH"
+                else
+                  ENABLE_RESPONSE=$(bao secrets enable -path="$ENGINE_PATH" "$ENGINE_TYPE" 2>&1)
+                  if [ $? -ne 0 ]; then
+                    error "Failed to enable secret engine: $ENABLE_RESPONSE"
+                  fi
+                  log "✓ Successfully enabled $ENGINE_TYPE engine at: $ENGINE_PATH"
+                fi
+              fi
+              ;;
+
+            create-policy)
+              if [ -z "$POLICY_NAME" ]; then
+                error "create-policy operation requires policy-name parameter"
+              fi
+              if [ -z "$POLICY_RULES" ]; then
+                error "create-policy operation requires policy-rules parameter"
+              fi
+
+              log "=== Creating Policy ==="
+              log "Name: $POLICY_NAME"
+
+              if [ "$DRY_RUN" = "true" ]; then
+                log "DRY RUN: Would create policy: $POLICY_NAME"
+                log "DRY RUN: Policy rules (first 200 chars): ${POLICY_RULES:0:200}..."
+              else
+                # Write policy
+                POLICY_RESPONSE=$(echo "$POLICY_RULES" | bao policy write "$POLICY_NAME" - 2>&1)
+                if [ $? -ne 0 ]; then
+                  error "Failed to create policy: $POLICY_RESPONSE"
+                fi
+                log "✓ Successfully created policy: $POLICY_NAME"
+
+                # Verify creation
+                log "Verifying policy creation..."
+                if bao policy read "$POLICY_NAME" >/dev/null 2>&1; then
+                  log "✓ Policy creation verified"
+                else
+                  error "Policy creation verification failed"
+                fi
+              fi
+              ;;
+
+            *)
+              error "Unknown operation: $OPERATION. Valid options: create-secret, enable-engine, create-policy"
+              ;;
+          esac
+
+          # Summary
+          log "=== Provisioning Complete ==="
+          log "Operation: $OPERATION"
+          log "Status: Success"
+          log "Dry Run: $DRY_RUN"
+
+          if [ "$OPERATION" = "create-secret" ] && [ -n "$SECRET_PATH" ]; then
+            log "Resource Created: Secret at $SECRET_PATH"
+          elif [ "$OPERATION" = "enable-engine" ] && [ -n "$ENGINE_PATH" ]; then
+            log "Resource Created: $ENGINE_TYPE engine at $ENGINE_PATH"
+          elif [ "$OPERATION" = "create-policy" ] && [ -n "$POLICY_NAME" ]; then
+            log "Resource Created: Policy $POLICY_NAME"
+          fi
+
+    serviceAccountName: argo-workflow
+    retryStrategy:
+      limit: 2

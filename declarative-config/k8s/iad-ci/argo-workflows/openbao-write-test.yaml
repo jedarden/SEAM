@@ -1,0 +1,241 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: openbao-write-test
+  namespace: argo-workflows
+  labels:
+    app: openbao-test
+    component: write-provisioning
+spec:
+  entrypoint: test-write
+  templates:
+  - name: test-write
+    inputs:
+      parameters:
+      - name: test-secret-path
+        value: "secret/data/test/write-test"
+      - name: test-secret-value
+        value: "test-value-from-workflow"
+      - name: enable-test-engine
+        value: "false"
+      - name: engine-name
+        value: "test-engine"
+    container:
+      image: openbao/openbao:2.6.1
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          # Configure OpenBao address
+          OPENBAO_ADDR="http://openbao.external-secrets.svc.cluster.local:8200"
+          export VAULT_ADDR=$OPENBAO_ADDR
+
+          TEST_SECRET_PATH="{{inputs.parameters.test-secret-path}}"
+          TEST_SECRET_VALUE="{{inputs.parameters.test-secret-value}}"
+          ENABLE_TEST_ENGINE="{{inputs.parameters.enable-test-engine}}"
+          ENGINE_NAME="{{inputs.parameters.engine-name}}"
+
+          log "=== OpenBao Write/Provisioning Test ==="
+          log "Test Configuration:"
+          log "  - Test Secret Path: $TEST_SECRET_PATH"
+          log "  - Engine Enable: $ENABLE_TEST_ENGINE"
+          log "  - Engine Name: $ENGINE_NAME"
+
+          # Check if we can reach OpenBao
+          log "Testing connectivity to OpenBao at $OPENBAO_ADDR..."
+          if ! bao status >/dev/null 2>&1; then
+            error "Cannot reach OpenBao at $OPENBAO_ADDR"
+          fi
+          log "✓ OpenBao is reachable"
+
+          # Read Kubernetes service account token for authentication
+          if [ ! -f "/var/run/secrets/kubernetes.io/serviceaccount/token" ]; then
+            error "Not running in Kubernetes cluster"
+          fi
+
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          SA_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          SA_NAME=$(cat /var/run/secrets/kubernetes.io/serviceaccount/name)
+
+          log "Running as ServiceAccount: $SA_NAME in namespace: $SA_NS"
+
+          # Authenticate using Kubernetes auth method
+          log "Authenticating to OpenBao via Kubernetes auth..."
+          AUTH_RESPONSE=$(bao write -field=client_token auth/kubernetes/login role=argo-workflow jwt="$SA_TOKEN" 2>&1)
+
+          if [ $? -ne 0 ] || [ -z "$AUTH_RESPONSE" ]; then
+            error "Failed to authenticate via Kubernetes auth: $AUTH_RESPONSE"
+          fi
+
+          export VAULT_TOKEN=$AUTH_RESPONSE
+          log "✓ Successfully authenticated to OpenBao (token: ${VAULT_TOKEN:0:12}...)"
+
+          # Test 1: Enable a test secret engine (if requested)
+          if [ "$ENABLE_TEST_ENGINE" = "true" ]; then
+            log "Test 1: Enabling test secret engine at $ENGINE_NAME..."
+
+            # Check if engine already exists
+            if bao secrets list -format=json | grep -q "$ENGINE_NAME/"; then
+              log "⚠ Engine $ENGINE_NAME already exists, skipping enable"
+            else
+              # Enable test KV v2 secrets engine
+              if bao secrets enable -path="$ENGINE_NAME" kv-v2 2>&1; then
+                log "✓ Successfully enabled KV v2 engine at: $ENGINE_NAME"
+              else
+                error "Failed to enable secret engine: $ENGINE_NAME"
+              fi
+            fi
+          else
+            log "Test 1: Skipped (engine enable not requested)"
+          fi
+
+          # Test 2: Write a test secret
+          log "Test 2: Writing test secret to $TEST_SECRET_PATH..."
+
+          # Convert path from "secret/data/test/path" to "secret/test/path" for bao kv put
+          KV_PATH=$(echo "$TEST_SECRET_PATH" | sed 's|secret/data/|secret/|')
+
+          WRITE_RESPONSE=$(bao kv put "$KV_PATH" \
+            value="$TEST_SECRET_VALUE" \
+            created_by="openbao-write-test-workflow" \
+            created_on=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            workflow_run="$(whoami)-${RANDOM}" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            error "Failed to write secret: $WRITE_RESPONSE"
+          fi
+
+          log "✓ Successfully wrote test secret to: $KV_PATH"
+
+          # Test 3: Read back the secret to verify
+          log "Test 3: Reading back secret to verify write..."
+          READ_BACK=$(bao kv get -field=value "$KV_PATH" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            error "Failed to read back secret: $READ_BACK"
+          fi
+
+          if [ "$READ_BACK" != "$TEST_SECRET_VALUE" ]; then
+            error "Read value doesn't match written value. Expected: '$TEST_SECRET_VALUE', Got: '$READ_BACK'"
+          fi
+
+          log "✓ Successfully verified written value matches: $READ_BACK"
+
+          # Test 4: Update the secret (modify operation)
+          log "Test 4: Updating test secret (modify operation)..."
+          UPDATED_VALUE="${TEST_SECRET_VALUE}-updated"
+
+          UPDATE_RESPONSE=$(bao kv put "$KV_PATH" \
+            value="$UPDATED_VALUE" \
+            updated_by="openbao-write-test-workflow" \
+            updated_on=$(date -u +"%Y-%m-%dT%H:%M:%SZ") 2>&1)
+
+          if [ $? -ne 0 ]; then
+            error "Failed to update secret: $UPDATE_RESPONSE"
+          fi
+
+          log "✓ Successfully updated test secret"
+
+          # Test 5: Verify the update
+          log "Test 5: Verifying update..."
+          READ_UPDATED=$(bao kv get -field=value "$KV_PATH" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            error "Failed to read updated secret: $READ_UPDATED"
+          fi
+
+          if [ "$READ_UPDATED" != "$UPDATED_VALUE" ]; then
+            error "Updated value verification failed. Expected: '$UPDATED_VALUE', Got: '$READ_UPDATED'"
+          fi
+
+          log "✓ Successfully verified updated value: $READ_UPDATED"
+
+          # Test 6: Create metadata-only secret (for configuration)
+          log "Test 6: Creating metadata-only secret..."
+          METADATA_PATH="${KV_PATH}-metadata"
+
+          METADATA_RESPONSE=$(bao kv put "$METADATA_PATH" \
+            config="test-configuration" \
+            environment="test" \
+            version="1.0.0" \
+            metadata_test="true" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            error "Failed to create metadata secret: $METADATA_RESPONSE"
+          fi
+
+          log "✓ Successfully created metadata-only secret at: $METADATA_PATH"
+
+          # Test 7: List secrets in the test path (if we have list permissions)
+          log "Test 7: Attempting to list secrets in test path..."
+          LIST_PATH=$(echo "$KV_PATH" | sed 's|/write-test$||')
+
+          LIST_RESPONSE=$(bao kv list "$LIST_PATH" 2>&1 || true)
+
+          if echo "$LIST_RESPONSE" | grep -qi "permission denied"; then
+            log "⚠ List permission denied (expected if policy doesn't include list capability)"
+          elif echo "$LIST_RESPONSE" | grep -qi "write-test"; then
+            log "✓ Successfully listed secrets (includes write-test)"
+          else
+            log "⚠ List operation returned unexpected response: $LIST_RESPONSE"
+          fi
+
+          # Test 8: Test patch operation (if supported)
+          log "Test 8: Testing patch/update operation..."
+          PATCH_VALUE="${UPDATED_VALUE}-patched"
+
+          PATCH_RESPONSE=$(bao kv patch "$KV_PATH" \
+            value="$PATCH_VALUE" \
+            patched_by="openbao-write-test-workflow" 2>&1)
+
+          if [ $? -eq 0 ]; then
+            log "✓ Successfully patched secret"
+
+            # Verify patch
+            READ_PATCHED=$(bao kv get -field=value "$KV_PATH" 2>&1)
+            if [ "$READ_PATCHED" = "$PATCH_VALUE" ]; then
+              log "✓ Patch verification successful"
+            else
+              log "⚠ Patch value doesn't match expected"
+            fi
+          else
+            log "⚠ Patch operation failed or not supported: $PATCH_RESPONSE"
+          fi
+
+          # Summary
+          log "=== OpenBao Write/Provisioning Test Complete ==="
+          log ""
+          log "✓ Tests Passed:"
+          log "  - OpenBao connectivity verified"
+          log "  - Authentication successful"
+          if [ "$ENABLE_TEST_ENGINE" = "true" ]; then
+            log "  - Secret engine enable/test passed"
+          fi
+          log "  - Secret write operation successful"
+          log "  - Secret read-back verification passed"
+          log "  - Secret update operation successful"
+          log "  - Metadata secret creation successful"
+          log "  - List operation attempted"
+          log "  - Patch operation attempted"
+          log ""
+          log "Resources Created During Test:"
+          log "  - Secret: $KV_PATH (with value, updated, and patched)"
+          log "  - Metadata: $METADATA_PATH"
+          if [ "$ENABLE_TEST_ENGINE" = "true" ]; then
+            log "  - Engine: $ENGINE_NAME (if newly created)"
+          fi
+          log ""
+          log "Cleanup Required:"
+          log "  - Manual cleanup of test secrets: bao kv delete $KV_PATH"
+          log "  - Manual cleanup of metadata: bao kv delete $METADATA_PATH"
+          if [ "$ENABLE_TEST_ENGINE" = "true" ]; then
+            log "  - Manual engine disable: bao secrets disable $ENGINE_NAME"
+          fi
+
+    serviceAccountName: argo-workflow
+    retryStrategy:
+      limit: 2
