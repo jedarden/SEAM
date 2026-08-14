@@ -69,7 +69,7 @@ spec:
           log "Configuring Kubernetes auth role for seam-retirement-evaluator..."
           bao write auth/kubernetes/role/seam-retirement-evaluator \
             bound_service_account_names=seam-retirement-evaluator \
-            bound_service_account_namespaces=seam-retirement-evaluator \
+            bound_service_account_namespaces=seam \
             policies=seam-retirement-evaluator-policy \
             token_ttl=24h \
             token_max_ttl=72h \
