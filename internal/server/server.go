@@ -87,10 +87,26 @@ func isReservedPath(path string) bool {
 }
 
 // Config holds the server configuration
+//
+// SERVER URL SOURCE:
+// The BaseURL field comes from runtime configuration:
+//   - CLI flag: -base-url (default: "http://localhost:8080")
+//   - Environment variable: SEAM_BASE_URL (overrides CLI flag if set)
+//
+// This URL is passed to the spec loader and used to populate the OpenAPI spec's
+// servers array. It should be the externally-accessible caller-facing endpoint URL.
+//
+// Example values:
+//   - Development: "http://localhost:8080"
+//   - Production: "https://api.example.com"
+//   - Behind proxy: "https://seam.example.com"
+//
+// The URL is synthesized into the spec at runtime, not read from spec files,
+// allowing the same spec fragments to be served from different environments.
 type Config struct {
 	CallerPort     int
 	OperatorPort   int
-	BaseURL        string
+	BaseURL        string // Caller-facing endpoint URL (from SEAM_BASE_URL or -base-url flag)
 	SpecDir        string
 	FragmentMode   bool
 	SchemaPath     string
@@ -435,6 +451,19 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 		if validCount, ok := fragmentStatus["valid_count"].(int); ok && validCount == 0 {
 			log.Printf("[/docs] Warning: No valid fragments loaded, serving empty spec")
 		}
+	}
+
+	// Check Accept header for content negotiation
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "application/json") {
+		// Return raw OpenAPI spec as JSON
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+		w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(specJSON)
+		return
 	}
 
 	// Serve the documentation UI with the spec embedded
@@ -841,6 +870,10 @@ func (s *Server) Start(ctx context.Context) error {
 		callerHandler = s.captureMiddleware.Wrap(callerHandler)
 		log.Printf("Capture middleware active on caller-facing port")
 	}
+
+	// Wrap with version injection middleware (outermost - adds version headers to all responses)
+	callerHandler = s.versionInjectionMiddleware(callerHandler)
+	log.Printf("Version injection middleware active on caller-facing port")
 
 	// Create servers
 	s.callerServer = &http.Server{
