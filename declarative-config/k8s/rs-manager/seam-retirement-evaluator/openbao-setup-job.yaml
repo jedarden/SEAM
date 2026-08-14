@@ -17,7 +17,7 @@ spec:
         value: ""
     container:
       image: ghcr.io/openbao/openbao:1.15.0
-      command: ["/bin/bash", "-c"]
+      command: ["/bin/sh", "-c"]
       args:
         - |
           set -e

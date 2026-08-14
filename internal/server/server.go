@@ -315,9 +315,37 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // openapiJSONHandler returns the OpenAPI spec as JSON
+//
+// Query parameters:
+//	version - the API version (optional, defaults to _unversioned)
 func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse and validate version parameter
+	query := r.URL.Query()
+	version := query.Get("version")
+
+	// Set default version
+	if version == "" {
+		version = "_unversioned"
+	}
+
+	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
+	if version != "_unversioned" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":            "invalid_version_parameter",
+			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
+			"expected_version": "_unversioned",
+			"actual_version":   version,
+			"docs_url":         "/docs",
+		})
 		return
 	}
 
@@ -349,9 +377,37 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 // docsHandler serves the OpenAPI documentation UI with embedded spec
 // Fetches the merged OpenAPI spec from the spec loader and serves it with Scalar API Reference
+//
+// Query parameters:
+//	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse and validate version parameter
+	query := r.URL.Query()
+	version := query.Get("version")
+
+	// Set default version
+	if version == "" {
+		version = "_unversioned"
+	}
+
+	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
+	if version != "_unversioned" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":            "invalid_version_parameter",
+			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
+			"expected_version": "_unversioned",
+			"actual_version":   version,
+			"docs_url":         "/docs",
+		})
 		return
 	}
 
@@ -493,6 +549,8 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
 	if version != "_unversioned" {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":            "invalid_version_parameter",
@@ -727,7 +785,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set headers and return response
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetVersion())
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
