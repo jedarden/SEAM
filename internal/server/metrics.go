@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"runtime"
 )
 
 var (
@@ -55,7 +56,23 @@ var (
 		Name: "seam_quota_bypassed_total",
 		Help: "Total number of quota checks bypassed due to cache hit",
 	}, []string{"route"})
+
+	// SEAM build info metric
+	seamBuildInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "seam_build_info",
+		Help: "SEAM gateway build information",
+	}, []string{"version", "go_version"})
 )
+
+func init() {
+	// Register Go runtime collectors (goroutines, memory stats, GC stats, etc.)
+	// Use Register instead of MustRegister to handle potential duplicates gracefully
+	_ = prometheus.Register(prometheus.NewGoCollector())
+	_ = prometheus.Register(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+
+	// Set SEAM build info metrics
+	seamBuildInfo.WithLabelValues("dev", runtime.Version()).Set(1)
+}
 
 // recordCacheHit records a cache hit for metrics
 func recordCacheHit(route string) {
