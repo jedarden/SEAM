@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: seam
+  name: seam-retirement-evaluator
   labels:
     # ArgoCD project label for organizational purposes
     argocd.argoproj.io/project: rs-manager
