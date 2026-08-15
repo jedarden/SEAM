@@ -449,7 +449,7 @@ func testForgedHeadersOnReservedPaths(t *testing.T) {
 	s := New(cfg)
 
 	reservedPaths := []struct {
-		path string
+		path   string
 		reason string
 	}{
 		{"/_seam/healthz", "health check endpoint"},
@@ -484,8 +484,8 @@ func testForgedHeadersOnReservedPaths(t *testing.T) {
 			// Verify forged headers don't appear in response
 			for headerName := range req.Header {
 				if strings.HasPrefix(string(headerName), "X-SEAM-") &&
-				   string(headerName) != "X-Seam-Spec-Version" &&
-				   string(headerName) != "X-Seam-Api-Version" {
+					string(headerName) != "X-Seam-Spec-Version" &&
+					string(headerName) != "X-Seam-Api-Version" {
 					// These should have been stripped
 					t.Logf("Forged header %s should have been stripped from request to %s", headerName, tc.path)
 				}
@@ -508,7 +508,7 @@ func testCrossListenerAccess(t *testing.T) {
 
 	// Caller-only endpoints (should be accessible via callerMux, not operatorMux)
 	callerOnlyEndpoints := []struct {
-		path string
+		path   string
 		reason string
 	}{
 		{"/_seam/healthz", "caller health endpoint"},
@@ -521,7 +521,7 @@ func testCrossListenerAccess(t *testing.T) {
 
 	// Operator-only endpoints (should be accessible via operatorMux, not callerMux)
 	operatorOnlyEndpoints := []struct {
-		path string
+		path   string
 		reason string
 	}{
 		{"/_seam/metrics", "operator metrics endpoint"},
