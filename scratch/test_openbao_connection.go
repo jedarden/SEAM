@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -131,8 +132,8 @@ func isNotFoundError(err error) bool {
 	}
 	errMsg := err.Error()
 	return contains(errMsg, "404") ||
-	       contains(errMsg, "not found") ||
-	       contains(errMsg, "Invalid path")
+		contains(errMsg, "not found") ||
+		contains(errMsg, "Invalid path")
 }
 
 // contains is a simple string contains helper

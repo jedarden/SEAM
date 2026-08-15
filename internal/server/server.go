@@ -333,6 +333,7 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 // openapiJSONHandler returns the OpenAPI spec as JSON
 //
 // Query parameters:
+//
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -395,6 +396,7 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 // Fetches the merged OpenAPI spec from the spec loader and serves it with Scalar API Reference
 //
 // Query parameters:
+//
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

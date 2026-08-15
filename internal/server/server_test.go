@@ -1331,7 +1331,7 @@ func TestSpecVersionHeaderAcrossDifferentRequests(t *testing.T) {
 		{"docs_get_with_json_accept", "/docs", http.MethodGet, true},
 		{"docs_route_get", "/docs/route?path=/openapi.json&method=GET", http.MethodGet, true},
 		{"openapi_post", "/openapi.json", http.MethodPost, false}, // Returns 405, no manual header set
-		{"docs_post", "/docs", http.MethodPost, false},             // Returns 405, no manual header set
+		{"docs_post", "/docs", http.MethodPost, false},            // Returns 405, no manual header set
 	}
 
 	for _, tc := range testCases {
@@ -1413,8 +1413,8 @@ func TestVersionWriterDirectly(t *testing.T) {
 
 	// Create a versionWriter
 	vw := &versionWriter{
-		ResponseWriter: mockWriter,
-		specHash:       specHash,
+		ResponseWriter:  mockWriter,
+		specHash:        specHash,
 		headersInjected: false,
 	}
 
@@ -1431,8 +1431,8 @@ func TestVersionWriterDirectly(t *testing.T) {
 
 	// Test WriteHeader() triggers injection
 	vw2 := &versionWriter{
-		ResponseWriter: mockWriter,
-		specHash:       specHash,
+		ResponseWriter:  mockWriter,
+		specHash:        specHash,
 		headersInjected: false,
 	}
 
@@ -1443,8 +1443,8 @@ func TestVersionWriterDirectly(t *testing.T) {
 
 	// Test Write() triggers injection
 	vw3 := &versionWriter{
-		ResponseWriter: mockWriter,
-		specHash:       specHash,
+		ResponseWriter:  mockWriter,
+		specHash:        specHash,
 		headersInjected: false,
 	}
 
@@ -1475,8 +1475,8 @@ func TestVersionWriterNoDoubleInjection(t *testing.T) {
 	mockWriter := httptest.NewRecorder()
 
 	vw := &versionWriter{
-		ResponseWriter: mockWriter,
-		specHash:       specHash,
+		ResponseWriter:  mockWriter,
+		specHash:        specHash,
 		headersInjected: false,
 	}
 
@@ -1503,8 +1503,8 @@ func TestVersionWriterEmptyHash(t *testing.T) {
 	mockWriter := httptest.NewRecorder()
 
 	vw := &versionWriter{
-		ResponseWriter: mockWriter,
-		specHash:       "", // Empty hash
+		ResponseWriter:  mockWriter,
+		specHash:        "", // Empty hash
 		headersInjected: false,
 	}
 
