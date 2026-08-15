@@ -26,9 +26,10 @@ import (
 // This URL is used to populate the OpenAPI spec's servers array when serving the spec via GetRawJSON().
 //
 // Expected servers array format (OpenAPI 3.1):
-//   servers:
-//     - url: https://api.example.com
-//       description: SEAM caller-facing endpoint
+//
+//	servers:
+//	  - url: https://api.example.com
+//	    description: SEAM caller-facing endpoint
 //
 // The base URL is NOT embedded in the source spec files - it's synthesized at runtime
 // to allow the same spec fragments to be served from different endpoints in different environments.

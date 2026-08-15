@@ -669,13 +669,13 @@ func TestE2E_RequestFlow_IntegrationMatrix(t *testing.T) {
 	t.Log("=== Integration Matrix: Testing various request patterns ===")
 
 	testCases := []struct {
-		name          string
-		method        string
-		authType      string
-		authHeader    string
-		authValue     string
-		expectedOK    bool
-		description   string
+		name        string
+		method      string
+		authType    string
+		authHeader  string
+		authValue   string
+		expectedOK  bool
+		description string
 	}{
 		{
 			name:        "GET_with_Bearer_token",
