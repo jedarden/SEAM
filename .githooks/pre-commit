@@ -1,0 +1,18 @@
+#!/bin/sh
+# Blocks commits that introduce gofmt-unclean Go files.
+# Checks only staged files, so pre-existing unrelated issues elsewhere
+# in the tree never block an unrelated commit.
+
+files=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
+[ -z "$files" ] && exit 0
+
+bad=$(printf '%s\n' "$files" | xargs -r gofmt -l 2>/dev/null || true)
+if [ -n "$bad" ]; then
+    echo "pre-commit: gofmt found formatting issues in staged file(s):" >&2
+    echo "$bad" | sed 's/^/  /' >&2
+    echo "" >&2
+    echo "Fix with: gofmt -w $bad" >&2
+    exit 1
+fi
+
+exit 0
