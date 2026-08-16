@@ -132,9 +132,10 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 		cm.entries = append(cm.entries, entry)
 		cm.saveCount++
 		shouldSave := cm.autoSave && cm.saveCount%10 == 0
+		entryCount := len(cm.entries)
 		cm.mu.Unlock()
 
-		log.Printf("captured: %s %s (total %d entries)", r.Method, r.URL.Path, len(cm.entries))
+		log.Printf("captured: %s %s (total %d entries)", r.Method, r.URL.Path, entryCount)
 
 		// Auto-save every 10 entries
 		if shouldSave {
