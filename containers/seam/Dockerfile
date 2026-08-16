@@ -42,9 +42,12 @@ USER 65534:65534
 # Expose ports
 EXPOSE 8080 8081
 
-# Health check
+# Health check. Exec form only -- the runtime stage is FROM scratch and has no
+# shell, so a trailing `|| exit 1` would be passed to the binary as an argument
+# rather than interpreted. `seam healthcheck` already exits non-zero when the
+# caller-facing listener is not serving, which is what the retries act on.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD ["/seam", "healthcheck"] || exit 1
+  CMD ["/seam", "healthcheck"]
 
 # Set entrypoint
 ENTRYPOINT ["/seam"]
