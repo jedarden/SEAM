@@ -2,7 +2,7 @@
 
 ## Overview
 
-Health sentinel probes and other control-plane endpoints have special handling in SEAM's middleware stack. This document explains how health probe traffic interacts with the caching layer and quota enforcement system.
+Health sentinel probes and other control-plane endpoints have special handling in SEAM's middleware stack. This document explains how health probe traffic interacts with the caching layer, quota enforcement system, and circuit-breaker state.
 
 ## Health Sentinel Probe Traffic Patterns
 
@@ -64,6 +64,49 @@ Request → Cache Middleware → Reserved Path Check → Bypass Cache → Execut
 - Health probes must detect actual system health, not stale cached responses
 - Caching health checks would mask failures (e.g., cached "OK" during actual outage)
 - Cache metrics should reflect application traffic, not infrastructure noise
+
+## Circuit-breaker State
+
+`/health/credentials` is a read-only operator health sentinel. It renders a
+fresh snapshot of the in-process, origin-keyed circuit-breaker registry on each
+GET request. The response includes an aggregate `circuit_breaker` object and,
+when origins have been registered, the corresponding `circuit_breakers` list.
+Only operational metadata is returned; credential values are never included.
+
+```json
+{
+  "status": "unhealthy",
+  "credentials": {"available": true},
+  "circuit_breaker": {
+    "enabled": true,
+    "state": "open",
+    "consecutive_failures": 5,
+    "retry_after_seconds": 21
+  },
+  "circuit_breakers": [
+    {
+      "origin": "https://upstream.example",
+      "state": "open",
+      "enabled": true,
+      "consecutive_failures": 5,
+      "source": "caller"
+    }
+  ]
+}
+```
+
+An open breaker makes the credential health status `unhealthy`; a half-open
+breaker makes it `degraded`. The endpoint still returns HTTP 200 so operators
+can inspect the structured state. It sends `Cache-Control: no-store` and is a
+reserved path, so a state transition is visible immediately and never becomes
+a stale cached health response. The endpoint itself only reads state: breaker
+admission, failure counting, and probe labeling remain responsibilities of the
+circuit-breaker and credential-sentinel implementations.
+
+The registry is process-local and restart-scoped. A future per-origin breaker
+publishes updates through the server's circuit-breaker state registry; this
+keeps health reporting separate from request caching while preserving the
+state needed by operators.
 
 ## Quota/Cost Counter Integration
 
@@ -227,6 +270,12 @@ Tests that reserved paths bypass quota enforcement even when quota is exceeded.
 
 Tests that reserved paths always bypass cache, even when TTL is configured.
 
+**Test file:** `internal/server/health_sentinel_test.go`
+
+Tests that `/health/credentials` reports a live breaker transition when
+wrapped in the cache middleware, without adding cache entries, hit/miss
+counters, or `X-SEAM-Cache` headers.
+
 ### Test Coverage
 
 ✅ **Verified behaviors:**
@@ -235,6 +284,8 @@ Tests that reserved paths always bypass cache, even when TTL is configured.
 3. Multiple health probe requests always execute fresh (no caching)
 4. Health probe responses lack cache headers
 5. Reserved paths succeed even when quota is exceeded for regular routes
+6. `/health/credentials` reports open and half-open breaker state without
+   caching the response
 
 ## Design Rationale
 
@@ -258,10 +309,12 @@ Tests that reserved paths always bypass cache, even when TTL is configured.
 - `docs/notes/bf-19bc-summary.md` - Quota enforcement via `x-quota`
 - `internal/server/cache_middleware.go` - Cache implementation
 - `internal/server/quota_middleware.go` - Quota enforcement implementation
+- `internal/server/circuit_breaker_health.go` - Breaker state registry
+- `internal/server/health_sentinel.go` - Credential health response
 - `internal/server/server.go` - Reserved path definitions and detection
 
 ## Implementation Reference
 
 - **Bead:** `bf-3787s` - Documentation task for health sentinel and cache integration
 - **Dependencies:** Requires cache hit bypass wired into cost-governed route checks
-- **Status:** ✅ Complete (documenting existing implementation)
+- **Status:** ✅ Complete (health state, cache bypass, tests, and interaction documented)

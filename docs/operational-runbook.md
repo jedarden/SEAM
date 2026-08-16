@@ -283,7 +283,7 @@ SEAM provides multiple health endpoints for different monitoring scenarios:
 |----------|---------|--------|-----------------|
 | `/_seam/healthz` | Liveness probe | Caller port | Plain text "OK" |
 | `/_seam/readyz` | Readiness probe | Caller port | JSON `{"ready": true}` |
-| `/health/credentials` | Credential status | Caller port | JSON with circuit breaker state |
+| `/health/credentials` | Credential status | Operator port | JSON with circuit breaker state |
 | `/health/upstreams` | Upstream connectivity | Caller port | JSON with upstream health |
 | `/_seam/metrics` | Prometheus metrics | Operator port | Prometheus text format |
 
@@ -336,6 +336,12 @@ curl http://localhost:8080/_seam/readyz
 
 **Purpose:** Monitor OpenBao credential health and circuit breaker state.
 
+This is a read-only operator endpoint. It is a reserved path, bypasses the
+cache and quota middleware, and sends `Cache-Control: no-store`, so an open or
+half-open breaker is visible without waiting for a cached health response.
+The aggregate `circuit_breaker` field is accompanied by per-origin
+`circuit_breakers` entries when breaker state has been published.
+
 **Expected Response:**
 
 ```json
@@ -368,7 +374,7 @@ curl http://localhost:8080/_seam/readyz
 
 ```bash
 # Check credential health
-curl http://localhost:8080/health/credentials
+curl http://localhost:8081/health/credentials
 
 # If status != "healthy":
 # 1. Check OpenBao connectivity (see OpenBao Debugging section)
@@ -1586,7 +1592,7 @@ curl http://seam.example.com/_seam/healthz
 curl http://seam.example.com/_seam/readyz
 
 # Credentials
-curl http://seam.example.com/health/credentials
+curl http://seam.example.com:8081/health/credentials
 
 # Upstreams
 curl http://seam.example.com/health/upstreams

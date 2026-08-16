@@ -130,6 +130,7 @@ type Server struct {
 	cache             *ResponseCache
 	singleFlight      *SingleFlight
 	cacheTTLs         map[string]int // route path -> cache TTL in seconds
+	circuitBreakers   *CircuitBreakerStateRegistry
 	quotaTracker      *QuotaTracker
 	costPerCalls      map[string]float64 // route -> cost per call
 	mu                sync.RWMutex
@@ -227,6 +228,7 @@ func (s *Server) setupRoutes() {
 	s.operatorMux.HandleFunc("/_seam/capture/status", s.captureStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
+	s.operatorMux.HandleFunc("/health/credentials", s.credentialsHealthHandler)
 }
 
 // healthzHandler returns 200 OK for liveness checks

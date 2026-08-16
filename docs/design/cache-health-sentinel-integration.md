@@ -8,6 +8,7 @@
 - **Related Components:**
   - Cache middleware (`internal/server/cache_middleware.go`)
   - Quota middleware (`internal/server/quota_middleware.go`)
+  - Circuit-breaker state registry (`internal/server/circuit_breaker_health.go`)
   - Reserved paths (`internal/server/server.go`)
 
 ## Overview
@@ -41,8 +42,16 @@ SEAM provides several health sentinel endpoints:
 | `/_seam/health` | Liveness probe | `200 OK` with body `"OK"` |
 | `/_seam/healthz` | Liveness probe (alias) | `200 OK` with body `"OK"` |
 | `/_seam/readyz` | Readiness probe | `200 OK` (future: dependency checks) |
-| `/health/credentials` | Credential health | `200 OK` (future: auth backend status) |
+| `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
 | `/health/upstreams` | Upstream health | `200 OK` (future: route table health) |
+
+`/health/credentials` is an operator-only, read-only sentinel. It renders a
+fresh snapshot of breaker state and sends `Cache-Control: no-store`; it is
+also a reserved path, so cache and quota middleware bypass it even if a TTL
+is configured for the path. An open breaker is reported as `status: "unhealthy"`,
+a half-open breaker as `"degraded"`, and the endpoint remains
+HTTP 200 so operators can inspect the structured response. No credential
+values are returned.
 
 ### Traffic Pattern
 
