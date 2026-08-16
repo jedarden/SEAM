@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ardenone/seam/internal/server"
 )
@@ -17,10 +19,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Usage: seam <command> [<args>]")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Available commands:")
-		fmt.Fprintln(os.Stderr, "  serve    Start the SEAM gateway server")
-		fmt.Fprintln(os.Stderr, "  lint     Validate SEAM route fragments")
-		fmt.Fprintln(os.Stderr, "  diff     Show differences between fragment versions")
-		fmt.Fprintln(os.Stderr, "  import   Import fragments into SEAM")
+		fmt.Fprintln(os.Stderr, "  serve        Start the SEAM gateway server")
+		fmt.Fprintln(os.Stderr, "  healthcheck  Probe the caller-facing liveness endpoint")
+		fmt.Fprintln(os.Stderr, "  lint         Validate SEAM route fragments")
+		fmt.Fprintln(os.Stderr, "  diff         Show differences between fragment versions")
+		fmt.Fprintln(os.Stderr, "  import       Import fragments into SEAM")
 		os.Exit(1)
 	}
 
@@ -30,6 +33,8 @@ func main() {
 	switch cmd {
 	case "serve":
 		serveCommand(args)
+	case "healthcheck":
+		healthcheckCommand(args)
 	case "lint":
 		lintCommand(args)
 	case "diff":
@@ -38,7 +43,53 @@ func main() {
 		importCommand(args)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		fmt.Fprintln(os.Stderr, "Available commands: serve, lint, diff, import")
+		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import")
+		os.Exit(1)
+	}
+}
+
+// runHealthcheck probes a liveness URL and reports whether the gateway is
+// serving. Split from healthcheckCommand so it is testable without os.Exit.
+func runHealthcheck(url string, timeout time.Duration) error {
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("probe %s: %w", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("probe %s: got HTTP %d, want %d", url, resp.StatusCode, http.StatusOK)
+	}
+	return nil
+}
+
+// healthcheckCommand is what the container image's HEALTHCHECK invokes. It
+// probes /_seam/healthz on the caller-facing listener — the same port the
+// kubelet liveness probe targets — and exits non-zero if the gateway is not
+// serving. The runtime image is FROM scratch and has no shell, so this must
+// remain a real subcommand: without it the HEALTHCHECK falls through to the
+// unknown-command branch and the container reports unhealthy forever.
+func healthcheckCommand(args []string) {
+	fs := flag.NewFlagSet("healthcheck", flag.ExitOnError)
+	callerPort := fs.Int("caller-port", 8080, "Port of the caller-facing listener to probe")
+	timeout := fs.Duration("timeout", 2*time.Second, "Probe timeout")
+
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+
+	// Honour the same env var serve does, so a port override configured on the
+	// Deployment cannot leave the healthcheck probing the wrong listener.
+	if val := os.Getenv("SEAM_CALLER_PORT"); val != "" {
+		if _, err := fmt.Sscanf(val, "%d", callerPort); err != nil {
+			fmt.Fprintf(os.Stderr, "healthcheck: invalid SEAM_CALLER_PORT %q, keeping %d: %v\n", val, *callerPort, err)
+		}
+	}
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/_seam/healthz", *callerPort)
+	if err := runHealthcheck(url, *timeout); err != nil {
+		fmt.Fprintf(os.Stderr, "healthcheck: %v\n", err)
 		os.Exit(1)
 	}
 }
