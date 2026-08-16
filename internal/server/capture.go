@@ -79,10 +79,14 @@ func NewCaptureMiddleware(corpusDir, service, incumbent string, autoSave bool) *
 
 // Wrap wraps an http.Handler with capture functionality
 func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
-	if !cm.enabled {
-		return next
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Snapshot the mode when the request starts. A toggle can then affect
+		// later requests without interrupting a capture already in progress.
+		if !cm.IsEnabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Skip capture for reserved paths
 		if isReservedPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
@@ -267,16 +271,22 @@ func (cm *CaptureMiddleware) Load() error {
 
 // Enable enables capture mode
 func (cm *CaptureMiddleware) Enable() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.enabled = true
 }
 
 // Disable disables capture mode
 func (cm *CaptureMiddleware) Disable() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.enabled = false
 }
 
 // IsEnabled returns whether capture is enabled
 func (cm *CaptureMiddleware) IsEnabled() bool {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	return cm.enabled
 }
 
