@@ -319,7 +319,7 @@ func TestOpenAPIJSONHandler(t *testing.T) {
 	}
 	// Verify all characters are valid hex
 	for _, c := range specVersion {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			t.Errorf("X-SEAM-Spec-Version contains invalid hex character: %c", c)
 		}
 	}
@@ -376,7 +376,7 @@ func TestOpenAPIJSONHashHeader(t *testing.T) {
 	s.callerMux.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -395,7 +395,7 @@ func TestOpenAPIJSONHashHeader(t *testing.T) {
 
 	// Verify all characters are valid hex
 	for _, c := range specHash {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			t.Errorf("X-Spec-Version contains invalid hex character: %c", c)
 		}
 	}
@@ -1225,7 +1225,7 @@ func TestSpecVersionHeaderFormat(t *testing.T) {
 
 	// Verify all characters are valid hex (lowercase a-f, 0-9)
 	for i, c := range specVersion {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			t.Errorf("X-Seam-Spec-Version contains invalid hex character '%c' at position %d", c, i)
 		}
 	}
@@ -1349,13 +1349,11 @@ func TestSpecVersionHeaderAcrossDifferentRequests(t *testing.T) {
 
 			specVersion := resp.Header.Get("X-Seam-Spec-Version")
 
-			if tc.headerCheck {
-				if specVersion == "" {
-					t.Errorf("expected X-Seam-Spec-Version header for %s", tc.name)
-				}
-			} else {
-				// For error responses that don't manually set headers, we don't expect it
-				// (in production, the middleware would set it, but direct mux calls bypass middleware)
+			// Error responses that don't manually set headers are not expected to
+			// carry it: in production the middleware would, but these direct mux
+			// calls bypass middleware.
+			if tc.headerCheck && specVersion == "" {
+				t.Errorf("expected X-Seam-Spec-Version header for %s", tc.name)
 			}
 		})
 	}
@@ -1484,7 +1482,7 @@ func TestVersionWriterNoDoubleInjection(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		vw.Header()
 		vw.WriteHeader(http.StatusOK)
-		vw.Write([]byte("test"))
+		_, _ = vw.Write([]byte("test"))
 	}
 
 	// Verify the header was set only once (no duplicates)

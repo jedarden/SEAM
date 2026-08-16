@@ -42,7 +42,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 		t.Skipf("Failed to start OpenBao test server: %v (skipping integration test)", err)
 		return
 	}
-	defer obServer.Close()
+	defer func() { _ = obServer.Close() }()
 
 	obClient := obServer.Client()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -57,7 +57,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write test secret: %v", err)
 	}
-	defer obClient.DeleteSecret(ctx, "seam/routes/testservice/token")
+	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/testservice/token") }()
 
 	t.Logf("✓ OpenBao test server running at %s", obServer.BaseURL())
 
@@ -71,7 +71,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for stub to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -94,7 +94,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err := seamServer.Start(startCtx); err != nil {
 		t.Fatalf("Failed to start SEAM server: %v", err)
 	}
-	defer seamServer.Shutdown(context.Background())
+	defer func() { _ = seamServer.Shutdown(context.Background()) }()
 
 	// Wait for SEAM server to be ready
 	time.Sleep(200 * time.Millisecond)
@@ -108,7 +108,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call health endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected health status 200, got %d", resp.StatusCode)
@@ -124,7 +124,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call ready endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected ready status 200, got %d", resp.StatusCode)
@@ -142,7 +142,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call OpenAPI endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected OpenAPI status 200, got %d", resp.StatusCode)
@@ -162,7 +162,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call docs endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected docs status 200, got %d", resp.StatusCode)
@@ -180,7 +180,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call metrics endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected metrics status 200, got %d", resp.StatusCode)
@@ -200,7 +200,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call config status endpoint: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected config status 200, got %d", resp.StatusCode)
@@ -236,7 +236,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call stub upstream: %v", err)
 	}
-	defer upstreamResp.Body.Close()
+	defer func() { _ = upstreamResp.Body.Close() }()
 
 	if upstreamResp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("Expected stub status 401, got %d", upstreamResp.StatusCode)
@@ -336,7 +336,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 		t.Skipf("Failed to start OpenBao: %v", err)
 		return
 	}
-	defer obServer.Close()
+	defer func() { _ = obServer.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -350,7 +350,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write secret: %v", err)
 	}
-	defer obClient.DeleteSecret(ctx, "seam/routes/scenario1/token")
+	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/scenario1/token") }()
 
 	// Setup stub upstream in echo mode
 	stub := stubupstream.New(stubupstream.Config{
@@ -360,7 +360,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Setup SEAM server
@@ -375,7 +375,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	if err := seamServer.Start(startCtx); err != nil {
 		t.Fatalf("Failed to start SEAM: %v", err)
 	}
-	defer seamServer.Shutdown(context.Background())
+	defer func() { _ = seamServer.Shutdown(context.Background()) }()
 	defer startCancel()
 	time.Sleep(200 * time.Millisecond)
 
@@ -397,7 +397,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stub request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	bodyStr := string(body)
@@ -443,7 +443,7 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 		t.Skipf("Failed to start OpenBao: %v", err)
 		return
 	}
-	defer obServer.Close()
+	defer func() { _ = obServer.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -456,7 +456,7 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write initial secret: %v", err)
 	}
-	defer obClient.DeleteSecret(ctx, "seam/routes/scenario2/token")
+	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/scenario2/token") }()
 
 	// Setup stub upstream that returns 401
 	stub := stubupstream.New(stubupstream.Config{
@@ -466,7 +466,7 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test credential rotation
@@ -493,7 +493,7 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stub request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("Expected 401, got %d", resp.StatusCode)
@@ -522,7 +522,7 @@ func TestE2E_RequestFlow_Scenario3_CircuitBreaker(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 	time.Sleep(100 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -543,7 +543,7 @@ func TestE2E_RequestFlow_Scenario3_CircuitBreaker(t *testing.T) {
 				breakerOpen = true
 			}
 		} else if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			consecutiveFailures = 0 // Reset on success
 		}
 
@@ -580,7 +580,7 @@ func TestE2E_RequestFlow_Scenario4_Timeout(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 	time.Sleep(100 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -592,7 +592,7 @@ func TestE2E_RequestFlow_Scenario4_Timeout(t *testing.T) {
 	resp, err := client.Do(req)
 
 	if err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Error("Expected timeout error, got response")
 	} else {
 		t.Logf("✓ Got expected timeout error: %v", err)
@@ -620,7 +620,7 @@ func TestE2E_RequestFlow_Scenario5_OversizedResponse(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("Failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 	time.Sleep(100 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -633,7 +633,7 @@ func TestE2E_RequestFlow_Scenario5_OversizedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Oversized request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response in chunks
 	const bufferSize = 32 * 1024
@@ -718,7 +718,7 @@ func TestE2E_RequestFlow_IntegrationMatrix(t *testing.T) {
 			if err := stub.Start(); err != nil {
 				t.Fatalf("Failed to start stub: %v", err)
 			}
-			defer stub.Stop(context.Background())
+			defer func() { _ = stub.Stop(context.Background()) }()
 			time.Sleep(50 * time.Millisecond)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -740,7 +740,7 @@ func TestE2E_RequestFlow_IntegrationMatrix(t *testing.T) {
 				}
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			body, _ := io.ReadAll(resp.Body)
 			bodyStr := string(body)

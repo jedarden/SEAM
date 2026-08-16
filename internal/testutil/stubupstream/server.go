@@ -216,7 +216,7 @@ func (s *Server) handleControl(w http.ResponseWriter, r *http.Request) {
 		s.cfgMu.RUnlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(status)
+		_ = json.NewEncoder(w).Encode(status)
 		return
 	}
 
@@ -238,7 +238,7 @@ func (s *Server) handleControl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 // handleRequest handles incoming requests based on the current behavior.
@@ -269,7 +269,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		// Read and discard body to track size
 		n, _ := io.Copy(io.Discard, r.Body)
 		record.BodySize = n
-		r.Body.Close()
+		_ = r.Body.Close()
 	}
 
 	s.callMu.Lock()
@@ -318,9 +318,7 @@ func (s *Server) handleEcho(w http.ResponseWriter, r *http.Request, record CallR
 	}
 
 	// Strip common prefixes to get the raw value
-	if strings.HasPrefix(credential, "Bearer ") {
-		credential = strings.TrimPrefix(credential, "Bearer ")
-	}
+	credential = strings.TrimPrefix(credential, "Bearer ")
 
 	errorResp := map[string]interface{}{
 		"error": "authentication_failed",
@@ -335,7 +333,7 @@ func (s *Server) handleEcho(w http.ResponseWriter, r *http.Request, record CallR
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Credential-Echo", "true") // Custom header to test header scrubbing
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(errorResp)
+	_ = json.NewEncoder(w).Encode(errorResp)
 }
 
 // handle401 returns a 401 Unauthorized response.
@@ -343,7 +341,7 @@ func (s *Server) handle401(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("WWW-Authenticate", `Bearer realm="stub upstream"`)
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"error":   "invalid_token",
 		"message": "The provided credential is stale or invalid",
 	})
@@ -353,7 +351,7 @@ func (s *Server) handle401(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handle5xx(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"error":   "internal_server_error",
 		"message": "The upstream service encountered an error",
 	})
@@ -369,7 +367,7 @@ func (s *Server) handleTimeout(w http.ResponseWriter, r *http.Request, delay tim
 	case <-time.After(delay):
 		// Finally respond after delay
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Response after timeout"))
+		_, _ = w.Write([]byte("Response after timeout"))
 	case <-ctx.Done():
 		// Client canceled
 		log.Printf("[stubupstream] Client canceled during timeout")
@@ -450,14 +448,14 @@ func (s *Server) handleTransportFault(w http.ResponseWriter, r *http.Request, fa
 	}
 
 	// Close immediately to simulate connection reset
-	conn.Close()
+	_ = conn.Close()
 }
 
 // handleNormal returns a normal 200 OK response.
 func (s *Server) handleNormal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "ok",
 		"message": "Request processed successfully",
 		"path":    r.URL.Path,

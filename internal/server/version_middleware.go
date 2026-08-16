@@ -9,6 +9,9 @@ import (
 // This middleware is a skeleton for future version header logic.
 // It currently passes all requests through without modification.
 // Implementation will be added in subsequent beads.
+// Remove this directive when the version-header middleware is attached.
+//
+//nolint:unused // Intentional scaffolding: not yet wired into setupRoutes.
 func (s *Server) versionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Add version header logic in future bead

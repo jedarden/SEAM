@@ -852,11 +852,13 @@ func TestCache_TTL_VeryLarge(t *testing.T) {
 	// Verify entry exists and is accessible
 	cached, found := cache.Get(key)
 	if !found {
-		t.Errorf("Entry with very large TTL should be found")
+		t.Fatal("Entry with very large TTL should be found")
 	}
 
+	// t.Fatal, not t.Errorf: execution must stop here, or the cached.Body
+	// dereference below panics instead of reporting a clean failure.
 	if cached == nil {
-		t.Errorf("Cached response should not be nil")
+		t.Fatal("Cached response should not be nil")
 	}
 
 	if string(cached.Body) != "test response" {

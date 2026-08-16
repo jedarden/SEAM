@@ -34,7 +34,7 @@ func TestCostPerCallMetric_CacheHitBypass(t *testing.T) {
 	// Create a mock upstream handler
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	// Wrap with cache middleware (outer) wrapping quota middleware (inner)
@@ -140,7 +140,7 @@ func TestCostPerCallMetric_CacheMissIncrements(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	// Wrap with quota and cache middleware
@@ -206,7 +206,7 @@ func TestCostPerCallMetric_MixedHitsAndMisses(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	quotaInner := s.quotaMiddleware(mockHandler)

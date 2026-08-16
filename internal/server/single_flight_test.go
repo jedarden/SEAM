@@ -17,7 +17,7 @@ func TestSingleFlight_Coalescing(t *testing.T) {
 
 	// Track how many times the function is executed
 	var executionCount int32
-	var executionDelay time.Duration = 100 * time.Millisecond
+	executionDelay := 100 * time.Millisecond
 
 	// Function that simulates an expensive upstream call
 	executeFn := func(ctx context.Context) (*cachedResponse, error) {
@@ -104,7 +104,7 @@ func TestSingleFlight_TTLZeroDedup(t *testing.T) {
 		atomic.AddInt32(&upstreamCallCount, 1)
 		time.Sleep(50 * time.Millisecond) // Simulate slow upstream
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -159,7 +159,7 @@ func TestSingleFlight_ConcurrentTTLZero(t *testing.T) {
 		atomic.AddInt32(&upstreamCallCount, 1)
 		time.Sleep(100 * time.Millisecond) // Simulate slow upstream
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -259,7 +259,7 @@ func TestSingleFlight_MultipleKeys(t *testing.T) {
 	for _, key := range keys {
 		for i := 0; i < 3; i++ {
 			go func(k CacheKey) {
-				sf.Do(ctx, k, executeFn)
+				_, _, _ = sf.Do(ctx, k, executeFn)
 				done <- true
 			}(key)
 		}

@@ -80,7 +80,7 @@ func (c *Client) WriteSecret(ctx context.Context, path string, data map[string]i
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -108,7 +108,7 @@ func (c *Client) ReadSecret(ctx context.Context, path string) (map[string]interf
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -144,7 +144,7 @@ func (c *Client) DeleteSecret(ctx context.Context, path string) error {
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -172,14 +172,14 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	// Create logs directory
 	logDir := filepath.Join(tmpDir, "logs")
 	if err := os.Mkdir(logDir, 0755); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
 	// Find the openbao binary
 	openbaoPath, err := exec.LookPath("openbao" /* or "vault" */)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("openbao not found in PATH: %w (install from https://openbao.org)", err)
 	}
 
@@ -199,7 +199,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("start openbao server: %w", err)
 	}
 
@@ -220,17 +220,17 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	defer cancel()
 
 	if err := server.waitForReady(ctx); err != nil {
-		cmd.Process.Signal(syscall.SIGTERM)
-		cmd.Wait()
-		os.RemoveAll(tmpDir)
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		_ = cmd.Wait()
+		_ = os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("wait for server ready: %w", err)
 	}
 
 	// Set up cleanup function
 	server.cleanup = func() {
-		cmd.Process.Signal(syscall.SIGTERM)
-		cmd.Wait()
-		os.RemoveAll(tmpDir)
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		_ = cmd.Wait()
+		_ = os.RemoveAll(tmpDir)
 	}
 
 	return server, nil
@@ -252,7 +252,7 @@ func (s *Server) waitForReady(ctx context.Context) error {
 			// Health endpoint doesn't need auth
 			resp, err := http.DefaultClient.Do(req)
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				if resp.StatusCode == http.StatusOK || resp.StatusCode == 501 {
 					// 200 = initialized, 501 = not initialized (but ready in dev mode)
 					return nil
@@ -409,12 +409,12 @@ func ManageTestServer(t *testing.T) *Server {
 	defer cancel()
 
 	if err := server.SetupTestSecrets(ctx); err != nil {
-		server.Close()
+		_ = server.Close()
 		t.Fatalf("failed to set up test secrets: %v", err)
 	}
 
 	t.Cleanup(func() {
-		server.Close()
+		_ = server.Close()
 	})
 
 	return server

@@ -551,9 +551,10 @@ func TestFragmentStatusEndpoint(t *testing.T) {
 	// Verify fragment details
 	var validFrag, invalidFrag *FragmentStatus
 	for i := range fragments {
-		if fragments[i].Status == "valid" {
+		switch fragments[i].Status {
+		case "valid":
 			validFrag = &fragments[i]
-		} else if fragments[i].Status == "quarantined" {
+		case "quarantined":
 			invalidFrag = &fragments[i]
 		}
 	}

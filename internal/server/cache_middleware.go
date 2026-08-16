@@ -155,7 +155,7 @@ func (s *Server) serveCachedResponse(w http.ResponseWriter, r *http.Request, cac
 
 	// Write status code and body
 	w.WriteHeader(cached.StatusCode)
-	w.Write(cached.Body)
+	_, _ = w.Write(cached.Body)
 }
 
 // getRouteCacheTTL returns the cache TTL for a given route path

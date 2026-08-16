@@ -1,9 +1,11 @@
 package server
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"runtime"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -42,6 +44,8 @@ var (
 		Help: "Total accumulated cost by route in USD",
 	}, []string{"route"})
 
+	// Registered with Prometheus at init but not yet populated by any caller.
+	//nolint:unused // Awaiting the quota-accounting wiring.
 	metricQuotaRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "seam_quota_remaining",
 		Help: "Remaining quota by scope",
@@ -67,8 +71,8 @@ var (
 func init() {
 	// Register Go runtime collectors (goroutines, memory stats, GC stats, etc.)
 	// Use Register instead of MustRegister to handle potential duplicates gracefully
-	_ = prometheus.Register(prometheus.NewGoCollector())
-	_ = prometheus.Register(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	_ = prometheus.Register(collectors.NewGoCollector())
+	_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Set SEAM build info metrics
 	seamBuildInfo.WithLabelValues("dev", runtime.Version()).Set(1)

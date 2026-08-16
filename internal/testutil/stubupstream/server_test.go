@@ -17,7 +17,7 @@ func TestStubUpstream_EchoBehavior(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -31,7 +31,7 @@ func TestStubUpstream_EchoBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", resp.StatusCode)
@@ -61,7 +61,7 @@ func TestStubUpstream_BehaviorChange(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -69,7 +69,7 @@ func TestStubUpstream_BehaviorChange(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, stub.URL()+"/", nil)
 	client := &http.Client{}
 	resp, _ := client.Do(req)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("initial request: expected 200, got %d", resp.StatusCode)
@@ -81,7 +81,7 @@ func TestStubUpstream_BehaviorChange(t *testing.T) {
 	// Second request should get 401
 	req2, _ := http.NewRequest(http.MethodGet, stub.URL()+"/", nil)
 	resp2, _ := client.Do(req2)
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusUnauthorized {
 		t.Errorf("after behavior change: expected 401, got %d", resp2.StatusCode)
@@ -96,14 +96,14 @@ func TestStubUpstream_FiveHundred(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	time.Sleep(100 * time.Millisecond)
 
 	req, _ := http.NewRequest(http.MethodGet, stub.URL()+"/", nil)
 	client := &http.Client{}
 	resp, _ := client.Do(req)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", resp.StatusCode)
@@ -119,7 +119,7 @@ func TestStubUpstream_OversizedResponse(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -129,7 +129,7 @@ func TestStubUpstream_OversizedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response
 	body, err := io.ReadAll(resp.Body)
@@ -150,7 +150,7 @@ func TestStubUpstream_CallLog(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -159,7 +159,7 @@ func TestStubUpstream_CallLog(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, stub.URL()+"/", nil)
 		client := &http.Client{}
 		resp, _ := client.Do(req)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	calls := stub.GetCallLog()
@@ -184,7 +184,7 @@ func TestStubUpstream_ControlEndpoint(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -199,7 +199,7 @@ func TestStubUpstream_ControlEndpoint(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("control GET: expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// POST to change behavior
 	// (This is tested indirectly via SetBehavior)
@@ -215,7 +215,7 @@ func TestStubUpstream_MultipleServers(t *testing.T) {
 		if err := stub.Start(); err != nil {
 			t.Fatalf("failed to start stub: %v", err)
 		}
-		defer stub.Stop(context.Background())
+		defer func() { _ = stub.Stop(context.Background()) }()
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -227,17 +227,17 @@ func TestStubUpstream_MultipleServers(t *testing.T) {
 	if resp1.StatusCode != http.StatusOK {
 		t.Errorf("stub1: expected 200, got %d", resp1.StatusCode)
 	}
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	resp2, _ := client.Get(stub2.URL() + "/")
 	if resp2.StatusCode != http.StatusUnauthorized {
 		t.Errorf("stub2: expected 401, got %d", resp2.StatusCode)
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 
 	resp3, _ := client.Get(stub3.URL() + "/")
 	if resp3.StatusCode != http.StatusInternalServerError {
 		t.Errorf("stub3: expected 500, got %d", resp3.StatusCode)
 	}
-	resp3.Body.Close()
+	_ = resp3.Body.Close()
 }

@@ -24,7 +24,7 @@ func Example_stubUpstream() {
 	if err := stub.Start(); err != nil {
 		log.Fatal(err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Make a request (in real code, use http.Get)
 	// The stub will echo back any Authorization header in an error body
@@ -43,8 +43,8 @@ func Example_stubUpstream_behaviorChange() {
 		Behavior: stubupstream.BehaviorNormal,
 	})
 
-	stub.Start()
-	defer stub.Stop(context.Background())
+	_ = stub.Start()
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Initially returns 200 OK
 
@@ -62,8 +62,8 @@ func Example_stubUpstream_circuitBreaker() {
 		FailThreshold: 5,
 	})
 
-	stub.Start()
-	defer stub.Stop(context.Background())
+	_ = stub.Start()
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// The stub will return transport faults
 	// After 5 consecutive failures, a circuit breaker should open
@@ -97,11 +97,11 @@ func Example_openbao_manual() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	// Set up test secrets
 	ctx := context.Background()
-	server.SetupTestSecrets(ctx)
+	_ = server.SetupTestSecrets(ctx)
 
 	// Use the server's client
 	client := server.Client()
@@ -114,10 +114,10 @@ func Example_openbao_rotation() {
 	server, _ := openbao.NewServer(openbao.ServerConfig{
 		ListenAddr: "localhost:18201",
 	})
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	ctx := context.Background()
-	server.SetupTestSecrets(ctx)
+	_ = server.SetupTestSecrets(ctx)
 
 	// Rotate a credential
 	newSecret, err := server.RotateCredential(ctx, "seam/routes/testservice/token", "token")
@@ -159,19 +159,19 @@ func Example_integration_credentialScrubbing() {
 		Addr:     "localhost:15830",
 		Behavior: stubupstream.BehaviorEcho,
 	})
-	stub.Start()
-	defer stub.Stop(context.Background())
+	_ = stub.Start()
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// 2. Set up OpenBao with test secret
 	server, _ := openbao.NewServer(openbao.ServerConfig{
 		ListenAddr: "localhost:18202",
 	})
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	server.SetupTestSecrets(ctx)
+	_ = server.SetupTestSecrets(ctx)
 	obClient := server.Client()
 
 	// 3. Test the flow:
@@ -196,20 +196,20 @@ func Example_integration_credentialRotation() {
 		Addr:     "localhost:15831",
 		Behavior: stubupstream.Behavior401,
 	})
-	stub.Start()
-	defer stub.Stop(context.Background())
+	_ = stub.Start()
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// 2. Start OpenBao with initial secret
 	server, _ := openbao.NewServer(openbao.ServerConfig{
 		ListenAddr: "localhost:18203",
 	})
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	obClient := server.Client()
-	obClient.WriteSecret(ctx, "seam/routes/rotating/token", map[string]interface{}{
+	_ = obClient.WriteSecret(ctx, "seam/routes/rotating/token", map[string]interface{}{
 		"token": "initial-credential",
 	})
 
@@ -234,8 +234,8 @@ func Example_integration_circuitBreaker() {
 		Behavior:      stubupstream.BehaviorTransportFault,
 		FailThreshold: 5,
 	})
-	stub.Start()
-	defer stub.Stop(context.Background())
+	_ = stub.Start()
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// 2. Make multiple requests
 	//    - First 5 requests should get transport errors

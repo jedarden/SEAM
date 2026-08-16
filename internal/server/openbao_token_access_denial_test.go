@@ -42,7 +42,7 @@ func testSEAMCannotReadEvaluatorToken(t *testing.T) {
 		t.Skipf("Failed to start OpenBao test server: %v (skipping integration test)", err)
 		return
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	// Wait for server to be ready
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -165,7 +165,7 @@ func createPolicy(ctx context.Context, baseURL, token, policyName, policyHCL str
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -200,7 +200,7 @@ func createToken(ctx context.Context, baseURL, token, policies string) (string, 
 	if err != nil {
 		return "", fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -282,7 +282,7 @@ func openBaoEndpoint() string {
 		resp, err := http.DefaultClient.Do(req)
 		cancel()
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return addr
 		}
 	}

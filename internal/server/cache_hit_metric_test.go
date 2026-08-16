@@ -26,7 +26,7 @@ func TestCacheHitMetric_Recorded(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -103,7 +103,7 @@ func TestCacheHitMetric_ThreadSafety(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -168,7 +168,7 @@ func TestCacheHitMetric_HitDetection(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -259,7 +259,7 @@ func TestCacheHitMetric_RouteLabels(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("response"))
+		_, _ = w.Write([]byte("response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -320,7 +320,7 @@ func TestCacheHitMetric_ConsecutiveHits(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)

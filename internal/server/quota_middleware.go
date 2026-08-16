@@ -152,6 +152,10 @@ func sprintfInt(val int) string {
 }
 
 // updateMetrics updates Prometheus metrics for quota
+//
+// recordCacheHit/recordCacheMiss. Reconcile the two when quota wiring lands.
+//
+//nolint:unused // Not yet called; cache hit/miss is currently recorded via
 func (s *Server) updateMetrics(route string, cacheHit bool, cost float64) {
 	if cacheHit {
 		metricCacheHits.WithLabelValues(route).Inc()

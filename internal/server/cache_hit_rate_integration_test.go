@@ -25,7 +25,7 @@ func TestCacheHitRateZeroTotals(t *testing.T) {
 	// Set up cache handler (not used in this test, but part of standard setup)
 	_ = s.cacheMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	}))
 
 	// Get metrics before any requests
@@ -65,7 +65,7 @@ func TestCacheHitRateAllMisses(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -116,7 +116,7 @@ func TestCacheHitRateFiftyPercent(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -179,7 +179,7 @@ func TestCacheHitRateSeventyFivePercent(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -240,7 +240,7 @@ func TestCacheHitRateAllHits(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -301,7 +301,7 @@ func TestCacheHitRateConcurrent(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -387,7 +387,7 @@ func TestCacheHitRateStatusEndpoint(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
