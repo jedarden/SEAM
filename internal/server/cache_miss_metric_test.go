@@ -26,7 +26,7 @@ func TestCacheMissMetric_Recorded(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -89,7 +89,7 @@ func TestCacheMissMetric_ThreadSafety(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -151,7 +151,7 @@ func TestCacheMissMetric_MissDetection(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)

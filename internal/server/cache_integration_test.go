@@ -26,7 +26,7 @@ func TestCacheMiddleware_Integration_HitPath(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	// Wrap with cache middleware
@@ -102,7 +102,7 @@ func TestCacheMiddleware_Integration_MissPath(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -153,7 +153,7 @@ func TestCacheMiddleware_Integration_NonGetBypass(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -223,7 +223,7 @@ func TestCacheMiddleware_Integration_ErrorNotCached(t *testing.T) {
 		upstreamCallCount++
 		// Return 500 error
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+		_, _ = w.Write([]byte("internal server error"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -275,7 +275,7 @@ func TestCacheMiddleware_Integration_4xxCached(t *testing.T) {
 		upstreamCallCount++
 		// Return 404 error
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		_, _ = w.Write([]byte("not found"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -326,7 +326,7 @@ func TestCacheMiddleware_Integration_QueryParamNormalization(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -381,7 +381,7 @@ func TestCacheMiddleware_Integration_NoTTL(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -427,7 +427,7 @@ func TestCacheMiddleware_Integration_Expiration(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)
@@ -485,7 +485,7 @@ func TestCacheMiddleware_Integration_ReservedPathsBypass(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	cachedHandler := s.cacheMiddleware(mockHandler)

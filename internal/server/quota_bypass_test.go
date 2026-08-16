@@ -36,7 +36,7 @@ func TestQuotaBypass_CacheHit(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	// Wrap with cache middleware (outer) wrapping quota middleware (inner)
@@ -152,7 +152,7 @@ func TestQuotaBypass_CacheMissDeducts(t *testing.T) {
 	// Create a mock upstream handler
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("upstream response"))
+		_, _ = w.Write([]byte("upstream response"))
 	})
 
 	// Wrap with quota middleware first, then cache middleware
@@ -230,7 +230,7 @@ func TestQuotaBypass_ConsecutiveHits(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCallCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("response"))
+		_, _ = w.Write([]byte("response"))
 	})
 
 	// Wrap with quota and cache middleware (correct order)
@@ -298,7 +298,7 @@ func TestQuotaBypass_ContextPropagation(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("response"))
+		_, _ = w.Write([]byte("response"))
 	})
 
 	// Wrap with quota and cache middleware (correct order)
@@ -362,7 +362,7 @@ func TestQuotaBypass_MultipleRoutes(t *testing.T) {
 
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("response"))
+		_, _ = w.Write([]byte("response"))
 	})
 
 	// Wrap with quota and cache middleware (correct order)

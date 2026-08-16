@@ -31,7 +31,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Create OpenBao client and provision test secret
 	obClient, err := openbao.NewClientForTesting()
@@ -49,7 +49,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to write test secret: %v", err)
 	}
-	defer obClient.DeleteSecret(ctx, "seam/routes/test/token")
+	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/test/token") }()
 
 	// Create a test route that injects the OpenBao secret
 	// In a real scenario, this would come from a fragment ConfigMap
@@ -93,7 +93,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
-		defer upstreamResp.Body.Close()
+		defer func() { _ = upstreamResp.Body.Close() }()
 
 		// Read upstream response
 		body, _ := io.ReadAll(upstreamResp.Body)
@@ -127,7 +127,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 		}
 
 		w.WriteHeader(upstreamResp.StatusCode)
-		w.Write([]byte(scrubbedBody))
+		_, _ = w.Write([]byte(scrubbedBody))
 	})
 
 	// Make a test request to SEAM
@@ -139,7 +139,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 	testHandler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		// Stub returns 401 with echoed credential, SEAM scrubs and forwards it
@@ -161,7 +161,7 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Create OpenBao client
 	obClient, err := openbao.NewClientForTesting()
@@ -180,7 +180,7 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to write initial secret: %v", err)
 	}
-	defer obClient.DeleteSecret(ctx, "seam/routes/rotating/token")
+	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/rotating/token") }()
 
 	// Simulate SEAM's 401 handling flow
 	attempts := 0
@@ -217,7 +217,7 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 			lastErr = err
 			continue
 		}
-		defer upstreamResp.Body.Close()
+		defer func() { _ = upstreamResp.Body.Close() }()
 
 		// Check if we got 401 (stale credential)
 		if upstreamResp.StatusCode == http.StatusUnauthorized {
@@ -263,7 +263,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Simulate circuit breaker state
 	type BreakerState struct {
@@ -323,7 +323,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 				t.Logf("Request %d: Breaker OPENED after %d consecutive failures", i+1, breaker.ConsecutiveFailures)
 			}
 		} else {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			// Success - reset consecutive failures
 			breaker.ConsecutiveFailures = 0
 			breaker.Open = false
@@ -352,7 +352,7 @@ func TestIntegration_OversizedResponse(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -367,11 +367,10 @@ func TestIntegration_OversizedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upstream request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body in chunks to simulate streaming
-	const maxBufferSize = 1 * 1024 * 1024 // 1 MiB max buffer
-	buffer := make([]byte, 32*1024)       // Read in 32KB chunks
+	buffer := make([]byte, 32*1024) // Read in 32KB chunks
 	totalRead := 0
 
 	for {
@@ -406,7 +405,7 @@ func TestIntegration_Timeout(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -420,7 +419,7 @@ func TestIntegration_Timeout(t *testing.T) {
 	resp, err := client.Do(upstreamReq)
 
 	if err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Error("Expected timeout error, got response")
 	} else {
 		t.Logf("Got expected timeout error: %v", err)
@@ -437,7 +436,7 @@ func TestIntegration_5xxError(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -452,7 +451,7 @@ func TestIntegration_5xxError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upstream request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -482,7 +481,7 @@ func TestIntegration_ProtocolUpgrade(t *testing.T) {
 	if err := stub.Start(); err != nil {
 		t.Fatalf("failed to start stub upstream: %v", err)
 	}
-	defer stub.Stop(context.Background())
+	defer func() { _ = stub.Stop(context.Background()) }()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
@@ -501,7 +500,7 @@ func TestIntegration_ProtocolUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upstream request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify we got a 101 Switching Protocols response
 	if resp.StatusCode != http.StatusSwitchingProtocols {

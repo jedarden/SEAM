@@ -25,7 +25,7 @@ func TestValidationMiddleware_ValidRequest_PassesThrough(t *testing.T) {
 	// Create validation middleware
 	middleware := server.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	// Test valid request

@@ -194,6 +194,8 @@ func New(cfg *Config) *Server {
 }
 
 // loadCacheTTLs extracts cache TTL configuration from loaded fragments
+//
+//nolint:unused // Stub retained for the fragment-mode TTL work; no caller yet.
 func (s *Server) loadCacheTTLs() {
 	if !s.config.FragmentMode {
 		return

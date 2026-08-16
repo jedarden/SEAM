@@ -25,7 +25,7 @@ func TestVersionInjectionMiddleware(t *testing.T) {
 	// Create a test handler that returns a simple response
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Wrap with version injection middleware
@@ -40,7 +40,7 @@ func TestVersionInjectionMiddleware(t *testing.T) {
 
 	// Check the response headers
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify X-SEAM-Spec-Version header is present
 	specVersion := resp.Header.Get("X-Seam-Spec-Version")
@@ -88,7 +88,7 @@ func TestVersionInjectionMiddlewareWithStatusCode(t *testing.T) {
 	// Handler that explicitly sets a status code
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("Created"))
+		_, _ = w.Write([]byte("Created"))
 	})
 
 	handler := s.versionInjectionMiddleware(testHandler)
@@ -98,7 +98,7 @@ func TestVersionInjectionMiddlewareWithStatusCode(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check headers are present
 	specVersion := resp.Header.Get("X-Seam-Spec-Version")
@@ -134,7 +134,7 @@ func TestVersionInjectionMiddlewareHealthEndpoints(t *testing.T) {
 	// Wrap the health handler directly with version middleware
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := s.versionInjectionMiddleware(healthHandler)
@@ -146,7 +146,7 @@ func TestVersionInjectionMiddlewareHealthEndpoints(t *testing.T) {
 	wrappedHandler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check headers are present on health endpoint
 	specVersion := resp.Header.Get("X-Seam-Spec-Version")

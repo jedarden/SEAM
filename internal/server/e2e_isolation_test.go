@@ -84,7 +84,7 @@ func testCompleteIsolation(t *testing.T) {
 		t.Skipf("Failed to start OpenBao test server: %v (skipping integration test)", err)
 		return
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	rootClient := server.Client()
 	baseURL := server.BaseURL()

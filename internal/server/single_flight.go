@@ -9,10 +9,12 @@ import (
 
 // inFlightRequest represents an in-flight request being processed
 type inFlightRequest struct {
-	result   *cachedResponse
-	err      error
-	waiters  chan struct{}      // Channel for goroutines waiting on this request
-	once     sync.Once          // Ensures result is broadcast only once
+	result  *cachedResponse
+	err     error
+	waiters chan struct{} // Channel for goroutines waiting on this request
+	//nolint:unused // Reserved for broadcast-once semantics; completion is
+	// currently signalled by closing the waiters channel.
+	once     sync.Once
 	done     bool               // Whether the request has completed
 	cancelFn context.CancelFunc // Function to cancel the in-flight request
 }

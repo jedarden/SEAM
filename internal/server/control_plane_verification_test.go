@@ -41,10 +41,10 @@ func testForgedHeadersStripped(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		if len(survivingHeaders) > 0 {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"survived": ["` + strings.Join(survivingHeaders, `", "`) + `"]}`))
+			_, _ = w.Write([]byte(`{"survived": ["` + strings.Join(survivingHeaders, `", "`) + `"]}`))
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"survived": []}`))
+			_, _ = w.Write([]byte(`{"survived": []}`))
 		}
 	})
 
