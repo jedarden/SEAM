@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-08-16T10:57:56-04:00",
+  "commit_sha": "768349135c0daef68761fbbb18b7d5cf2c706a3a",
+  "commit_message": "feat(benchmark): implement memory and concurrency benchmarks\n\nAdd comprehensive benchmarks for measuring:\n- Memory per connection at rest (1, 10, 50, 100, 500, 1000 connections)\n- Concurrent throughput with latency percentiles\n- Memory growth patterns over time\n- GC impact under load\n- Connection scaling behavior\n- Memory footprint for idle connections\n\nMetrics include:\n- Per-connection memory footprint\n- Requests per second\n- Latency percentiles (p50, p95, p99)\n- GC cycles and pause times\n- Heap and system memory usage\n- Goroutine counts\n\nBenchmarks are runnable via:\ngo test -bench=Memory -benchmem ./benches/...\ngo test -bench=Concurrent -benchmem ./benches/...\ngo test -bench=GC -benchmem ./benches/...\ngo test -bench=Scaling -benchmem ./benches/...",
+  "metrics": {
+    "BenchmarkTest": {
+      "name": "BenchmarkTest-8",
+      "ns_per_op": 1234.56,
+      "bytes_per_op": 2048,
+      "allocs_per_op": 8
+    }
+  },
+  "version": "v1"
+}
