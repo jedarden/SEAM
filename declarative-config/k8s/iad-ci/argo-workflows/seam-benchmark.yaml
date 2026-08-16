@@ -1,0 +1,86 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: seam-benchmark
+  namespace: argo-workflows
+  labels:
+    app: seam
+    component: benchmark
+spec:
+  entrypoint: run-benchmarks
+  templates:
+  - name: run-benchmarks
+    container:
+      image: golang:1.25.7-alpine
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m:%S')] ERROR: $1" >&2; exit 1; }
+
+          log "=== SEAM Benchmark Run ==="
+
+          # Configure git identity
+          git config --global user.email "github@jedarden.com"
+          git config --global user.name "jedarden"
+
+          # Clone SEAM repository
+          log "Cloning SEAM repository..."
+          git clone --depth 1 https://git.ardenone.com/jedarden/SEAM.git /workspace/seam
+          cd /workspace/seam
+
+          # Install dependencies
+          log "Installing Go dependencies..."
+          go mod download
+
+          # Create benchmark results directory with timestamp
+          TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+          RESULTS_DIR="benchmark-results/run-${TIMESTAMP}"
+          mkdir -p "${RESULTS_DIR}"
+
+          log "Running benchmarks..."
+
+          # Run benchmarks and capture both human-readable and JSON output
+          go test -bench=. -benchmem -benchtime=5s -json ./benches/... \
+            2>&1 | tee "${RESULTS_DIR}/raw-output.json"
+
+          # Generate human-readable summary
+          log "Benchmark results saved to ${RESULTS_DIR}/"
+
+          # Extract key metrics (if any benchmarks exist)
+          if grep -q '"GoBenchmark"' "${RESULTS_DIR}/raw-output.json" 2>/dev/null; then
+            log "✓ Benchmarks completed successfully"
+
+            # Count benchmarks run
+            BENCH_COUNT=$(grep -c '"GoBenchmark"' "${RESULTS_DIR}/raw-output.json" || echo "0")
+            log "  Benchmarks executed: ${BENCH_COUNT}"
+          else
+            log "⚠ No benchmark results found (benchmark suite may be empty)"
+          fi
+
+          log "=== Benchmark Run Complete ==="
+
+    retryStrategy:
+      limit: 2
+      backoff:
+        duration: "30s"
+        factor: 2
+        maxDuration: "5m"
+  - name: benchmark-report
+    container:
+      image: golang:1.25.7-alpine
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+
+          log "=== Benchmark Summary Report ==="
+
+          # This would parse and format benchmark results for display
+          # For now, it's a placeholder for future reporting enhancement
+
+          log "Benchmark reporting is minimal - results are stored in benchmark-results/"
+          log "Future enhancements will include trend analysis and comparison"

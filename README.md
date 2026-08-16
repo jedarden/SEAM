@@ -93,3 +93,72 @@ Response:
   "status": "saved",
   "entry_count": 42
 }
+
+## Running Benchmarks
+
+SEAM includes a benchmark suite to measure performance characteristics.
+
+### Quick Start
+
+Run all benchmarks with default settings:
+```bash
+make benchmark
+```
+
+### Benchmark Modes
+
+**Standard run** (10s per benchmark, memory stats):
+```bash
+go test -bench=. -benchmem ./benches/...
+```
+
+**CPU profiling**:
+```bash
+make benchmark-cpu
+# Analyze with: go tool pprof cpu.prof
+```
+
+**Memory profiling**:
+```bash
+make benchmark-mem
+# Analyze with: go tool pprof mem.prof
+```
+
+**CI mode** (JSON output for automated collection):
+```bash
+make benchmark-ci
+```
+
+### Interpreting Results
+
+Benchmark output shows:
+```
+BenchmarkExample-8    1000000    1234 ns/op    512 B/op    8 allocs/op
+```
+
+- `1000000`: Iterations executed
+- `1234 ns/op`: Nanoseconds per operation
+- `512 B/op`: Bytes allocated per operation  
+- `8 allocs/op`: Number of memory allocations per operation
+
+For detailed benchmark documentation, see [`benches/README.md`](benches/README.md).
+
+## Development
+
+### Building
+
+```bash
+make build
+```
+
+### Testing
+
+```bash
+make test
+```
+
+### Dependencies
+
+```bash
+make deps
+```
