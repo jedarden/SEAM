@@ -67,6 +67,14 @@ func NewProxyTestHarness(t *testing.T, captureEnabled bool) *ProxyTestHarness {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Upstream", "stub")
+		if r.URL.Query().Get("mode") == "error" {
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.Header().Set("X-Upstream", "error-stub")
+			w.Header().Set("X-Error-Code", "upstream-failure")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = io.WriteString(w, `{"error":"upstream failure","request_id":"capture-test"}`)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, `{"proxied":true}`)
 	}))
