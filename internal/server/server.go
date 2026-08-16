@@ -269,7 +269,8 @@ func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	promhttp.Handler().ServeHTTP(w, r)
 }
 
-// configStatusHandler returns configuration fragment status
+// configStatusHandler returns comprehensive runtime configuration status
+// Returns: current configuration values, spec hash, corpus status, enabled route count, and health status
 func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -278,10 +279,7 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
-	// Get fragment status from the spec loader
-	status := s.specLoader.GetFragmentStatus()
-	_ = json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(s.runtimeConfigStatus())
 }
 
 // captureSaveHandler manually saves the corpus
