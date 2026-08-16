@@ -1,0 +1,380 @@
+# SEAM CI workflow execution log capture
+# Captured with kubectl logs using /home/coding/.kube/iad-ci.kubeconfig
+# Workflow: seam-ci-z6cdg
+# Namespace: argo-workflows
+# Pod: seam-ci-z6cdg-ci-3207406674
+# Workflow phase: Failed
+# Started: 2026-08-16T13:30:37Z
+# Finished: 2026-08-16T13:36:49Z
+# Workflow message: child 'seam-ci-z6cdg-3207406674' failed
+# Pod message: main: Error (exit code 1)
+# The pod was deleted by podGC after completion; the following container output
+# was captured while the pod was running.
+
+=== CONTAINER init ===
+2026-08-16T13:30:39.073752401Z time=2026-08-16T13:30:39.073Z level=INFO msg="Starting Workflow Executor" goVersion=go1.25.7 version=v4.0.3 buildDate=2026-03-19T08:45:16Z gitCommit=8cae17b6fb49f077eeb269fcf21ce021b37a97f1 gitTag=v4.0.3 gitTreeState=clean argo=true
+2026-08-16T13:30:39.077945819Z time=2026-08-16T13:30:39.077Z level=INFO msg="Using executor retry strategy" Duration=1s Factor=1.6 Jitter=0.5 argo=true Steps=5
+2026-08-16T13:30:39.077958833Z time=2026-08-16T13:30:39.077Z level=INFO msg="Executor initialized" namespace=argo-workflows templateName=ci gitCommit=8cae17b6fb49f077eeb269fcf21ce021b37a97f1 argo=true gitTag=v4.0.3 deadline=0001-01-01T00:00:00.000Z gitTreeState=clean version=v4.0.3 includeScriptOutput=false podName=seam-ci-z6cdg-ci-3207406674 buildDate=2026-03-19T08:45:16Z goVersion=go1.25.7
+2026-08-16T13:30:40.158572828Z time=2026-08-16T13:30:40.158Z level=INFO msg="Start loading input artifacts..." argo=true pluginName=""
+2026-08-16T13:30:40.158865616Z time="2026-08-16T13:30:40.158Z" level=info msg="Alloc=7940 TotalAlloc=15825 Sys=22870 NumGC=5 Goroutines=4"
+=== CONTAINER wait ===
+2026-08-16T13:30:41.819257415Z time=2026-08-16T13:30:41.819Z level=INFO msg="Starting Workflow Executor" argo=true version=v4.0.3 buildDate=2026-03-19T08:45:16Z gitCommit=8cae17b6fb49f077eeb269fcf21ce021b37a97f1 gitTag=v4.0.3 gitTreeState=clean goVersion=go1.25.7
+2026-08-16T13:30:41.824000935Z time=2026-08-16T13:30:41.823Z level=INFO msg="Using executor retry strategy" argo=true Duration=1s Factor=1.6 Jitter=0.5 Steps=5
+2026-08-16T13:30:41.824018156Z time=2026-08-16T13:30:41.823Z level=INFO msg="Executor initialized" argo=true gitCommit=8cae17b6fb49f077eeb269fcf21ce021b37a97f1 gitTag=v4.0.3 buildDate=2026-03-19T08:45:16Z version=v4.0.3 gitTreeState=clean namespace=argo-workflows goVersion=go1.25.7 podName=seam-ci-z6cdg-ci-3207406674 deadline=0001-01-01T00:00:00.000Z includeScriptOutput=false templateName=ci
+2026-08-16T13:30:41.847796548Z time=2026-08-16T13:30:41.847Z level=INFO msg="Starting deadline monitor" argo=true containers=[main]
+2026-08-16T13:35:41.824899054Z time="2026-08-16T13:35:41.824Z" level=info msg="Alloc=6716 TotalAlloc=16278 Sys=22870 NumGC=6 Goroutines=9"
+=== CONTAINER main ===
+2026-08-16T13:30:41.999440464Z time=2026-08-16T13:30:41.999Z level=INFO msg="waiting for signals" argo=true signalPath=/var/run/argo/ctr/main/signal
+2026-08-16T13:30:42.004193655Z + apt-get update -qq
+2026-08-16T13:30:44.695245059Z + apt-get install -y --no-install-recommends git ca-certificates python3
+2026-08-16T13:30:45.693943967Z Reading package lists...
+2026-08-16T13:30:45.903581668Z Building dependency tree...
+2026-08-16T13:30:45.905151198Z Reading state information...
+2026-08-16T13:30:46.229014509Z git is already the newest version (1:2.47.3-0+deb13u1).
+2026-08-16T13:30:46.229095304Z ca-certificates is already the newest version (20250419).
+2026-08-16T13:30:46.229101050Z python3 is already the newest version (3.13.5-1).
+2026-08-16T13:30:46.229105331Z python3 set to manually installed.
+2026-08-16T13:30:46.229109185Z 0 upgraded, 0 newly installed, 0 to remove and 10 not upgraded.
+2026-08-16T13:30:46.230127233Z + rm -rf /var/lib/apt/lists/auxfiles /var/lib/apt/lists/deb.debian.org_debian-security_dists_trixie-security_InRelease /var/lib/apt/lists/deb.debian.org_debian-security_dists_trixie-security_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_trixie-updates_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_trixie-updates_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_trixie_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_trixie_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/lock /var/lib/apt/lists/partial
+2026-08-16T13:30:46.235887385Z + git clone --branch main https://github.com/jedarden/SEAM.git /workspace
+2026-08-16T13:30:46.275070470Z Cloning into '/workspace'...
+2026-08-16T13:30:51.677605866Z + cd /workspace
+2026-08-16T13:30:51.678422973Z ++ git rev-parse HEAD
+2026-08-16T13:30:51.683544318Z + echo 'Commit: 4fe4b846f59cc561161804866e4afd15ba726200'
+2026-08-16T13:30:51.683579060Z Commit: 4fe4b846f59cc561161804866e4afd15ba726200
+2026-08-16T13:30:51.683651686Z + go version
+2026-08-16T13:30:51.689917462Z go version go1.26.5 linux/amd64
+2026-08-16T13:30:51.690770010Z + echo '=== gofmt ==='
+2026-08-16T13:30:51.690801181Z === gofmt ===
+2026-08-16T13:30:51.691312855Z ++ gofmt -l .
+2026-08-16T13:30:51.800172972Z + UNFORMATTED=
+2026-08-16T13:30:51.800214813Z + '[' -n '' ']'
+2026-08-16T13:30:51.800222688Z + echo '=== go vet ==='
+2026-08-16T13:30:51.800246238Z === go vet ===
+2026-08-16T13:30:51.800281394Z + go vet ./...
+2026-08-16T13:30:51.934931492Z go: downloading github.com/pb33f/libopenapi v0.38.7
+2026-08-16T13:30:51.936012004Z go: downloading github.com/pb33f/libopenapi-validator v0.14.0
+2026-08-16T13:30:52.267740267Z go: downloading github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+2026-08-16T13:30:52.267821109Z go: downloading gopkg.in/yaml.v3 v3.0.1
+2026-08-16T13:30:52.308756093Z go: downloading github.com/prometheus/client_golang v1.24.1
+2026-08-16T13:30:52.667991514Z go: downloading go.yaml.in/yaml/v4 v4.0.0-rc.6
+2026-08-16T13:30:53.168614844Z go: downloading golang.org/x/text v0.40.0
+2026-08-16T13:30:53.199446908Z go: downloading github.com/beorn7/perks v1.0.1
+2026-08-16T13:30:53.208067698Z go: downloading github.com/cespare/xxhash/v2 v2.3.0
+2026-08-16T13:30:53.213814125Z go: downloading github.com/prometheus/client_model v0.6.2
+2026-08-16T13:30:53.223619471Z go: downloading github.com/prometheus/common v0.70.1
+2026-08-16T13:30:53.292929578Z go: downloading github.com/prometheus/procfs v0.21.1
+2026-08-16T13:30:53.292954378Z go: downloading google.golang.org/protobuf v1.36.11
+2026-08-16T13:30:53.918941426Z go: downloading github.com/go-openapi/jsonpointer v1.0.0
+2026-08-16T13:30:53.919086441Z go: downloading github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad
+2026-08-16T13:30:53.932763297Z go: downloading github.com/pb33f/jsonpath v0.8.2
+2026-08-16T13:30:54.139662584Z go: downloading github.com/pb33f/ordered-map/v2 v2.3.1
+2026-08-16T13:30:54.147930825Z go: downloading github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+2026-08-16T13:30:54.148767695Z go: downloading golang.org/x/sys v0.47.0
+2026-08-16T13:30:54.181524979Z go: downloading golang.org/x/net v0.57.0
+2026-08-16T13:30:54.182337601Z go: downloading golang.org/x/sync v0.22.0
+2026-08-16T13:30:54.192143411Z go: downloading github.com/bahlo/generic-list-go v0.2.0
+2026-08-16T13:30:54.206638328Z go: downloading github.com/buger/jsonparser v1.1.2
+2026-08-16T13:34:25.362058885Z + echo '=== golangci-lint ==='
+2026-08-16T13:34:25.362110800Z + go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+2026-08-16T13:34:25.362083642Z === golangci-lint ===
+2026-08-16T13:34:25.437278663Z go: downloading github.com/golangci/golangci-lint/v2 v2.12.2
+2026-08-16T13:34:26.210317729Z go: downloading charm.land/lipgloss/v2 v2.0.3
+2026-08-16T13:34:26.213757639Z go: downloading github.com/fatih/color v1.19.0
+2026-08-16T13:34:26.214037130Z go: downloading github.com/gofrs/flock v0.13.0
+2026-08-16T13:34:26.216945295Z go: downloading github.com/ldez/grignotin v0.10.1
+2026-08-16T13:34:26.257492969Z go: downloading github.com/pelletier/go-toml/v2 v2.3.1
+2026-08-16T13:34:26.271152692Z go: downloading github.com/spf13/cobra v1.10.2
+2026-08-16T13:34:26.288355739Z go: downloading github.com/spf13/pflag v1.0.10
+2026-08-16T13:34:26.342886436Z go: downloading github.com/spf13/viper v1.12.0
+2026-08-16T13:34:26.347516004Z go: downloading go.yaml.in/yaml/v3 v3.0.4
+2026-08-16T13:34:26.349125209Z go: downloading golang.org/x/mod v0.35.0
+2026-08-16T13:34:26.355899735Z go: downloading github.com/pelletier/go-toml v1.9.5
+2026-08-16T13:34:26.434212573Z go: downloading golang.org/x/tools v0.44.0
+2026-08-16T13:34:26.438005285Z go: downloading github.com/go-viper/mapstructure/v2 v2.5.0
+2026-08-16T13:34:26.447900018Z go: downloading github.com/hashicorp/go-version v1.9.0
+2026-08-16T13:34:26.452020091Z go: downloading github.com/mitchellh/go-homedir v1.1.0
+2026-08-16T13:34:26.476040266Z go: downloading github.com/alecthomas/chroma/v2 v2.24.1
+2026-08-16T13:34:26.488437446Z go: downloading github.com/rogpeppe/go-internal v1.14.1
+2026-08-16T13:34:26.588847435Z go: downloading github.com/golangci/plugin-module-register v0.1.2
+2026-08-16T13:34:26.610786634Z go: downloading github.com/mattn/go-colorable v0.1.14
+2026-08-16T13:34:26.640508097Z go: downloading github.com/sirupsen/logrus v1.9.4
+2026-08-16T13:34:26.681667305Z go: downloading github.com/stretchr/testify v1.11.1
+2026-08-16T13:34:26.732325852Z go: downloading github.com/go-xmlfmt/xmlfmt v1.1.3
+2026-08-16T13:34:26.771713928Z go: downloading github.com/golangci/revgrep v0.8.0
+2026-08-16T13:34:26.799078564Z go: downloading github.com/mattn/go-isatty v0.0.20
+2026-08-16T13:34:26.824095664Z go: downloading golang.org/x/sys v0.43.0
+2026-08-16T13:34:26.917131612Z go: downloading golang.org/x/text v0.36.0
+2026-08-16T13:34:27.223528371Z go: downloading github.com/charmbracelet/colorprofile v0.4.3
+2026-08-16T13:34:27.240980242Z go: downloading github.com/charmbracelet/ultraviolet v0.0.0-20251205161215-1948445e3318
+2026-08-16T13:34:27.248820156Z go: downloading github.com/charmbracelet/x/ansi v0.11.7
+2026-08-16T13:34:27.298723707Z go: downloading github.com/charmbracelet/x/term v0.2.2
+2026-08-16T13:34:27.304771529Z go: downloading github.com/clipperhouse/displaywidth v0.11.0
+2026-08-16T13:34:27.320656084Z go: downloading github.com/lucasb-eyer/go-colorful v1.4.0
+2026-08-16T13:34:27.339573217Z go: downloading github.com/rivo/uniseg v0.4.7
+2026-08-16T13:34:27.455766758Z go: downloading github.com/fsnotify/fsnotify v1.5.4
+2026-08-16T13:34:27.459049096Z go: downloading github.com/mitchellh/mapstructure v1.5.0
+2026-08-16T13:34:27.481682534Z go: downloading github.com/spf13/afero v1.15.0
+2026-08-16T13:34:27.485946756Z go: downloading github.com/spf13/cast v1.5.0
+2026-08-16T13:34:27.505105227Z go: downloading github.com/spf13/jwalterweatherman v1.1.0
+2026-08-16T13:34:27.558599329Z go: downloading golang.org/x/sync v0.20.0
+2026-08-16T13:34:27.583296888Z go: downloading github.com/daixiang0/gci v0.13.7
+2026-08-16T13:34:27.618264357Z go: downloading github.com/golangci/gofmt v0.0.0-20250106114630-d62b90e6713d
+2026-08-16T13:34:27.618299216Z go: downloading mvdan.cc/gofumpt v0.9.2
+2026-08-16T13:34:27.656803435Z go: downloading github.com/golangci/golines v0.15.0
+2026-08-16T13:34:27.663088599Z go: downloading github.com/sourcegraph/go-diff v0.8.0
+2026-08-16T13:34:27.710861450Z go: downloading github.com/golangci/swaggoswag v0.0.0-20250504205917-77f2aca3143e
+2026-08-16T13:34:27.731051255Z go: downloading go.augendre.info/arangolint v0.4.0
+2026-08-16T13:34:27.731195989Z go: downloading github.com/alingse/asasalint v0.0.11
+2026-08-16T13:34:27.754022160Z go: downloading github.com/golangci/asciicheck v0.5.0
+2026-08-16T13:34:27.761435391Z go: downloading github.com/breml/bidichk v0.3.3
+2026-08-16T13:34:27.776938568Z go: downloading github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4
+2026-08-16T13:34:27.785204551Z go: downloading github.com/lasiar/canonicalheader v1.1.2
+2026-08-16T13:34:27.801791929Z go: downloading github.com/ClickHouse/clickhouse-go-linter v1.2.0
+2026-08-16T13:34:27.829365918Z go: downloading github.com/sivchari/containedctx v1.0.3
+2026-08-16T13:34:27.829959830Z go: downloading github.com/kkHAIKE/contextcheck v1.1.6
+2026-08-16T13:34:27.851826912Z go: downloading github.com/karamaru-alpha/copyloopvar v1.2.2
+2026-08-16T13:34:27.852726596Z go: downloading github.com/bkielbasa/cyclop v1.2.3
+2026-08-16T13:34:27.873026978Z go: downloading gitlab.com/bosi/decorder v0.4.2
+2026-08-16T13:34:27.876854050Z go: downloading github.com/OpenPeeDeeP/depguard/v2 v2.2.1
+2026-08-16T13:34:27.899733330Z go: downloading github.com/golangci/dupl v0.0.0-20260401084720-c99c5cf5c202
+2026-08-16T13:34:27.901199559Z go: downloading github.com/Abirdcfly/dupword v0.1.7
+2026-08-16T13:34:27.924362286Z go: downloading github.com/charithe/durationcheck v0.0.11
+2026-08-16T13:34:27.927886499Z go: downloading github.com/manuelarte/embeddedstructfieldcheck v0.4.0
+2026-08-16T13:34:27.943801327Z go: downloading github.com/Djarvur/go-err113 v0.1.1
+2026-08-16T13:34:27.953918181Z go: downloading github.com/kisielk/errcheck v1.10.0
+2026-08-16T13:34:27.964505622Z go: downloading github.com/breml/errchkjson v0.4.1
+2026-08-16T13:34:27.970943193Z go: downloading codeberg.org/polyfloyd/go-errorlint v1.9.0
+2026-08-16T13:34:27.972840507Z go: downloading github.com/Antonboom/errname v1.1.1
+2026-08-16T13:34:27.995497691Z go: downloading github.com/nishanths/exhaustive v0.12.0
+2026-08-16T13:34:28.007248825Z go: downloading dev.gaijin.team/go/exhaustruct/v4 v4.0.0
+2026-08-16T13:34:28.041777766Z go: downloading github.com/ldez/exptostd v0.4.5
+2026-08-16T13:34:28.042075706Z go: downloading go.augendre.info/fatcontext v0.9.0
+2026-08-16T13:34:28.048257314Z go: downloading github.com/ashanbrown/forbidigo/v2 v2.3.1
+2026-08-16T13:34:28.059559473Z go: downloading github.com/gostaticanalysis/forcetypeassert v0.2.0
+2026-08-16T13:34:28.063727019Z go: downloading github.com/manuelarte/funcorder v0.6.0
+2026-08-16T13:34:28.067807982Z go: downloading github.com/ultraware/funlen v0.2.0
+2026-08-16T13:34:28.079375211Z go: downloading github.com/nunnatsa/ginkgolinter v0.23.0
+2026-08-16T13:34:28.092251386Z go: downloading 4d63.com/gocheckcompilerdirectives v1.3.0
+2026-08-16T13:34:28.105639411Z go: downloading 4d63.com/gochecknoglobals v0.2.2
+2026-08-16T13:34:28.116639248Z go: downloading github.com/alecthomas/go-check-sumtype v0.3.1
+2026-08-16T13:34:28.133540234Z go: downloading github.com/uudashr/gocognit v1.2.1
+2026-08-16T13:34:28.141807975Z go: downloading github.com/jgautheron/goconst v1.10.0
+2026-08-16T13:34:28.142110808Z go: downloading github.com/go-critic/go-critic v0.14.3
+2026-08-16T13:34:28.163661824Z go: downloading github.com/quasilyte/go-ruleguard/dsl v0.3.23
+2026-08-16T13:34:28.174962764Z go: downloading github.com/fzipp/gocyclo v0.6.0
+2026-08-16T13:34:28.186319677Z go: downloading github.com/quasilyte/go-ruleguard v0.4.5
+2026-08-16T13:34:28.205015416Z go: downloading github.com/godoc-lint/godoc-lint v0.11.2
+2026-08-16T13:34:28.314640022Z go: downloading github.com/tetafro/godot v1.5.6
+2026-08-16T13:34:28.318110892Z go: downloading github.com/matoous/godox v1.1.0
+2026-08-16T13:34:28.318352129Z go: downloading github.com/denis-tingaikin/go-header v0.5.0
+2026-08-16T13:34:28.318960450Z go: downloading github.com/ldez/gomoddirectives v0.8.0
+2026-08-16T13:34:28.342111242Z go: downloading github.com/Masterminds/semver/v3 v3.5.0
+2026-08-16T13:34:28.343714307Z go: downloading github.com/ryancurrah/gomodguard v1.4.1
+2026-08-16T13:34:28.348198282Z go: downloading github.com/ryancurrah/gomodguard/v2 v2.1.3
+2026-08-16T13:34:28.348921852Z go: downloading github.com/golangci/go-printf-func-name v0.1.1
+2026-08-16T13:34:28.363829092Z go: downloading github.com/securego/gosec/v2 v2.26.1
+2026-08-16T13:34:28.500305190Z go: downloading github.com/xen0n/gosmopolitan v1.3.0
+2026-08-16T13:34:28.501394985Z go: downloading github.com/leonklingele/grouper v1.1.2
+2026-08-16T13:34:28.501821402Z go: downloading github.com/uudashr/iface v1.4.2
+2026-08-16T13:34:28.541635593Z go: downloading github.com/julz/importas v0.2.0
+2026-08-16T13:34:28.541967150Z go: downloading github.com/macabu/inamedparam v0.2.0
+2026-08-16T13:34:28.542228122Z go: downloading github.com/gordonklaus/ineffassign v0.2.0
+2026-08-16T13:34:28.542493622Z go: downloading github.com/sashamelentyev/interfacebloat v1.1.0
+2026-08-16T13:34:28.564882905Z go: downloading github.com/ckaznocha/intrange v0.3.1
+2026-08-16T13:34:28.564898819Z go: downloading github.com/AdminBenni/iota-mixing v1.0.0
+2026-08-16T13:34:28.567236606Z go: downloading github.com/butuzov/ireturn v0.4.1
+2026-08-16T13:34:28.583066647Z go: downloading github.com/timonwong/loggercheck v0.11.0
+2026-08-16T13:34:28.587500415Z go: downloading github.com/yagipy/maintidx v1.0.0
+2026-08-16T13:34:28.587517960Z go: downloading github.com/ashanbrown/makezero/v2 v2.2.1
+2026-08-16T13:34:28.590503339Z go: downloading github.com/butuzov/mirror v1.3.0
+2026-08-16T13:34:28.609036492Z go: downloading github.com/golangci/misspell v0.8.0
+2026-08-16T13:34:28.609851508Z go: downloading github.com/tommy-muehle/go-mnd/v2 v2.5.1
+2026-08-16T13:34:28.611900191Z go: downloading go-simpler.org/musttag v0.14.0
+2026-08-16T13:34:28.628334702Z go: downloading github.com/alexkohler/nakedret/v2 v2.0.6
+2026-08-16T13:34:28.638793177Z go: downloading github.com/nakabonne/nestif v0.3.1
+2026-08-16T13:34:28.648207720Z go: downloading github.com/gostaticanalysis/nilerr v0.1.2
+2026-08-16T13:34:28.659692939Z go: downloading github.com/alingse/nilnesserr v0.2.0
+2026-08-16T13:34:28.670737143Z go: downloading github.com/Antonboom/nilnil v1.1.1
+2026-08-16T13:34:28.684892308Z go: downloading github.com/ssgreg/nlreturn/v2 v2.2.1
+2026-08-16T13:34:28.694759538Z go: downloading github.com/sonatard/noctx v0.5.1
+2026-08-16T13:34:28.695770668Z go: downloading github.com/AlwxSin/noinlineerr v1.0.5
+2026-08-16T13:34:28.705321812Z go: downloading github.com/firefart/nonamedreturns v1.0.6
+2026-08-16T13:34:28.705572863Z go: downloading github.com/stbenjam/no-sprintf-host-port v0.3.1
+2026-08-16T13:34:28.714153073Z go: downloading github.com/kunwardeep/paralleltest v1.0.15
+2026-08-16T13:34:28.729514965Z go: downloading github.com/catenacyber/perfsprint v0.10.1
+2026-08-16T13:34:28.731110576Z go: downloading github.com/alexkohler/prealloc v1.1.0
+2026-08-16T13:34:28.733210721Z go: downloading github.com/nishanths/predeclared v0.2.2
+2026-08-16T13:34:28.734831500Z go: downloading github.com/yeya24/promlinter v0.3.0
+2026-08-16T13:34:28.756853416Z go: downloading github.com/ghostiam/protogetter v0.3.20
+2026-08-16T13:34:28.756892935Z go: downloading github.com/curioswitch/go-reassign v0.3.0
+2026-08-16T13:34:28.776627067Z go: downloading github.com/raeperd/recvcheck v0.2.0
+2026-08-16T13:34:28.778024907Z go: downloading github.com/BurntSushi/toml v1.6.0
+2026-08-16T13:34:28.795013949Z go: downloading github.com/mgechev/revive v1.15.0
+2026-08-16T13:34:28.952167817Z go: downloading github.com/golangci/rowserrcheck v0.0.0-20260419091836-c5f79b8a11ba
+2026-08-16T13:34:28.952573867Z go: downloading go-simpler.org/sloglint v0.12.0
+2026-08-16T13:34:28.952782659Z go: downloading github.com/jjti/go-spancheck v0.6.5
+2026-08-16T13:34:28.971943789Z go: downloading github.com/ryanrolds/sqlclosecheck v0.6.0
+2026-08-16T13:34:28.976095957Z go: downloading honnef.co/go/tools v0.7.0
+2026-08-16T13:34:29.405164789Z go: downloading github.com/4meepo/tagalign v1.4.3
+2026-08-16T13:34:29.405460172Z go: downloading github.com/maratori/testableexamples v1.0.1
+2026-08-16T13:34:29.406000898Z go: downloading github.com/Antonboom/testifylint v1.6.4
+2026-08-16T13:34:29.406127821Z go: downloading github.com/ldez/tagliatelle v0.7.2
+2026-08-16T13:34:29.429638143Z go: downloading github.com/maratori/testpackage v1.1.2
+2026-08-16T13:34:29.432625995Z go: downloading github.com/kulti/thelper v0.7.1
+2026-08-16T13:34:29.436970748Z go: downloading github.com/moricho/tparallel v0.3.2
+2026-08-16T13:34:29.454285163Z go: downloading github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e
+2026-08-16T13:34:29.466764886Z go: downloading mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15
+2026-08-16T13:34:29.466779290Z go: downloading github.com/MirrexOne/unqueryvet v1.5.4
+2026-08-16T13:34:29.475578516Z go: downloading github.com/sashamelentyev/usestdlibvars v1.29.0
+2026-08-16T13:34:29.486796341Z go: downloading github.com/ldez/usetesting v0.5.0
+2026-08-16T13:34:29.514053451Z go: downloading github.com/blizzy78/varnamelen v0.8.0
+2026-08-16T13:34:29.522730250Z go: downloading github.com/sanposhiho/wastedassign/v2 v2.1.0
+2026-08-16T13:34:29.550394595Z go: downloading github.com/ultraware/whitespace v0.2.0
+2026-08-16T13:34:29.559018493Z go: downloading github.com/tomarrell/wrapcheck/v2 v2.12.0
+2026-08-16T13:34:29.567486220Z go: downloading github.com/bombsimon/wsl/v4 v4.7.0
+2026-08-16T13:34:29.619806091Z go: downloading github.com/bombsimon/wsl/v5 v5.8.0
+2026-08-16T13:34:29.621338692Z go: downloading github.com/ykadowak/zerologlint v0.1.5
+2026-08-16T13:34:29.641860598Z go: downloading github.com/davecgh/go-spew v1.1.1
+2026-08-16T13:34:29.672794206Z go: downloading github.com/pmezard/go-difflib v1.0.0
+2026-08-16T13:34:29.682275468Z go: downloading github.com/stretchr/objx v0.5.2
+2026-08-16T13:34:29.732998497Z go: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
+2026-08-16T13:34:29.751249208Z go: downloading github.com/charmbracelet/x/termios v0.1.1
+2026-08-16T13:34:29.757818383Z go: downloading github.com/charmbracelet/x/windows v0.2.2
+2026-08-16T13:34:29.772988557Z go: downloading github.com/muesli/cancelreader v0.2.2
+2026-08-16T13:34:29.780940761Z go: downloading github.com/clipperhouse/uax29/v2 v2.7.0
+2026-08-16T13:34:29.796151246Z go: downloading github.com/mattn/go-runewidth v0.0.23
+2026-08-16T13:34:29.826268977Z go: downloading github.com/subosito/gotenv v1.4.1
+2026-08-16T13:34:29.846574365Z go: downloading github.com/hashicorp/hcl v1.0.0
+2026-08-16T13:34:29.908132179Z go: downloading gopkg.in/ini.v1 v1.67.0
+2026-08-16T13:34:29.908158152Z go: downloading github.com/magiconair/properties v1.8.6
+2026-08-16T13:34:29.956623059Z go: downloading go.uber.org/zap v1.27.0
+2026-08-16T13:34:30.034851696Z go: downloading github.com/hexops/gotextdiff v1.0.3
+2026-08-16T13:34:30.058198537Z go: downloading github.com/google/go-cmp v0.7.0
+2026-08-16T13:34:30.059101131Z go: downloading github.com/dave/dst v0.27.3
+2026-08-16T13:34:30.113320860Z go: downloading github.com/gostaticanalysis/analysisutil v0.7.1
+2026-08-16T13:34:30.115229894Z go: downloading github.com/go-toolsmith/astcast v1.1.0
+2026-08-16T13:34:30.133274695Z go: downloading github.com/gobwas/glob v0.2.3
+2026-08-16T13:34:30.136951938Z go: downloading dev.gaijin.team/go/golib v0.6.0
+2026-08-16T13:34:30.170474932Z go: downloading github.com/go-toolsmith/astcopy v1.1.0
+2026-08-16T13:34:30.171225048Z go: downloading github.com/go-toolsmith/astequal v1.2.0
+2026-08-16T13:34:30.185353959Z go: downloading github.com/go-toolsmith/astfmt v1.1.0
+2026-08-16T13:34:30.189350297Z go: downloading github.com/go-toolsmith/astp v1.1.0
+2026-08-16T13:34:30.200387464Z go: downloading github.com/go-toolsmith/strparse v1.1.0
+2026-08-16T13:34:30.205846988Z go: downloading github.com/go-toolsmith/typep v1.1.0
+2026-08-16T13:34:30.221186834Z go: downloading github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727
+2026-08-16T13:34:30.240296882Z go: downloading github.com/ccojocar/zxcvbn-go v1.0.4
+2026-08-16T13:34:30.241952624Z go: downloading github.com/gostaticanalysis/comment v1.5.0
+2026-08-16T13:34:30.271984912Z go: downloading github.com/prometheus/client_golang v1.12.1
+2026-08-16T13:34:30.347374047Z go: downloading github.com/prometheus/client_model v0.2.0
+2026-08-16T13:34:30.358789140Z go: downloading github.com/fatih/structtag v1.2.0
+2026-08-16T13:34:30.366157382Z go: downloading github.com/ettle/strcase v0.2.0
+2026-08-16T13:34:30.377440716Z go: downloading github.com/hashicorp/go-immutable-radix/v2 v2.1.0
+2026-08-16T13:34:30.397004658Z go: downloading github.com/alfatraining/structtag v1.0.0
+2026-08-16T13:34:30.418745775Z go: downloading github.com/dlclark/regexp2 v1.12.0
+2026-08-16T13:34:30.461802013Z go: downloading go.uber.org/multierr v1.10.0
+2026-08-16T13:34:30.492400683Z go: downloading github.com/ldez/structtags v0.6.1
+2026-08-16T13:34:30.536551637Z go: downloading golang.org/x/exp/typeparams v0.0.0-20260209203927-2842357ff358
+2026-08-16T13:34:30.538156254Z go: downloading github.com/quasilyte/gogrep v0.5.0
+2026-08-16T13:34:30.567763990Z go: downloading golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
+2026-08-16T13:34:30.574165169Z go: downloading github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567
+2026-08-16T13:34:30.623403287Z go: downloading github.com/golang/protobuf v1.5.3
+2026-08-16T13:34:30.625945407Z go: downloading github.com/prometheus/common v0.32.1
+2026-08-16T13:34:30.697593550Z go: downloading github.com/prometheus/procfs v0.7.3
+2026-08-16T13:34:30.697908336Z go: downloading google.golang.org/protobuf v1.36.10
+2026-08-16T13:34:30.780828392Z go: downloading codeberg.org/chavacava/garif v0.2.0
+2026-08-16T13:34:30.793251173Z go: downloading github.com/hashicorp/golang-lru/v2 v2.0.7
+2026-08-16T13:34:31.207776892Z go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.1
+
+=== kubectl logs -c main --timestamps --tail=80 (completion capture) ===
+2026-08-16T13:34:29.956623059Z go: downloading go.uber.org/zap v1.27.0
+2026-08-16T13:34:30.034851696Z go: downloading github.com/hexops/gotextdiff v1.0.3
+2026-08-16T13:34:30.058198537Z go: downloading github.com/google/go-cmp v0.7.0
+2026-08-16T13:34:30.059101131Z go: downloading github.com/dave/dst v0.27.3
+2026-08-16T13:34:30.113320860Z go: downloading github.com/gostaticanalysis/analysisutil v0.7.1
+2026-08-16T13:34:30.115229894Z go: downloading github.com/go-toolsmith/astcast v1.1.0
+2026-08-16T13:34:30.133274695Z go: downloading github.com/gobwas/glob v0.2.3
+2026-08-16T13:34:30.136951938Z go: downloading dev.gaijin.team/go/golib v0.6.0
+2026-08-16T13:34:30.170474932Z go: downloading github.com/go-toolsmith/astcopy v1.1.0
+2026-08-16T13:34:30.171225048Z go: downloading github.com/go-toolsmith/astequal v1.2.0
+2026-08-16T13:34:30.185353959Z go: downloading github.com/go-toolsmith/astfmt v1.1.0
+2026-08-16T13:34:30.189350297Z go: downloading github.com/go-toolsmith/astp v1.1.0
+2026-08-16T13:34:30.200387464Z go: downloading github.com/go-toolsmith/strparse v1.1.0
+2026-08-16T13:34:30.205846988Z go: downloading github.com/go-toolsmith/typep v1.1.0
+2026-08-16T13:34:30.221186834Z go: downloading github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727
+2026-08-16T13:34:30.240296882Z go: downloading github.com/ccojocar/zxcvbn-go v1.0.4
+2026-08-16T13:34:30.241952624Z go: downloading github.com/gostaticanalysis/comment v1.5.0
+2026-08-16T13:34:30.271984912Z go: downloading github.com/prometheus/client_golang v1.12.1
+2026-08-16T13:34:30.347374047Z go: downloading github.com/prometheus/client_model v0.2.0
+2026-08-16T13:34:30.358789140Z go: downloading github.com/fatih/structtag v1.2.0
+2026-08-16T13:34:30.366157382Z go: downloading github.com/ettle/strcase v0.2.0
+2026-08-16T13:34:30.377440716Z go: downloading github.com/hashicorp/go-immutable-radix/v2 v2.1.0
+2026-08-16T13:34:30.397004658Z go: downloading github.com/alfatraining/structtag v1.0.0
+2026-08-16T13:34:30.418745775Z go: downloading github.com/dlclark/regexp2 v1.12.0
+2026-08-16T13:34:30.461802013Z go: downloading go.uber.org/multierr v1.10.0
+2026-08-16T13:34:30.492400683Z go: downloading github.com/ldez/structtags v0.6.1
+2026-08-16T13:34:30.536551637Z go: downloading golang.org/x/exp/typeparams v0.0.0-20260209203927-2842357ff358
+2026-08-16T13:34:30.538156254Z go: downloading github.com/quasilyte/gogrep v0.5.0
+2026-08-16T13:34:30.567763990Z go: downloading golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
+2026-08-16T13:34:30.574165169Z go: downloading github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567
+2026-08-16T13:34:30.623403287Z go: downloading github.com/golang/protobuf v1.5.3
+2026-08-16T13:34:30.625945407Z go: downloading github.com/prometheus/common v0.32.1
+2026-08-16T13:34:30.697593550Z go: downloading github.com/prometheus/procfs v0.7.3
+2026-08-16T13:34:30.697908336Z go: downloading google.golang.org/protobuf v1.36.10
+2026-08-16T13:34:30.780828392Z go: downloading codeberg.org/chavacava/garif v0.2.0
+2026-08-16T13:34:30.793251173Z go: downloading github.com/hashicorp/golang-lru/v2 v2.0.7
+2026-08-16T13:34:31.207776892Z go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.1
+2026-08-16T13:35:51.480821183Z ++ go env GOPATH
+2026-08-16T13:35:51.487274237Z + /go/bin/golangci-lint run --max-issues-per-linter=0 --max-same-issues=0 ./...
+2026-08-16T13:36:37.374475218Z internal/server/capture_endpoints_test.go:36:24: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374501496Z 		defer resp.Body.Close()
+2026-08-16T13:36:37.374508300Z 		                     ^
+2026-08-16T13:36:37.374513964Z internal/server/capture_endpoints_test.go:57:24: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374519890Z 		defer resp.Body.Close()
+2026-08-16T13:36:37.374525189Z 		                     ^
+2026-08-16T13:36:37.374530419Z internal/server/capture_endpoints_test.go:97:25: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374535874Z 			defer resp.Body.Close()
+2026-08-16T13:36:37.374541091Z 			                     ^
+2026-08-16T13:36:37.374546401Z internal/server/capture_endpoints_test.go:124:26: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374551820Z 				defer resp.Body.Close()
+2026-08-16T13:36:37.374556894Z 				                     ^
+2026-08-16T13:36:37.374562053Z internal/server/capture_endpoints_test.go:141:24: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374567074Z 		defer resp.Body.Close()
+2026-08-16T13:36:37.374572044Z 		                     ^
+2026-08-16T13:36:37.374577293Z internal/server/capture_endpoints_test.go:164:24: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374582350Z 		defer resp.Body.Close()
+2026-08-16T13:36:37.374587580Z 		                     ^
+2026-08-16T13:36:37.374592694Z internal/server/capture_endpoints_test.go:186:24: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374598341Z 		defer resp.Body.Close()
+2026-08-16T13:36:37.374603237Z 		                     ^
+2026-08-16T13:36:37.374608578Z internal/server/proxy_capture_pairs_test.go:21:23: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374614205Z 	defer resp.Body.Close()
+2026-08-16T13:36:37.374619559Z 	                     ^
+2026-08-16T13:36:37.374638288Z internal/server/proxy_capture_pairs_test.go:72:23: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374790658Z 	defer resp.Body.Close()
+2026-08-16T13:36:37.374814257Z 	                     ^
+2026-08-16T13:36:37.374821110Z internal/server/proxy_capture_test.go:192:23: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374826477Z 	defer resp.Body.Close()
+2026-08-16T13:36:37.374831584Z 	                     ^
+2026-08-16T13:36:37.374836681Z internal/server/proxy_capture_test.go:211:23: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374841744Z 	defer resp.Body.Close()
+2026-08-16T13:36:37.374846838Z 	                     ^
+2026-08-16T13:36:37.374851938Z internal/server/proxy_capture_test.go:240:23: Error return value of `resp.Body.Close` is not checked (errcheck)
+2026-08-16T13:36:37.374903709Z 	defer resp.Body.Close()
+2026-08-16T13:36:37.374910689Z 	                     ^
+2026-08-16T13:36:37.374916082Z 12 issues:
+2026-08-16T13:36:37.374921325Z * errcheck: 12
+2026-08-16T13:36:38.322658295Z time=2026-08-16T13:36:38.320Z level=INFO msg="file signal handler exiting due to context cancellation" argo=true
+2026-08-16T13:36:38.323095017Z time=2026-08-16T13:36:38.320Z level=INFO msg="sub-process exited" argo=true error="exit status 1"
+2026-08-16T13:36:38.326083391Z Error: exit status 1
+
+=== Final workflow status (kubectl get workflow) ===
+phase: Failed
+startedAt: 2026-08-16T13:30:37Z
+finishedAt: 2026-08-16T13:36:49Z
+message: child 'seam-ci-z6cdg-3207406674' failed
+progress: 0/1
+node verify: Failed; message: main: Error (exit code 1); exitCode: 1
+
+=== Post-completion kubectl logs result ===
+The pod was deleted by podGC: pods "seam-ci-z6cdg-ci-3207406674" not found.

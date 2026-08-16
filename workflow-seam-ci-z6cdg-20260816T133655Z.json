@@ -1,0 +1,728 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Workflow",
+    "metadata": {
+        "annotations": {
+            "workflows.argoproj.io/last-seen-version": "63345879"
+        },
+        "creationTimestamp": "2026-08-16T13:02:22Z",
+        "generateName": "seam-ci-",
+        "generation": 5,
+        "labels": {
+            "events.argoproj.io/action-timestamp": "1786885341831",
+            "events.argoproj.io/sensor": "seam-ci-sensor",
+            "events.argoproj.io/trigger": "seam-ci",
+            "workflows.argoproj.io/completed": "true",
+            "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+            "workflows.argoproj.io/phase": "Failed"
+        },
+        "name": "seam-ci-z6cdg",
+        "namespace": "argo-workflows",
+        "resourceVersion": "63348386",
+        "uid": "79052573-4d8c-4f13-a760-7f7e5345b12d"
+    },
+    "spec": {
+        "arguments": {},
+        "serviceAccountName": "argo-workflow",
+        "workflowTemplateRef": {
+            "name": "seam-ci"
+        }
+    },
+    "status": {
+        "artifactGCStatus": {
+            "notSpecified": true
+        },
+        "artifactRepositoryRef": {
+            "artifactRepository": {},
+            "default": true
+        },
+        "conditions": [
+            {
+                "status": "False",
+                "type": "PodRunning"
+            },
+            {
+                "status": "True",
+                "type": "Completed"
+            }
+        ],
+        "finishedAt": "2026-08-16T13:36:49Z",
+        "message": "child 'seam-ci-z6cdg-3207406674' failed",
+        "nodes": {
+            "seam-ci-z6cdg": {
+                "children": [
+                    "seam-ci-z6cdg-1738849531"
+                ],
+                "displayName": "seam-ci-z6cdg",
+                "finishedAt": "2026-08-16T13:36:49Z",
+                "id": "seam-ci-z6cdg",
+                "message": "child 'seam-ci-z6cdg-3207406674' failed",
+                "name": "seam-ci-z6cdg",
+                "outboundNodes": [
+                    "seam-ci-z6cdg-3207406674"
+                ],
+                "phase": "Failed",
+                "progress": "0/1",
+                "resourcesDuration": {
+                    "cpu": 749,
+                    "memory": 7771
+                },
+                "startedAt": "2026-08-16T13:30:37Z",
+                "templateName": "pipeline",
+                "templateScope": "local/",
+                "type": "Steps"
+            },
+            "seam-ci-z6cdg-1738849531": {
+                "boundaryID": "seam-ci-z6cdg",
+                "children": [
+                    "seam-ci-z6cdg-3207406674"
+                ],
+                "displayName": "[0]",
+                "finishedAt": "2026-08-16T13:36:49Z",
+                "id": "seam-ci-z6cdg-1738849531",
+                "message": "child 'seam-ci-z6cdg-3207406674' failed",
+                "name": "seam-ci-z6cdg[0]",
+                "nodeFlag": {},
+                "phase": "Failed",
+                "progress": "0/1",
+                "resourcesDuration": {
+                    "cpu": 749,
+                    "memory": 7771
+                },
+                "startedAt": "2026-08-16T13:30:37Z",
+                "templateScope": "local/",
+                "type": "StepGroup"
+            },
+            "seam-ci-z6cdg-3207406674": {
+                "boundaryID": "seam-ci-z6cdg",
+                "displayName": "verify",
+                "finishedAt": "2026-08-16T13:36:39Z",
+                "hostNodeName": "prod-instance-17864971120751201",
+                "id": "seam-ci-z6cdg-3207406674",
+                "message": "main: Error (exit code 1)",
+                "name": "seam-ci-z6cdg[0].verify",
+                "outputs": {
+                    "exitCode": "1"
+                },
+                "phase": "Failed",
+                "progress": "0/1",
+                "resourcesDuration": {
+                    "cpu": 749,
+                    "memory": 7771
+                },
+                "startedAt": "2026-08-16T13:30:37Z",
+                "taskResultSynced": true,
+                "templateName": "ci",
+                "templateScope": "local/",
+                "type": "Pod"
+            }
+        },
+        "phase": "Failed",
+        "progress": "0/1",
+        "resourcesDuration": {
+            "cpu": 749,
+            "memory": 7771
+        },
+        "startedAt": "2026-08-16T13:30:37Z",
+        "storedTemplates": {
+            "namespaced/seam-ci/ci": {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates python3\nrm -rf /var/lib/apt/lists/*\n\n# Clone from trusted hardcoded source (ignore webhook payload),\n# matching the other CI templates' security posture.\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\necho \"Commit: $(git rev-parse HEAD)\"\ngo version\n\necho \"=== gofmt ===\"\nUNFORMATTED=\"$(gofmt -l .)\"\nif [ -n \"$UNFORMATTED\" ]; then\n  echo \"gofmt would reformat the following files:\"\n  echo \"$UNFORMATTED\"\n  exit 1\nfi\n\necho \"=== go vet ===\"\ngo vet ./...\n\necho \"=== golangci-lint ===\"\n# Installed via the Go module proxy, NOT upstream's install.sh.\n#\n# install.sh was fetched unpinned from master (a :latest-class\n# hazard: upstream can change it under us at any time) and then\n# downloaded a GitHub release tarball that this cluster's egress\n# corrupts deterministically -- two runs produced the identical\n# wrong sha256 fd3a137c... against the genuine 8df580d2..., so\n# the installer aborted and the gate never ran. Because the\n# corruption is reproducible rather than flaky, a retry loop\n# does not fix it; the download path itself has to go.\n#\n# `go install` uses the same module proxy that `go mod download`\n# already succeeds with in this very step, and verifies against\n# GOSUMDB, so it is both reachable and checksum-pinned.\ngo install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2\n# Report every finding. Default caps (max-issues-per-linter=50,\n# max-same-issues=3) silently truncate repeated findings, which\n# makes the printed count read as the total when it is not.\n\"$(go env GOPATH)/bin/golangci-lint\" run \\\n  --max-issues-per-linter=0 --max-same-issues=0 ./...\n\necho \"=== go test -race ===\"\ngo test -race ./...\n\necho \"=== benchmark gate (plan.md -\u003e Performance Budgets -\u003e CI-gated benchmarks) ===\"\ngo test -bench=. -benchmem -run=^$ ./... | tee /tmp/bench-new.txt\n\nif [ -f bench/baseline.txt ]; then\n  # x/perf carries no tagged releases — pin by commit for reproducibility.\n  go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d\n  benchstat bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt\n  python3 -c \"\nimport re, sys\nworst = 0.0\nfor line in open('/tmp/benchstat.txt'):\n    m = re.search(r'([+-]\\d+(?:\\.\\d+)?)%', line)\n    if m:\n        worst = max(worst, float(m.group(1)))\nprint(f'Worst regression: {worst:.1f}%')\nsys.exit(1 if worst \u003e 20.0 else 0)\n\"\nelse\n  echo \"No committed bench/baseline.txt yet - benchmark gate is inert until Phase 2 establishes one (plan.md CI-gated benchmarks).\"\nfi\n\necho \"CI passed!\"\n"
+                    ],
+                    "command": [
+                        "bash",
+                        "-c"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_CONFIG_COUNT",
+                            "value": "1"
+                        },
+                        {
+                            "name": "GIT_CONFIG_KEY_0",
+                            "value": "credential.helper"
+                        },
+                        {
+                            "name": "GIT_CONFIG_VALUE_0",
+                            "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                        },
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "golang:1.26",
+                    "name": "",
+                    "resources": {
+                        "limits": {
+                            "cpu": "3500m",
+                            "memory": "4Gi"
+                        },
+                        "requests": {
+                            "cpu": "2",
+                            "memory": "2Gi"
+                        }
+                    }
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "ci",
+                "outputs": {}
+            },
+            "namespaced/seam-ci/github-release": {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates jq\nrm -rf /var/lib/apt/lists/*\n\nVERSION=\"{{inputs.parameters.version}}\"\nCOMMIT=\"{{inputs.parameters.commit}}\"\nDIGEST=\"{{inputs.parameters.digest}}\"\nAPI=\"https://api.github.com/repos/jedarden/SEAM\"\n\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\ngit checkout -q \"$COMMIT\"\n\nASSET=\"seam_${VERSION}_linux_amd64\"\nCGO_ENABLED=0 GOOS=linux GOARCH=amd64 \\\n  go build -trimpath -ldflags '-s -w' -o \"$ASSET\" ./cmd/seam\n\n# Smoke the artifact we are about to publish: healthcheck against a\n# port nothing is serving must fail, which proves the binary runs\n# and its subcommand dispatch works.\nif \"./$ASSET\" healthcheck --caller-port 1 \u003e/dev/null 2\u003e\u00261; then\n  echo \"ERROR: healthcheck unexpectedly succeeded against a dead port\" \u003e\u00262\n  exit 1\nfi\n\nRESP=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/tags/v${VERSION}\" || echo '')\"\nif [ -n \"$RESP\" ]; then\n  RELEASE_ID=\"$(echo \"$RESP\" | jq -r '.id')\"\n  if [ \"$(echo \"$RESP\" | jq -r '.draft')\" = \"false\" ]; then\n    echo \"v${VERSION} already published - skipping\"\n    exit 0\n  fi\n  echo \"v${VERSION} exists as a draft - publishing it in place\"\nelse\n  # GHCR packages default to PRIVATE even when the source repo is\n  # public, and GitHub exposes no REST endpoint to change that -- it\n  # is a one-time per-package UI setting. So probe anonymously and\n  # let the notes state what is actually true rather than assume it.\n  # v0.1.0 shipped claiming \"(public)\" while the package was private.\n  ANON=\"$(curl -fsSL \"https://ghcr.io/token?scope=repository:jedarden/seam:pull\u0026service=ghcr.io\" | jq -r '.token // empty')\"\n  PULL_CODE=\"$(curl -s -o /dev/null -w '%%{http_code}' \\\n    -H \"Authorization: Bearer $ANON\" \\\n    -H 'Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \\\n    \"https://ghcr.io/v2/jedarden/seam/manifests/${VERSION}\")\"\n  if [ \"$PULL_CODE\" = \"200\" ]; then\n    VISIBILITY=\"The GHCR package is public - docker pull needs no authentication.\"\n  else\n    VISIBILITY=\"NOTE: the GHCR package is currently PRIVATE (anonymous pull returned HTTP ${PULL_CODE}), so docker pull requires authentication. Flip it once at https://github.com/users/jedarden/packages/container/seam/settings\"\n    echo \"WARNING: ghcr.io/jedarden/seam:${VERSION} is not anonymously pullable (HTTP ${PULL_CODE})\" \u003e\u00262\n  fi\n\n  NOTES=\"Built from commit ${COMMIT}.\n\nContainer image:\n  ghcr.io/jedarden/seam:${VERSION}\n  ghcr.io/jedarden/seam@${DIGEST}\n\nPin the digest, not the tag, in declarative-config -- plan.md defines\nrollback as reverting the image-digest commit.\n\n${VISIBILITY}\"\n  CREATED=\"$(jq -n \\\n    --arg tag \"v${VERSION}\" \\\n    --arg name \"SEAM v${VERSION}\" \\\n    --arg body \"$NOTES\" \\\n    '{tag_name:$tag, name:$name, body:$body, draft:true, prerelease:false, target_commitish:\"main\"}' \\\n    | curl -fsSL -X POST -H \"Authorization: Bearer $GH_TOKEN\" \\\n        -H \"Content-Type: application/json\" --data @- \"$API/releases\")\"\n  RELEASE_ID=\"$(echo \"$CREATED\" | jq -r '.id')\"\nfi\n\n# Replace any same-named asset so a retry does not append a duplicate.\nEXISTING=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \\\n  \"$API/releases/${RELEASE_ID}/assets\" | jq -r --arg n \"$ASSET\" '.[] | select(.name==$n) | .id')\"\nfor a in $EXISTING; do\n  curl -fsSL -X DELETE -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/assets/${a}\"\ndone\n\ncurl -fsSL -X POST -H \"Authorization: Bearer $GH_TOKEN\" \\\n  -H \"Content-Type: application/octet-stream\" \\\n  --data-binary \"@${ASSET}\" \\\n  \"https://uploads.github.com/repos/jedarden/SEAM/releases/${RELEASE_ID}/assets?name=${ASSET}\"\n\n# Publish last, so a release is never visible without its binary.\ncurl -fsSL -X PATCH -H \"Authorization: Bearer $GH_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"draft\":false}' \"$API/releases/${RELEASE_ID}\"\n\nFINAL=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/tags/v${VERSION}\" | jq -r '.draft')\"\nif [ \"$FINAL\" != \"false\" ]; then\n  echo \"ERROR: v${VERSION} did not publish (draft=${FINAL})\" \u003e\u00262\n  exit 1\nfi\necho \"Published v${VERSION} with ${ASSET} and ghcr.io/jedarden/seam@${DIGEST}\"\n"
+                    ],
+                    "command": [
+                        "bash",
+                        "-c"
+                    ],
+                    "env": [
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "golang:1.26",
+                    "name": "",
+                    "resources": {
+                        "limits": {
+                            "cpu": "2",
+                            "memory": "4Gi"
+                        },
+                        "requests": {
+                            "cpu": "1",
+                            "memory": "2Gi"
+                        }
+                    }
+                },
+                "inputs": {
+                    "parameters": [
+                        {
+                            "name": "version"
+                        },
+                        {
+                            "name": "commit"
+                        },
+                        {
+                            "name": "digest"
+                        }
+                    ]
+                },
+                "metadata": {},
+                "name": "github-release",
+                "outputs": {},
+                "retryStrategy": {
+                    "backoff": {
+                        "duration": "60s",
+                        "factor": "2"
+                    },
+                    "limit": "2",
+                    "retryPolicy": "OnTransientError"
+                }
+            },
+            "namespaced/seam-ci/image-build": {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "--context=git://github.com/jedarden/SEAM.git#refs/heads/main",
+                        "--dockerfile=containers/seam/Dockerfile",
+                        "--destination=ghcr.io/jedarden/seam:{{inputs.parameters.version}}",
+                        "--digest-file=/tmp/digest",
+                        "--single-snapshot"
+                    ],
+                    "image": "gcr.io/kaniko-project/executor:v1.23.2",
+                    "name": "",
+                    "resources": {
+                        "limits": {
+                            "cpu": "2",
+                            "memory": "4Gi"
+                        },
+                        "requests": {
+                            "cpu": "1",
+                            "memory": "2Gi"
+                        }
+                    },
+                    "volumeMounts": [
+                        {
+                            "mountPath": "/kaniko/.docker",
+                            "name": "docker-config"
+                        }
+                    ]
+                },
+                "inputs": {
+                    "parameters": [
+                        {
+                            "name": "version"
+                        }
+                    ]
+                },
+                "metadata": {},
+                "name": "image-build",
+                "outputs": {
+                    "parameters": [
+                        {
+                            "name": "digest",
+                            "valueFrom": {
+                                "path": "/tmp/digest"
+                            }
+                        }
+                    ]
+                }
+            },
+            "namespaced/seam-ci/pipeline": {
+                "inputs": {},
+                "metadata": {},
+                "name": "pipeline",
+                "outputs": {},
+                "steps": [
+                    [
+                        {
+                            "arguments": {},
+                            "name": "verify",
+                            "template": "ci"
+                        }
+                    ],
+                    [
+                        {
+                            "arguments": {},
+                            "name": "resolve-release",
+                            "template": "resolve-release"
+                        }
+                    ],
+                    [
+                        {
+                            "arguments": {
+                                "parameters": [
+                                    {
+                                        "name": "version",
+                                        "value": "{{steps.resolve-release.outputs.parameters.version}}"
+                                    }
+                                ]
+                            },
+                            "name": "image-build",
+                            "template": "image-build",
+                            "when": "{{steps.resolve-release.outputs.parameters.should-release}} == true"
+                        }
+                    ],
+                    [
+                        {
+                            "arguments": {
+                                "parameters": [
+                                    {
+                                        "name": "version",
+                                        "value": "{{steps.resolve-release.outputs.parameters.version}}"
+                                    },
+                                    {
+                                        "name": "commit",
+                                        "value": "{{steps.resolve-release.outputs.parameters.commit}}"
+                                    },
+                                    {
+                                        "name": "digest",
+                                        "value": "{{steps.image-build.outputs.parameters.digest}}"
+                                    }
+                                ]
+                            },
+                            "name": "github-release",
+                            "template": "github-release",
+                            "when": "{{steps.resolve-release.outputs.parameters.should-release}} == true"
+                        }
+                    ]
+                ]
+            },
+            "namespaced/seam-ci/resolve-release": {
+                "activeDeadlineSeconds": 300,
+                "container": {
+                    "args": [
+                        "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates jq\nrm -rf /var/lib/apt/lists/*\n\ngit clone --branch main --depth 50 \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\ngit rev-parse HEAD \u003e /tmp/commit\n\ntest -f containers/seam/VERSION || {\n  echo \"containers/seam/VERSION is required; CI never invents a version\" \u003e\u00262\n  exit 1\n}\nVERSION=\"$(tr -d '[:space:]' \u003c containers/seam/VERSION)\"\n\n# Semver only. This is also what keeps the image tag off :latest --\n# the fleet's standing ban -- since the tag is this value verbatim.\ncase \"$VERSION\" in\n  [0-9]*.[0-9]*.[0-9]*) ;;\n  *) echo \"VERSION must be a semantic version, got: $VERSION\" \u003e\u00262; exit 1 ;;\nesac\nprintf '%s' \"$VERSION\" \u003e /tmp/version\n\n# Skip only when the tag is genuinely PUBLISHED. A draft is treated\n# as releasable so the release step can publish it in place --\n# jedarden/bead-rs saw GitHub silently revert v0.1.0 to draft twice,\n# and needle-workflowtemplate.yml carries the same defense.\nRESP=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \\\n  \"https://api.github.com/repos/jedarden/SEAM/releases/tags/v${VERSION}\" || echo '')\"\nif [ -n \"$RESP\" ] \u0026\u0026 [ \"$(echo \"$RESP\" | jq -r '.draft')\" = \"false\" ]; then\n  echo \"v${VERSION} is already published - nothing to release\"\n  printf 'false' \u003e /tmp/should-release\nelse\n  echo \"v${VERSION} is not published yet - releasing\"\n  printf 'true' \u003e /tmp/should-release\nfi\n"
+                    ],
+                    "command": [
+                        "bash",
+                        "-c"
+                    ],
+                    "env": [
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "golang:1.26",
+                    "name": "",
+                    "resources": {
+                        "limits": {
+                            "cpu": "500m",
+                            "memory": "1Gi"
+                        },
+                        "requests": {
+                            "cpu": "200m",
+                            "memory": "512Mi"
+                        }
+                    }
+                },
+                "inputs": {},
+                "metadata": {},
+                "name": "resolve-release",
+                "outputs": {
+                    "parameters": [
+                        {
+                            "name": "version",
+                            "valueFrom": {
+                                "path": "/tmp/version"
+                            }
+                        },
+                        {
+                            "name": "commit",
+                            "valueFrom": {
+                                "path": "/tmp/commit"
+                            }
+                        },
+                        {
+                            "name": "should-release",
+                            "valueFrom": {
+                                "path": "/tmp/should-release"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "storedWorkflowTemplateSpec": {
+            "activeDeadlineSeconds": 7200,
+            "arguments": {},
+            "entrypoint": "pipeline",
+            "podGC": {
+                "strategy": "OnPodCompletion"
+            },
+            "serviceAccountName": "argo-workflow",
+            "synchronization": {
+                "mutexes": [
+                    {
+                        "name": "seam-ci-mutex"
+                    }
+                ]
+            },
+            "templates": [
+                {
+                    "inputs": {},
+                    "metadata": {},
+                    "name": "pipeline",
+                    "outputs": {},
+                    "steps": [
+                        [
+                            {
+                                "arguments": {},
+                                "name": "verify",
+                                "template": "ci"
+                            }
+                        ],
+                        [
+                            {
+                                "arguments": {},
+                                "name": "resolve-release",
+                                "template": "resolve-release"
+                            }
+                        ],
+                        [
+                            {
+                                "arguments": {
+                                    "parameters": [
+                                        {
+                                            "name": "version",
+                                            "value": "{{steps.resolve-release.outputs.parameters.version}}"
+                                        }
+                                    ]
+                                },
+                                "name": "image-build",
+                                "template": "image-build",
+                                "when": "{{steps.resolve-release.outputs.parameters.should-release}} == true"
+                            }
+                        ],
+                        [
+                            {
+                                "arguments": {
+                                    "parameters": [
+                                        {
+                                            "name": "version",
+                                            "value": "{{steps.resolve-release.outputs.parameters.version}}"
+                                        },
+                                        {
+                                            "name": "commit",
+                                            "value": "{{steps.resolve-release.outputs.parameters.commit}}"
+                                        },
+                                        {
+                                            "name": "digest",
+                                            "value": "{{steps.image-build.outputs.parameters.digest}}"
+                                        }
+                                    ]
+                                },
+                                "name": "github-release",
+                                "template": "github-release",
+                                "when": "{{steps.resolve-release.outputs.parameters.should-release}} == true"
+                            }
+                        ]
+                    ]
+                },
+                {
+                    "activeDeadlineSeconds": 1800,
+                    "container": {
+                        "args": [
+                            "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates python3\nrm -rf /var/lib/apt/lists/*\n\n# Clone from trusted hardcoded source (ignore webhook payload),\n# matching the other CI templates' security posture.\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\necho \"Commit: $(git rev-parse HEAD)\"\ngo version\n\necho \"=== gofmt ===\"\nUNFORMATTED=\"$(gofmt -l .)\"\nif [ -n \"$UNFORMATTED\" ]; then\n  echo \"gofmt would reformat the following files:\"\n  echo \"$UNFORMATTED\"\n  exit 1\nfi\n\necho \"=== go vet ===\"\ngo vet ./...\n\necho \"=== golangci-lint ===\"\n# Installed via the Go module proxy, NOT upstream's install.sh.\n#\n# install.sh was fetched unpinned from master (a :latest-class\n# hazard: upstream can change it under us at any time) and then\n# downloaded a GitHub release tarball that this cluster's egress\n# corrupts deterministically -- two runs produced the identical\n# wrong sha256 fd3a137c... against the genuine 8df580d2..., so\n# the installer aborted and the gate never ran. Because the\n# corruption is reproducible rather than flaky, a retry loop\n# does not fix it; the download path itself has to go.\n#\n# `go install` uses the same module proxy that `go mod download`\n# already succeeds with in this very step, and verifies against\n# GOSUMDB, so it is both reachable and checksum-pinned.\ngo install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2\n# Report every finding. Default caps (max-issues-per-linter=50,\n# max-same-issues=3) silently truncate repeated findings, which\n# makes the printed count read as the total when it is not.\n\"$(go env GOPATH)/bin/golangci-lint\" run \\\n  --max-issues-per-linter=0 --max-same-issues=0 ./...\n\necho \"=== go test -race ===\"\ngo test -race ./...\n\necho \"=== benchmark gate (plan.md -\u003e Performance Budgets -\u003e CI-gated benchmarks) ===\"\ngo test -bench=. -benchmem -run=^$ ./... | tee /tmp/bench-new.txt\n\nif [ -f bench/baseline.txt ]; then\n  # x/perf carries no tagged releases — pin by commit for reproducibility.\n  go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d\n  benchstat bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt\n  python3 -c \"\nimport re, sys\nworst = 0.0\nfor line in open('/tmp/benchstat.txt'):\n    m = re.search(r'([+-]\\d+(?:\\.\\d+)?)%', line)\n    if m:\n        worst = max(worst, float(m.group(1)))\nprint(f'Worst regression: {worst:.1f}%')\nsys.exit(1 if worst \u003e 20.0 else 0)\n\"\nelse\n  echo \"No committed bench/baseline.txt yet - benchmark gate is inert until Phase 2 establishes one (plan.md CI-gated benchmarks).\"\nfi\n\necho \"CI passed!\"\n"
+                        ],
+                        "command": [
+                            "bash",
+                            "-c"
+                        ],
+                        "env": [
+                            {
+                                "name": "GIT_CONFIG_COUNT",
+                                "value": "1"
+                            },
+                            {
+                                "name": "GIT_CONFIG_KEY_0",
+                                "value": "credential.helper"
+                            },
+                            {
+                                "name": "GIT_CONFIG_VALUE_0",
+                                "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                            },
+                            {
+                                "name": "GH_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "github-webhook-secret"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "golang:1.26",
+                        "name": "",
+                        "resources": {
+                            "limits": {
+                                "cpu": "3500m",
+                                "memory": "4Gi"
+                            },
+                            "requests": {
+                                "cpu": "2",
+                                "memory": "2Gi"
+                            }
+                        }
+                    },
+                    "inputs": {},
+                    "metadata": {},
+                    "name": "ci",
+                    "outputs": {}
+                },
+                {
+                    "activeDeadlineSeconds": 300,
+                    "container": {
+                        "args": [
+                            "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates jq\nrm -rf /var/lib/apt/lists/*\n\ngit clone --branch main --depth 50 \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\ngit rev-parse HEAD \u003e /tmp/commit\n\ntest -f containers/seam/VERSION || {\n  echo \"containers/seam/VERSION is required; CI never invents a version\" \u003e\u00262\n  exit 1\n}\nVERSION=\"$(tr -d '[:space:]' \u003c containers/seam/VERSION)\"\n\n# Semver only. This is also what keeps the image tag off :latest --\n# the fleet's standing ban -- since the tag is this value verbatim.\ncase \"$VERSION\" in\n  [0-9]*.[0-9]*.[0-9]*) ;;\n  *) echo \"VERSION must be a semantic version, got: $VERSION\" \u003e\u00262; exit 1 ;;\nesac\nprintf '%s' \"$VERSION\" \u003e /tmp/version\n\n# Skip only when the tag is genuinely PUBLISHED. A draft is treated\n# as releasable so the release step can publish it in place --\n# jedarden/bead-rs saw GitHub silently revert v0.1.0 to draft twice,\n# and needle-workflowtemplate.yml carries the same defense.\nRESP=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \\\n  \"https://api.github.com/repos/jedarden/SEAM/releases/tags/v${VERSION}\" || echo '')\"\nif [ -n \"$RESP\" ] \u0026\u0026 [ \"$(echo \"$RESP\" | jq -r '.draft')\" = \"false\" ]; then\n  echo \"v${VERSION} is already published - nothing to release\"\n  printf 'false' \u003e /tmp/should-release\nelse\n  echo \"v${VERSION} is not published yet - releasing\"\n  printf 'true' \u003e /tmp/should-release\nfi\n"
+                        ],
+                        "command": [
+                            "bash",
+                            "-c"
+                        ],
+                        "env": [
+                            {
+                                "name": "GH_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "github-webhook-secret"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "golang:1.26",
+                        "name": "",
+                        "resources": {
+                            "limits": {
+                                "cpu": "500m",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "200m",
+                                "memory": "512Mi"
+                            }
+                        }
+                    },
+                    "inputs": {},
+                    "metadata": {},
+                    "name": "resolve-release",
+                    "outputs": {
+                        "parameters": [
+                            {
+                                "name": "version",
+                                "valueFrom": {
+                                    "path": "/tmp/version"
+                                }
+                            },
+                            {
+                                "name": "commit",
+                                "valueFrom": {
+                                    "path": "/tmp/commit"
+                                }
+                            },
+                            {
+                                "name": "should-release",
+                                "valueFrom": {
+                                    "path": "/tmp/should-release"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "activeDeadlineSeconds": 1800,
+                    "container": {
+                        "args": [
+                            "--context=git://github.com/jedarden/SEAM.git#refs/heads/main",
+                            "--dockerfile=containers/seam/Dockerfile",
+                            "--destination=ghcr.io/jedarden/seam:{{inputs.parameters.version}}",
+                            "--digest-file=/tmp/digest",
+                            "--single-snapshot"
+                        ],
+                        "image": "gcr.io/kaniko-project/executor:v1.23.2",
+                        "name": "",
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "4Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "2Gi"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/kaniko/.docker",
+                                "name": "docker-config"
+                            }
+                        ]
+                    },
+                    "inputs": {
+                        "parameters": [
+                            {
+                                "name": "version"
+                            }
+                        ]
+                    },
+                    "metadata": {},
+                    "name": "image-build",
+                    "outputs": {
+                        "parameters": [
+                            {
+                                "name": "digest",
+                                "valueFrom": {
+                                    "path": "/tmp/digest"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "activeDeadlineSeconds": 1800,
+                    "container": {
+                        "args": [
+                            "set -exo pipefail\napt-get update -qq \u0026\u0026 apt-get install -y --no-install-recommends git ca-certificates jq\nrm -rf /var/lib/apt/lists/*\n\nVERSION=\"{{inputs.parameters.version}}\"\nCOMMIT=\"{{inputs.parameters.commit}}\"\nDIGEST=\"{{inputs.parameters.digest}}\"\nAPI=\"https://api.github.com/repos/jedarden/SEAM\"\n\ngit clone --branch main \"https://github.com/jedarden/SEAM.git\" /workspace\ncd /workspace\ngit checkout -q \"$COMMIT\"\n\nASSET=\"seam_${VERSION}_linux_amd64\"\nCGO_ENABLED=0 GOOS=linux GOARCH=amd64 \\\n  go build -trimpath -ldflags '-s -w' -o \"$ASSET\" ./cmd/seam\n\n# Smoke the artifact we are about to publish: healthcheck against a\n# port nothing is serving must fail, which proves the binary runs\n# and its subcommand dispatch works.\nif \"./$ASSET\" healthcheck --caller-port 1 \u003e/dev/null 2\u003e\u00261; then\n  echo \"ERROR: healthcheck unexpectedly succeeded against a dead port\" \u003e\u00262\n  exit 1\nfi\n\nRESP=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/tags/v${VERSION}\" || echo '')\"\nif [ -n \"$RESP\" ]; then\n  RELEASE_ID=\"$(echo \"$RESP\" | jq -r '.id')\"\n  if [ \"$(echo \"$RESP\" | jq -r '.draft')\" = \"false\" ]; then\n    echo \"v${VERSION} already published - skipping\"\n    exit 0\n  fi\n  echo \"v${VERSION} exists as a draft - publishing it in place\"\nelse\n  # GHCR packages default to PRIVATE even when the source repo is\n  # public, and GitHub exposes no REST endpoint to change that -- it\n  # is a one-time per-package UI setting. So probe anonymously and\n  # let the notes state what is actually true rather than assume it.\n  # v0.1.0 shipped claiming \"(public)\" while the package was private.\n  ANON=\"$(curl -fsSL \"https://ghcr.io/token?scope=repository:jedarden/seam:pull\u0026service=ghcr.io\" | jq -r '.token // empty')\"\n  PULL_CODE=\"$(curl -s -o /dev/null -w '%%{http_code}' \\\n    -H \"Authorization: Bearer $ANON\" \\\n    -H 'Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \\\n    \"https://ghcr.io/v2/jedarden/seam/manifests/${VERSION}\")\"\n  if [ \"$PULL_CODE\" = \"200\" ]; then\n    VISIBILITY=\"The GHCR package is public - docker pull needs no authentication.\"\n  else\n    VISIBILITY=\"NOTE: the GHCR package is currently PRIVATE (anonymous pull returned HTTP ${PULL_CODE}), so docker pull requires authentication. Flip it once at https://github.com/users/jedarden/packages/container/seam/settings\"\n    echo \"WARNING: ghcr.io/jedarden/seam:${VERSION} is not anonymously pullable (HTTP ${PULL_CODE})\" \u003e\u00262\n  fi\n\n  NOTES=\"Built from commit ${COMMIT}.\n\nContainer image:\n  ghcr.io/jedarden/seam:${VERSION}\n  ghcr.io/jedarden/seam@${DIGEST}\n\nPin the digest, not the tag, in declarative-config -- plan.md defines\nrollback as reverting the image-digest commit.\n\n${VISIBILITY}\"\n  CREATED=\"$(jq -n \\\n    --arg tag \"v${VERSION}\" \\\n    --arg name \"SEAM v${VERSION}\" \\\n    --arg body \"$NOTES\" \\\n    '{tag_name:$tag, name:$name, body:$body, draft:true, prerelease:false, target_commitish:\"main\"}' \\\n    | curl -fsSL -X POST -H \"Authorization: Bearer $GH_TOKEN\" \\\n        -H \"Content-Type: application/json\" --data @- \"$API/releases\")\"\n  RELEASE_ID=\"$(echo \"$CREATED\" | jq -r '.id')\"\nfi\n\n# Replace any same-named asset so a retry does not append a duplicate.\nEXISTING=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \\\n  \"$API/releases/${RELEASE_ID}/assets\" | jq -r --arg n \"$ASSET\" '.[] | select(.name==$n) | .id')\"\nfor a in $EXISTING; do\n  curl -fsSL -X DELETE -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/assets/${a}\"\ndone\n\ncurl -fsSL -X POST -H \"Authorization: Bearer $GH_TOKEN\" \\\n  -H \"Content-Type: application/octet-stream\" \\\n  --data-binary \"@${ASSET}\" \\\n  \"https://uploads.github.com/repos/jedarden/SEAM/releases/${RELEASE_ID}/assets?name=${ASSET}\"\n\n# Publish last, so a release is never visible without its binary.\ncurl -fsSL -X PATCH -H \"Authorization: Bearer $GH_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"draft\":false}' \"$API/releases/${RELEASE_ID}\"\n\nFINAL=\"$(curl -fsSL -H \"Authorization: Bearer $GH_TOKEN\" \"$API/releases/tags/v${VERSION}\" | jq -r '.draft')\"\nif [ \"$FINAL\" != \"false\" ]; then\n  echo \"ERROR: v${VERSION} did not publish (draft=${FINAL})\" \u003e\u00262\n  exit 1\nfi\necho \"Published v${VERSION} with ${ASSET} and ghcr.io/jedarden/seam@${DIGEST}\"\n"
+                        ],
+                        "command": [
+                            "bash",
+                            "-c"
+                        ],
+                        "env": [
+                            {
+                                "name": "GH_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "github-webhook-secret"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "golang:1.26",
+                        "name": "",
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "4Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "2Gi"
+                            }
+                        }
+                    },
+                    "inputs": {
+                        "parameters": [
+                            {
+                                "name": "version"
+                            },
+                            {
+                                "name": "commit"
+                            },
+                            {
+                                "name": "digest"
+                            }
+                        ]
+                    },
+                    "metadata": {},
+                    "name": "github-release",
+                    "outputs": {},
+                    "retryStrategy": {
+                        "backoff": {
+                            "duration": "60s",
+                            "factor": "2"
+                        },
+                        "limit": "2",
+                        "retryPolicy": "OnTransientError"
+                    }
+                }
+            ],
+            "ttlStrategy": {
+                "secondsAfterCompletion": 3600,
+                "secondsAfterFailure": 7200,
+                "secondsAfterSuccess": 1800
+            },
+            "volumes": [
+                {
+                    "name": "docker-config",
+                    "secret": {
+                        "items": [
+                            {
+                                "key": ".dockerconfigjson",
+                                "path": "config.json"
+                            }
+                        ],
+                        "secretName": "ghcr-jedarden-registry"
+                    }
+                }
+            ],
+            "workflowTemplateRef": {
+                "name": "seam-ci"
+            }
+        }
+    }
+}
