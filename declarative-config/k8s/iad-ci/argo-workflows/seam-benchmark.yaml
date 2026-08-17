@@ -17,14 +17,13 @@ spec:
       args:
         - |
           set -e
+          set -o pipefail
           log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
-          error() { echo "[$(date -u '+%Y-%m:%S')] ERROR: $1" >&2; exit 1; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
 
           log "=== SEAM Benchmark Run ==="
 
-          # Configure git identity
-          git config --global user.email "github@jedarden.com"
-          git config --global user.name "jedarden"
+          apk add --no-cache git
 
           # Clone SEAM repository
           log "Cloning SEAM repository..."
@@ -43,24 +42,113 @@ spec:
           log "Running benchmarks..."
 
           # Run benchmarks and capture both human-readable and JSON output
-          go test -bench=. -benchmem -benchtime=5s -json ./benches/... \
+          go test -run='^$' -bench=. -benchmem -benchtime=5s -json ./benches/... \
             2>&1 | tee "${RESULTS_DIR}/raw-output.json"
 
           # Generate human-readable summary
           log "Benchmark results saved to ${RESULTS_DIR}/"
 
           # Extract key metrics (if any benchmarks exist)
-          if grep -q '"GoBenchmark"' "${RESULTS_DIR}/raw-output.json" 2>/dev/null; then
+          if grep -q 'Benchmark' "${RESULTS_DIR}/raw-output.json" 2>/dev/null; then
             log "✓ Benchmarks completed successfully"
 
             # Count benchmarks run
-            BENCH_COUNT=$(grep -c '"GoBenchmark"' "${RESULTS_DIR}/raw-output.json" || echo "0")
+            BENCH_COUNT=$(grep -c 'Benchmark[^"]*-[0-9]' "${RESULTS_DIR}/raw-output.json" || echo "0")
             log "  Benchmarks executed: ${BENCH_COUNT}"
           else
             log "⚠ No benchmark results found (benchmark suite may be empty)"
           fi
 
           log "=== Benchmark Run Complete ==="
+
+    retryStrategy:
+      limit: 2
+      backoff:
+        duration: "30s"
+        factor: 2
+        maxDuration: "5m"
+  - name: benchmark-regression-check
+    container:
+      image: golang:1.25.7-alpine
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          set -o pipefail
+          log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
+          error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; exit 1; }
+
+          log "=== SEAM Baseline Regression Check ==="
+
+          apk add --no-cache git
+
+          # Clone SEAM repository
+          log "Cloning SEAM repository..."
+          WORKSPACE=$(mktemp -d)
+          git clone --depth 1 https://git.ardenone.com/jedarden/SEAM.git "${WORKSPACE}/seam"
+          cd "${WORKSPACE}/seam"
+
+          # Install dependencies
+          log "Installing Go dependencies..."
+          go mod download
+
+          # Build baseline tool
+          log "Building baseline tool..."
+          go build -o /tmp/baseline cmd/baseline/main.go
+
+          # Check if baselines exist
+          if [ ! -d "benchmarks/baselines" ] || [ -z "$(ls -A benchmarks/baselines/*.json 2>/dev/null)" ]; then
+            log "⚠️  No baseline files found - skipping regression check"
+            log "    To establish baselines, run: make benchmark-save-baseline TYPE=<type>"
+            exit 0
+          fi
+
+          # Run regression checks for each benchmark type
+          REGRESSION_THRESHOLD=${REGRESSION_THRESHOLD:-10}
+          log "Regression threshold: ${REGRESSION_THRESHOLD}%"
+
+          EXIT_CODE=0
+
+          for TYPE in openbao memory throughput; do
+            # Run appropriate benchmarks based on type
+            case "${TYPE}" in
+              openbao)
+                BASELINE_FILE="benchmarks/baselines/openbao-latency-baseline.json"
+                BENCH_FILTER="OpenBao|DirectConnection"
+                ;;
+              memory)
+                BASELINE_FILE="benchmarks/baselines/memory-concurrency-baseline.json"
+                BENCH_FILTER="Memory|Concurrent|GC"
+                ;;
+              throughput)
+                BASELINE_FILE="benchmarks/baselines/throughput-baseline.json"
+                BENCH_FILTER="Proxy|Scaling|Throughput|DirectConnection"
+                ;;
+            esac
+
+            # Skip if baseline doesn't exist for this type
+            if [ ! -f "${BASELINE_FILE}" ]; then
+              log "  ℹ️  ${TYPE}: no baseline file, skipping"
+              continue
+            fi
+
+            log "  🔍 Checking ${TYPE} benchmarks..."
+
+            # Run benchmarks and pipe to baseline tool
+            if go test -run='^$' -bench="${BENCH_FILTER}" -benchmem -benchtime=5s ./benches/... 2>&1 | \
+               /tmp/baseline -type="${TYPE}" -check-regression -threshold="${REGRESSION_THRESHOLD}"; then
+              log "    ✅ ${TYPE}: PASSED"
+            else
+              log "    ❌ ${TYPE}: REGRESSIONS DETECTED"
+              EXIT_CODE=1
+            fi
+          done
+
+          if [ ${EXIT_CODE} -eq 0 ]; then
+            log "✅ All regression checks passed"
+          else
+            error "❌ Regression check failed - one or more benchmarks regressed beyond ${REGRESSION_THRESHOLD}% threshold"
+          fi
 
     retryStrategy:
       limit: 2
