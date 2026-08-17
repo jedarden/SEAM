@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ardenone/seam/internal/server"
 	"github.com/ardenone/seam/internal/testutil/openbao"
 )
 
@@ -191,116 +188,6 @@ func BenchmarkOpenBaoCacheMiss(b *testing.B) {
 		}
 
 		b.ReportMetric(float64(elapsed.Nanoseconds()), "ns/request")
-	}
-}
-
-// BenchmarkDirectConnectionBaseline measures latency without OpenBao (baseline)
-func BenchmarkDirectConnectionBaseline(b *testing.B) {
-	// Create a simple upstream server that returns mock data
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
-	}))
-	defer upstream.Close()
-
-	proxy, err := server.NewReverseProxy(upstream.URL)
-	if err != nil {
-		b.Fatalf("Failed to create proxy: %v", err)
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("GET", "/api/test", nil)
-		req.Header.Set("Authorization", "Bearer mock-token")
-		w := httptest.NewRecorder()
-
-		start := time.Now()
-		proxy.ServeHTTP(w, req)
-		elapsed := time.Since(start)
-
-		if w.Code != http.StatusOK {
-			b.Fatalf("Expected status 200, got %d", w.Code)
-		}
-
-		b.ReportMetric(float64(elapsed.Nanoseconds()), "ns/request")
-	}
-}
-
-// BenchmarkOpenBaoProxyIntegration measures full proxy flow with OpenBao secret injection
-func BenchmarkOpenBaoProxyIntegration(b *testing.B) {
-	suite := NewOpenBaoBenchmarkSuite(b)
-
-	// Create upstream server that validates the injected secret
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","data":"test"}`))
-	}))
-	defer upstream.Close()
-
-	proxy, err := server.NewReverseProxy(upstream.URL)
-	if err != nil {
-		b.Fatalf("Failed to create proxy: %v", err)
-	}
-
-	ctx := context.Background()
-	secretPath := "seam/routes/testservice/token"
-
-	// Ensure secret exists
-	if err := suite.client.WriteSecret(ctx, secretPath, map[string]interface{}{
-		"token": "test-service-token-12345",
-		"type":  "bearer",
-	}); err != nil {
-		b.Fatalf("Failed to write secret: %v", err)
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		// Retrieve secret from OpenBao
-		start := time.Now()
-		secret, err := suite.client.ReadSecret(ctx, secretPath)
-		openbaoLatency := time.Since(start)
-
-		if err != nil {
-			b.Fatalf("Failed to read secret: %v", err)
-		}
-
-		// Extract token from secret
-		token, ok := secret["token"].(string)
-		if !ok {
-			b.Fatalf("Secret does not contain token field")
-		}
-
-		// Make proxy request with injected secret
-		req := httptest.NewRequest("GET", "/api/test", nil)
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		w := httptest.NewRecorder()
-
-		start = time.Now()
-		proxy.ServeHTTP(w, req)
-		totalLatency := time.Since(start)
-
-		if w.Code != http.StatusOK {
-			b.Fatalf("Expected status 200, got %d", w.Code)
-		}
-
-		b.ReportMetric(float64(openbaoLatency.Nanoseconds()), "ns/openbao")
-		b.ReportMetric(float64(totalLatency.Nanoseconds()), "ns/total")
 	}
 }
 
