@@ -387,6 +387,35 @@ func (p *ReverseProxy) streamResponse(w http.ResponseWriter, body io.Reader) err
 	return err
 }
 
+// StreamResponse writes status, headers, and streams the response body to the
+// caller. It handles hop-by-hop header filtering, ensures the response body is
+// closed, and returns an error if writing fails.
+func StreamResponse(w http.ResponseWriter, resp *http.Response) error {
+	if resp == nil {
+		return fmt.Errorf("response is nil")
+	}
+
+	// Copy headers, excluding hop-by-hop headers
+	copyHeaders(resp.Header, w.Header())
+
+	// Write status code
+	w.WriteHeader(resp.StatusCode)
+
+	// Stream the response body efficiently using io.Copy
+	// The Go http package handles chunked transfer encoding automatically
+	_, err := io.Copy(w, resp.Body)
+	if err != nil {
+		return fmt.Errorf("streaming response body: %w", err)
+	}
+
+	// Always close the response body to release the connection
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		return fmt.Errorf("closing response body: %w", closeErr)
+	}
+
+	return nil
+}
+
 func (p *ReverseProxy) handleError(w http.ResponseWriter, _ *http.Request, err error, phase string) {
 	log.Printf("[proxy] Error during %s: %v", phase, err)
 	w.Header().Set("Content-Type", "application/json")
