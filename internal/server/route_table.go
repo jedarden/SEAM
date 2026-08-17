@@ -3,7 +3,9 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -53,6 +55,65 @@ type RouteMatcher interface {
 	// Returns a RouteMatch if a matching route is found, or an error if no match is found
 	// or if the request is invalid.
 	Match(req *http.Request) (*RouteMatch, error)
+}
+
+// RouteTableHolder owns the route table used to match requests. Implementations
+// may replace the table while requests are being served.
+type RouteTableHolder interface {
+	// Swap atomically replaces the current route table.
+	Swap(table *RouteTable) error
+	// Match matches a request against the current route table.
+	Match(req *http.Request) (*RouteMatch, error)
+}
+
+// ThreadSafeTableHolder provides an atomic route-table swap point for hot
+// reloads. Route tables are built completely before being passed to Swap and
+// are treated as immutable after installation.
+type ThreadSafeTableHolder struct {
+	mu      sync.RWMutex
+	current *RouteTable
+}
+
+var _ RouteTableHolder = (*ThreadSafeTableHolder)(nil)
+
+// NewThreadSafeTableHolder creates a holder with table as its initial route
+// table. A nil table creates an empty holder; the first non-nil table can be
+// installed with Swap.
+func NewThreadSafeTableHolder(table *RouteTable) *ThreadSafeTableHolder {
+	return &ThreadSafeTableHolder{current: table}
+}
+
+// Swap atomically installs table as the current route table. Nil tables are
+// rejected so an invalid reload cannot make an existing table unavailable.
+func (h *ThreadSafeTableHolder) Swap(table *RouteTable) error {
+	if h == nil {
+		return fmt.Errorf("route table holder is nil")
+	}
+	if table == nil {
+		return fmt.Errorf("route table cannot be nil")
+	}
+
+	h.mu.Lock()
+	h.current = table
+	h.mu.Unlock()
+	return nil
+}
+
+// Match matches req against the route table that is current when the read
+// begins. The read lock remains held for the duration of the match so a swap
+// cannot expose a partially observed table to a caller.
+func (h *ThreadSafeTableHolder) Match(req *http.Request) (*RouteMatch, error) {
+	if h == nil {
+		return nil, fmt.Errorf("route table holder is nil")
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.current == nil {
+		return nil, fmt.Errorf("route table is not initialized")
+	}
+	return h.current.Match(req)
 }
 
 // BuildRouteTable creates a populated RouteTable from an OpenAPI v3 document.
@@ -203,6 +264,90 @@ func (t *RouteTable) GetRoutes() []RouteEntry {
 // RouteCount returns the number of routes in the table.
 func (t *RouteTable) RouteCount() int {
 	return len(t.routes)
+}
+
+// Match returns the route matching req and extracts values for path
+// parameters. When the request does not select an API version explicitly,
+// the oldest matching version is selected, with _unversioned taking
+// precedence over numbered versions.
+func (t *RouteTable) Match(req *http.Request) (*RouteMatch, error) {
+	if t == nil {
+		return nil, fmt.Errorf("route table is nil")
+	}
+	if req == nil || req.URL == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+
+	requestedVersion := req.Header.Get("X-SEAM-API-Version")
+	method := strings.ToUpper(req.Method)
+	var selected *RouteMatch
+	selectedRank := int(^uint(0) >> 1)
+
+	for _, route := range t.routes {
+		if strings.ToUpper(route.Method) != method {
+			continue
+		}
+		if requestedVersion != "" && route.APIVersion != requestedVersion {
+			continue
+		}
+
+		pathParams, ok := matchRoutePath(route.PathTemplate, req.URL.Path)
+		if !ok {
+			continue
+		}
+
+		if requestedVersion != "" {
+			return &RouteMatch{Route: route, PathParams: pathParams}, nil
+		}
+
+		rank := routeVersionRank(route.APIVersion)
+		if selected == nil || rank < selectedRank {
+			selected = &RouteMatch{Route: route, PathParams: pathParams}
+			selectedRank = rank
+		}
+	}
+
+	if selected == nil {
+		return nil, fmt.Errorf("no route matched %s %s", method, req.URL.Path)
+	}
+	return selected, nil
+}
+
+func matchRoutePath(template, path string) (map[string]string, bool) {
+	templateParts := strings.Split(template, "/")
+	pathParts := strings.Split(path, "/")
+	if len(templateParts) != len(pathParts) {
+		return nil, false
+	}
+
+	params := make(map[string]string)
+	for i, templatePart := range templateParts {
+		pathPart := pathParts[i]
+		if len(templatePart) >= 2 && templatePart[0] == '{' && templatePart[len(templatePart)-1] == '}' {
+			name := templatePart[1 : len(templatePart)-1]
+			if name == "" {
+				return nil, false
+			}
+			params[name] = pathPart
+			continue
+		}
+		if templatePart != pathPart {
+			return nil, false
+		}
+	}
+	return params, true
+}
+
+func routeVersionRank(version string) int {
+	if version == "_unversioned" {
+		return 0
+	}
+	if strings.HasPrefix(version, "v") {
+		if number, err := strconv.Atoi(version[1:]); err == nil && number >= 0 {
+			return number + 1
+		}
+	}
+	return int(^uint(0) >> 1)
 }
 
 // Validate checks if the route table entries are valid.
