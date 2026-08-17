@@ -193,11 +193,6 @@ func serveCommand(args []string) {
 	log.Println("Server stopped")
 }
 
-func lintCommand(args []string) {
-	fmt.Println("lint command: not yet implemented")
-	os.Exit(1)
-}
-
 func diffCommand(args []string) {
 	fmt.Println("diff command: not yet implemented")
 	os.Exit(1)
