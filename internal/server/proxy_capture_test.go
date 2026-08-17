@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -382,4 +383,143 @@ func TestProxyCaptureModesReturnSameResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestProxyCaptureEnabledResponseTimeOverhead compares the same proxied
+// operation with corpus capture disabled and enabled. It keeps the response
+// body and upstream request checks in the timed path so a latency improvement
+// cannot hide a functional regression.
+func TestProxyCaptureEnabledResponseTimeOverhead(t *testing.T) {
+	const (
+		warmupRequests = 3
+		samples        = 30
+		maxOverhead    = 100 * time.Millisecond
+	)
+
+	requestBody := []byte(`{"operation":"response-time"}`)
+	requestHeaders := map[string]string{
+		"Content-Type":  "application/json",
+		"X-Test-Header": "response-time",
+	}
+
+	baseline := NewProxyTestHarness(t, false)
+	captured := NewProxyTestHarness(t, true)
+
+	status, err := captured.GetCaptureStatus()
+	if err != nil {
+		t.Fatalf("get capture status: %v", err)
+	}
+	if enabled, ok := status["enabled"].(bool); !ok || !enabled {
+		t.Fatalf("expected capture to be enabled for timed requests, got %v", status["enabled"])
+	}
+
+	for i := 0; i < warmupRequests; i++ {
+		measureProxyCaptureOperation(t, baseline, requestBody, requestHeaders, i, "baseline warmup")
+		measureProxyCaptureOperation(t, captured, requestBody, requestHeaders, i, "capture warmup")
+	}
+
+	baselineLatencies := make([]time.Duration, samples)
+	captureLatencies := make([]time.Duration, samples)
+	for i := 0; i < samples; i++ {
+		// Alternate request order to reduce the effect of changing host load on
+		// the comparison while keeping each request otherwise identical.
+		if i%2 == 0 {
+			baselineLatencies[i] = measureProxyCaptureOperation(t, baseline, requestBody, requestHeaders, i, "baseline")
+			captureLatencies[i] = measureProxyCaptureOperation(t, captured, requestBody, requestHeaders, i, "capture")
+		} else {
+			captureLatencies[i] = measureProxyCaptureOperation(t, captured, requestBody, requestHeaders, i, "capture")
+			baselineLatencies[i] = measureProxyCaptureOperation(t, baseline, requestBody, requestHeaders, i, "baseline")
+		}
+	}
+
+	baselineP50, baselineP95 := proxyCaptureOperationPercentiles(baselineLatencies)
+	captureP50, captureP95 := proxyCaptureOperationPercentiles(captureLatencies)
+	overheadP50 := captureP50 - baselineP50
+	overheadP95 := captureP95 - baselineP95
+	t.Logf("proxy response time baseline: p50=%v p95=%v", baselineP50, baselineP95)
+	t.Logf("proxy response time with capture: p50=%v p95=%v", captureP50, captureP95)
+	t.Logf("capture response time overhead: p50=%v p95=%v (limit=%v)", overheadP50, overheadP95, maxOverhead)
+
+	if overheadP95 > maxOverhead {
+		t.Fatalf("capture response time overhead p95 %v exceeds acceptable limit %v", overheadP95, maxOverhead)
+	}
+
+	if got := baselineCaptureEntryCount(t, baseline); got != 0 {
+		t.Fatalf("baseline recorded %d corpus entries with capture disabled", got)
+	}
+
+	if _, err := captured.TriggerManualSave(); err != nil {
+		t.Fatalf("save captured corpus: %v", err)
+	}
+	corpus, err := captured.LoadCorpus()
+	if err != nil {
+		t.Fatalf("load captured corpus: %v", err)
+	}
+	if got, want := len(corpus.Entries), warmupRequests+samples; got != want {
+		t.Fatalf("captured corpus entries = %d, want %d", got, want)
+	}
+}
+
+func measureProxyCaptureOperation(t *testing.T, h *ProxyTestHarness, requestBody []byte, headers map[string]string, requestNumber int, mode string) time.Duration {
+	t.Helper()
+
+	started := time.Now()
+	resp, err := h.MakeTestRequest(http.MethodPost, proxyTestPath+"?mode=response-time", requestBody, headers)
+	if err != nil {
+		t.Fatalf("%s request %d failed: %v", mode, requestNumber, err)
+	}
+
+	responseBody, readErr := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if readErr != nil {
+		t.Fatalf("%s request %d response read failed: %v", mode, requestNumber, readErr)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("%s request %d returned status %d", mode, requestNumber, resp.StatusCode)
+	}
+	if got, want := string(responseBody), `{"proxied":true}`; got != want {
+		t.Fatalf("%s request %d returned body %q, want %q", mode, requestNumber, got, want)
+	}
+	if got := resp.Header.Get("X-Upstream"); got != "stub" {
+		t.Fatalf("%s request %d returned X-Upstream %q, want %q", mode, requestNumber, got, "stub")
+	}
+
+	upstream := h.waitForBackendRequest(t)
+	if upstream.method != http.MethodPost || upstream.path != proxyTestPath || upstream.query != "mode=response-time" {
+		t.Fatalf("%s request %d reached upstream incorrectly: %#v", mode, requestNumber, upstream)
+	}
+	if string(upstream.body) != string(requestBody) {
+		t.Fatalf("%s request %d body changed in transit: got %q, want %q", mode, requestNumber, upstream.body, requestBody)
+	}
+
+	return time.Since(started)
+}
+
+func proxyCaptureOperationPercentiles(samples []time.Duration) (time.Duration, time.Duration) {
+	sorted := append([]time.Duration(nil), samples...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	if len(sorted) == 0 {
+		return 0, 0
+	}
+	percentile := func(fraction float64) time.Duration {
+		index := int(float64(len(sorted)) * fraction)
+		if index >= len(sorted) {
+			index = len(sorted) - 1
+		}
+		return sorted[index]
+	}
+	return percentile(0.50), percentile(0.95)
+}
+
+func baselineCaptureEntryCount(t *testing.T, h *ProxyTestHarness) int {
+	t.Helper()
+	status, err := h.GetCaptureStatus()
+	if err != nil {
+		t.Fatalf("get baseline capture status: %v", err)
+	}
+	entryCount, ok := status["entry_count"].(float64)
+	if !ok {
+		t.Fatalf("baseline capture status has no numeric entry_count: %v", status["entry_count"])
+	}
+	return int(entryCount)
 }
