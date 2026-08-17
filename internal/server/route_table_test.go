@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/ardenone/seam/internal/spec"
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 // createTestSpecLoader creates a minimal spec loader for testing
@@ -478,6 +481,581 @@ func TestRouteEntryFieldValidation(t *testing.T) {
 				t.Errorf("expected entry to be valid, got error: %v", err)
 			} else if !tt.wantValid && err == nil {
 				t.Error("expected entry to be invalid, got nil error")
+			}
+		})
+	}
+}
+
+// Tests for BuildRouteTable function
+
+func TestBuildRouteTable_NilSpec(t *testing.T) {
+	table, err := BuildRouteTable(nil)
+
+	if err == nil {
+		t.Error("expected error for nil spec, got nil")
+	}
+	if table != nil {
+		t.Error("expected nil table for nil spec, got non-nil")
+	}
+}
+
+func TestBuildRouteTable_NoPaths(t *testing.T) {
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "Test API",
+			"version": "1.0.0"
+		},
+		"paths": {}
+	}`
+
+	doc, err := libopenapi.NewDocument([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("failed to create document: %v", err)
+	}
+
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		t.Fatalf("failed to build model: %v", err)
+	}
+
+	table, err := BuildRouteTable(&model.Model)
+
+	if err != nil {
+		t.Fatalf("expected empty paths object to be valid, got: %v", err)
+	}
+	if table == nil {
+		t.Fatal("expected non-nil table for empty paths object")
+	}
+	if table.RouteCount() != 0 {
+		t.Errorf("expected 0 routes for empty paths object, got %d", table.RouteCount())
+	}
+}
+
+func TestBuildRouteTable_SingleRoute(t *testing.T) {
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "Test API",
+			"version": "1.0.0"
+		},
+		"paths": {
+			"/test": {
+				"get": {
+					"operationId": "testGet",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	doc, err := libopenapi.NewDocument([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("failed to create document: %v", err)
+	}
+
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		t.Fatalf("failed to build model: %v", err)
+	}
+
+	table, err := BuildRouteTable(&model.Model)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if table == nil {
+		t.Fatal("expected non-nil table, got nil")
+	}
+
+	if table.RouteCount() != 1 {
+		t.Errorf("expected 1 route, got %d", table.RouteCount())
+	}
+
+	routes := table.GetRoutes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route in slice, got %d", len(routes))
+	}
+
+	entry := routes[0]
+	if entry.PathTemplate != "/test" {
+		t.Errorf("expected PathTemplate=/test, got %q", entry.PathTemplate)
+	}
+	if entry.Method != "GET" {
+		t.Errorf("expected Method=GET, got %q", entry.Method)
+	}
+	if entry.APIVersion != "v1" {
+		t.Errorf("expected APIVersion=v1 (default), got %q", entry.APIVersion)
+	}
+}
+
+func TestBuildRouteTable_MultiplePathsAndMethods(t *testing.T) {
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "Test API",
+			"version": "1.0.0"
+		},
+		"paths": {
+			"/users": {
+				"get": {
+					"operationId": "listUsers",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				},
+				"post": {
+					"operationId": "createUser",
+					"responses": {
+						"201": {
+							"description": "Created"
+						}
+					}
+				}
+			},
+			"/users/{id}": {
+				"get": {
+					"operationId": "getUser",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				},
+				"put": {
+					"operationId": "updateUser",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				},
+				"delete": {
+					"operationId": "deleteUser",
+					"responses": {
+						"204": {
+							"description": "No Content"
+						}
+					}
+				}
+			},
+			"/health": {
+				"get": {
+					"operationId": "healthCheck",
+					"responses": {
+						"200": {
+							"description": "OK"
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	doc, err := libopenapi.NewDocument([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("failed to create document: %v", err)
+	}
+
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		t.Fatalf("failed to build model: %v", err)
+	}
+
+	table, err := BuildRouteTable(&model.Model)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Should have 6 routes:
+	// GET /users, POST /users
+	// GET /users/{id}, PUT /users/{id}, DELETE /users/{id}
+	// GET /health
+	expectedCount := 6
+	if table.RouteCount() != expectedCount {
+		t.Errorf("expected %d routes, got %d", expectedCount, table.RouteCount())
+	}
+
+	routes := table.GetRoutes()
+	if len(routes) != expectedCount {
+		t.Fatalf("expected %d routes in slice, got %d", expectedCount, len(routes))
+	}
+
+	// Verify some specific routes
+	foundUsersGet := false
+	foundUsersPost := false
+	foundUsersIdGet := false
+	foundUsersIdPut := false
+	foundUsersIdDelete := false
+	foundHealthGet := false
+
+	for _, route := range routes {
+		switch route.PathTemplate {
+		case "/users":
+			if route.Method == "GET" {
+				foundUsersGet = true
+			}
+			if route.Method == "POST" {
+				foundUsersPost = true
+			}
+		case "/users/{id}":
+			if route.Method == "GET" {
+				foundUsersIdGet = true
+			}
+			if route.Method == "PUT" {
+				foundUsersIdPut = true
+			}
+			if route.Method == "DELETE" {
+				foundUsersIdDelete = true
+			}
+		case "/health":
+			if route.Method == "GET" {
+				foundHealthGet = true
+			}
+		}
+	}
+
+	if !foundUsersGet {
+		t.Error("missing route: GET /users")
+	}
+	if !foundUsersPost {
+		t.Error("missing route: POST /users")
+	}
+	if !foundUsersIdGet {
+		t.Error("missing route: GET /users/{id}")
+	}
+	if !foundUsersIdPut {
+		t.Error("missing route: PUT /users/{id}")
+	}
+	if !foundUsersIdDelete {
+		t.Error("missing route: DELETE /users/{id}")
+	}
+	if !foundHealthGet {
+		t.Error("missing route: GET /health")
+	}
+}
+
+func TestBuildRouteTable_CustomAPIVersions(t *testing.T) {
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "Test API",
+			"version": "1.0.0"
+		},
+		"paths": {
+			"/v1/users": {
+				"get": {
+					"operationId": "listUsersV1",
+					"x-api-version": "v1",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				}
+			},
+			"/v2/users": {
+				"get": {
+					"operationId": "listUsersV2",
+					"x-api-version": "v2",
+					"responses": {
+						"200": {
+							"description": "Success"
+						}
+					}
+				}
+			},
+			"/unversioned/health": {
+				"get": {
+					"operationId": "healthCheck",
+					"x-api-version": "_unversioned",
+					"responses": {
+						"200": {
+							"description": "OK"
+						}
+					}
+				}
+			},
+			"/default": {
+				"get": {
+					"operationId": "defaultVersion",
+					"responses": {
+						"200": {
+							"description": "OK"
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	doc, err := libopenapi.NewDocument([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("failed to create document: %v", err)
+	}
+
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		t.Fatalf("failed to build model: %v", err)
+	}
+
+	table, err := BuildRouteTable(&model.Model)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if table.RouteCount() != 4 {
+		t.Errorf("expected 4 routes, got %d", table.RouteCount())
+	}
+
+	routes := table.GetRoutes()
+
+	// Verify API versions
+	for _, route := range routes {
+		switch route.PathTemplate {
+		case "/v1/users":
+			if route.APIVersion != "v1" {
+				t.Errorf("expected APIVersion=v1 for /v1/users, got %q", route.APIVersion)
+			}
+		case "/v2/users":
+			if route.APIVersion != "v2" {
+				t.Errorf("expected APIVersion=v2 for /v2/users, got %q", route.APIVersion)
+			}
+		case "/unversioned/health":
+			if route.APIVersion != "_unversioned" {
+				t.Errorf("expected APIVersion=_unversioned for /unversioned/health, got %q", route.APIVersion)
+			}
+		case "/default":
+			if route.APIVersion != "v1" {
+				t.Errorf("expected APIVersion=v1 (default) for /default, got %q", route.APIVersion)
+			}
+		}
+	}
+}
+
+func TestBuildRouteTable_DuplicateDetection(t *testing.T) {
+	table := &RouteTable{}
+	seen := make(map[routeKey]struct{})
+	entry := RouteEntry{PathTemplate: "/test", Method: "GET", APIVersion: "v1"}
+
+	if err := addBuiltRoute(table, seen, entry); err != nil {
+		t.Fatalf("first route should be accepted: %v", err)
+	}
+	if err := addBuiltRoute(table, seen, entry); err == nil {
+		t.Fatal("expected duplicate route error, got nil")
+	}
+	if table.RouteCount() != 1 {
+		t.Errorf("expected duplicate not to be appended, got %d routes", table.RouteCount())
+	}
+}
+
+func TestBuildRouteTable_DuplicateDifferentVersions(t *testing.T) {
+	// Same path+method but different versions are valid coexistence routes.
+	table := &RouteTable{}
+	seen := make(map[routeKey]struct{})
+	for _, version := range []string{"v1", "v2"} {
+		if err := addBuiltRoute(table, seen, RouteEntry{
+			PathTemplate: "/test",
+			Method:       "GET",
+			APIVersion:   version,
+		}); err != nil {
+			t.Fatalf("version %s should be accepted: %v", version, err)
+		}
+	}
+	if table.RouteCount() != 2 {
+		t.Errorf("expected 2 routes (different versions), got %d", table.RouteCount())
+	}
+}
+
+func TestBuildRouteTable_AllHTTPMethods(t *testing.T) {
+	specJSON := `{
+		"openapi": "3.0.0",
+		"info": {
+			"title": "Test API",
+			"version": "1.0.0"
+		},
+		"paths": {
+			"/resource": {
+				"get": {
+					"operationId": "getResource",
+					"responses": {"200": {"description": "OK"}}
+				},
+				"post": {
+					"operationId": "createResource",
+					"responses": {"201": {"description": "Created"}}
+				},
+				"put": {
+					"operationId": "updateResource",
+					"responses": {"200": {"description": "OK"}}
+				},
+				"delete": {
+					"operationId": "deleteResource",
+					"responses": {"204": {"description": "No Content"}}
+				},
+				"patch": {
+					"operationId": "patchResource",
+					"responses": {"200": {"description": "OK"}}
+				},
+				"head": {
+					"operationId": "headResource",
+					"responses": {"200": {"description": "OK"}}
+				},
+				"options": {
+					"operationId": "optionsResource",
+					"responses": {"200": {"description": "OK"}}
+				},
+				"trace": {
+					"operationId": "traceResource",
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	doc, err := libopenapi.NewDocument([]byte(specJSON))
+	if err != nil {
+		t.Fatalf("failed to create document: %v", err)
+	}
+
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		t.Fatalf("failed to build model: %v", err)
+	}
+
+	table, err := BuildRouteTable(&model.Model)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	expectedCount := 5
+	if table.RouteCount() != expectedCount {
+		t.Errorf("expected %d supported routes, got %d", expectedCount, table.RouteCount())
+	}
+
+	routes := table.GetRoutes()
+	methodsFound := make(map[string]bool)
+
+	for _, route := range routes {
+		if route.PathTemplate == "/resource" {
+			methodsFound[route.Method] = true
+		}
+	}
+
+	expectedMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
+	for _, method := range expectedMethods {
+		if !methodsFound[method] {
+			t.Errorf("missing method: %s", method)
+		}
+	}
+}
+
+func TestBuildRouteTable_NilPathItem(t *testing.T) {
+	// A nil path item is not a valid OpenAPI Path Item Object. Constructing the
+	// high-level model directly lets this test exercise the builder's guard;
+	// the parser normally rejects or drops null path values earlier.
+	spec := &v3.Document{
+		Paths: &v3.Paths{
+			PathItems: func() *orderedmap.Map[string, *v3.PathItem] {
+				items := orderedmap.New[string, *v3.PathItem]()
+				items.Set("/empty", nil)
+				return items
+			}(),
+		},
+	}
+
+	table, err := BuildRouteTable(spec)
+
+	if err == nil {
+		t.Fatal("expected an error for nil path item, got nil")
+	}
+	if table != nil {
+		t.Fatal("expected nil table for malformed path item")
+	}
+}
+
+func TestExtractAPIVersion(t *testing.T) {
+	tests := []struct {
+		name          string
+		operationJSON string
+		expectedVer   string
+	}{
+		{
+			name: "string version",
+			operationJSON: `{
+				"operationId": "test",
+				"x-api-version": "v2",
+				"responses": {"200": {"description": "OK"}}
+			}`,
+			expectedVer: "v2",
+		},
+		{
+			name: "numeric version is malformed",
+			operationJSON: `{
+				"operationId": "test",
+				"x-api-version": 2,
+				"responses": {"200": {"description": "OK"}}
+			}`,
+			expectedVer: "",
+		},
+		{
+			name: "default version (no extension)",
+			operationJSON: `{
+				"operationId": "test",
+				"responses": {"200": {"description": "OK"}}
+			}`,
+			expectedVer: "v1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specJSON := `{
+				"openapi": "3.0.0",
+				"info": {"title": "Test", "version": "1.0.0"},
+				"paths": {
+					"/test": {
+						"get": ` + tt.operationJSON + `
+					}
+				}
+			}`
+
+			doc, err := libopenapi.NewDocument([]byte(specJSON))
+			if err != nil {
+				t.Fatalf("failed to create document: %v", err)
+			}
+
+			model, err := doc.BuildV3Model()
+			if err != nil {
+				t.Fatalf("failed to build model: %v", err)
+			}
+
+			table, err := BuildRouteTable(&model.Model)
+			if tt.expectedVer == "" {
+				if err == nil {
+					t.Fatal("expected malformed x-api-version error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+
+			routes := table.GetRoutes()
+			if len(routes) != 1 {
+				t.Fatalf("expected 1 route, got %d", len(routes))
+			}
+
+			if routes[0].APIVersion != tt.expectedVer {
+				t.Errorf("expected APIVersion=%q, got %q", tt.expectedVer, routes[0].APIVersion)
 			}
 		})
 	}
