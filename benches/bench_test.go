@@ -1,42 +1,80 @@
 package benches
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+
+	"github.com/ardenone/seam/internal/server"
 )
 
-// BenchmarkExample is a placeholder benchmark demonstrating the basic structure.
-// Replace this with actual benchmarks as the project grows.
-func BenchmarkExample(b *testing.B) {
-	// Setup code that should NOT be benchmarked goes here
-	// ...
+var benchmarkSink atomic.Pointer[byte]
 
-	// Reset the timer before the actual benchmark loop
-	b.ResetTimer()
+// BenchmarkProxyForwarding measures the core proxy operation with realistic
+// request and response bodies. The upstream server is outside the timed loop,
+// so the result includes request construction, forwarding, and response copy.
+func BenchmarkProxyForwarding(b *testing.B) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("{\"status\":\"ok\"}"))
+	}))
+	defer upstream.Close()
 
-	// The actual benchmark - this will be run b.N times
-	for i := 0; i < b.N; i++ {
-		// Code to benchmark goes here
-		// Example: dummy operation
-		_ = i * 2
+	proxy, err := server.NewReverseProxy(upstream.URL)
+	if err != nil {
+		b.Fatalf("create proxy: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		body []byte
+	}{
+		{name: "GET", body: nil},
+		{name: "POST-small", body: []byte("{\"message\":\"hello\"}")},
+		{name: "POST-medium", body: bytes.Repeat([]byte("x"), 4*1024)},
+	}
+
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				method := http.MethodGet
+				if tc.body != nil {
+					method = http.MethodPost
+				}
+				req := httptest.NewRequest(method, "/proxy/benchmark?iteration=1", bytes.NewReader(tc.body))
+				w := httptest.NewRecorder()
+				proxy.ServeHTTP(w, req)
+				if w.Code != http.StatusOK {
+					b.Fatalf("expected status 200, got %d", w.Code)
+				}
+			}
+		})
 	}
 }
 
-// BenchmarkWithAllocation demonstrates how to measure memory allocations
+// BenchmarkWithAllocation demonstrates how to measure memory allocations.
 func BenchmarkWithAllocation(b *testing.B) {
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Code that allocates memory
 		data := make([]byte, 1024)
-		_ = data
+		benchmarkSink.Store(&data[0])
 	}
 }
 
-// BenchmarkParallel demonstrates parallel benchmark execution
+// BenchmarkParallel demonstrates parallel benchmark execution.
 func BenchmarkParallel(b *testing.B) {
+	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			// Code to benchmark in parallel
-			_ = make([]byte, 128)
+			data := make([]byte, 128)
+			benchmarkSink.Store(&data[0])
 		}
 	})
 }

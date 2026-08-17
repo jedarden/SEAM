@@ -115,25 +115,26 @@ go test -bench=. -benchmem ./benches/...
 **CPU profiling**:
 ```bash
 make benchmark-cpu
-# Analyze with: go tool pprof cpu.prof
+# Analyze with: go tool pprof benchmark-results/cpu.prof
 ```
 
 **Memory profiling**:
 ```bash
 make benchmark-mem
-# Analyze with: go tool pprof mem.prof
+# Analyze with: go tool pprof benchmark-results/mem.prof
 ```
 
 **CI mode** (JSON output for automated collection):
 ```bash
 make benchmark-ci
+# Results: benchmark-results/latest.json
 ```
 
 ### Interpreting Results
 
 Benchmark output shows:
 ```
-BenchmarkExample-8    1000000    1234 ns/op    512 B/op    8 allocs/op
+BenchmarkProxyForwarding/GET-8    1000000    1234 ns/op    512 B/op    8 allocs/op
 ```
 
 - `1000000`: Iterations executed
@@ -142,6 +143,18 @@ BenchmarkExample-8    1000000    1234 ns/op    512 B/op    8 allocs/op
 - `8 allocs/op`: Number of memory allocations per operation
 
 For detailed benchmark documentation, see [`benches/README.md`](benches/README.md).
+
+### Baselines and Regression Checks
+
+Capture a baseline for a benchmark category, then compare later runs against
+it. The check exits non-zero when a metric regresses by more than 10% (or the
+`THRESHOLD` supplied by the caller).
+
+```bash
+make benchmark-save-baseline TYPE=throughput
+make benchmark-check-regression TYPE=throughput
+make benchmark-check-regression TYPE=memory THRESHOLD=15
+```
 
 ## Development
 
