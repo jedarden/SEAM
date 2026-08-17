@@ -3,6 +3,10 @@ package spec
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -424,6 +428,516 @@ func TestComputeSpecHash_KnownValues(t *testing.T) {
 			if got != tt.wantHash {
 				t.Errorf("ComputeSpecHash() = %v, want %v", got, tt.wantHash)
 				t.Logf("Full SHA256 would be: %x", sha256.Sum256(tt.data))
+			}
+		})
+	}
+}
+
+// TestReservedPathExactMatch tests that fragments declaring exact reserved paths are quarantined
+func TestReservedPathExactMatch(t *testing.T) {
+	testCases := []struct {
+		name            string
+		reservedPath    string
+		wantQuarantined bool
+	}{
+		{name: "docs_exact", reservedPath: "/docs", wantQuarantined: true},
+		{name: "docs_route_exact", reservedPath: "/docs/route", wantQuarantined: true},
+		{name: "openapi_json_exact", reservedPath: "/openapi.json", wantQuarantined: true},
+		{name: "whoami_exact", reservedPath: "/whoami", wantQuarantined: true},
+		{name: "scopes_exact", reservedPath: "/scopes", wantQuarantined: true},
+		{name: "changes_exact", reservedPath: "/changes", wantQuarantined: true},
+		{name: "health_credentials_exact", reservedPath: "/health/credentials", wantQuarantined: true},
+		{name: "health_upstreams_exact", reservedPath: "/health/upstreams", wantQuarantined: true},
+		{name: "config_status_exact", reservedPath: "/config/status", wantQuarantined: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			fragmentsDir := filepath.Join(tmpDir, "fragments")
+			schemaDir := t.TempDir()
+
+			schema := `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"required": ["openapi", "info", "paths"],
+				"properties": {
+					"openapi": {"type": "string"},
+					"info": {"type": "object"},
+					"paths": {"type": "object"}
+				}
+			}`
+			schemaPath := filepath.Join(schemaDir, "schema.json")
+			if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+				t.Fatalf("Failed to write schema: %v", err)
+			}
+
+			content := fmt.Sprintf(`{
+				"openapi": "3.1.0",
+				"info": {"title": "Test Service", "version": "1.0.0"},
+				"paths": {
+					"%s": {
+						"get": {"summary": "Reserved path endpoint"}
+					}
+				},
+				"x-seam-owner": "myservice",
+				"x-api-version": "v1"
+			}`, tc.reservedPath)
+
+			fragmentPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+			if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+				t.Fatalf("Failed to create directory: %v", err)
+			}
+			if err := os.WriteFile(fragmentPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write fragment: %v", err)
+			}
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatalf("Failed to create fragment loader: %v", err)
+			}
+
+			if err := loader.LoadDirectory(fragmentsDir); err != nil {
+				t.Fatalf("Failed to load fragments: %v", err)
+			}
+
+			if err := loader.ValidateFragments(schemaPath); err != nil {
+				t.Fatalf("ValidateFragments failed: %v", err)
+			}
+
+			if tc.wantQuarantined {
+				if loader.GetValidFragmentCount() != 0 {
+					t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 1 {
+					t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+				}
+
+				quarantined := loader.GetQuarantined()
+				if len(quarantined) != 1 {
+					t.Fatalf("Expected 1 quarantined fragment, got %d", len(quarantined))
+				}
+
+				if !quarantined[0].QueuedForQuarantine {
+					t.Error("Expected fragment to be quarantined")
+				}
+
+				if len(quarantined[0].QuarantineReasons) == 0 {
+					t.Error("Expected quarantine reasons to be set")
+				}
+
+				// Verify the reason mentions the reserved path
+				hasReservedReason := false
+				for _, reason := range quarantined[0].QuarantineReasons {
+					if strings.Contains(reason, "reserved path") && strings.Contains(reason, tc.reservedPath) {
+						hasReservedReason = true
+						break
+					}
+				}
+				if !hasReservedReason {
+					t.Errorf("Expected quarantine reason to mention reserved path %s, got: %v", tc.reservedPath, quarantined[0].QuarantineReasons)
+				}
+			} else {
+				if loader.GetValidFragmentCount() != 1 {
+					t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 0 {
+					t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+				}
+			}
+		})
+	}
+}
+
+// TestReservedPathPrefix tests that fragments declaring paths with reserved prefixes are quarantined
+func TestReservedPathPrefix(t *testing.T) {
+	testCases := []struct {
+		name            string
+		path            string
+		wantQuarantined bool
+		reason          string
+	}{
+		{name: "docs_prefix_with_subpath", path: "/docs/mypath", wantQuarantined: true, reason: "prefix: /docs/"},
+		{name: "docs_prefix_deep", path: "/docs/api/v1/users", wantQuarantined: true, reason: "prefix: /docs/"},
+		{name: "health_prefix_with_subpath", path: "/health/mypath", wantQuarantined: true, reason: "prefix: /health/"},
+		{name: "health_prefix_deep", path: "/health/custom/metric", wantQuarantined: true, reason: "prefix: /health/"},
+		{name: "config_prefix_with_subpath", path: "/config/myvalue", wantQuarantined: true, reason: "prefix: /config/"},
+		{name: "config_prefix_deep", path: "/config/nested/value", wantQuarantined: true, reason: "prefix: /config/"},
+		{name: "approvals_prefix", path: "/approvals/request", wantQuarantined: true, reason: "prefix: /approvals/"},
+		{name: "seam_prefix", path: "/_seam/internal", wantQuarantined: true, reason: "prefix: /_seam/"},
+		{name: "valid_similar_path", path: "/doc", wantQuarantined: false, reason: ""},
+		{name: "valid_healthy_path", path: "/healthy", wantQuarantined: false, reason: ""},
+		{name: "valid_configuration_path", path: "/configuration", wantQuarantined: false, reason: ""},
+		{name: "valid_approval_path", path: "/approval", wantQuarantined: false, reason: ""},
+		{name: "valid_seamless_path", path: "/seamless", wantQuarantined: false, reason: ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			fragmentsDir := filepath.Join(tmpDir, "fragments")
+			schemaDir := t.TempDir()
+
+			schema := `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"required": ["openapi", "info", "paths"],
+				"properties": {
+					"openapi": {"type": "string"},
+					"info": {"type": "object"},
+					"paths": {"type": "object"}
+				}
+			}`
+			schemaPath := filepath.Join(schemaDir, "schema.json")
+			if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+				t.Fatalf("Failed to write schema: %v", err)
+			}
+
+			content := fmt.Sprintf(`{
+				"openapi": "3.1.0",
+				"info": {"title": "Test Service", "version": "1.0.0"},
+				"paths": {
+					"%s": {
+						"get": {"summary": "Endpoint"}
+					}
+				},
+				"x-seam-owner": "myservice",
+				"x-api-version": "v1"
+			}`, tc.path)
+
+			fragmentPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+			if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+				t.Fatalf("Failed to create directory: %v", err)
+			}
+			if err := os.WriteFile(fragmentPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write fragment: %v", err)
+			}
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatalf("Failed to create fragment loader: %v", err)
+			}
+
+			if err := loader.LoadDirectory(fragmentsDir); err != nil {
+				t.Fatalf("Failed to load fragments: %v", err)
+			}
+
+			if err := loader.ValidateFragments(schemaPath); err != nil {
+				t.Fatalf("ValidateFragments failed: %v", err)
+			}
+
+			if tc.wantQuarantined {
+				if loader.GetValidFragmentCount() != 0 {
+					t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 1 {
+					t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+				}
+
+				quarantined := loader.GetQuarantined()
+				if !quarantined[0].QueuedForQuarantine {
+					t.Error("Expected fragment to be quarantined")
+				}
+
+				// Verify the reason mentions the prefix
+				hasReason := false
+				for _, reason := range quarantined[0].QuarantineReasons {
+					if strings.Contains(reason, tc.reason) {
+						hasReason = true
+						break
+					}
+				}
+				if !hasReason && tc.reason != "" {
+					t.Errorf("Expected quarantine reason to mention '%s', got: %v", tc.reason, quarantined[0].QuarantineReasons)
+				}
+			} else {
+				if loader.GetValidFragmentCount() != 1 {
+					t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 0 {
+					t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+				}
+			}
+		})
+	}
+}
+
+// TestReservedPathMultiplePaths tests fragments with multiple paths
+func TestReservedPathMultiplePaths(t *testing.T) {
+	testCases := []struct {
+		name            string
+		paths           map[string]interface{}
+		wantQuarantined bool
+		reasonContains  string
+	}{
+		{
+			name: "all_valid_paths",
+			paths: map[string]interface{}{
+				"/api/users": map[string]interface{}{"get": map[string]interface{}{"summary": "List users"}},
+				"/api/posts": map[string]interface{}{"get": map[string]interface{}{"summary": "List posts"}},
+				"/v1/items":  map[string]interface{}{"get": map[string]interface{}{"summary": "List items"}},
+			},
+			wantQuarantined: false,
+			reasonContains:  "",
+		},
+		{
+			name: "one_reserved_path_among_valid",
+			paths: map[string]interface{}{
+				"/api/users": map[string]interface{}{"get": map[string]interface{}{"summary": "List users"}},
+				"/docs":      map[string]interface{}{"get": map[string]interface{}{"summary": "Docs"}},
+				"/api/posts": map[string]interface{}{"get": map[string]interface{}{"summary": "List posts"}},
+			},
+			wantQuarantined: true,
+			reasonContains:  "reserved path: /docs",
+		},
+		{
+			name: "multiple_reserved_paths",
+			paths: map[string]interface{}{
+				"/docs":        map[string]interface{}{"get": map[string]interface{}{"summary": "Docs"}},
+				"/whoami":      map[string]interface{}{"get": map[string]interface{}{"summary": "Whoami"}},
+				"/config/test": map[string]interface{}{"get": map[string]interface{}{"summary": "Config test"}},
+			},
+			wantQuarantined: true,
+			reasonContains:  "reserved path",
+		},
+		{
+			name: "mixed_exact_and_prefix_reserved",
+			paths: map[string]interface{}{
+				"/docs":           map[string]interface{}{"get": map[string]interface{}{"summary": "Docs"}},
+				"/health/mycheck": map[string]interface{}{"get": map[string]interface{}{"summary": "Health check"}},
+			},
+			wantQuarantined: true,
+			reasonContains:  "reserved",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			fragmentsDir := filepath.Join(tmpDir, "fragments")
+			schemaDir := t.TempDir()
+
+			schema := `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"required": ["openapi", "info", "paths"],
+				"properties": {
+					"openapi": {"type": "string"},
+					"info": {"type": "object"},
+					"paths": {"type": "object"}
+				}
+			}`
+			schemaPath := filepath.Join(schemaDir, "schema.json")
+			if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+				t.Fatalf("Failed to write schema: %v", err)
+			}
+
+			// Build paths JSON
+			pathsJSON, err := json.Marshal(tc.paths)
+			if err != nil {
+				t.Fatalf("Failed to marshal paths: %v", err)
+			}
+
+			content := fmt.Sprintf(`{
+				"openapi": "3.1.0",
+				"info": {"title": "Test Service", "version": "1.0.0"},
+				"paths": %s,
+				"x-seam-owner": "myservice",
+				"x-api-version": "v1"
+			}`, string(pathsJSON))
+
+			fragmentPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+			if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+				t.Fatalf("Failed to create directory: %v", err)
+			}
+			if err := os.WriteFile(fragmentPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write fragment: %v", err)
+			}
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatalf("Failed to create fragment loader: %v", err)
+			}
+
+			if err := loader.LoadDirectory(fragmentsDir); err != nil {
+				t.Fatalf("Failed to load fragments: %v", err)
+			}
+
+			if err := loader.ValidateFragments(schemaPath); err != nil {
+				t.Fatalf("ValidateFragments failed: %v", err)
+			}
+
+			if tc.wantQuarantined {
+				if loader.GetValidFragmentCount() != 0 {
+					t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 1 {
+					t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+				}
+
+				quarantined := loader.GetQuarantined()
+				if !quarantined[0].QueuedForQuarantine {
+					t.Error("Expected fragment to be quarantined")
+				}
+
+				// Verify at least one reason contains the expected text
+				hasReason := false
+				for _, reason := range quarantined[0].QuarantineReasons {
+					if strings.Contains(reason, tc.reasonContains) {
+						hasReason = true
+						break
+					}
+				}
+				if !hasReason && tc.reasonContains != "" {
+					t.Errorf("Expected quarantine reason to contain '%s', got: %v", tc.reasonContains, quarantined[0].QuarantineReasons)
+				}
+			} else {
+				if loader.GetValidFragmentCount() != 1 {
+					t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 0 {
+					t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+				}
+			}
+		})
+	}
+}
+
+// TestReservedPathNoPathsField tests fragments without a paths field
+func TestReservedPathNoPathsField(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object"
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	content := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Test Service"},
+		"x-seam-owner": "myservice"
+	}`
+
+	fragmentPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+	if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(fragmentPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write fragment: %v", err)
+	}
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Fragment with no paths field should not be quarantined for reserved paths
+	if loader.GetValidFragmentCount() != 1 {
+		t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 0 {
+		t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+	}
+}
+
+// TestReservedPathCaseSensitivity tests that reserved paths are case-sensitive
+func TestReservedPathCaseSensitivity(t *testing.T) {
+	testCases := []struct {
+		name            string
+		path            string
+		wantQuarantined bool
+	}{
+		{name: "Docs_uppercase", path: "/Docs", wantQuarantined: false},
+		{name: "DOCS_allcaps", path: "/DOCS", wantQuarantined: false},
+		{name: "docs_path_uppercase", path: "/docs/MyPath", wantQuarantined: true},
+		{name: "docs_exact_lowercase", path: "/docs", wantQuarantined: true},
+		{name: "Health_uppercase", path: "/Health/check", wantQuarantined: false},
+		{name: "config_uppercase", path: "/Config/value", wantQuarantined: false},
+		{name: "config_exact_lowercase", path: "/config/test", wantQuarantined: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			fragmentsDir := filepath.Join(tmpDir, "fragments")
+			schemaDir := t.TempDir()
+
+			schema := `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"required": ["openapi", "info", "paths"],
+				"properties": {
+					"openapi": {"type": "string"},
+					"info": {"type": "object"},
+					"paths": {"type": "object"}
+				}
+			}`
+			schemaPath := filepath.Join(schemaDir, "schema.json")
+			if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+				t.Fatalf("Failed to write schema: %v", err)
+			}
+
+			content := fmt.Sprintf(`{
+				"openapi": "3.1.0",
+				"info": {"title": "Test Service", "version": "1.0.0"},
+				"paths": {
+					"%s": {
+						"get": {"summary": "Endpoint"}
+					}
+				},
+				"x-seam-owner": "myservice",
+				"x-api-version": "v1"
+			}`, tc.path)
+
+			fragmentPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+			if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+				t.Fatalf("Failed to create directory: %v", err)
+			}
+			if err := os.WriteFile(fragmentPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write fragment: %v", err)
+			}
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatalf("Failed to create fragment loader: %v", err)
+			}
+
+			if err := loader.LoadDirectory(fragmentsDir); err != nil {
+				t.Fatalf("Failed to load fragments: %v", err)
+			}
+
+			if err := loader.ValidateFragments(schemaPath); err != nil {
+				t.Fatalf("ValidateFragments failed: %v", err)
+			}
+
+			if tc.wantQuarantined {
+				if loader.GetValidFragmentCount() != 0 {
+					t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 1 {
+					t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+				}
+			} else {
+				if loader.GetValidFragmentCount() != 1 {
+					t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+				}
+				if loader.GetQuarantinedCount() != 0 {
+					t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+				}
 			}
 		})
 	}
