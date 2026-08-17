@@ -171,10 +171,16 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
+			upstreamTarget, err := extractUpstreamTarget(methodOp.operation)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
 			entry := RouteEntry{
 				PathTemplate: path,
 				Method:       methodOp.method,
 				APIVersion:   apiVersion,
+			UpstreamTarget: upstreamTarget,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
@@ -238,6 +244,37 @@ func extractAPIVersion(operation *v3.Operation) (string, error) {
 	}
 
 	return "v1", nil
+}
+
+// extractUpstreamTarget extracts the upstream target URL from operation extensions.
+// It looks for the "x-upstream" extension and returns its value.
+// If not found, returns an empty string, which means no upstream is configured.
+func extractUpstreamTarget(operation *v3.Operation) (string, error) {
+	if operation == nil {
+		return "", fmt.Errorf("operation cannot be nil")
+	}
+
+	if operation.Extensions == nil {
+		return "", nil
+	}
+
+	if upstreamNode, ok := operation.Extensions.Get("x-upstream"); ok && upstreamNode != nil {
+		var value any
+		if err := upstreamNode.Decode(&value); err != nil {
+			return "", fmt.Errorf("x-upstream must be a string: %w", err)
+		}
+		upstream, ok := value.(string)
+		if !ok {
+			return "", fmt.Errorf("x-upstream must be a string")
+		}
+		upstream = strings.TrimSpace(upstream)
+		if upstream == "" {
+			return "", nil
+		}
+		return upstream, nil
+	}
+
+	return "", nil
 }
 
 // NewRouteTable creates a new empty RouteTable.
