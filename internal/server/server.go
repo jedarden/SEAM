@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -113,6 +114,7 @@ type Config struct {
 	CaptureEnabled bool
 	CorpusDir      string
 	FragmentsDir   string
+	UpstreamURL    string // Default upstream URL for proxying (Phase 2.0: single upstream)
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -126,6 +128,9 @@ type Server struct {
 	operatorListener  net.Listener
 	wg                sync.WaitGroup
 	specLoader        *spec.Loader
+	routeTable        *RouteTable              // Route table for request matching (stage 4)
+	proxyMap          map[string]*ReverseProxy // Map of upstream URL -> proxy instance (stages 6-11)
+	proxyMapMu        sync.RWMutex             // Protects proxyMap
 	captureMiddleware *CaptureMiddleware
 	cache             *ResponseCache
 	singleFlight      *SingleFlight
@@ -161,16 +166,20 @@ func New(cfg *Config) *Server {
 	}
 
 	s := &Server{
-		config:       cfg,
-		callerMux:    http.NewServeMux(),
-		operatorMux:  http.NewServeMux(),
-		specLoader:   specLoader,
-		cache:        NewResponseCache(),
-		singleFlight: NewSingleFlight(),
-		cacheTTLs:    make(map[string]int),
-		quotaTracker: NewQuotaTracker(),
-		costPerCalls: make(map[string]float64),
+		config:          cfg,
+		callerMux:       http.NewServeMux(),
+		operatorMux:     http.NewServeMux(),
+		specLoader:      specLoader,
+		routeTable:      NewRouteTable(specLoader),
+		proxyMap:        make(map[string]*ReverseProxy),
+		cache:           NewResponseCache(),
+		singleFlight:    NewSingleFlight(),
+		cacheTTLs:       make(map[string]int),
+		circuitBreakers: NewCircuitBreakerStateRegistry(),
+		quotaTracker:    NewQuotaTracker(),
+		costPerCalls:    make(map[string]float64),
 	}
+	log.Printf("Route table initialized with %d routes", s.routeTable.RouteCount())
 
 	// Initialize capture middleware if enabled
 	if cfg.CaptureEnabled {
@@ -221,6 +230,10 @@ func (s *Server) setupRoutes() {
 
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
 
+	// Catch-all dispatch handler for upstream proxying (Phase 2.0)
+	// This must be registered last so it doesn't intercept the specific handlers above
+	s.callerMux.HandleFunc("/", s.dispatchHandler)
+
 	// Operator-only routes
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
 	s.operatorMux.HandleFunc("/config/status", s.configStatusHandler)
@@ -234,7 +247,7 @@ func (s *Server) setupRoutes() {
 // healthzHandler returns 200 OK for liveness checks
 func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -246,7 +259,7 @@ func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 // Phase 6a (bf-38bj) will add login dependency gating.
 func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -259,7 +272,7 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 // and quota metrics via the Prometheus handler.
 func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -285,18 +298,18 @@ func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 // captureSaveHandler manually saves the corpus
 func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only POST method is allowed").Write(w, r)
 		return
 	}
 
 	if s.captureMiddleware == nil {
-		http.Error(w, "Capture middleware not enabled", http.StatusServiceUnavailable)
+		NewErrorResponse(ErrCodeServiceUnavailable, "Capture middleware not enabled").Write(w, r)
 		return
 	}
 
 	if err := s.captureMiddleware.Save(); err != nil {
 		log.Printf("Failed to save corpus: %v", err)
-		http.Error(w, "Failed to save corpus", http.StatusInternalServerError)
+		NewErrorResponse(ErrCodeInternalServer, "Failed to save corpus").WithDetail("error", err.Error()).Write(w, r)
 		return
 	}
 
@@ -311,7 +324,7 @@ func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 // captureStatusHandler returns the current status of corpus capture
 func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -339,7 +352,7 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -372,7 +385,7 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
 		log.Printf("[openapi.json] Failed to get spec JSON: %v", err)
-		http.Error(w, "Failed to load spec", http.StatusInternalServerError)
+		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load spec").WithDetail("error", err.Error()).Write(w, r)
 		return
 	}
 
@@ -402,7 +415,7 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -435,7 +448,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
 		log.Printf("[/docs] Failed to fetch merged spec: %v", err)
-		http.Error(w, "Failed to load API specification", http.StatusInternalServerError)
+		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load API specification").WithDetail("error", err.Error()).Write(w, r)
 		return
 	}
 
@@ -443,7 +456,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	var specJSONCheck interface{}
 	if err := json.Unmarshal(specJSON, &specJSONCheck); err != nil {
 		log.Printf("[/docs] Spec validation failed - invalid JSON: %v", err)
-		http.Error(w, "API specification is not valid JSON", http.StatusInternalServerError)
+		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification is not valid JSON").WithDetail("error", err.Error()).Write(w, r)
 		return
 	}
 
@@ -543,7 +556,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -869,6 +882,10 @@ func (s *Server) Start(ctx context.Context) error {
 	callerHandler = s.validationMiddleware(callerHandler)
 	log.Printf("Validation middleware active on caller-facing port (stage 1)")
 
+	// Wrap with metrics middleware to track HTTP requests
+	callerHandler = s.metricsMiddleware(callerHandler)
+	log.Printf("Metrics middleware active on caller-facing port")
+
 	// Wrap with capture middleware if enabled
 	if s.captureMiddleware != nil {
 		callerHandler = s.captureMiddleware.Wrap(callerHandler)
@@ -949,7 +966,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // cacheStatusHandler returns cache statistics
 func (s *Server) cacheStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -986,7 +1003,7 @@ func (s *Server) cacheStatusHandler(w http.ResponseWriter, r *http.Request) {
 // cacheCleanupHandler manually triggers cache cleanup
 func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only POST method is allowed").Write(w, r)
 		return
 	}
 
@@ -1003,4 +1020,152 @@ func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 		"size":      stats.Size,
 		"evictions": stats.Evictions,
 	})
+}
+
+// dispatchHandler is the catch-all handler that dispatches requests to upstream services
+// This is the core proxy primitive that implements stages 4-11 of the request pipeline:
+//   - Stage 4: Match request against route table
+//   - Stages 5: (Reserved for future - validation, guards, etc.)
+//   - Stage 6-11: Dispatch to upstream via ReverseProxy
+//
+// Phase 2.0: Route-based upstream selection - each route has its own upstream target
+// The upstream URL is extracted from the matched route's UpstreamTarget field
+func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
+	// Stage 4: Match the request against the route table
+	routeMatch, err := s.routeTable.Match(r)
+	if err != nil {
+		// No route found - return 404
+		s.handleNotFound(w, r)
+		return
+	}
+
+	// Extract upstream URL from the matched route
+	upstreamURL := routeMatch.Route.UpstreamTarget
+	if upstreamURL == "" {
+		// No upstream configured for this route - return 503
+		s.handleNoUpstream(w, r)
+		return
+	}
+
+	// Get or create proxy for this upstream
+	proxy := s.getOrCreateProxy(upstreamURL)
+	if proxy == nil {
+		// Proxy creation failed - return 503
+		s.handleProxyCreationFailed(w, r, upstreamURL)
+		return
+	}
+
+	// Stages 6-11: Dispatch to upstream and stream response back
+	// The ReverseProxy handles all stages: building request, dispatching, streaming response
+	proxy.ServeHTTP(w, r)
+}
+
+// getOrCreateProxy gets an existing proxy from the proxyMap or creates a new one
+// This is the swap point for hot reload (Phase 3.1) - proxies are cached by upstream URL
+func (s *Server) getOrCreateProxy(upstreamURL string) *ReverseProxy {
+	s.proxyMapMu.Lock()
+	defer s.proxyMapMu.Unlock()
+
+	// Check if proxy already exists
+	if proxy, exists := s.proxyMap[upstreamURL]; exists {
+		return proxy
+	}
+
+	// Create new proxy
+	proxy, err := NewReverseProxy(upstreamURL)
+	if err != nil {
+		log.Printf("[dispatch] Failed to create proxy for upstream %s: %v", upstreamURL, err)
+		return nil
+	}
+
+	s.proxyMap[upstreamURL] = proxy
+	log.Printf("[dispatch] Created new proxy for upstream %s", upstreamURL)
+	return proxy
+}
+
+// handleNotFound returns a 404 response when no route matches
+func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":   "route_not_found",
+		"message": fmt.Sprintf("No route found for %s %s", r.Method, r.URL.Path),
+		"path":    r.URL.Path,
+		"method":  r.Method,
+		"docs":    "/docs",
+	})
+}
+
+// handleNoUpstream returns a 503 response when no upstream is configured
+func (s *Server) handleNoUpstream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":   "no_upstream_configured",
+		"message": "No upstream URL configured for this route",
+		"path":    r.URL.Path,
+		"method":  r.Method,
+	})
+}
+
+// handleProxyCreationFailed returns a 503 response when proxy creation fails
+func (s *Server) handleProxyCreationFailed(w http.ResponseWriter, r *http.Request, upstreamURL string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":        "proxy_creation_failed",
+		"message":     "Failed to create proxy for upstream",
+		"upstream_url": upstreamURL,
+		"path":         r.URL.Path,
+		"method":       r.Method,
+	})
+}
+
+// metricsMiddleware tracks HTTP request metrics (count, latency, in-flight)
+func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip metrics for reserved paths (control plane endpoints)
+		if isReservedPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Track route and method
+		route := r.URL.Path
+		method := r.Method
+
+		// Increment in-flight counter
+		incrementInFlight(route, method)
+		defer decrementInFlight(route, method)
+
+		// Record start time
+		startTime := time.Now()
+
+		// Wrap response writer to capture status code
+		wrapped := &metricsResponseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK, // Default status code
+		}
+
+		// Call next handler
+		next.ServeHTTP(wrapped, r)
+
+		// Calculate duration
+		duration := time.Since(startTime).Seconds()
+
+		// Record request metrics
+		recordHTTPRequest(route, method, wrapped.statusCode, duration)
+	})
+}
+
+// metricsResponseWriter wraps http.ResponseWriter to capture status code
+type metricsResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+// WriteHeader captures the status code
+func (w *metricsResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
