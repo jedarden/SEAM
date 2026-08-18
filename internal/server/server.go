@@ -7,11 +7,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ardenone/seam/internal/spec"
+	"github.com/ardenone/seam/internal/vault"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -145,6 +147,8 @@ type Server struct {
 	costPerCalls      map[string]float64 // route -> cost per call
 	mu                sync.RWMutex
 	allowlistEnforcer *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
+	openBaoMu         sync.RWMutex
+	openBaoReady      bool
 }
 
 // New creates a new Server with the given configuration
@@ -208,6 +212,7 @@ func New(cfg *Config) *Server {
 		quotaTracker:      NewQuotaTracker(),
 		costPerCalls:      make(map[string]float64),
 		allowlistEnforcer: allowlistEnforcer,
+		openBaoReady:      true,
 	}
 	log.Printf("Route table initialized with %d routes", s.routeTable.RouteCount())
 
@@ -297,6 +302,9 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	// Check allowlist status
 	ready := true
 	if s.allowlistEnforcer != nil && s.allowlistEnforcer.IsFailClosed() {
+		ready = false
+	}
+	if !s.isOpenBaoReady() {
 		ready = false
 	}
 
@@ -885,6 +893,11 @@ func (s *Server) Start(ctx context.Context) error {
 	callerAddr := fmt.Sprintf(":%d", s.config.CallerPort)
 	operatorAddr := fmt.Sprintf(":%d", s.config.OperatorPort)
 
+	// In-cluster deployments must authenticate to OpenBao before Kubernetes
+	// considers the pod ready. Local/dev runs do not have the projected token
+	// or explicit SEAM_OPENBAO_ADDR, so they retain the Phase 1 behavior.
+	s.startOpenBaoLogin(ctx)
+
 	log.Printf("Starting caller-facing listener on %s", callerAddr)
 	log.Printf("Starting operator-only listener on %s", operatorAddr)
 
@@ -969,6 +982,74 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+// isOpenBaoConfigured reports whether this process is expected to use the
+// projected Kubernetes service-account token. The deployment sets the
+// address explicitly; checking the token path also covers an in-cluster
+// caller that relies on the standard OpenBao defaults.
+func isOpenBaoConfigured() bool {
+	if strings.TrimSpace(os.Getenv("SEAM_OPENBAO_ADDR")) != "" ||
+		strings.TrimSpace(os.Getenv("OPENBAO_ADDR")) != "" {
+		return true
+	}
+	tokenPath := strings.TrimSpace(os.Getenv("SEAM_OPENBAO_SA_TOKEN_PATH"))
+	if tokenPath == "" {
+		tokenPath = vault.DefaultServiceAccount
+	}
+	_, err := os.Stat(tokenPath)
+	return err == nil
+}
+
+func (s *Server) isOpenBaoReady() bool {
+	s.openBaoMu.RLock()
+	defer s.openBaoMu.RUnlock()
+	return s.openBaoReady
+}
+
+func (s *Server) setOpenBaoReady(ready bool) {
+	s.openBaoMu.Lock()
+	s.openBaoReady = ready
+	s.openBaoMu.Unlock()
+}
+
+// startOpenBaoLogin performs the first Kubernetes-auth login asynchronously.
+// The listeners can serve health checks while readyz remains 503, allowing
+// the Deployment's readiness probe to gate Service traffic without turning a
+// transient OpenBao outage into a CrashLoopBackOff. No token or secret value is
+// logged; client errors contain only non-secret authentication diagnostics.
+func (s *Server) startOpenBaoLogin(ctx context.Context) {
+	if !isOpenBaoConfigured() {
+		return
+	}
+
+	s.setOpenBaoReady(false)
+	go func() {
+		for {
+			client, err := vault.NewFromEnv()
+			if err == nil {
+				loginCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				err = client.Login(loginCtx)
+				cancel()
+			}
+			if err == nil {
+				s.setOpenBaoReady(true)
+				log.Printf("OpenBao startup Kubernetes login succeeded")
+				return
+			}
+
+			log.Printf("OpenBao startup login not ready: %v", err)
+			timer := time.NewTimer(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			case <-timer.C:
+			}
+		}
+	}()
 }
 
 // Shutdown gracefully shuts down the server
