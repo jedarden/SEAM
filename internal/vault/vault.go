@@ -42,8 +42,9 @@ const (
 	AuthModeDevToken   AuthMode = "dev-token"
 )
 
-// Config configures a Client. Address, Role, and DevToken have corresponding
-// environment variables in ConfigFromEnv/NewFromEnv.
+// Config configures a Client. Address, Role, DevToken, MountPath, and
+// AuthMountPath have corresponding environment variables in
+// ConfigFromEnv/NewFromEnv.
 type Config struct {
 	Address string
 	// Addr is accepted as an alias for Address for callers that use the OpenBao
@@ -62,7 +63,12 @@ type Config struct {
 	// persisted. DevToken takes precedence when selecting dev-token mode.
 	AuthToken string
 
+	// MountPath is the KV secrets engine mount, such as "secret".
 	MountPath string
+	// AuthMountPath is the Kubernetes auth method mount, such as
+	// "k8s-rs-manager". It is separate from MountPath because OpenBao may
+	// mount auth methods and secret engines at different paths.
+	AuthMountPath string
 
 	ServiceAccountTokenPath string
 	// ServiceAccountToken is a test/developer injection point. Production
@@ -95,6 +101,7 @@ func ConfigFromEnv() Config {
 		Role:                    firstNonEmpty(os.Getenv("SEAM_OPENBAO_ROLE"), os.Getenv("OPENBAO_ROLE")),
 		DevToken:                devToken,
 		MountPath:               os.Getenv("SEAM_OPENBAO_MOUNT"),
+		AuthMountPath:           firstNonEmpty(os.Getenv("SEAM_OPENBAO_AUTH_MOUNT"), os.Getenv("OPENBAO_AUTH_MOUNT")),
 		ServiceAccountTokenPath: os.Getenv("SEAM_OPENBAO_SA_TOKEN_PATH"),
 	}
 }
@@ -122,6 +129,10 @@ func New(cfg Config) (*Client, error) {
 	mount := strings.Trim(strings.TrimSpace(firstNonEmpty(cfg.MountPath, "secret")), "/")
 	if mount == "" {
 		return nil, fmt.Errorf("OpenBao mount path must not be empty")
+	}
+	authMount := strings.Trim(strings.TrimSpace(firstNonEmpty(cfg.AuthMountPath, "kubernetes")), "/")
+	if authMount == "" {
+		return nil, fmt.Errorf("OpenBao auth mount path must not be empty")
 	}
 
 	saPath := firstNonEmpty(cfg.ServiceAccountTokenPath, DefaultServiceAccount)
@@ -161,6 +172,7 @@ func New(cfg Config) (*Client, error) {
 		address:                 address,
 		role:                    role,
 		mountPath:               mount,
+		authMountPath:           authMount,
 		authMode:                mode,
 		devToken:                devToken,
 		authToken:               cfg.AuthToken,
@@ -188,6 +200,7 @@ type Client struct {
 	address                 string
 	role                    string
 	mountPath               string
+	authMountPath           string
 	authMode                AuthMode
 	devToken                string
 	authToken               string
@@ -635,7 +648,7 @@ func (c *Client) token(ctx context.Context, force bool) (string, error) {
 	if err != nil {
 		return "", nilFetchFailure(FailureResponse)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.address+"/v1/auth/kubernetes/login", strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.address+"/v1/auth/"+c.authMountPath+"/login", strings.NewReader(string(payload)))
 	if err != nil {
 		return "", nilFetchFailure(FailureResponse)
 	}
