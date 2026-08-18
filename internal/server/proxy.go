@@ -29,6 +29,51 @@ const (
 	DefaultUpstreamCADir = "/etc/gateway/upstream-ca"
 )
 
+// Context key type for storing replayable body in request context
+type contextKey int
+
+const (
+	replayableBodyKey contextKey = iota
+)
+
+// contextWithReplayableBody stores a replayable body in the context
+func contextWithReplayableBody(ctx context.Context, rb *replayableBody) context.Context {
+	return context.WithValue(ctx, replayableBodyKey, rb)
+}
+
+// replayableBodyFromContext extracts the replayable body from the context
+func replayableBodyFromContext(ctx context.Context) *replayableBody {
+	if rb, ok := ctx.Value(replayableBodyKey).(*replayableBody); ok {
+		return rb
+	}
+	return nil
+}
+
+// isProtocolUpgrade detects if the request is a protocol upgrade (WebSocket, HTTP/2, etc.)
+// Protocol upgrades are unreplayable because the connection semantics change mid-stream.
+func isProtocolUpgrade(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+
+	// Check for Upgrade header (WebSocket, etc.)
+	if r.Header.Get("Upgrade") != "" {
+		return true
+	}
+
+	// Check for HTTP/2 prior knowledge (PRI request method)
+	if r.Method == "PRI" && r.URL.Path == "*" {
+		return true
+	}
+
+	// Check for CONNECT method (tunneling)
+	if r.Method == "CONNECT" {
+		return true
+	}
+
+	return false
+}
+
 // defaultUpstreamClient is shared by standalone ForwardRequest calls. Sharing
 // the client also shares its Transport, so requests to the same upstream can
 // reuse pooled connections.
@@ -138,29 +183,70 @@ type ReverseProxy struct {
 	RequestTimeout time.Duration
 
 	BufferPool *bufferPool
+
+	// MaxReplayableRequestBytes is the maximum request body size to buffer for replay.
+	// This is an independent knob from response buffering. Default: 1 MiB.
+	MaxReplayableRequestBytes int64
 }
 
 // NewReverseProxy creates a reverse proxy for upstreamURL.
 func NewReverseProxy(upstreamURL string) (*ReverseProxy, error) {
+	return NewReverseProxyWithConfig(upstreamURL, nil)
+}
+
+// ReverseProxyConfig holds configuration for creating a ReverseProxy.
+type ReverseProxyConfig struct {
+	MaxReplayableRequestBytes int64
+}
+
+// NewReverseProxyWithConfig creates a reverse proxy with custom configuration.
+func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*ReverseProxy, error) {
 	parsedURL, err := parseUpstreamBaseURL(upstreamURL)
 	if err != nil {
 		return nil, err
 	}
 
+	maxReplayable := DefaultMaxReplayableRequestBytes
+	if cfg != nil && cfg.MaxReplayableRequestBytes > 0 {
+		maxReplayable = cfg.MaxReplayableRequestBytes
+	}
+
 	return &ReverseProxy{
-		Client:         defaultUpstreamClient,
-		UpstreamURL:    parsedURL,
-		UpstreamHost:   parsedURL.Host,
-		RequestTimeout: upstreamRequestTimeout,
-		BufferPool:     newBufferPool(),
+		Client:                    defaultUpstreamClient,
+		UpstreamURL:               parsedURL,
+		UpstreamHost:              parsedURL.Host,
+		RequestTimeout:            upstreamRequestTimeout,
+		BufferPool:                newBufferPool(),
+		MaxReplayableRequestBytes: maxReplayable,
 	}, nil
 }
 
 // ServeHTTP implements http.Handler for the reverse proxy.
 func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	match := routeMatchFromRequest(r)
+	if match != nil && match.Route.InjectAs != nil {
+		resolver := routeSecretResolverFromRequest(r)
+		if resolver == nil {
+			p.handleError(w, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
+			return
+		}
+		secret, err := resolver(ctx, match.Route)
+		if err != nil {
+			p.handleError(w, r, err, "resolving upstream credential")
+			return
+		}
+		if err := InjectSecret(r, match.Route.InjectAs, secret); err != nil {
+			p.handleError(w, r, err, "injecting upstream credential")
+			return
+		}
+	}
 
-	outgoingURL := p.buildUpstreamURL(r)
+	outgoingURL, err := p.buildUpstreamURLForMatch(r, match)
+	if err != nil {
+		p.handleError(w, r, err, "building upstream path")
+		return
+	}
 	upstreamReq, err := p.buildUpstreamRequest(ctx, r, outgoingURL)
 	if err != nil {
 		p.handleError(w, r, err, "building upstream request")
@@ -175,13 +261,27 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // buildUpstreamURL constructs the full upstream URL from the base URL and the
 // incoming request path and query.
 func (p *ReverseProxy) buildUpstreamURL(r *http.Request) string {
+	url, _ := p.buildUpstreamURLForMatch(r, nil)
+	return url
+}
+
+func (p *ReverseProxy) buildUpstreamURLForMatch(r *http.Request, match *RouteMatch) (string, error) {
 	if p == nil || p.UpstreamURL == nil || r == nil || r.URL == nil {
-		return ""
+		return "", nil
 	}
-	return buildUpstreamURL(p.UpstreamURL, r.URL.Path, r.URL.RawQuery)
+	if match != nil {
+		path, err := ComputeUpstreamPath(match)
+		if err != nil {
+			return "", err
+		}
+		return buildUpstreamURLWithEscapedPath(p.UpstreamURL, path, r.URL.RawQuery), nil
+	}
+	return buildUpstreamURL(p.UpstreamURL, r.URL.Path, r.URL.RawQuery), nil
 }
 
 // buildUpstreamRequest creates the request sent to the upstream service.
+// Phase 2.5: Integrates replayable body tee to buffer request body up to
+// MaxReplayableRequestBytes while streaming upstream.
 func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *http.Request, outgoingURL string) (*http.Request, error) {
 	if inboundReq == nil {
 		return nil, fmt.Errorf("incoming request is nil")
@@ -190,7 +290,30 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 		ctx = context.Background()
 	}
 
-	outboundReq, err := http.NewRequestWithContext(ctx, inboundReq.Method, outgoingURL, inboundReq.Body)
+	// Phase 2.5: Wrap request body with replayable tee if present
+	var requestBody io.ReadCloser = inboundReq.Body
+	if inboundReq.Body != nil {
+		// Detect unreplayable conditions (protocol upgrades)
+		if isProtocolUpgrade(inboundReq) {
+			// Protocol upgrade (WebSocket, HTTP/2 prior knowledge, etc.)
+			// Stream through unbuffered - mark as unreplayable
+			log.Printf("[proxy] Protocol upgrade detected - body not buffered for replay: %s", inboundReq.Header.Get("Upgrade"))
+		} else if inboundReq.Body == http.NoBody {
+			// No body present - use as-is
+			requestBody = inboundReq.Body
+		} else {
+			// Wrap body with replayable tee
+			// ContentLength of -1 means unknown (chunked or no Content-Length header)
+			replayable := newReplayableBody(inboundReq.Body, inboundReq.ContentLength, p.MaxReplayableRequestBytes)
+			requestBody = replayable
+
+			// Store replayable body in request context for later retrieval by Phase 12/13
+			// This allows the 401 retry logic to access the buffered body without re-reading
+			ctx = contextWithReplayableBody(ctx, replayable)
+		}
+	}
+
+	outboundReq, err := http.NewRequestWithContext(ctx, inboundReq.Method, outgoingURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating outbound request: %w", err)
 	}
@@ -387,7 +510,7 @@ func ForwardRequestWithConfig(ctx context.Context, in *http.Request, match *Rout
 	return forwardRequestWithClient(ctx, in, match, upstreamBase, client, upstreamRequestTimeout)
 }
 
-func forwardRequestWithClient(ctx context.Context, in *http.Request, _ *RouteMatch, upstreamBase string, client *http.Client, timeout time.Duration) (*http.Response, error) {
+func forwardRequestWithClient(ctx context.Context, in *http.Request, match *RouteMatch, upstreamBase string, client *http.Client, timeout time.Duration) (*http.Response, error) {
 	if in == nil {
 		return nil, fmt.Errorf("incoming request is nil")
 	}
@@ -407,6 +530,14 @@ func forwardRequestWithClient(ctx context.Context, in *http.Request, _ *RouteMat
 	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 
 	outboundURL := buildUpstreamURL(baseURL, in.URL.Path, in.URL.RawQuery)
+	if match != nil {
+		path, pathErr := ComputeUpstreamPath(match)
+		if pathErr != nil {
+			cancel()
+			return nil, pathErr
+		}
+		outboundURL = buildUpstreamURLWithEscapedPath(baseURL, path, in.URL.RawQuery)
+	}
 	outboundReq, err := http.NewRequestWithContext(requestCtx, in.Method, outboundURL, in.Body)
 	if err != nil {
 		cancel()
@@ -452,6 +583,27 @@ func buildUpstreamURL(upstreamURL *url.URL, requestPath, rawQuery string) string
 	target.Path = joinURLPaths(upstreamURL.Path, requestPath)
 	target.RawPath = ""
 	target.RawQuery = rawQuery
+	target.Fragment = ""
+	target.RawFragment = ""
+	return target.String()
+}
+
+func buildUpstreamURLWithEscapedPath(upstreamURL *url.URL, requestPath, rawQuery string) string {
+	if upstreamURL == nil {
+		return ""
+	}
+	decodedPath, err := url.PathUnescape(requestPath)
+	if err != nil {
+		return ""
+	}
+	target := *upstreamURL
+	target.Path = joinURLPaths(upstreamURL.Path, decodedPath)
+	target.RawPath = joinURLPaths(upstreamURL.EscapedPath(), requestPath)
+	if target.RawPath == target.Path {
+		target.RawPath = ""
+	}
+	target.RawQuery = rawQuery
+	target.ForceQuery = false
 	target.Fragment = ""
 	target.RawFragment = ""
 	return target.String()
