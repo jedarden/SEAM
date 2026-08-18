@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/url"
+	"os"
 )
 
 // runtimeConfigStatus builds the operator-facing runtime snapshot returned by
@@ -19,6 +20,7 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 			"capture_enabled": s.config.CaptureEnabled,
 			"corpus_dir":      s.config.CorpusDir,
 			"fragments_dir":   s.config.FragmentsDir,
+			"upstream_ca_dir": s.config.UpstreamCADir,
 		},
 	}
 
@@ -37,6 +39,21 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 	status["spec"] = specStatus
 	status["routes"] = map[string]interface{}{
 		"enabled_count": routeCount,
+	}
+
+	// Enumerate routes with TLS exceptions for operator visibility
+	tlsExceptions := s.enumerateTLSExceptions()
+	if len(tlsExceptions) > 0 {
+		status["tls_exceptions"] = tlsExceptions
+	}
+
+	// Detect and report dev-mode CA source
+	devModeSource := detectDevModeCA()
+	if devModeSource != "" {
+		status["dev_mode_sources"] = map[string]interface{}{
+			"upstream_ca_directory": devModeSource,
+			"note":                  "Custom CA directory is active; ensure this is intentional for local development",
+		}
 	}
 
 	corpusDir := s.config.CorpusDir
@@ -139,4 +156,67 @@ func redactConfigURL(raw string) string {
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	return parsed.String()
+}
+
+// enumerateTLSExceptions scans the route table for routes with TLS exceptions
+// (skip-verify or plaintext) and returns a structured report for operator visibility.
+func (s *Server) enumerateTLSExceptions() map[string]interface{} {
+	if s.routeTable == nil {
+		return map[string]interface{}{
+			"skip_verify_routes": []interface{}{},
+			"plaintext_routes":   []interface{}{},
+		}
+	}
+
+	skipVerifyRoutes := make([]map[string]interface{}, 0)
+	plaintextRoutes := make([]map[string]interface{}, 0)
+
+	routes := s.routeTable.GetRoutes()
+	for _, route := range routes {
+		if route.TLSConfig == nil {
+			continue
+		}
+
+		// Check for skip-verify (insecureSkipVerify)
+		if route.TLSConfig.InsecureSkipVerify {
+			skipVerifyRoutes = append(skipVerifyRoutes, map[string]interface{}{
+				"path":        route.PathTemplate,
+				"method":      route.Method,
+				"api_version": route.APIVersion,
+				"upstream":    redactConfigURL(route.UpstreamTarget),
+				"server_name": route.TLSConfig.ServerName,
+				"ca_bundle":   route.TLSConfig.CaBundle,
+				"reason":      "x-upstream-tls.insecureSkipVerify: acknowledged",
+			})
+		}
+
+		// Check for plaintext acknowledgment
+		if route.TLSConfig.PlaintextAck {
+			plaintextRoutes = append(plaintextRoutes, map[string]interface{}{
+				"path":        route.PathTemplate,
+				"method":      route.Method,
+				"api_version": route.APIVersion,
+				"upstream":    redactConfigURL(route.UpstreamTarget),
+				"reason":      "x-upstream-plaintext: acknowledged",
+			})
+		}
+	}
+
+	return map[string]interface{}{
+		"skip_verify_routes": skipVerifyRoutes,
+		"plaintext_routes":   plaintextRoutes,
+		"total_count":        len(skipVerifyRoutes) + len(plaintextRoutes),
+	}
+}
+
+// detectDevModeCA checks if a custom upstream CA directory is being used,
+// indicating local development mode. Returns the directory path if custom,
+// empty string if using the default production path.
+func detectDevModeCA() string {
+	// Check if the upstream CA directory differs from the production default
+	// This is set by the --upstream-ca-dir flag in local development
+	if customDir := os.Getenv("SEAM_UPSTREAM_CA_DIR"); customDir != "" && customDir != DefaultUpstreamCADir {
+		return customDir
+	}
+	return ""
 }
