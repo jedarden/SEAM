@@ -206,6 +206,46 @@ func TestKubernetesAuthUsesProjectedTokenAndReportsMode(t *testing.T) {
 	}
 }
 
+func TestKubernetesAuthUsesSeparateConfiguredAuthAndKVMounts(t *testing.T) {
+	var loginCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/auth/k8s-rs-manager/login" {
+			loginCalls.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"auth":{"client_token":"example-client-token","lease_duration":60}}`))
+			return
+		}
+		if r.URL.Path != "/v1/secret/data/rs-manager/seam/routes/example/token" {
+			t.Errorf("request path = %q, want separate KV mount path", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"data":{"token":"example"}}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		Address:             server.URL,
+		Role:                "example-role",
+		MountPath:           "secret",
+		AuthMountPath:       "k8s-rs-manager",
+		InCluster:           boolPtr(true),
+		ServiceAccountToken: "example-jwt",
+		HTTPClient:          server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Login(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetSecret(context.Background(), "rs-manager/seam/routes/example/token"); err != nil {
+		t.Fatal(err)
+	}
+	if got := loginCalls.Load(); got != 1 {
+		t.Fatalf("login calls = %d, want 1", got)
+	}
+}
+
 func boolPtr(value bool) *bool { return &value }
 
 // errFrom is used only to inspect the typed hold-down error while keeping the
