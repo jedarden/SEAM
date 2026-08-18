@@ -205,14 +205,14 @@ path "secret/data/*" {
 		t.Fatalf("Failed to create evaluator token: %v", err)
 	}
 	report.EvaluatorTests.Details = append(report.EvaluatorTests.Details, "✓ Evaluator token created")
-	t.Logf("✓ Evaluator token created: %s...", evaluatorToken[:12])
+	t.Log("✓ Evaluator token created")
 
 	seamToken, err := createToken(ctx, baseURL, server.DevToken(), "seam-policy")
 	if err != nil {
 		t.Fatalf("Failed to create SEAM token: %v", err)
 	}
 	report.SEAMTests.Details = append(report.SEAMTests.Details, "✓ SEAM token created")
-	t.Logf("✓ SEAM token created: %s...", seamToken[:12])
+	t.Log("✓ SEAM token created")
 
 	evaluatorClient := openbao.NewClient(baseURL, evaluatorToken)
 	seamClient := openbao.NewClient(baseURL, seamToken)
@@ -229,7 +229,7 @@ path "secret/data/*" {
 		t.Fatalf("Evaluator MUST be able to read own token: %v", err)
 	}
 	if evaluatorTokenData["token"] != "ghp_testevaluatortoken12345678" {
-		t.Fatalf("Evaluator token value mismatch: got %v", evaluatorTokenData)
+		t.Fatalf("Evaluator token value mismatch")
 	}
 	report.EvaluatorTests.CanReadOwnToken = true
 	report.EvaluatorTests.Details = append(report.EvaluatorTests.Details,
@@ -242,7 +242,7 @@ path "secret/data/*" {
 		t.Fatalf("Evaluator MUST be able to read VM credentials: %v", err)
 	}
 	if vmCredsData["endpoint"] != "http://victoriametrics.example.com:8428" {
-		t.Fatalf("VM endpoint mismatch: got %v", vmCredsData)
+		t.Fatalf("VM endpoint credential mismatch")
 	}
 	report.EvaluatorTests.CanReadVMAuthCreds = true
 	report.EvaluatorTests.Details = append(report.EvaluatorTests.Details,
@@ -296,7 +296,7 @@ path "secret/data/*" {
 		t.Fatalf("SEAM MUST be able to read own routes: %v", err)
 	}
 	if seamOwnData["token"] != "test-seam-token-abc123" {
-		t.Fatalf("SEAM token value mismatch: got %v", seamOwnData)
+		t.Fatalf("SEAM token value mismatch")
 	}
 	report.SEAMTests.CanReadOwnRoutes = true
 	report.SEAMTests.Details = append(report.SEAMTests.Details,

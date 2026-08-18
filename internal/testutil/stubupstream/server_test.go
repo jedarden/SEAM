@@ -49,7 +49,7 @@ func TestStubUpstream_EchoBehavior(t *testing.T) {
 	}
 
 	if calls[0].AuthHeader != "Bearer test-token-12345" {
-		t.Errorf("logged auth header: got %s", calls[0].AuthHeader)
+		t.Errorf("logged auth header was not empty")
 	}
 }
 

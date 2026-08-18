@@ -9,18 +9,23 @@ import (
 // /config/status. The snapshot deliberately contains configuration metadata
 // only; credential material and URL user-info are never included.
 func (s *Server) runtimeConfigStatus() map[string]interface{} {
+	maxBufferedResponseBytes := s.config.MaxBufferedResponseBytes
+	if maxBufferedResponseBytes <= 0 {
+		maxBufferedResponseBytes = DefaultMaxBufferedResponseBytes
+	}
 	status := map[string]interface{}{
 		"config": map[string]interface{}{
-			"caller_port":     s.config.CallerPort,
-			"operator_port":   s.config.OperatorPort,
-			"base_url":        redactConfigURL(s.config.BaseURL),
-			"spec_dir":        s.config.SpecDir,
-			"fragment_mode":   s.config.FragmentMode,
-			"schema_path":     s.config.SchemaPath,
-			"capture_enabled": s.config.CaptureEnabled,
-			"corpus_dir":      s.config.CorpusDir,
-			"fragments_dir":   s.config.FragmentsDir,
-			"upstream_ca_dir": s.config.UpstreamCADir,
+			"caller_port":                 s.config.CallerPort,
+			"operator_port":               s.config.OperatorPort,
+			"base_url":                    redactConfigURL(s.config.BaseURL),
+			"spec_dir":                    s.config.SpecDir,
+			"fragment_mode":               s.config.FragmentMode,
+			"schema_path":                 s.config.SchemaPath,
+			"capture_enabled":             s.config.CaptureEnabled,
+			"corpus_dir":                  s.config.CorpusDir,
+			"fragments_dir":               s.config.FragmentsDir,
+			"upstream_ca_dir":             s.config.UpstreamCADir,
+			"max_buffered_response_bytes": maxBufferedResponseBytes,
 		},
 	}
 
@@ -40,6 +45,7 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 	status["routes"] = map[string]interface{}{
 		"enabled_count": routeCount,
 	}
+	status["scrubbing"] = s.enumerateScrubbingRoutes()
 
 	// Enumerate routes with TLS exceptions for operator visibility
 	tlsExceptions := s.enumerateTLSExceptions()
@@ -158,6 +164,38 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 	}
 
 	return status
+}
+
+// enumerateScrubbingRoutes makes every acknowledged unscrubbable route
+// visible to operators without exposing its vault path or credential policy.
+func (s *Server) enumerateScrubbingRoutes() map[string]interface{} {
+	routes := make([]map[string]interface{}, 0)
+	if s.routeTable != nil {
+		for _, route := range s.routeTable.GetRoutes() {
+			if !route.Unscrubbable {
+				continue
+			}
+			routes = append(routes, map[string]interface{}{
+				"path":        route.PathTemplate,
+				"method":      route.Method,
+				"api_version": route.APIVersion,
+				"upstream":    redactConfigURL(route.UpstreamTarget),
+				"reason":      "x-unscrubbable: acknowledged",
+			})
+		}
+	}
+	return map[string]interface{}{
+		"max_buffered_response_bytes": maxBufferedResponseBytes(s),
+		"unscrubbable_routes":         routes,
+		"unscrubbable_count":          len(routes),
+	}
+}
+
+func maxBufferedResponseBytes(s *Server) int64 {
+	if s == nil || s.config == nil || s.config.MaxBufferedResponseBytes <= 0 {
+		return DefaultMaxBufferedResponseBytes
+	}
+	return s.config.MaxBufferedResponseBytes
 }
 
 // redactConfigURL preserves the useful endpoint identity while removing URL

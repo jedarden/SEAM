@@ -224,9 +224,9 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 		t.Fatal("Secret token is not a string")
 	}
 	if token != testSecret {
-		t.Errorf("Expected token %s, got %s", testSecret, token)
+		t.Errorf("retrieved token did not match the configured fixture")
 	}
-	t.Logf("✓ Successfully retrieved secret from OpenBao: %s...", token[:12])
+	t.Log("✓ Successfully retrieved secret from OpenBao")
 
 	// Phase 7: Verify stub upstream received requests
 	t.Log("=== Phase 7: Verifying stub upstream behavior ===")
@@ -386,7 +386,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	}
 	token, ok := secretData["token"].(string)
 	if !ok || token != testSecret {
-		t.Errorf("Secret mismatch: expected %s, got %v", testSecret, secretData["token"])
+		t.Errorf("retrieved scenario credential did not match the configured fixture")
 	}
 
 	// Test: Verify stub upstream echoes credentials
@@ -402,7 +402,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	bodyStr := string(body)
 	if !strings.Contains(bodyStr, testSecret) {
-		t.Errorf("Stub should echo credential, got: %s", bodyStr)
+		t.Errorf("stub did not echo the credential")
 	}
 
 	// Verify scrubbing would work (replace secret with [REDACTED-BY-SEAM])
@@ -482,7 +482,7 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	}
 	token, ok := secretData["token"].(string)
 	if !ok || token != newSecret {
-		t.Errorf("Rotated secret mismatch: expected %s, got %v", newSecret, token)
+		t.Errorf("rotated secret did not match the configured fixture")
 	}
 
 	// Verify stub returns 401
@@ -765,7 +765,7 @@ func TestE2E_RequestFlow_IntegrationMatrix(t *testing.T) {
 
 			// Verify echo behavior
 			if !strings.Contains(bodyStr, tc.authValue) {
-				t.Logf("Note: Body doesn't contain auth value (may be redacted): %s", bodyStr[:100])
+				t.Log("Note: response body does not contain the auth value (it may be redacted)")
 			}
 
 			t.Logf("✓ %s completed successfully", tc.name)

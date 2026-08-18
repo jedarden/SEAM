@@ -119,6 +119,7 @@ type Config struct {
 	AllowlistFile             string // Path to upstream host allowlist file (optional, for dev mode)
 	VaultBaseDir              string // Base directory for vault path validation (default: "seam/routes")
 	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
+	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -148,6 +149,9 @@ type Server struct {
 
 // New creates a new Server with the given configuration
 func New(cfg *Config) *Server {
+	if cfg.MaxBufferedResponseBytes <= 0 {
+		cfg.MaxBufferedResponseBytes = DefaultMaxBufferedResponseBytes
+	}
 	// Initialize the spec loader
 	var specLoader *spec.Loader
 	var err error
@@ -1112,6 +1116,7 @@ func (s *Server) getOrCreateProxy(upstreamURL string) *ReverseProxy {
 	// Create new proxy
 	proxy, err := NewReverseProxyWithConfig(upstreamURL, &ReverseProxyConfig{
 		MaxReplayableRequestBytes: s.config.MaxReplayableRequestBytes,
+		MaxBufferedResponseBytes:  s.config.MaxBufferedResponseBytes,
 	})
 	if err != nil {
 		log.Printf("[dispatch] Failed to create proxy for upstream %s: %v", upstreamURL, err)

@@ -72,6 +72,11 @@ type RouteEntry struct {
 	VaultPath string
 	InjectAs  *InjectAs
 
+	// Unscrubbable is true only when the route explicitly acknowledges that an
+	// injected response cannot be scanned. The acknowledgement is enumerable
+	// through /config/status and is never inferred from a runtime failure.
+	Unscrubbable bool
+
 	// InstanceParam identifies the path binding consumed by an upstream map.
 	// It is removed from the upstream path before any remaining bindings are
 	// substituted.
@@ -250,6 +255,10 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			unscrubbable, err := extractAcknowledgedExtension(methodOp.operation, pathItem, spec, "x-unscrubbable")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 			instanceParam, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-instance-param")
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
@@ -275,6 +284,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				TLSConfig:            tlsConfig,
 				VaultPath:            vaultPath,
 				InjectAs:             injectAs,
+				Unscrubbable:         unscrubbable,
 				InstanceParam:        instanceParam,
 				UpstreamPathTemplate: upstreamPathTemplate,
 				UpstreamStripPrefix:  upstreamStripPrefix,
@@ -408,6 +418,21 @@ func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v
 		return nil, err
 	}
 	return injectAs, nil
+}
+
+func extractAcknowledgedExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, name string) (bool, error) {
+	node, ok := firstExtension(operation, pathItem, document, name)
+	if !ok || node == nil {
+		return false, nil
+	}
+	var value string
+	if err := node.Decode(&value); err != nil {
+		return false, fmt.Errorf("%s must be a string: %w", name, err)
+	}
+	if value != "acknowledged" {
+		return false, fmt.Errorf("%s must be \"acknowledged\" or absent; got %q", name, value)
+	}
+	return true, nil
 }
 
 func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (map[string]RouteTarget, error) {
