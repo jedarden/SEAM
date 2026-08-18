@@ -19,6 +19,211 @@ info:
 # servers will be populated at runtime with the caller-facing base URL
 servers: []
 
+# Error response schemas - reusable components for all error responses
+components:
+  schemas:
+    # Standard error response format
+    ErrorResponse:
+      type: object
+      description: Standard error response format for all API errors
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code identifier
+          enum:
+            - bad_request
+            - unauthorized
+            - forbidden
+            - not_found
+            - method_not_allowed
+            - invalid_version_parameter
+            - missing_required_parameter
+            - invalid_payload
+            - route_not_found
+            - validation_error
+            - quota_exceeded
+            - rate_limit_exceeded
+            - internal_server_error
+            - bad_gateway
+            - service_unavailable
+            - gateway_timeout
+            - upstream_failed
+            - capture_failed
+            - spec_load_failed
+            - config_error
+        message:
+          type: string
+          description: Human-readable error description
+        details:
+          type: object
+          description: Additional error context and metadata
+          additionalProperties: true
+        docs_url:
+          type: string
+          description: Link to relevant documentation
+          format: uri
+        request_id:
+          type: string
+          description: Unique request identifier for tracing
+      example:
+        error: route_not_found
+        message: No route found for GET /unknown/path
+        details:
+          method: GET
+          path: /unknown/path
+        docs_url: /docs
+        request_id: req_123456
+
+    # Validation error response format
+    ValidationErrorResponse:
+      type: object
+      description: Detailed validation error response with field-level errors
+      required:
+        - error
+        - message
+        - errors
+      properties:
+        error:
+          type: string
+          enum: [validation_error]
+          description: Error code for validation failures
+        message:
+          type: string
+          description: Human-readable validation error summary
+        errors:
+          type: array
+          description: Array of field-level validation errors
+          items:
+            $ref: '#/components/schemas/ValidationError'
+      example:
+        error: validation_error
+        message: Request validation failed
+        errors:
+          - field: version
+            expected: _unversioned
+            actual: v1
+            docs_url: /docs/route?path=/openapi.json&method=GET&version=_unversioned
+
+    # Individual field validation error
+    ValidationError:
+      type: object
+      description: Field-level validation error
+      required:
+        - field
+        - expected
+      properties:
+        field:
+          type: string
+          description: Field or parameter name that failed validation
+        expected:
+          type: string
+          description: Expected value or format for the field
+        actual:
+          type: string
+          description: Actual value received (optional)
+        docs_url:
+          type: string
+          description: Link to documentation for this field
+          format: uri
+
+  # Reusable response templates
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid request parameters or payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: bad_request
+            message: Invalid request parameters
+            details:
+              parameter: version
+
+    Unauthorized:
+      description: Unauthorized - Authentication required or failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Authentication required
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions to access this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: forbidden
+            message: Insufficient permissions
+
+    NotFound:
+      description: Not Found - Resource or route does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: route_not_found
+            message: No route found for GET /unknown/path
+            docs_url: /docs
+
+    MethodNotAllowed:
+      description: Method Not Allowed - HTTP method not supported for this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: method_not_allowed
+            message: Method not allowed
+
+    TooManyRequests:
+      description: Too Many Requests - Rate limit or quota exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: quota_exceeded
+            message: Request quota exceeded
+
+    InternalServerError:
+      description: Internal Server Error - Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_server_error
+            message: An unexpected error occurred
+
+    BadGateway:
+      description: Bad Gateway - Upstream service error or unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: bad_gateway
+            message: Upstream request failed
+
+    ServiceUnavailable:
+      description: Service Unavailable - Service temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: service_unavailable
+            message: Service temporarily unavailable
+
 paths:
   /openapi.json:
     get:
@@ -44,6 +249,12 @@ paths:
               schema:
                 type: string
                 default: _unversioned
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /docs:
     get:
@@ -72,6 +283,12 @@ paths:
               schema:
                 type: string
                 default: _unversioned
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /_seam/healthz:
     get:
@@ -93,6 +310,8 @@ paths:
               schema:
                 type: string
                 enum: ["OK"]
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
 
   /_seam/readyz:
     get:
@@ -114,6 +333,8 @@ paths:
                   ready:
                     type: boolean
                 required: [ready]
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
 
   /_seam/metrics:
     get:
@@ -131,6 +352,8 @@ paths:
             text/plain:
               schema:
                 type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
 
   /config/status:
     get:
@@ -158,6 +381,8 @@ paths:
                       type: string
                     description: Array of condition messages (empty in Phase 1a)
                 required: [fragments_loaded, conditions]
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
 
 tags:
   - name: Documentation
