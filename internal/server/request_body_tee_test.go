@@ -10,38 +10,38 @@ import (
 
 func TestNewReplayableBody(t *testing.T) {
 	tests := []struct {
-		name          string
-		contentLength int64
-		maxBytes      int64
-		wantUnreplayable bool
+		name              string
+		contentLength     int64
+		maxBytes          int64
+		wantUnreplayable  bool
 		wantExceededLimit bool
 	}{
 		{
-			name:          "small body within limit",
-			contentLength: 100,
-			maxBytes:      1000,
-			wantUnreplayable: false,
+			name:              "small body within limit",
+			contentLength:     100,
+			maxBytes:          1000,
+			wantUnreplayable:  false,
 			wantExceededLimit: false,
 		},
 		{
-			name:          "body exceeding limit",
-			contentLength: 2000,
-			maxBytes:      1000,
-			wantUnreplayable: true,
+			name:              "body exceeding limit",
+			contentLength:     2000,
+			maxBytes:          1000,
+			wantUnreplayable:  true,
 			wantExceededLimit: true,
 		},
 		{
-			name:          "unknown content length (chunked)",
-			contentLength: -1,
-			maxBytes:      1000,
-			wantUnreplayable: false,
+			name:              "unknown content length (chunked)",
+			contentLength:     -1,
+			maxBytes:          1000,
+			wantUnreplayable:  false,
 			wantExceededLimit: false,
 		},
 		{
-			name:          "exact limit match",
-			contentLength: 1000,
-			maxBytes:      1000,
-			wantUnreplayable: false,
+			name:              "exact limit match",
+			contentLength:     1000,
+			maxBytes:          1000,
+			wantUnreplayable:  false,
 			wantExceededLimit: false,
 		},
 	}
@@ -296,27 +296,27 @@ func TestReplayableBodyMultipleReads(t *testing.T) {
 
 func TestReplayableBodyIsReplayable(t *testing.T) {
 	tests := []struct {
-		name          string
-		contentLength int64
-		maxBytes      int64
+		name             string
+		contentLength    int64
+		maxBytes         int64
 		wantIsReplayable bool
 	}{
 		{
-			name:          "replayable body",
-			contentLength: 100,
-			maxBytes:      1000,
+			name:             "replayable body",
+			contentLength:    100,
+			maxBytes:         1000,
 			wantIsReplayable: true,
 		},
 		{
-			name:          "body exceeding limit",
-			contentLength: 2000,
-			maxBytes:      1000,
+			name:             "body exceeding limit",
+			contentLength:    2000,
+			maxBytes:         1000,
 			wantIsReplayable: false,
 		},
 		{
-			name:          "unknown length body",
-			contentLength: -1,
-			maxBytes:      1000,
+			name:             "unknown length body",
+			contentLength:    -1,
+			maxBytes:         1000,
 			wantIsReplayable: true,
 		},
 	}
@@ -412,46 +412,46 @@ func TestReplayableBodyLargeChunkedRead(t *testing.T) {
 
 func TestIsProtocolUpgrade(t *testing.T) {
 	tests := []struct {
-		name         string
-		method       string
-		path         string
+		name          string
+		method        string
+		path          string
 		upgradeHeader string
-		wantUpgrade  bool
+		wantUpgrade   bool
 	}{
 		{
-			name:         "normal GET request",
-			method:       "GET",
-			path:         "/api/test",
+			name:          "normal GET request",
+			method:        "GET",
+			path:          "/api/test",
 			upgradeHeader: "",
-			wantUpgrade:  false,
+			wantUpgrade:   false,
 		},
 		{
-			name:         "WebSocket upgrade",
-			method:       "GET",
-			path:         "/ws",
+			name:          "WebSocket upgrade",
+			method:        "GET",
+			path:          "/ws",
 			upgradeHeader: "websocket",
-			wantUpgrade:  true,
+			wantUpgrade:   true,
 		},
 		{
-			name:         "HTTP/2 prior knowledge (PRI)",
-			method:       "PRI",
-			path:         "*",
+			name:          "HTTP/2 prior knowledge (PRI)",
+			method:        "PRI",
+			path:          "*",
 			upgradeHeader: "",
-			wantUpgrade:  true,
+			wantUpgrade:   true,
 		},
 		{
-			name:         "CONNECT method",
-			method:       "CONNECT",
-			path:         "example.com:443",
+			name:          "CONNECT method",
+			method:        "CONNECT",
+			path:          "example.com:443",
 			upgradeHeader: "",
-			wantUpgrade:  true,
+			wantUpgrade:   true,
 		},
 		{
-			name:         "POST with WebSocket",
-			method:       "POST",
-			path:         "/ws",
+			name:          "POST with WebSocket",
+			method:        "POST",
+			path:          "/ws",
 			upgradeHeader: "websocket",
-			wantUpgrade:  true,
+			wantUpgrade:   true,
 		},
 	}
 

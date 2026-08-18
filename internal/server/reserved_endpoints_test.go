@@ -327,13 +327,33 @@ func testConfigStatusEndpointResponses(t *testing.T) {
 					t.Fatalf("failed to decode JSON response: %v", err)
 				}
 
-				// Check for expected fields
-				if status["fragments_loaded"] == nil {
-					t.Error("expected fragments_loaded field in response")
+				// Check for expected top-level sections
+				expectedSections := []string{"config", "spec", "routes", "corpus", "cache", "quota", "health"}
+				for _, section := range expectedSections {
+					if status[section] == nil {
+						t.Errorf("expected %s section in response", section)
+					}
 				}
 
-				if status["conditions"] == nil {
-					t.Error("expected conditions field in response")
+				// Check config section has required fields
+				if config, ok := status["config"].(map[string]interface{}); ok {
+					if config["caller_port"] == nil {
+						t.Error("expected caller_port in config section")
+					}
+					if config["operator_port"] == nil {
+						t.Error("expected operator_port in config section")
+					}
+				} else {
+					t.Error("config section is not a map")
+				}
+
+				// Check spec section has hash
+				if spec, ok := status["spec"].(map[string]interface{}); ok {
+					if spec["hash"] == nil {
+						t.Error("expected hash in spec section")
+					}
+				} else {
+					t.Error("spec section is not a map")
 				}
 
 				// Check content type

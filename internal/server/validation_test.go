@@ -72,7 +72,7 @@ func TestValidationMiddleware_InvalidRequest_Returns400(t *testing.T) {
 	}
 
 	// Verify structured error response
-	var response ValidationErrorResponse
+	var response SpecValidationResponse
 	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 		t.Fatalf("Failed to decode error response: %v", err)
 	}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,6 +37,40 @@ var (
 	metricCacheEvictions = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "seam_cache_evictions_total",
 		Help: "Total number of cache evictions",
+	})
+
+	// HTTP request metrics
+	metricHTTPRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "seam_http_requests_total",
+		Help: "Total number of HTTP requests by route and method",
+	}, []string{"route", "method", "status"})
+
+	metricHTTPLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "seam_http_latency_seconds",
+		Help:    "HTTP request latency in seconds by route and method",
+		Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+	}, []string{"route", "method"})
+
+	metricHTTPInFlight = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "seam_http_requests_in_flight",
+		Help: "Current number of in-flight HTTP requests by route and method",
+	}, []string{"route", "method"})
+
+	// Upstream health metrics
+	metricUpstreamHealth = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "seam_upstream_health",
+		Help: "Upstream health status: 0=closed, 1=open, 2=half_open",
+	}, []string{"origin"})
+
+	metricUpstreamConsecutiveFailures = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "seam_upstream_consecutive_failures",
+		Help: "Number of consecutive failures for upstream circuit breaker",
+	}, []string{"origin"})
+
+	// OpenBao cache metrics (placeholder for future OpenBao integration)
+	metricOpenBaoCacheHits = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "seam_openbao_cache_hits_total",
+		Help: "Total number of OpenBao cache hits (placeholder - OpenBao integration not yet implemented)",
 	})
 
 	// Quota metrics
@@ -75,6 +110,8 @@ func init() {
 	_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Set SEAM build info metrics
+	// TODO: Populate version from build info (e.g., via ldflags)
+	// For now, use runtime version as a placeholder
 	seamBuildInfo.WithLabelValues("dev", runtime.Version()).Set(1)
 }
 
@@ -126,4 +163,43 @@ func recordQuotaExceeded(route string) {
 // recordQuotaBypassed records a quota check bypassed due to cache hit
 func recordQuotaBypassed(route string) {
 	metricQuotaBypassed.WithLabelValues(route).Inc()
+}
+
+// recordHTTPRequest records an HTTP request completion with status code
+func recordHTTPRequest(route, method string, statusCode int, duration float64) {
+	metricHTTPRequests.WithLabelValues(route, method, fmt.Sprintf("%d", statusCode)).Inc()
+	metricHTTPLatency.WithLabelValues(route, method).Observe(duration)
+}
+
+// incrementInFlight increments the in-flight request counter
+func incrementInFlight(route, method string) {
+	metricHTTPInFlight.WithLabelValues(route, method).Inc()
+}
+
+// decrementInFlight decrements the in-flight request counter
+func decrementInFlight(route, method string) {
+	metricHTTPInFlight.WithLabelValues(route, method).Dec()
+}
+
+// recordOpenBaoCacheHit records an OpenBao cache hit
+func recordOpenBaoCacheHit() {
+	metricOpenBaoCacheHits.Inc()
+}
+
+// setUpstreamHealth records upstream circuit breaker state
+func setUpstreamHealth(origin string, state CircuitBreakerState, consecutiveFailures int) {
+	var stateValue float64
+	switch state {
+	case CircuitBreakerClosed:
+		stateValue = 0
+	case CircuitBreakerOpen:
+		stateValue = 1
+	case CircuitBreakerHalfOpen:
+		stateValue = 2
+	default:
+		stateValue = 0
+	}
+
+	metricUpstreamHealth.WithLabelValues(origin).Set(stateValue)
+	metricUpstreamConsecutiveFailures.WithLabelValues(origin).Set(float64(consecutiveFailures))
 }
