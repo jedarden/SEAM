@@ -38,6 +38,9 @@ metadata:
   annotations:
     tailscale.com/expose: "true"
     tailscale.com/hostname: "seam-rs-manager"
+    # Give SEAM its own destination tag so the tailnet ACL can scope access
+    # to this service rather than every Tailscale proxy in rs-manager.
+    tailscale.com/tags: "tag:seam"
 spec:
   type: ClusterIP
   selector:

@@ -18,7 +18,8 @@ resources:
 # ConfigMap generators (disableNameSuffixHash for name stability)
 configMapGenerator:
   - name: seam-routes-seam
-    disableNameSuffixHash: true
+    options:
+      disableNameSuffixHash: true
     files:
       # Route fragments loaded from spec/fragments.d
       - fragments.d/argocd-read-only-proxy.yaml

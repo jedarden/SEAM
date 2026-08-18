@@ -1,0 +1,54 @@
+{
+  // SEAM's tailnet policy slice.
+  //
+  // Merge these members into the existing tailnet policy file. The explicit
+  // "acls" section is intentional: access to tag:seam is deny-by-default, so
+  // tailnet membership alone never grants access to either listener.
+  //
+  // The operator source set is autogroup:admin: the administrative devices
+  // used to inspect the operator-only surface. It is also allowed to use the
+  // caller port for operational testing; worker sources are not allowed on
+  // the operator port.
+  "tagOwners": {
+    "tag:seam": ["tag:k8s-operator"],
+    "tag:needle-worker": ["autogroup:admin"],
+    "tag:devpod": ["autogroup:admin"]
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "proto": "tcp",
+      "src": [
+        "tag:needle-worker",
+        "tag:devpod",
+        "autogroup:admin"
+      ],
+      "dst": ["tag:seam:8080"]
+    },
+    {
+      "action": "accept",
+      "proto": "tcp",
+      "src": ["autogroup:admin"],
+      "dst": ["tag:seam:8081"]
+    }
+  ],
+  "tests": [
+    {
+      "src": "tag:needle-worker",
+      "proto": "tcp",
+      "accept": ["tag:seam:8080"],
+      "deny": ["tag:seam:8081"]
+    },
+    {
+      "src": "tag:devpod",
+      "proto": "tcp",
+      "accept": ["tag:seam:8080"],
+      "deny": ["tag:seam:8081"]
+    },
+    {
+      "src": "autogroup:admin",
+      "proto": "tcp",
+      "accept": ["tag:seam:8080", "tag:seam:8081"]
+    }
+  ]
+}
