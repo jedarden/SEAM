@@ -14,6 +14,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/errors"
+	validatorpaths "github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -312,6 +313,19 @@ func (l *Loader) GetRawDocument() []byte {
 // ValidateRequest validates an HTTP request against the OpenAPI spec
 // Returns nil if valid, or a ValidationError if invalid
 func (l *Loader) ValidateRequest(r *http.Request) *ValidationError {
+	if l == nil || l.validator == nil || l.model == nil || r == nil {
+		return nil
+	}
+
+	// Resolve the request once for the contract path. The validator populates
+	// SpecPath on most errors, but that value is not guaranteed for decoder and
+	// schema errors. Keeping the template here is also what lets a pointer for
+	// /widgets/123 name /widgets/{id} rather than the concrete request path.
+	_, _, pathTemplate := validatorpaths.FindPath(r, &l.model.Model, nil)
+	if pathTemplate == "" {
+		pathTemplate = r.URL.Path
+	}
+
 	// Validate the request
 	valid, validationErrors := l.validator.ValidateHttpRequest(r)
 
@@ -322,7 +336,8 @@ func (l *Loader) ValidateRequest(r *http.Request) *ValidationError {
 
 	// Build structured error response
 	return &ValidationError{
-		Errors: validationErrors,
+		Errors:       validationErrors,
+		PathTemplate: pathTemplate,
 	}
 }
 
@@ -433,7 +448,8 @@ func (l *Loader) ListPaths() []string {
 
 // ValidationError represents a structured validation error
 type ValidationError struct {
-	Errors []*errors.ValidationError
+	Errors       []*errors.ValidationError
+	PathTemplate string
 }
 
 // ValidationErrorItem represents a single validation error from libopenapi-validator
@@ -451,17 +467,15 @@ type ValidationErrorItem struct {
 
 // ToJSON converts the validation error to a structured JSON response
 func (ve *ValidationError) ToJSON(path, method string) map[string]interface{} {
+	if path == "" && ve != nil {
+		path = ve.PathTemplate
+	}
 	errorDetails := []map[string]interface{}{}
 
 	for _, err := range ve.Errors {
-		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
-		field := err.SpecPath
-		if field == "" {
-			field = err.RequestPath
-		}
 		errorDetails = append(errorDetails, map[string]interface{}{
-			"field":          field,
-			"expected_shape": err.HowToFix,
+			"field":          validationField(err),
+			"expected_shape": extractExpectedShape(err),
 			"actual":         err.RequestPath,
 			"reason":         err.Reason,
 			"line":           err.SpecLine,
@@ -499,13 +513,8 @@ func FormatValidationErrorTo400(validationErrors []*errors.ValidationError, path
 	errorDetails := []map[string]interface{}{}
 
 	for _, err := range validationErrors {
-		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
-		field := err.SpecPath
-		if field == "" {
-			field = err.RequestPath
-		}
 		errorDetails = append(errorDetails, map[string]interface{}{
-			"field":          field,
+			"field":          validationField(err),
 			"expected_shape": extractExpectedShape(err),
 			"actual":         err.RequestPath,
 			"reason":         err.Reason,
@@ -529,6 +538,25 @@ func FormatDocsURL(path, method string) string {
 
 // extractExpectedShape derives the expected shape/type from a validation error
 func extractExpectedShape(err *errors.ValidationError) string {
+	if err == nil {
+		return "See OpenAPI specification for required format"
+	}
+
+	// Schema failures carry the useful field-level diagnostic separately from
+	// HowToFix, whose generic value is often just "invalid schema". Include the
+	// detail so callers can tell, for example, that a field must be an integer.
+	if len(err.SchemaValidationErrors) > 0 {
+		details := make([]string, 0, len(err.SchemaValidationErrors))
+		for _, schemaErr := range err.SchemaValidationErrors {
+			if schemaErr != nil && schemaErr.Reason != "" {
+				details = append(details, schemaErr.Reason)
+			}
+		}
+		if len(details) > 0 {
+			return strings.Join(details, "; ")
+		}
+	}
+
 	// Start with the HowToFix as the base expected shape
 	expectedShape := err.HowToFix
 
@@ -567,6 +595,47 @@ func extractExpectedShape(err *errors.ValidationError) string {
 	return expectedShape
 }
 
+// validationField returns a stable, caller-useful field description. The
+// validator's SpecPath identifies the route for body errors, while the nested
+// schema diagnostics identify the actual JSON field. Keep both when both are
+// available: it preserves the contract context and names the bad field.
+func validationField(err *errors.ValidationError) string {
+	if err == nil {
+		return "request"
+	}
+
+	field := err.SpecPath
+	if len(err.SchemaValidationErrors) > 0 {
+		for _, schemaErr := range err.SchemaValidationErrors {
+			if schemaErr == nil {
+				continue
+			}
+			if schemaErr.FieldPath != "" {
+				if field != "" && field != schemaErr.FieldPath {
+					return field + ": " + schemaErr.FieldPath
+				}
+				return schemaErr.FieldPath
+			}
+			if schemaErr.FieldName != "" {
+				if field != "" && field != schemaErr.FieldName {
+					return field + ": " + schemaErr.FieldName
+				}
+				return schemaErr.FieldName
+			}
+		}
+	}
+	if err.ParameterName != "" {
+		if field != "" {
+			return field + ": " + err.ParameterName
+		}
+		return err.ParameterName
+	}
+	if field != "" {
+		return field
+	}
+	return err.RequestPath
+}
+
 // ValidationFieldError represents a single field error in the structured 400 response
 type ValidationFieldError struct {
 	Field         string `json:"field"`
@@ -594,13 +663,8 @@ func ConvertToStructured400(ve *ValidationError, path, method string) *Structure
 	}
 
 	for _, err := range ve.Errors {
-		// Use SpecPath as field, fallback to RequestPath if SpecPath is empty
-		field := err.SpecPath
-		if field == "" {
-			field = err.RequestPath
-		}
 		response.ValidationErrors = append(response.ValidationErrors, ValidationFieldError{
-			Field:         field,
+			Field:         validationField(err),
 			ExpectedShape: extractExpectedShape(err),
 			Actual:        err.RequestPath,
 			Reason:        err.Reason,
