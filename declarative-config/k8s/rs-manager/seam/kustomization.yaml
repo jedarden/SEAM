@@ -1,0 +1,32 @@
+---
+# Kustomization for SEAM Gateway deployment
+# Phase 6a: Hosting foundation with Kubernetes auth to OpenBao
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Resources to deploy
+# Note: namespace.yaml is excluded as the namespace is already managed by
+# seam-retirement-evaluator-ns-rs-manager. Both applications share the seam namespace.
+resources:
+  - configmap-upstream-ca.yaml
+  - configmap-allowlist.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+
+# ConfigMap generators (disableNameSuffixHash for name stability)
+configMapGenerator:
+  - name: seam-routes-seam
+    disableNameSuffixHash: true
+    files:
+      # Route fragments loaded from spec/fragments.d
+      - fragments.d/argocd-read-only-proxy.yaml
+      # Fragment schema for validation
+      - fragment-schema.json
+
+# Labels to apply to all resources
+commonLabels:
+  app.kubernetes.io/name: seam
+  app.kubernetes.io/component: gateway
+  app.kubernetes.io/managed-by: argocd

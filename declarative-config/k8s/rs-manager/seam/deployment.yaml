@@ -1,0 +1,140 @@
+---
+# SEAM Gateway Deployment
+# Phase 6a: Hosting foundation for the credential-injecting gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seam
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/managed-by: argocd
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seam
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seam
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      serviceAccountName: seam
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: seam
+        # Semver tag from containers/seam/VERSION — never :latest, never bare SHA
+        image: ronaldraygun/seam:0.1.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: caller
+          containerPort: 8080
+          protocol: TCP
+        - name: operator
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: SEAM_CALLER_PORT
+          value: "8080"
+        - name: SEAM_OPERATOR_PORT
+          value: "8081"
+        - name: SEAM_BASE_URL
+          value: "https://seam-rs-manager.tail1b1987.ts.net"
+        - name: SEAM_SPEC_DIR
+          value: "/spec"
+        - name: SEAM_FRAGMENT_MODE
+          value: "true"
+        - name: SEAM_FRAGMENTS_DIR
+          value: "/spec/fragments.d"
+        - name: SEAM_SCHEMA_PATH
+          value: "/spec/fragment-schema.json"
+        - name: SEAM_UPSTREAM_CA_DIR
+          value: "/etc/gateway/upstream-ca"
+        # Phase 2.5: Request body tee for credential replay
+        - name: SEAM_MAX_REPLAYABLE_REQUEST_BYTES
+          value: "1048576"  # 1 MiB
+        # Phase 2.6: Response buffering for whole-response scrubbing
+        - name: SEAM_MAX_BUFFERED_RESPONSE_BYTES
+          value: "1048576"  # 1 MiB
+        # Disable OpenBao dev flags in-cluster (Phase 6a: prove Kubernetes auth)
+        - name: SEAM_OPENBAO_DEV_MODE
+          value: "false"
+        volumeMounts:
+        - name: spec
+          mountPath: /spec
+          readOnly: true
+        - name: upstream-ca
+          mountPath: /etc/gateway/upstream-ca
+          readOnly: true
+        - name: allowlist
+          mountPath: /etc/gateway/allowlist.yaml
+          subPath: allowlist.yaml
+          readOnly: true
+        # Projected service account token for Kubernetes auth to OpenBao
+        - name: service-account-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /_seam/healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_seam/readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+      volumes:
+      # Route spec fragments loaded from ConfigMap
+      - name: spec
+        configMap:
+          name: seam-routes-seam
+      # Upstream CA bundles for TLS verification
+      - name: upstream-ca
+        configMap:
+          name: seam-upstream-ca
+      # Upstream host allowlist for dual validation
+      - name: allowlist
+        configMap:
+          name: seam-upstream-allowlist
+      # Projected service account token for Kubernetes authentication to OpenBao
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: openbao
+              expirationSeconds: 3600
+              path: token

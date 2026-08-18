@@ -1,0 +1,30 @@
+---
+# SEAM Upstream CA Bundles ConfigMap
+# Contains TLS CA certificates for upstream server verification
+# Mounted at /etc/gateway/upstream-ca/ in the container
+#
+# Each key in this ConfigMap becomes a file in the mounted directory.
+# The filename is the key name, and the content is the certificate bundle.
+#
+# Phase 6a: Empty ConfigMap (no custom CAs required for initial deployment)
+# Add CA bundles as keys when upstream services use custom certificates.
+#
+# Example usage:
+#   data:
+#     openbao-ca.pem: |
+#       -----BEGIN CERTIFICATE-----
+#       MIIBkTCB+wIJAKH...
+#       -----END CERTIFICATE-----
+#     custom-upstream.pem: |
+#       -----BEGIN CERTIFICATE-----
+#       MIIBkTCB+wIJAKH...
+#       -----END CERTIFICATE-----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seam-upstream-ca
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+data: {}

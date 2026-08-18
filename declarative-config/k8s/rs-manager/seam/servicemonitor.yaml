@@ -1,0 +1,23 @@
+---
+# SEAM ServiceMonitor for VictoriaMetrics scraping
+# Scrapes Prometheus metrics from the operator port (8081) at /_seam/metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seam
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seam
+      app.kubernetes.io/component: gateway
+  endpoints:
+  - name: operator
+    port: operator
+    path: /_seam/metrics
+    interval: 30s
+    scrapeTimeout: 10s

@@ -1,0 +1,27 @@
+---
+# SEAM Upstream Allowlist ConfigMap
+# Dual validation system: validates both vault-path and upstream-host
+# Mounted at /etc/gateway/allowlist.yaml in the container
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seam-upstream-allowlist
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+data:
+  allowlist.yaml: |
+    # SEAM Upstream Allowlist Configuration
+    # Defines allowed upstream hosts and vault paths for dual validation
+    #
+    # Format:
+    #   upstream_hosts: List of allowed upstream hostnames
+    #   vault_paths: List of allowed vault path prefixes
+    #
+    # Phase 6a: Initial allowlist for testing
+    upstream_hosts:
+      - "openbao.openbao.svc.cluster.local"
+      - "*.tail1b1987.ts.net"
+    vault_paths:
+      - "seam/routes/"

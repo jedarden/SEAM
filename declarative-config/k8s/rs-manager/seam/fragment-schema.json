@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SEAM Route Fragment",
+  "type": "object",
+  "required": ["openapi", "info", "paths"],
+  "properties": {
+    "openapi": {
+      "type": "string",
+      "pattern": "^3\\.1\\.0$"
+    },
+    "info": {
+      "type": "object",
+      "required": ["title", "version"],
+      "properties": {
+        "title": {"type": "string"},
+        "version": {"type": "string"},
+        "description": {"type": "string"}
+      }
+    },
+    "x-seam-schema": {
+      "type": "string",
+      "enum": ["v1"]
+    },
+    "x-seam-owner": {
+      "type": "string"
+    },
+    "x-api-version": {
+      "type": "string"
+    },
+    "x-upstream": {
+      "type": "string",
+      "format": "uri"
+    },
+    "x-upstream-strip-prefix": {
+      "type": "string"
+    },
+    "x-required-scope": {
+      "type": "string"
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "securitySchemes": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}
