@@ -139,7 +139,8 @@ func (s *Server) headerStrippingMiddleware(next http.Handler) http.Handler {
 		// NOTE: Header names are canonicalized by Go (e.g., "X-SEAM-*" -> "X-Seam-*")
 		stripped := false
 		for headerName := range r.Header {
-			if strings.HasPrefix(headerName, "X-Seam-") && !allowedSEAMHeaders[headerName] {
+			if strings.HasPrefix(strings.ToLower(headerName), "x-seam-") &&
+				!allowedSEAMHeaders[headerName] && !strings.EqualFold(headerName, "X-SEAM-Dry-Run") {
 				r.Header.Del(headerName)
 				stripped = true
 			}
