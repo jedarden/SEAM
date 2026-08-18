@@ -8,9 +8,7 @@ import (
 )
 
 // Context key for cache hit status
-type contextKey string
-
-const cacheHitKey contextKey = "cacheHit"
+const cacheHitKey contextKey = iota
 
 // cacheMiddleware creates middleware that caches GET responses and provides single-flight coalescing
 // Only applies to GET requests; other methods pass through unchanged
@@ -60,12 +58,12 @@ func (s *Server) cacheMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			// Check if it's a context error (cancellation/timeout)
 			if ctxErr := ctxError(err); ctxErr != nil {
-				// Request was cancelled - just return
-				http.Error(w, "Request cancelled", http.StatusServiceUnavailable)
+				// Request was cancelled - return structured error
+				NewErrorResponse(ErrCodeServiceUnavailable, "Request cancelled").WithDetail("reason", "context_cancelled").Write(w, r)
 				return
 			}
-			// Some other error occurred
-			http.Error(w, "Upstream request failed", http.StatusBadGateway)
+			// Some other error occurred - return structured error
+			NewErrorResponse(ErrCodeBadGateway, "Upstream request failed").WithDetail("error", err.Error()).Write(w, r)
 			return
 		}
 

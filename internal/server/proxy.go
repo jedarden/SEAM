@@ -187,6 +187,11 @@ type ReverseProxy struct {
 	// MaxReplayableRequestBytes is the maximum request body size to buffer for replay.
 	// This is an independent knob from response buffering. Default: 1 MiB.
 	MaxReplayableRequestBytes int64
+
+	// MaxBufferedResponseBytes is the maximum decoded response body held for
+	// whole-body scrubbing. Larger and unknown-length bodies use incremental
+	// scrubbing instead. Default: 1 MiB.
+	MaxBufferedResponseBytes int64
 }
 
 // NewReverseProxy creates a reverse proxy for upstreamURL.
@@ -197,6 +202,7 @@ func NewReverseProxy(upstreamURL string) (*ReverseProxy, error) {
 // ReverseProxyConfig holds configuration for creating a ReverseProxy.
 type ReverseProxyConfig struct {
 	MaxReplayableRequestBytes int64
+	MaxBufferedResponseBytes  int64
 }
 
 // NewReverseProxyWithConfig creates a reverse proxy with custom configuration.
@@ -206,9 +212,13 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 		return nil, err
 	}
 
-	maxReplayable := DefaultMaxReplayableRequestBytes
+	maxReplayable := int64(DefaultMaxReplayableRequestBytes)
 	if cfg != nil && cfg.MaxReplayableRequestBytes > 0 {
 		maxReplayable = cfg.MaxReplayableRequestBytes
+	}
+	maxBufferedResponse := DefaultMaxBufferedResponseBytes
+	if cfg != nil && cfg.MaxBufferedResponseBytes > 0 {
+		maxBufferedResponse = cfg.MaxBufferedResponseBytes
 	}
 
 	return &ReverseProxy{
@@ -218,6 +228,7 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 		RequestTimeout:            upstreamRequestTimeout,
 		BufferPool:                newBufferPool(),
 		MaxReplayableRequestBytes: maxReplayable,
+		MaxBufferedResponseBytes:  maxBufferedResponse,
 	}, nil
 }
 
@@ -226,6 +237,10 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	match := routeMatchFromRequest(r)
 	if match != nil && match.Route.InjectAs != nil {
+		if isProtocolUpgrade(r) && !match.Route.Unscrubbable {
+			p.handleError(w, r, errUnscannableResponse, "refusing credential injection into protocol upgrade")
+			return
+		}
 		resolver := routeSecretResolverFromRequest(r)
 		if resolver == nil {
 			p.handleError(w, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
@@ -240,6 +255,7 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			p.handleError(w, r, err, "injecting upstream credential")
 			return
 		}
+		ctx = withResponseScrub(ctx, secret, match.Route.Unscrubbable)
 	}
 
 	outgoingURL, err := p.buildUpstreamURLForMatch(r, match)
@@ -352,6 +368,24 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	defer func() { _ = upstreamResp.Body.Close() }()
 
 	log.Printf("[proxy] Upstream %s %s -> %d (%v)", upstreamReq.Method, upstreamReq.URL.Path, upstreamResp.StatusCode, time.Since(startTime))
+
+	if scrubConfig := responseScrubFromContext(upstreamReq.Context()); scrubConfig != nil && len(scrubConfig.secrets) > 0 {
+		scrubber := newSecretScrubber(scrubConfig.secrets)
+		_, encodingsErr := parseContentEncodings(upstreamResp.Header.Get("Content-Encoding"))
+		if responseIsOpaque(upstreamResp) || encodingsErr != nil {
+			if !scrubConfig.allowUnscannable {
+				return errUnscannableResponse
+			}
+			if err := scrubber.serveUnscannable(w, upstreamResp); err != nil {
+				return fmt.Errorf("streaming acknowledged unscannable response: %w", err)
+			}
+			return nil
+		}
+		if err := scrubber.streamResponse(w, upstreamResp, p.MaxBufferedResponseBytes); err != nil {
+			return fmt.Errorf("scrubbing upstream response: %w", err)
+		}
+		return nil
+	}
 
 	copyHeaders(upstreamResp.Header, w.Header())
 	w.WriteHeader(upstreamResp.StatusCode)
@@ -652,7 +686,7 @@ func StreamResponse(w http.ResponseWriter, resp *http.Response) error {
 		return fmt.Errorf("response is nil")
 	}
 
-	// Copy headers, excluding hop-by-hop headers
+	// Copy headers, excluding hop-by-hop headers.
 	copyHeaders(resp.Header, w.Header())
 
 	// Write status code
