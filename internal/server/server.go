@@ -105,17 +105,20 @@ func isReservedPath(path string) bool {
 // The URL is synthesized into the spec at runtime, not read from spec files,
 // allowing the same spec fragments to be served from different environments.
 type Config struct {
-	CallerPort     int
-	OperatorPort   int
-	BaseURL        string // Caller-facing endpoint URL (from SEAM_BASE_URL or -base-url flag)
-	SpecDir        string
-	FragmentMode   bool
-	SchemaPath     string
-	CaptureEnabled bool
-	CorpusDir      string
-	FragmentsDir   string
-	UpstreamURL    string // Default upstream URL for proxying (Phase 2.0: single upstream)
-	UpstreamCADir  string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
+	CallerPort                int
+	OperatorPort              int
+	BaseURL                   string // Caller-facing endpoint URL (from SEAM_BASE_URL or -base-url flag)
+	SpecDir                   string
+	FragmentMode              bool
+	SchemaPath                string
+	CaptureEnabled            bool
+	CorpusDir                 string
+	FragmentsDir              string
+	UpstreamURL               string // Default upstream URL for proxying (Phase 2.0: single upstream)
+	UpstreamCADir             string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
+	AllowlistFile             string // Path to upstream host allowlist file (optional, for dev mode)
+	VaultBaseDir              string // Base directory for vault path validation (default: "seam/routes")
+	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -140,6 +143,7 @@ type Server struct {
 	quotaTracker      *QuotaTracker
 	costPerCalls      map[string]float64 // route -> cost per call
 	mu                sync.RWMutex
+	allowlistEnforcer *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
 }
 
 // New creates a new Server with the given configuration
@@ -147,6 +151,20 @@ func New(cfg *Config) *Server {
 	// Initialize the spec loader
 	var specLoader *spec.Loader
 	var err error
+
+	// Set default vault base directory
+	vaultBaseDir := cfg.VaultBaseDir
+	if vaultBaseDir == "" {
+		vaultBaseDir = "seam/routes"
+	}
+
+	// Initialize allowlist enforcer
+	allowlistEnforcer, err := spec.NewAllowlistEnforcer(vaultBaseDir, cfg.AllowlistFile)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize allowlist enforcer: %v", err)
+		// Continue without allowlist - will be fail-closed
+		allowlistEnforcer = nil
+	}
 
 	if cfg.FragmentMode {
 		specLoader, err = spec.NewWithFragments(cfg.SpecDir, cfg.BaseURL, cfg.SchemaPath, cfg.FragmentsDir)
@@ -158,6 +176,12 @@ func New(cfg *Config) *Server {
 		} else {
 			log.Printf("Loaded spec from fragments in %s/fragments.d", cfg.SpecDir)
 		}
+
+		// Configure allowlist enforcer for fragment loader
+		if allowlistEnforcer != nil && specLoader.FragmentLoader != nil {
+			specLoader.FragmentLoader.SetAllowlistEnforcer(allowlistEnforcer)
+			log.Printf("Allowlist enforcer configured for fragment validation")
+		}
 	} else {
 		specLoader, err = spec.New(cfg.SpecDir, cfg.BaseURL)
 		if err != nil {
@@ -167,18 +191,19 @@ func New(cfg *Config) *Server {
 	}
 
 	s := &Server{
-		config:          cfg,
-		callerMux:       http.NewServeMux(),
-		operatorMux:     http.NewServeMux(),
-		specLoader:      specLoader,
-		routeTable:      NewRouteTable(specLoader),
-		proxyMap:        make(map[string]*ReverseProxy),
-		cache:           NewResponseCache(),
-		singleFlight:    NewSingleFlight(),
-		cacheTTLs:       make(map[string]int),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker:    NewQuotaTracker(),
-		costPerCalls:    make(map[string]float64),
+		config:            cfg,
+		callerMux:         http.NewServeMux(),
+		operatorMux:       http.NewServeMux(),
+		specLoader:        specLoader,
+		routeTable:        NewRouteTable(specLoader),
+		proxyMap:          make(map[string]*ReverseProxy),
+		cache:             NewResponseCache(),
+		singleFlight:      NewSingleFlight(),
+		cacheTTLs:         make(map[string]int),
+		circuitBreakers:   NewCircuitBreakerStateRegistry(),
+		quotaTracker:      NewQuotaTracker(),
+		costPerCalls:      make(map[string]float64),
+		allowlistEnforcer: allowlistEnforcer,
 	}
 	log.Printf("Route table initialized with %d routes", s.routeTable.RouteCount())
 
@@ -256,16 +281,28 @@ func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // readyzHandler returns readiness status
-// In Phase 1a, this always returns ready=true.
-// Phase 6a (bf-38bj) will add login dependency gating.
+// Returns ready=false when allowlist is in fail-closed state (no hosts permitted)
+// Phase 2.2: Allowlist enforcement gating
 func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]bool{"ready": true})
+
+	// Check allowlist status
+	ready := true
+	if s.allowlistEnforcer != nil && s.allowlistEnforcer.IsFailClosed() {
+		ready = false
+	}
+
+	statusCode := http.StatusOK
+	if !ready {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ready": ready})
 }
 
 // metricsHandler returns Prometheus-style metrics
@@ -1073,7 +1110,9 @@ func (s *Server) getOrCreateProxy(upstreamURL string) *ReverseProxy {
 	}
 
 	// Create new proxy
-	proxy, err := NewReverseProxy(upstreamURL)
+	proxy, err := NewReverseProxyWithConfig(upstreamURL, &ReverseProxyConfig{
+		MaxReplayableRequestBytes: s.config.MaxReplayableRequestBytes,
+	})
 	if err != nil {
 		log.Printf("[dispatch] Failed to create proxy for upstream %s: %v", upstreamURL, err)
 		return nil

@@ -321,6 +321,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkURLs(report, allowlist)
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
+	f.checkPathRewrite(report)
 }
 
 func (f *lintFragment) addError(report *LintReport, code, message string) {

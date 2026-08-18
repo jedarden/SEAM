@@ -39,6 +39,7 @@ type FragmentLoader struct {
 	fragments           []*Fragment
 	quarantined         []*Fragment
 	lastLoadedTimestamp time.Time
+	allowlistEnforcer   *AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
 }
 
 // NewFragmentLoader creates a new fragment loader
@@ -51,7 +52,14 @@ func NewFragmentLoader() (*FragmentLoader, error) {
 		fragments:           []*Fragment{},
 		quarantined:         []*Fragment{},
 		lastLoadedTimestamp: time.Time{},
+		allowlistEnforcer:   nil, // Will be set later if needed
 	}, nil
+}
+
+// SetAllowlistEnforcer sets the allowlist enforcer for vault-path and upstream-host validation
+func (fl *FragmentLoader) SetAllowlistEnforcer(enforcer *AllowlistEnforcer) {
+	fl.allowlistEnforcer = enforcer
+	log.Printf("[Fragment] Allowlist enforcer configured")
 }
 
 // LoadDirectory loads all fragments from a directory tree
@@ -229,11 +237,20 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 		return fmt.Errorf("schema validation failed: %w", err)
 	}
 
-	// Check x-seam-owner matches directory
+	// Check x-seam-owner matches directory (basename is free-form, never authoritative)
+	// The PARENT DIRECTORY (from which fragment.Owner is derived) is the authoritative source
 	if fragment.Owner != "" {
-		ownerFromFragment, _ := fragment.ParsedFragment["x-seam-owner"].(string)
-		if ownerFromFragment != "" && ownerFromFragment != fragment.Owner {
-			return fmt.Errorf("x-seam-owner mismatch: fragment declares %s but loaded from %s directory", ownerFromFragment, fragment.Owner)
+		ownerFromFragment, hasOwnerField := fragment.ParsedFragment["x-seam-owner"]
+		ownerStr, _ := ownerFromFragment.(string)
+
+		// Quarantine if x-seam-owner field is omitted
+		if !hasOwnerField {
+			return fmt.Errorf("x-seam-owner field omitted: fragment must declare x-seam-owner matching its parent directory (%s)", fragment.Owner)
+		}
+
+		// Quarantine if x-seam-owner doesn't match parent directory
+		if ownerStr != "" && ownerStr != fragment.Owner {
+			return fmt.Errorf("x-seam-owner mismatch: fragment declares '%s' but parent directory is '%s'", ownerStr, fragment.Owner)
 		}
 	}
 
@@ -267,6 +284,39 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 		for _, prefix := range reservedPrefixes {
 			if strings.HasPrefix(path, prefix) {
 				return fmt.Errorf("fragment declares path with reserved prefix: %s (prefix: %s)", path, prefix)
+			}
+		}
+	}
+
+	// Validate vault paths and upstream hosts if allowlist enforcer is configured
+	if fl.allowlistEnforcer != nil {
+		// Extract and validate x-vault-path from fragment root
+		if vaultPath, hasVaultPath := fragment.ParsedFragment["x-vault-path"].(string); hasVaultPath {
+			if err := fl.allowlistEnforcer.ValidateVaultPath(vaultPath, fragment.Owner); err != nil {
+				return fmt.Errorf("vault_path_validation_failed: %w", err)
+			}
+		}
+
+		// Validate upstream hosts in each operation
+		for path, pathItem := range paths {
+			pathItemMap, ok := pathItem.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			// Check each HTTP method for x-upstream extension
+			for _, method := range []string{"get", "post", "put", "delete", "patch", "options", "head", "trace"} {
+				operation, hasOperation := pathItemMap[method].(map[string]any)
+				if !hasOperation {
+					continue
+				}
+
+				// Validate x-upstream if present
+				if upstreamURL, hasUpstream := operation["x-upstream"].(string); hasUpstream {
+					if err := fl.allowlistEnforcer.ValidateUpstreamHost(upstreamURL); err != nil {
+						return fmt.Errorf("upstream_host_validation_failed for %s %s: %w", strings.ToUpper(method), path, err)
+					}
+				}
 			}
 		}
 	}

@@ -42,7 +42,7 @@ type Loader struct {
 	loadedDoc      libopenapi.Document
 	model          *libopenapi.DocumentModel[v3.Document]
 	validator      validator.Validator
-	fragmentLoader *FragmentLoader // Fragment loader for fragment mode
+	FragmentLoader *FragmentLoader // Fragment loader for fragment mode (public for allowlist configuration)
 	fragmentMode   bool            // Whether we're in fragment mode
 	fragmentsDir   string          // Directory containing fragment files
 }
@@ -139,9 +139,15 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		log.Printf("[Loader] No schema provided, skipping fragment validation")
 	}
 
+	// Cross-field path rewrite rules cannot be expressed by JSON Schema. They
+	// are enforced again at merge time so an unrun or stale lint command cannot
+	// install a partly-applicable rewrite.
+	fragmentLoader.ValidatePathRewriteCoherence()
+
 	// Detect path collisions and quarantine conflicting fragments
 	log.Printf("[Loader] Detecting path collisions between fragments")
 	fragmentLoader.DetectPathCollisions()
+	fragmentLoader.PropagateRouteMetadata()
 
 	// Merge fragments into a single document
 	log.Printf("[Loader] Merging fragments into single OpenAPI document")
@@ -195,7 +201,7 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		loadedDoc:      loadedDoc,
 		model:          model,
 		validator:      v,
-		fragmentLoader: fragmentLoader,
+		FragmentLoader: fragmentLoader,
 		fragmentMode:   true,
 		fragmentsDir:   fragmentsDir,
 	}, nil
@@ -278,6 +284,7 @@ func (l *Loader) GetRawJSON() ([]byte, error) {
 	if err := yaml.Unmarshal(yamlBytes, &yamlMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
+	stripInternalRouteMetadata(yamlMap)
 
 	// Populate servers with the caller-facing base URL
 	// This modifies the YAML map directly
@@ -618,7 +625,7 @@ func getFragmentsDir() string {
 
 // GetFragmentStatus returns status information about loaded fragments
 func (l *Loader) GetFragmentStatus() map[string]interface{} {
-	if !l.fragmentMode || l.fragmentLoader == nil {
+	if !l.fragmentMode || l.FragmentLoader == nil {
 		return map[string]interface{}{
 			"fragments_loaded": false,
 			"fragment_mode":    false,
@@ -627,7 +634,7 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 	}
 
 	// Get detailed status from fragment loader
-	status := l.fragmentLoader.GetFragmentStatus()
+	status := l.FragmentLoader.GetFragmentStatus()
 	status["fragments_loaded"] = true
 	status["fragment_mode"] = true
 
@@ -639,12 +646,12 @@ func (l *Loader) GetFragmentStatus() map[string]interface{} {
 func (l *Loader) GetCacheTTLs() map[string]int {
 	cacheTTLs := make(map[string]int)
 
-	if !l.fragmentMode || l.fragmentLoader == nil {
+	if !l.fragmentMode || l.FragmentLoader == nil {
 		return cacheTTLs
 	}
 
 	// Iterate through all fragments and extract cache TTL
-	for _, fragment := range l.fragmentLoader.fragments {
+	for _, fragment := range l.FragmentLoader.fragments {
 		if fragment.QueuedForQuarantine {
 			continue
 		}

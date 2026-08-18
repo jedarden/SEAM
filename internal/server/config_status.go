@@ -117,14 +117,33 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 		}
 		issues = append(issues, "capture_not_initialized")
 	}
+
+	// Check allowlist status (fail-closed condition)
+	if s.allowlistEnforcer != nil && s.allowlistEnforcer.IsFailClosed() {
+		healthStatus = "unhealthy"
+		issues = append(issues, "allowlist_fail_closed")
+		// Add allowlist condition to health checks
+		if allowlistStatus := s.allowlistEnforcer.GetAllowlistStatus(); allowlistStatus != nil {
+			if condition, ok := allowlistStatus["condition"].(string); ok {
+				issues = append(issues, condition)
+			}
+		}
+	}
+
 	status["health"] = map[string]interface{}{
 		"status": healthStatus,
 		"issues": issues,
 		"checks": map[string]bool{
-			"spec_loaded":     specStatus["hash"] != "",
-			"cache_available": s.cache != nil,
-			"quota_available": s.quotaTracker != nil,
+			"spec_loaded":         specStatus["hash"] != "",
+			"cache_available":     s.cache != nil,
+			"quota_available":     s.quotaTracker != nil,
+			"allowlist_available": s.allowlistEnforcer != nil && !s.allowlistEnforcer.IsFailClosed(),
 		},
+	}
+
+	// Add allowlist status section
+	if s.allowlistEnforcer != nil {
+		status["allowlist"] = s.allowlistEnforcer.GetAllowlistStatus()
 	}
 
 	// Keep the original fragment status keys available for existing operators
