@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +13,22 @@ import (
 	"sync"
 	"testing"
 )
+
+func captureFailureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	var logs bytes.Buffer
+	previousWriter := log.Writer()
+	previousFlags := log.Flags()
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		log.SetOutput(previousWriter)
+		log.SetFlags(previousFlags)
+	})
+
+	return &logs
+}
 
 // TestCaptureSaveToReadOnlyDirectory tests that save failures are handled gracefully
 func TestCaptureSaveToReadOnlyDirectory(t *testing.T) {
@@ -497,7 +515,8 @@ func TestCaptureDirectoryCreationFailure(t *testing.T) {
 		t.Fatalf("failed to create blocking file: %v", err)
 	}
 
-	cm := NewCaptureMiddleware(blockedDir, "test-service", "test-incumbent", false)
+	logs := captureFailureLogs(t)
+	cm := NewCaptureMiddleware(blockedDir, "test-service", "test-incumbent", true)
 	cm.Enable()
 
 	// Capture an entry
@@ -507,28 +526,32 @@ func TestCaptureDirectoryCreationFailure(t *testing.T) {
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
-	w := httptest.NewRecorder()
-	wrappedHandler.ServeHTTP(w, req)
-
-	// Verify the response is still OK (capture failure doesn't disrupt operation)
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
+	// Auto-save on the tenth request must not interrupt request handling.
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest("GET", fmt.Sprintf("/api/test%d", i), nil)
+		w := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("request %d: expected status 200, got %d", i, w.Code)
+		}
 	}
 
-	// Verify entry was captured in memory
-	if cm.GetEntryCount() != 1 {
-		t.Errorf("Expected 1 captured entry, got %d", cm.GetEntryCount())
+	if cm.GetEntryCount() != 10 {
+		t.Errorf("Expected 10 captured entries, got %d", cm.GetEntryCount())
+	}
+	if !strings.Contains(logs.String(), "failed to auto-save corpus") ||
+		!strings.Contains(logs.String(), "create corpus directory") {
+		t.Errorf("expected directory creation failure to be logged, got %q", logs.String())
 	}
 
-	// Attempt to save - should fail but not crash
+	// A direct save must report the error while leaving captured entries intact.
 	err := cm.Save()
 	if err == nil {
 		t.Error("Expected error when saving to blocked directory, got nil")
 	}
 
 	// Verify entries are still in memory despite save failure
-	if cm.GetEntryCount() != 1 {
+	if cm.GetEntryCount() != 10 {
 		t.Errorf("Expected entries to remain in memory after save failure, got %d", cm.GetEntryCount())
 	}
 
@@ -539,18 +562,25 @@ func TestCaptureDirectoryCreationFailure(t *testing.T) {
 func TestCaptureWriteErrorDuringRequestHandling(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a read-only corpus directory to trigger write errors
+	// Create a writable directory first
 	readOnlyDir := filepath.Join(tmpDir, "readonly")
-	if err := os.Mkdir(readOnlyDir, 0o500); err != nil {
-		t.Fatalf("failed to create read-only directory: %v", err)
+	if err := os.Mkdir(readOnlyDir, 0o755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
 	}
 
-	// Create corpus file with read-only permissions
+	// Create a corpus file with read-only permissions to prevent overwrites
 	corpusPath := filepath.Join(readOnlyDir, "corpus.json")
-	if err := os.WriteFile(corpusPath, []byte("{}"), 0o400); err != nil {
-		t.Fatalf("failed to create corpus file: %v", err)
+	initialContent := `{"schema": "seam-diff-corpus/v1", "service": "test", "incumbent": "test-incumbent", "capturedAt": "2024-01-01T00:00:00Z", "description": "test", "entries": []}`
+	if err := os.WriteFile(corpusPath, []byte(initialContent), 0o644); err != nil {
+		t.Fatalf("failed to create initial corpus file: %v", err)
 	}
 
+	// Make the corpus file read-only to trigger write failures on save
+	if err := os.Chmod(corpusPath, 0o400); err != nil {
+		t.Fatalf("failed to make corpus file read-only: %v", err)
+	}
+
+	logs := captureFailureLogs(t)
 	cm := NewCaptureMiddleware(readOnlyDir, "test-service", "test-incumbent", true) // autoSave enabled
 	cm.Enable()
 
@@ -583,6 +613,10 @@ func TestCaptureWriteErrorDuringRequestHandling(t *testing.T) {
 	if entryCount != 15 {
 		t.Errorf("Expected 15 entries in memory, got %d", entryCount)
 	}
+	if !strings.Contains(logs.String(), "failed to auto-save corpus") ||
+		!strings.Contains(logs.String(), "write corpus file") {
+		t.Errorf("expected corpus write failure to be logged, got %q", logs.String())
+	}
 
 	t.Logf("All requests succeeded despite %d auto-save attempts, %d entries captured in memory",
 		15, entryCount)
@@ -590,60 +624,46 @@ func TestCaptureWriteErrorDuringRequestHandling(t *testing.T) {
 
 // TestCaptureFilesystemFullSimulated tests simulated disk full conditions
 func TestCaptureFilesystemFullSimulated(t *testing.T) {
-	tmpDir := t.TempDir()
+	if _, err := os.Stat("/dev/full"); err != nil {
+		t.Skip("/dev/full is unavailable; cannot simulate ENOSPC")
+	}
 
-	// Create a middleware instance
-	cm := NewCaptureMiddleware(tmpDir, "test-service", "test-incumbent", false)
+	tmpDir := t.TempDir()
+	corpusPath := filepath.Join(tmpDir, "corpus.json")
+	if err := os.Symlink("/dev/full", corpusPath); err != nil {
+		t.Skipf("cannot create /dev/full symlink: %v", err)
+	}
+
+	logs := captureFailureLogs(t)
+	cm := NewCaptureMiddleware(tmpDir, "test-service", "test-incumbent", true)
 	cm.Enable()
 
-	// Capture some entries first
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
-
-	for i := 0; i < 5; i++ {
+	// The tenth request triggers an auto-save whose write returns ENOSPC.
+	for i := 0; i < 11; i++ {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/api/test%d", i), nil)
 		w := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("request %d: expected status 200, got %d", i, w.Code)
+		}
 	}
 
-	if cm.GetEntryCount() != 5 {
-		t.Fatalf("Expected 5 entries before save, got %d", cm.GetEntryCount())
+	if cm.GetEntryCount() != 11 {
+		t.Fatalf("Expected 11 entries after disk-full failure, got %d", cm.GetEntryCount())
+	}
+	if !strings.Contains(logs.String(), "failed to auto-save corpus") ||
+		!strings.Contains(logs.String(), "write corpus file") ||
+		!strings.Contains(logs.String(), "no space") {
+		t.Errorf("expected ENOSPC capture failure to be logged, got %q", logs.String())
 	}
 
-	// Simulate disk full by making the corpus directory read-only after entries are captured
-	corpusDir := tmpDir
-	// On Unix systems, we can't easily simulate ENOSPC, but we can test that
-	// the error handling path works by making the parent directory read-only
-	_ = filepath.Dir(tmpDir) // Parent directory reference (unused but kept for documentation)
-	// Note: This is a partial simulation - real ENOSPC would come from the filesystem
-
-	// Instead, simulate by making the file read-only after creation attempt
-	corpusPath := filepath.Join(corpusDir, "corpus.json")
-
-	// Create a read-only file at the corpus path
-	if err := os.WriteFile(corpusPath, []byte("readonly"), 0o400); err != nil {
-		t.Logf("Could not create read-only file: %v", err)
-	}
-
-	// Now try to save - should fail gracefully
-	err := cm.Save()
-	if err == nil {
-		// If save succeeded (some systems allow overwriting read-only files), that's okay
-		t.Log("Save succeeded (filesystem allows overwriting read-only files)")
-	} else {
-		t.Logf("Save failed as expected with read-only file: %v", err)
-	}
-
-	// Critical: entries should still be in memory
-	if cm.GetEntryCount() != 5 {
-		t.Errorf("Expected 5 entries to remain in memory after save failure, got %d", cm.GetEntryCount())
-	}
-
-	// Proxy should still be functional
+	// The request after the failed save proves the middleware remains usable.
 	req := httptest.NewRequest("GET", "/api/another", nil)
 	w := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(w, req)
