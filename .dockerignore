@@ -1,0 +1,12 @@
+# Keep credentials, local state, and unrelated workspace artifacts out of the
+# Docker build context. The Dockerfile copies the explicitly unignored source
+# directories below.
+*
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!spec/
+!spec/**
