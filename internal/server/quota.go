@@ -103,7 +103,7 @@ func (qt *QuotaTracker) CheckAndRecordQuota(ctx context.Context, route string, c
 	qt.mu.Lock()
 	defer qt.mu.Unlock()
 
-	log.Printf("[QuotaTracker] CheckAndRecordQuota: route=%s, cost=$%.2f, token=%s, user=%s", route, cost, token, user)
+	log.Printf("[QuotaTracker] CheckAndRecordQuota: route=%s, cost=$%.2f, token_present=%t, user=%s", route, cost, token != "", user)
 
 	// Check if window has expired and reset if needed
 	now := time.Now()

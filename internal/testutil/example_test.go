@@ -32,7 +32,7 @@ func Example_stubUpstream() {
 	// Inspect the call log
 	calls := stub.GetCallLog()
 	for _, call := range calls {
-		fmt.Printf("Request to %s with auth: %s\n", call.Path, call.AuthHeader)
+		fmt.Printf("Request to %s with auth present: %t\n", call.Path, call.AuthHeader != "")
 	}
 }
 
@@ -105,8 +105,8 @@ func Example_openbao_manual() {
 
 	// Use the server's client
 	client := server.Client()
-	secret, _ := client.ReadSecret(ctx, "seam/routes/testservice/token")
-	fmt.Printf("Secret: %v\n", secret)
+	_, _ = client.ReadSecret(ctx, "seam/routes/testservice/token")
+	fmt.Println("Secret retrieved")
 }
 
 // Example_openbao_rotation demonstrates credential rotation testing.
@@ -125,7 +125,7 @@ func Example_openbao_rotation() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Rotated to: %s\n", newSecret)
+	fmt.Printf("Credential rotated: %t\n", newSecret != "")
 
 	// Now test that SEAM handles the 401 from the old credential
 	// and self-heals by refetching the new one

@@ -109,7 +109,7 @@ func TestIntegration_SecretInjectionAndScrubbing(t *testing.T) {
 
 		// Verify scrubbing worked
 		if strings.Contains(scrubbedBody, testSecret) || strings.Contains(scrubbedBody, token) {
-			t.Errorf("secret was not scrubbed from response body: %s", scrubbedBody)
+			t.Errorf("secret was not scrubbed from response body")
 		}
 
 		if !strings.Contains(scrubbedBody, "[REDACTED-BY-SEAM]") {
@@ -187,7 +187,6 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 	maxAttempts := 2 // Initial attempt + 1 retry
 
 	var lastErr error
-	var lastSecret string
 
 	for attempts < maxAttempts {
 		attempts++
@@ -204,8 +203,6 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 			lastErr = fmt.Errorf("secret token is not a string")
 			continue
 		}
-
-		lastSecret = token
 
 		// Make request to stub upstream
 		upstreamReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, stub.URL()+"/", nil)
@@ -242,13 +239,13 @@ func TestIntegration_CredentialRotation401(t *testing.T) {
 
 		// Success!
 		if upstreamResp.StatusCode == http.StatusOK {
-			t.Logf("Success on attempt %d with credential: %s", attempts, token)
+			t.Logf("Success on attempt %d with refreshed credential", attempts)
 			return
 		}
 	}
 
 	// If we got here, rotation didn't work as expected
-	t.Logf("Rotation simulation completed after %d attempts, last secret: %s, last error: %v", attempts, lastSecret, lastErr)
+	t.Logf("Rotation simulation completed after %d attempts, last error: %v", attempts, lastErr)
 }
 
 // TestIntegration_CircuitBreaker tests that SEAM's circuit breaker opens

@@ -17,6 +17,7 @@ var internalRouteMetadata = map[string]string{
 	"x-upstream-map":          internalRouteMetadataPrefix + "upstream-map",
 	"x-vault-path":            internalRouteMetadataPrefix + "vault-path",
 	"x-inject-as":             internalRouteMetadataPrefix + "inject-as",
+	"x-unscrubbable":          internalRouteMetadataPrefix + "unscrubbable",
 	"x-instance-param":        internalRouteMetadataPrefix + "instance-param",
 	"x-upstream-strip-prefix": internalRouteMetadataPrefix + "upstream-strip-prefix",
 }
