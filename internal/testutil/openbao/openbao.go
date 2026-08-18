@@ -58,7 +58,7 @@ func (c *Client) WriteSecret(ctx context.Context, path string, data map[string]i
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	url := fmt.Sprintf("%s/v1/secret/%s", c.baseURL, path)
+	url := c.dataURL(path)
 	payload := map[string]interface{}{
 		"data": data,
 	}
@@ -95,7 +95,7 @@ func (c *Client) ReadSecret(ctx context.Context, path string) (map[string]interf
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	url := fmt.Sprintf("%s/v1/secret/%s", c.baseURL, path)
+	url := c.dataURL(path)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -116,14 +116,16 @@ func (c *Client) ReadSecret(ctx context.Context, path string) (map[string]interf
 	}
 
 	var result struct {
-		Data map[string]interface{} `json:"data"`
+		Data struct {
+			Data map[string]interface{} `json:"data"`
+		} `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	return result.Data, nil
+	return result.Data.Data, nil
 }
 
 // DeleteSecret deletes a secret from the given path.
@@ -131,7 +133,7 @@ func (c *Client) DeleteSecret(ctx context.Context, path string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	url := fmt.Sprintf("%s/v1/secret/%s", c.baseURL, path)
+	url := c.dataURL(path)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
@@ -152,6 +154,10 @@ func (c *Client) DeleteSecret(ctx context.Context, path string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) dataURL(path string) string {
+	return fmt.Sprintf("%s/v1/secret/data/%s", c.baseURL, strings.Trim(path, "/"))
 }
 
 // NewServer starts a new OpenBao dev server for testing.
@@ -176,11 +182,15 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
-	// Find the openbao binary
-	openbaoPath, err := exec.LookPath("openbao" /* or "vault" */)
+	// Find the OpenBao binary. The upstream distribution commonly installs the
+	// client as "bao", while some environments expose the longer name.
+	openbaoPath, err := exec.LookPath("openbao")
+	if err != nil {
+		openbaoPath, err = exec.LookPath("bao")
+	}
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
-		return nil, fmt.Errorf("openbao not found in PATH: %w (install from https://openbao.org)", err)
+		return nil, fmt.Errorf("openbao/bao not found in PATH: %w (install from https://openbao.org)", err)
 	}
 
 	logFile := filepath.Join(logDir, "openbao.log")
@@ -195,8 +205,10 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	)
 
 	cmd.Dir = tmpDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// OpenBao's dev-mode banner includes the root token. Keep subprocess output
+	// out of test logs so credentials never enter a log sink.
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
 
 	if err := cmd.Start(); err != nil {
 		_ = os.RemoveAll(tmpDir)

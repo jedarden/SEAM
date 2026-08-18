@@ -331,9 +331,14 @@ func (s *Server) handleEcho(w http.ResponseWriter, r *http.Request, record CallR
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Credential-Echo", "true") // Custom header to test header scrubbing
+	// Echo the credential in every response location that the gateway promises
+	// to scrub. This keeps the scriptable fixture aligned with Scenario 1's
+	// body/header/trailer acceptance boundary.
+	w.Header().Set("X-Credential-Echo", credential)
+	w.Header().Add("Trailer", "X-Credential-Trailer")
 	w.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(w).Encode(errorResp)
+	w.Header().Set("X-Credential-Trailer", credential)
 }
 
 // handle401 returns a 401 Unauthorized response.
