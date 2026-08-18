@@ -84,6 +84,9 @@ func (r *CircuitBreakerStateRegistry) Set(status CircuitBreakerStatus) {
 	}
 	r.states[origin] = status
 	r.mu.Unlock()
+
+	// Update Prometheus metrics for upstream health
+	setUpstreamHealth(origin, status.State, status.ConsecutiveFailures)
 }
 
 // Remove stops publishing state for an origin that is no longer configured.

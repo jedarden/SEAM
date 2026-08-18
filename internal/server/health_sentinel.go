@@ -88,7 +88,7 @@ func (h *CredentialHealthSentinel) Snapshot() CredentialHealthResponse {
 // the middleware still guarantees that this endpoint never enters the cache.
 func (h *CredentialHealthSentinel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 

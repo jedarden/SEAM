@@ -107,6 +107,7 @@ func serveCommand(args []string) {
 	corpusDir := fs.String("corpus-dir", "corpus", "Directory to store captured corpus files")
 	fragmentsDir := fs.String("fragments-dir", "./fragments", "Directory containing OpenAPI fragment files")
 	upstreamCADir := fs.String("upstream-ca-dir", "", "Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, refused in-cluster)")
+	maxReplayableRequestBytes := fs.Int64("max-replayable-request-bytes", 1024*1024, "Phase 2.5: Maximum request body size to buffer for replay in bytes (default 1 MiB)")
 	maxBufferedResponseBytes := fs.Int64("max-buffered-response-bytes", 1024*1024, "Phase 2.6: Maximum decoded response body size to hold for whole-response scrubbing in bytes (default 1 MiB)")
 
 	if err := fs.Parse(args); err != nil {
@@ -148,6 +149,13 @@ func serveCommand(args []string) {
 	if val := os.Getenv("SEAM_UPSTREAM_CA_DIR"); val != "" {
 		*upstreamCADir = val
 	}
+	if val := os.Getenv("SEAM_MAX_REPLAYABLE_REQUEST_BYTES"); val != "" {
+		if parsed, err := fmt.Sscanf(val, "%d", maxReplayableRequestBytes); err == nil && parsed == 1 {
+			log.Printf("[config] SEAM_MAX_REPLAYABLE_REQUEST_BYTES=%s", val)
+		} else {
+			log.Printf("[config] invalid SEAM_MAX_REPLAYABLE_REQUEST_BYTES %q, keeping %d: %v", val, *maxReplayableRequestBytes, err)
+		}
+	}
 	if val := os.Getenv("SEAM_MAX_BUFFERED_RESPONSE_BYTES"); val != "" {
 		if parsed, err := fmt.Sscanf(val, "%d", maxBufferedResponseBytes); err == nil && parsed == 1 {
 			log.Printf("[config] SEAM_MAX_BUFFERED_RESPONSE_BYTES=%s", val)
@@ -188,20 +196,22 @@ func serveCommand(args []string) {
 	if isInCluster && *upstreamCADir != "" {
 		log.Printf("  (Running in-cluster, custom --upstream-ca-dir refused)")
 	}
+	log.Printf("  Max replayable request bytes: %d", *maxReplayableRequestBytes)
 	log.Printf("  Max buffered response bytes: %d", *maxBufferedResponseBytes)
 
 	cfg := &server.Config{
-		CallerPort:               *callerPort,
-		OperatorPort:             *operatorPort,
-		BaseURL:                  *baseURL,
-		SpecDir:                  *specDir,
-		FragmentMode:             *fragmentMode,
-		SchemaPath:               *schemaPath,
-		CaptureEnabled:           *captureEnabled,
-		CorpusDir:                *corpusDir,
-		FragmentsDir:             *fragmentsDir,
-		UpstreamCADir:            finalUpstreamCADir,
-		MaxBufferedResponseBytes: *maxBufferedResponseBytes,
+		CallerPort:                *callerPort,
+		OperatorPort:              *operatorPort,
+		BaseURL:                   *baseURL,
+		SpecDir:                   *specDir,
+		FragmentMode:              *fragmentMode,
+		SchemaPath:                *schemaPath,
+		CaptureEnabled:            *captureEnabled,
+		CorpusDir:                 *corpusDir,
+		FragmentsDir:              *fragmentsDir,
+		UpstreamCADir:             finalUpstreamCADir,
+		MaxReplayableRequestBytes: *maxReplayableRequestBytes,
+		MaxBufferedResponseBytes:  *maxBufferedResponseBytes,
 	}
 
 	srv := server.New(cfg)

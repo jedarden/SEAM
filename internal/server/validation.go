@@ -5,8 +5,8 @@ import (
 	"net/http"
 )
 
-// ValidationErrorResponse is the structured error response for validation failures
-type ValidationErrorResponse struct {
+// SpecValidationResponse is the structured error response for OpenAPI spec validation failures
+type SpecValidationResponse struct {
 	Error            string                 `json:"error"`
 	Message          string                 `json:"message"`
 	ValidationErrors []ValidationFieldError `json:"validation_errors"`
@@ -51,7 +51,7 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 func writeValidationError(w http.ResponseWriter, validationErrors map[string]interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 
-	response := ValidationErrorResponse{
+	response := SpecValidationResponse{
 		Error:   validationErrors["error"].(string),
 		Message: validationErrors["message"].(string),
 		DocsURL: validationErrors["docs_url"].(string),

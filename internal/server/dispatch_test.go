@@ -97,15 +97,15 @@ func TestDispatchHandler_RouteTableMatch(t *testing.T) {
 		SpecDir:      "./spec",
 	}
 	srv := &Server{
-		config:    cfg,
-		routeTable: table,
-		proxyMap:   make(map[string]*ReverseProxy),
-		cache:      NewResponseCache(),
-		singleFlight: NewSingleFlight(),
-		cacheTTLs:  make(map[string]int),
+		config:          cfg,
+		routeTable:      table,
+		proxyMap:        make(map[string]*ReverseProxy),
+		cache:           NewResponseCache(),
+		singleFlight:    NewSingleFlight(),
+		cacheTTLs:       make(map[string]int),
 		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker: NewQuotaTracker(),
-		costPerCalls: make(map[string]float64),
+		quotaTracker:    NewQuotaTracker(),
+		costPerCalls:    make(map[string]float64),
 	}
 
 	// Test GET request
@@ -153,17 +153,17 @@ func TestDispatchHandler_NoRoute(t *testing.T) {
 		SpecDir:      "./spec",
 	}
 	srv := &Server{
-		config:        cfg,
+		config: cfg,
 		routeTable: &RouteTable{
 			routes: make([]RouteEntry, 0),
 		},
-		proxyMap:       make(map[string]*ReverseProxy),
-		cache:          NewResponseCache(),
-		singleFlight:   NewSingleFlight(),
-		cacheTTLs:      make(map[string]int),
+		proxyMap:        make(map[string]*ReverseProxy),
+		cache:           NewResponseCache(),
+		singleFlight:    NewSingleFlight(),
+		cacheTTLs:       make(map[string]int),
 		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker:   NewQuotaTracker(),
-		costPerCalls:   make(map[string]float64),
+		quotaTracker:    NewQuotaTracker(),
+		costPerCalls:    make(map[string]float64),
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
@@ -212,8 +212,8 @@ func TestDispatchHandler_NoUpstream(t *testing.T) {
 		proxyMap:        make(map[string]*ReverseProxy),
 		cache:           NewResponseCache(),
 		singleFlight:    NewSingleFlight(),
-		cacheTTLs:        make(map[string]int),
-		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		cacheTTLs:       make(map[string]int),
+		circuitBreakers: NewCircuitBreakerStateRegistry(),
 		quotaTracker:    NewQuotaTracker(),
 		costPerCalls:    make(map[string]float64),
 	}
@@ -264,8 +264,8 @@ func TestDispatchHandler_ProxyCreationFailed(t *testing.T) {
 		proxyMap:        make(map[string]*ReverseProxy),
 		cache:           NewResponseCache(),
 		singleFlight:    NewSingleFlight(),
-		cacheTTLs:        make(map[string]int),
-		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		cacheTTLs:       make(map[string]int),
+		circuitBreakers: NewCircuitBreakerStateRegistry(),
 		quotaTracker:    NewQuotaTracker(),
 		costPerCalls:    make(map[string]float64),
 	}
@@ -295,10 +295,10 @@ func TestDispatchHandler_ProxyCreationFailed(t *testing.T) {
 // TestExtractUpstreamTarget verifies the extractUpstreamTarget function.
 func TestExtractUpstreamTarget(t *testing.T) {
 	tests := []struct {
-		name          string
-		extension     map[string]interface{}
-		expected      string
-		expectError   bool
+		name        string
+		extension   map[string]interface{}
+		expected    string
+		expectError bool
 	}{
 		{
 			name: "valid upstream extension",
@@ -566,15 +566,15 @@ func TestDispatchHandler_PathParameters(t *testing.T) {
 		SpecDir:      "./spec",
 	}
 	srv := &Server{
-		config:        cfg,
-		routeTable:    table,
-		proxyMap:      make(map[string]*ReverseProxy),
-		cache:         NewResponseCache(),
-		singleFlight:  NewSingleFlight(),
-		cacheTTLs:     make(map[string]int),
+		config:          cfg,
+		routeTable:      table,
+		proxyMap:        make(map[string]*ReverseProxy),
+		cache:           NewResponseCache(),
+		singleFlight:    NewSingleFlight(),
+		cacheTTLs:       make(map[string]int),
 		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker:  NewQuotaTracker(),
-		costPerCalls:  make(map[string]float64),
+		quotaTracker:    NewQuotaTracker(),
+		costPerCalls:    make(map[string]float64),
 	}
 
 	// Test with a specific user ID

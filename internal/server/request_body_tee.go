@@ -97,7 +97,7 @@ func (rb *replayableBody) Read(p []byte) (n int, err error) {
 		}
 	}
 
-		// Mark buffer as complete if we've hit EOF, an error
+	// Mark buffer as complete if we've hit EOF, an error
 	if err != nil {
 		rb.bufferComplete = true
 	} else if n == 0 && rb.bytesRead > 0 {

@@ -592,6 +592,485 @@ func TestFragmentStatusEndpoint(t *testing.T) {
 	}
 }
 
+// TestXSeamOwnerOmittedFieldQuarantine tests that fragments with omitted x-seam-owner field are quarantined
+func TestXSeamOwnerOmittedFieldQuarantine(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	// Create schema
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	// Create fragment WITHOUT x-seam-owner field (should be quarantined)
+	fragmentWithoutOwner := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/test": {"get": {"summary": "Test"}}}
+	}`
+	pathWithoutOwner := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+	if err := os.MkdirAll(filepath.Dir(pathWithoutOwner), 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(pathWithoutOwner, []byte(fragmentWithoutOwner), 0644); err != nil {
+		t.Fatalf("Failed to write fragment without owner: %v", err)
+	}
+
+	// Load and validate
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Verify fragment was quarantined
+	if loader.GetValidFragmentCount() != 0 {
+		t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 1 {
+		t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+	}
+
+	quarantined := loader.GetQuarantined()
+	if len(quarantined) != 1 {
+		t.Fatalf("Expected 1 quarantined fragment, got %d", len(quarantined))
+	}
+
+	// Verify quarantine reason mentions omitted field
+	hasOmittedReason := false
+	for _, reason := range quarantined[0].QuarantineReasons {
+		if contains(reason, "x-seam-owner field omitted") {
+			hasOmittedReason = true
+			break
+		}
+	}
+	if !hasOmittedReason {
+		t.Errorf("Expected quarantine reason to mention omitted x-seam-owner field, got: %v", quarantined[0].QuarantineReasons)
+	}
+
+	// Verify the fragment is reported in /config/status
+	status := loader.GetFragmentStatus()
+	fragmentStatuses, ok := status["fragments"].([]FragmentStatus)
+	if !ok {
+		t.Fatalf("Expected status fragments to be []FragmentStatus, got %T", status["fragments"])
+	}
+
+	if len(fragmentStatuses) != 1 {
+		t.Errorf("Expected 1 fragment in status, got %d", len(fragmentStatuses))
+	}
+
+	if fragmentStatuses[0].Status != "quarantined" {
+		t.Errorf("Expected fragment status to be quarantined, got %s", fragmentStatuses[0].Status)
+	}
+
+	if len(fragmentStatuses[0].QuarantineReasons) == 0 {
+		t.Error("Expected quarantine reasons in fragment status")
+	}
+}
+
+// TestXSeamOwnerMismatchQuarantine tests that fragments with mismatched x-seam-owner are quarantined
+func TestXSeamOwnerMismatchQuarantine(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	// Create schema
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	// Create fragment with mismatched x-seam-owner (directory is "myservice", owner is "wrong-service")
+	fragmentWithMismatch := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/test": {"get": {"summary": "Test"}}},
+		"x-seam-owner": "wrong-service"
+	}`
+	pathWithMismatch := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+	if err := os.MkdirAll(filepath.Dir(pathWithMismatch), 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(pathWithMismatch, []byte(fragmentWithMismatch), 0644); err != nil {
+		t.Fatalf("Failed to write fragment with mismatch: %v", err)
+	}
+
+	// Load and validate
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Verify fragment was quarantined
+	if loader.GetValidFragmentCount() != 0 {
+		t.Errorf("Expected 0 valid fragments, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 1 {
+		t.Errorf("Expected 1 quarantined fragment, got %d", loader.GetQuarantinedCount())
+	}
+
+	quarantined := loader.GetQuarantined()
+	if len(quarantined) != 1 {
+		t.Fatalf("Expected 1 quarantined fragment, got %d", len(quarantined))
+	}
+
+	// Verify quarantine reason mentions mismatch
+	hasMismatchReason := false
+	for _, reason := range quarantined[0].QuarantineReasons {
+		if contains(reason, "x-seam-owner mismatch") {
+			hasMismatchReason = true
+			// Verify the reason mentions both the declared value and the directory
+			if !contains(reason, "wrong-service") || !contains(reason, "myservice") {
+				t.Errorf("Expected mismatch reason to mention both values, got: %s", reason)
+			}
+			break
+		}
+	}
+	if !hasMismatchReason {
+		t.Errorf("Expected quarantine reason to mention x-seam-owner mismatch, got: %v", quarantined[0].QuarantineReasons)
+	}
+}
+
+// TestXSeamOwnerMatchingAcceptsFragment tests that fragments with matching x-seam-owner are accepted
+func TestXSeamOwnerMatchingAcceptsFragment(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	// Create schema
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	// Create fragment with matching x-seam-owner
+	fragmentWithMatch := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/test": {"get": {"summary": "Test"}}},
+		"x-seam-owner": "myservice"
+	}`
+	pathWithMatch := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
+	if err := os.MkdirAll(filepath.Dir(pathWithMatch), 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(pathWithMatch, []byte(fragmentWithMatch), 0644); err != nil {
+		t.Fatalf("Failed to write fragment with match: %v", err)
+	}
+
+	// Load and validate
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Verify fragment was accepted
+	if loader.GetValidFragmentCount() != 1 {
+		t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 0 {
+		t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+	}
+}
+
+// TestXSeamOwnerMultipleFilesInDirectory tests x-seam-owner validation with multiple files under one directory
+func TestXSeamOwnerMultipleFilesInDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	// Create schema
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	serviceDir := filepath.Join(fragmentsDir, "myservice")
+	if err := os.MkdirAll(serviceDir, 0755); err != nil {
+		t.Fatalf("Failed to create service directory: %v", err)
+	}
+
+	// Create multiple files under the same directory
+	// 1. Valid fragment with matching x-seam-owner
+	fragment1 := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/api1": {"get": {"summary": "API 1"}}},
+		"x-seam-owner": "myservice"
+	}`
+	path1 := filepath.Join(serviceDir, "fragment1.yaml")
+	if err := os.WriteFile(path1, []byte(fragment1), 0644); err != nil {
+		t.Fatalf("Failed to write fragment1: %v", err)
+	}
+
+	// 2. Fragment with omitted x-seam-owner (should be quarantined)
+	fragment2 := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/api2": {"get": {"summary": "API 2"}}}
+	}`
+	path2 := filepath.Join(serviceDir, "fragment2.yaml")
+	if err := os.WriteFile(path2, []byte(fragment2), 0644); err != nil {
+		t.Fatalf("Failed to write fragment2: %v", err)
+	}
+
+	// 3. Fragment with mismatched x-seam-owner (should be quarantined)
+	fragment3 := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/api3": {"get": {"summary": "API 3"}}},
+		"x-seam-owner": "wrong-service"
+	}`
+	path3 := filepath.Join(serviceDir, "fragment3.yaml")
+	if err := os.WriteFile(path3, []byte(fragment3), 0644); err != nil {
+		t.Fatalf("Failed to write fragment3: %v", err)
+	}
+
+	// 4. Another valid fragment with matching x-seam-owner
+	fragment4 := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/api4": {"get": {"summary": "API 4"}}},
+		"x-seam-owner": "myservice"
+	}`
+	path4 := filepath.Join(serviceDir, "fragment4.yaml")
+	if err := os.WriteFile(path4, []byte(fragment4), 0644); err != nil {
+		t.Fatalf("Failed to write fragment4: %v", err)
+	}
+
+	// Load and validate
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Verify: 2 valid, 2 quarantined
+	if loader.GetValidFragmentCount() != 2 {
+		t.Errorf("Expected 2 valid fragments, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 2 {
+		t.Errorf("Expected 2 quarantined fragments, got %d", loader.GetQuarantinedCount())
+	}
+
+	// Verify the quarantined fragments
+	quarantined := loader.GetQuarantined()
+	quarantinedPaths := make(map[string]bool)
+	for _, frag := range quarantined {
+		quarantinedPaths[frag.SourceFile] = true
+	}
+
+	if !quarantinedPaths[path2] {
+		t.Errorf("Expected fragment2 (omitted x-seam-owner) to be quarantined")
+	}
+	if !quarantinedPaths[path3] {
+		t.Errorf("Expected fragment3 (mismatched x-seam-owner) to be quarantined")
+	}
+	if quarantinedPaths[path1] {
+		t.Errorf("Expected fragment1 (matching x-seam-owner) to be valid, not quarantined")
+	}
+	if quarantinedPaths[path4] {
+		t.Errorf("Expected fragment4 (matching x-seam-owner) to be valid, not quarantined")
+	}
+
+	// Merge fragments and verify only valid fragments are included
+	mergedJSON, err := loader.MergeFragments("http://localhost:8080")
+	if err != nil {
+		t.Fatalf("Failed to merge fragments: %v", err)
+	}
+
+	var mergedSpec map[string]interface{}
+	if err := json.Unmarshal(mergedJSON, &mergedSpec); err != nil {
+		t.Fatalf("Failed to parse merged spec: %v", err)
+	}
+
+	paths, ok := mergedSpec["paths"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Merged spec missing paths")
+	}
+
+	// Should have only /api1 and /api4 (from valid fragments)
+	// Should NOT have /api2 or /api3 (from quarantined fragments)
+	if len(paths) != 2 {
+		t.Errorf("Expected 2 paths in merged spec, got %d", len(paths))
+	}
+
+	if _, exists := paths["/api1"]; !exists {
+		t.Error("Expected /api1 path to be in merged spec")
+	}
+	if _, exists := paths["/api4"]; !exists {
+		t.Error("Expected /api4 path to be in merged spec")
+	}
+	if _, exists := paths["/api2"]; exists {
+		t.Error("Expected /api2 path NOT to be in merged spec (quarantined fragment)")
+	}
+	if _, exists := paths["/api3"]; exists {
+		t.Error("Expected /api3 path NOT to be in merged spec (quarantined fragment)")
+	}
+}
+
+// TestXSeamOwnerIsDirectoryBasenot proves that parent directory name (not file basename) is authoritative
+func TestXSeamOwnerIsDirectoryBasenot(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	// Create schema
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	serviceDir := filepath.Join(fragmentsDir, "myservice")
+	if err := os.MkdirAll(serviceDir, 0755); err != nil {
+		t.Fatalf("Failed to create service directory: %v", err)
+	}
+
+	// Create fragment with file basename that differs from directory name
+	// File basename "wrong-name.yaml" should NOT affect owner validation
+	// x-seam-owner should match the DIRECTORY name "myservice", not file basename
+	fragment := `{
+		"openapi": "3.1.0",
+		"info": {"title": "Service", "version": "1.0.0"},
+		"paths": {"/test": {"get": {"summary": "Test"}}},
+		"x-seam-owner": "myservice"
+	}`
+	// File is "wrong-name.yaml" but x-seam-owner matches directory "myservice" - should be VALID
+	path := filepath.Join(serviceDir, "wrong-name.yaml")
+	if err := os.WriteFile(path, []byte(fragment), 0644); err != nil {
+		t.Fatalf("Failed to write fragment: %v", err)
+	}
+
+	// Load and validate
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// Verify fragment was accepted (owner matches directory, not file basename)
+	if loader.GetValidFragmentCount() != 1 {
+		t.Errorf("Expected 1 valid fragment (owner should match directory, not file basename), got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 0 {
+		t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+	}
+
+	// Verify owner was extracted from directory, not file basename
+	validFragments := loader.GetValidFragmentCount()
+	if validFragments == 1 {
+		// The fragment should have owner = "myservice" (directory name)
+		// even though file is "wrong-name.yaml"
+		status := loader.GetFragmentStatus()
+		fragmentStatuses, ok := status["fragments"].([]FragmentStatus)
+		if !ok {
+			t.Fatalf("Expected status fragments to be []FragmentStatus, got %T", status["fragments"])
+		}
+
+		if len(fragmentStatuses) != 1 {
+			t.Fatalf("Expected 1 fragment in status, got %d", len(fragmentStatuses))
+		}
+
+		if fragmentStatuses[0].Owner != "myservice" {
+			t.Errorf("Expected owner to be directory name 'myservice', got '%s'", fragmentStatuses[0].Owner)
+		}
+	}
+}
+
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsInString(s, substr))

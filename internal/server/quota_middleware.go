@@ -52,7 +52,7 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		allowed, remaining, err := s.quotaTracker.CheckAndRecordQuota(r.Context(), route, cost, token, user)
 		if err != nil {
 			log.Printf("[Quota] Error checking quota for %s: %v", route, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			NewErrorResponse(ErrCodeInternalServer, "Error checking quota").WithDetail("route", route).WithDetail("error", err.Error()).Write(w, r)
 			return
 		}
 
