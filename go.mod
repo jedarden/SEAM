@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/getkin/kin-openapi v0.146.0
 	github.com/go-openapi/runtime/server-middleware v0.33.0
+	github.com/google/uuid v1.6.0
 	github.com/mvrilo/go-redoc v0.1.5
 	github.com/oaswrap/openapi-ui v1.0.0
 	github.com/pb33f/libopenapi v0.38.7
