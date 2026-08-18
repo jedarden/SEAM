@@ -115,6 +115,7 @@ type Config struct {
 	CorpusDir      string
 	FragmentsDir   string
 	UpstreamURL    string // Default upstream URL for proxying (Phase 2.0: single upstream)
+	UpstreamCADir  string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -1114,7 +1115,7 @@ func (s *Server) handleProxyCreationFailed(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusServiceUnavailable)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"error":        "proxy_creation_failed",
-		"message":     "Failed to create proxy for upstream",
+		"message":      "Failed to create proxy for upstream",
 		"upstream_url": upstreamURL,
 		"path":         r.URL.Path,
 		"method":       r.Method,

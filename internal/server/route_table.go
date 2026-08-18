@@ -17,6 +17,27 @@ type RouteTable struct {
 	routes []RouteEntry
 }
 
+// UpstreamTLSConfig represents TLS configuration for upstream connections.
+// Absent fields mean system trust store with hostname checking (default secure behavior).
+type UpstreamTLSConfig struct {
+	// CaBundle names a PEM key in the upstream CA ConfigMap, resolved as a file
+	// under /etc/gateway/upstream-ca/<key>. Absent means system trust store.
+	CaBundle string
+
+	// ServerName overrides the SNI/hostname verification. Absent means use the
+	// upstream URL's hostname.
+	ServerName string
+
+	// InsecureSkipVerify is true only when the fragment author explicitly set
+	// x-upstream-tls.insecureSkipVerify: "acknowledged". This is NEVER set by a
+	// global flag - it is per-route only and requires human acknowledgment.
+	InsecureSkipVerify bool
+
+	// PlaintextAck is true when the fragment author acknowledged that this route
+	// uses plaintext http:// (x-upstream-plaintext: "acknowledged").
+	PlaintextAck bool
+}
+
 // RouteEntry represents a single route in the routing table.
 // It contains all the information needed to match and forward a request to an upstream target.
 type RouteEntry struct {
@@ -33,6 +54,10 @@ type RouteEntry struct {
 	// UpstreamTarget is the base URL or identifier of the upstream service
 	// that should handle requests matching this route (e.g., "http://userservice:8080")
 	UpstreamTarget string
+
+	// TLSConfig holds the TLS configuration for this route's upstream connection.
+	// If nil, the route uses system trust store with hostname checking.
+	TLSConfig *UpstreamTLSConfig
 }
 
 // RouteMatch represents a matched route with extracted path parameters.
@@ -176,11 +201,17 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
+			tlsConfig, err := extractUpstreamTLSConfig(methodOp.operation)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
 			entry := RouteEntry{
-				PathTemplate: path,
-				Method:       methodOp.method,
-				APIVersion:   apiVersion,
-			UpstreamTarget: upstreamTarget,
+				PathTemplate:   path,
+				Method:         methodOp.method,
+				APIVersion:     apiVersion,
+				UpstreamTarget: upstreamTarget,
+				TLSConfig:      tlsConfig,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
@@ -275,6 +306,72 @@ func extractUpstreamTarget(operation *v3.Operation) (string, error) {
 	}
 
 	return "", nil
+}
+
+// extractUpstreamTLSConfig extracts TLS configuration from operation extensions.
+// It looks for "x-upstream-tls" and "x-upstream-plaintext" extensions.
+// Returns nil if no TLS configuration is specified (system trust store default).
+func extractUpstreamTLSConfig(operation *v3.Operation) (*UpstreamTLSConfig, error) {
+	if operation == nil {
+		return nil, fmt.Errorf("operation cannot be nil")
+	}
+
+	if operation.Extensions == nil {
+		return nil, nil
+	}
+
+	var tlsConfig UpstreamTLSConfig
+	hasTLSConfig := false
+
+	// Extract x-upstream-tls configuration
+	if tlsNode, ok := operation.Extensions.Get("x-upstream-tls"); ok && tlsNode != nil {
+		var tlsMap map[string]any
+		if err := tlsNode.Decode(&tlsMap); err != nil {
+			return nil, fmt.Errorf("x-upstream-tls must be an object: %w", err)
+		}
+
+		// Extract caBundle
+		if caBundle, ok := tlsMap["caBundle"].(string); ok && caBundle != "" {
+			tlsConfig.CaBundle = caBundle
+			hasTLSConfig = true
+		}
+
+		// Extract serverName
+		if serverName, ok := tlsMap["serverName"].(string); ok && serverName != "" {
+			tlsConfig.ServerName = serverName
+			hasTLSConfig = true
+		}
+
+		// Extract insecureSkipVerify - only "acknowledged" is accepted
+		if insecureSkipVerify, ok := tlsMap["insecureSkipVerify"].(string); ok {
+			if insecureSkipVerify == "acknowledged" {
+				tlsConfig.InsecureSkipVerify = true
+				hasTLSConfig = true
+			} else if insecureSkipVerify != "" {
+				return nil, fmt.Errorf("x-upstream-tls.insecureSkipVerify must be \"acknowledged\" or absent; got %q", insecureSkipVerify)
+			}
+		}
+	}
+
+	// Extract x-upstream-plaintext acknowledgment
+	if plaintextNode, ok := operation.Extensions.Get("x-upstream-plaintext"); ok && plaintextNode != nil {
+		var plaintext string
+		if err := plaintextNode.Decode(&plaintext); err != nil {
+			return nil, fmt.Errorf("x-upstream-plaintext must be a string: %w", err)
+		}
+		if plaintext == "acknowledged" {
+			tlsConfig.PlaintextAck = true
+			hasTLSConfig = true
+		} else if plaintext != "" {
+			return nil, fmt.Errorf("x-upstream-plaintext must be \"acknowledged\" or absent; got %q", plaintext)
+		}
+	}
+
+	if !hasTLSConfig {
+		return nil, nil
+	}
+
+	return &tlsConfig, nil
 }
 
 // NewRouteTable creates a new empty RouteTable.

@@ -106,6 +106,7 @@ func serveCommand(args []string) {
 	captureEnabled := fs.Bool("capture-enabled", false, "Enable HTTP request/response capture")
 	corpusDir := fs.String("corpus-dir", "corpus", "Directory to store captured corpus files")
 	fragmentsDir := fs.String("fragments-dir", "./fragments", "Directory containing OpenAPI fragment files")
+	upstreamCADir := fs.String("upstream-ca-dir", "", "Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, refused in-cluster)")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -143,6 +144,22 @@ func serveCommand(args []string) {
 	if val := os.Getenv("SEAM_CORPUS_DIR"); val != "" {
 		*corpusDir = val
 	}
+	if val := os.Getenv("SEAM_UPSTREAM_CA_DIR"); val != "" {
+		*upstreamCADir = val
+	}
+
+	// Determine final upstream CA directory
+	finalUpstreamCADir := *upstreamCADir
+	if finalUpstreamCADir == "" {
+		finalUpstreamCADir = server.DefaultUpstreamCADir
+	}
+
+	// Detect if running in-cluster and refuse custom upstream CA directory
+	isInCluster := detectInClusterEnvironment()
+	if isInCluster && *upstreamCADir != "" {
+		log.Printf("[config] WARNING: --upstream-ca-dir is refused in-cluster; using %s", server.DefaultUpstreamCADir)
+		finalUpstreamCADir = server.DefaultUpstreamCADir
+	}
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("Starting SEAM gateway server:")
@@ -159,6 +176,10 @@ func serveCommand(args []string) {
 	if *captureEnabled {
 		log.Printf("  Corpus directory: %s", *corpusDir)
 	}
+	log.Printf("  Upstream CA directory: %s", finalUpstreamCADir)
+	if isInCluster && *upstreamCADir != "" {
+		log.Printf("  (Running in-cluster, custom --upstream-ca-dir refused)")
+	}
 
 	cfg := &server.Config{
 		CallerPort:     *callerPort,
@@ -170,6 +191,7 @@ func serveCommand(args []string) {
 		CaptureEnabled: *captureEnabled,
 		CorpusDir:      *corpusDir,
 		FragmentsDir:   *fragmentsDir,
+		UpstreamCADir:  finalUpstreamCADir,
 	}
 
 	srv := server.New(cfg)
@@ -201,4 +223,11 @@ func diffCommand(args []string) {
 func importCommand(args []string) {
 	fmt.Println("import command: not yet implemented")
 	os.Exit(1)
+}
+
+// detectInClusterEnvironment checks if SEAM is running in a Kubernetes cluster.
+// It uses the standard Kubernetes Downward API environment variables.
+func detectInClusterEnvironment() bool {
+	// Check for standard Kubernetes environment variables
+	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_PORT") != ""
 }

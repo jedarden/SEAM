@@ -2,12 +2,16 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +22,11 @@ const (
 	upstreamRequestTimeout  = 30 * time.Second
 	upstreamMaxIdleConns    = 100
 	upstreamIdleConnTimeout = 90 * time.Second
+
+	// DefaultUpstreamCADir is the default mount point for the upstream CA ConfigMap.
+	// Local development can override this with --upstream-ca-dir.
+	// This is the ConfigMap mount point in production deployments.
+	DefaultUpstreamCADir = "/etc/gateway/upstream-ca"
 )
 
 // defaultUpstreamClient is shared by standalone ForwardRequest calls. Sharing
@@ -25,13 +34,63 @@ const (
 // reuse pooled connections.
 var defaultUpstreamClient = newUpstreamHTTPClient()
 
+// buildTLSConfig creates a tls.Config from the route's UpstreamTLSConfig.
+// Absent or nil tlsConfig means system trust store with hostname checking (default secure behavior).
+func buildTLSConfig(tlsConfig *UpstreamTLSConfig, upstreamCADir string) (*tls.Config, error) {
+	if tlsConfig == nil {
+		// Default: system trust store with hostname checking
+		return &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}, nil
+	}
+
+	config := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	// Load custom CA bundle if specified
+	if tlsConfig.CaBundle != "" {
+		caPath := filepath.Join(upstreamCADir, tlsConfig.CaBundle)
+		caPEM, err := os.ReadFile(caPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA bundle %s: %w", caPath, err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(caPEM) {
+			return nil, fmt.Errorf("failed to parse CA bundle from %s", caPath)
+		}
+		config.RootCAs = certPool
+	}
+
+	// Set ServerName for SNI override if specified
+	if tlsConfig.ServerName != "" {
+		config.ServerName = tlsConfig.ServerName
+	}
+
+	// insecureSkipVerify is ONLY allowed when explicitly set to "acknowledged"
+	// in the fragment. This is never set globally.
+	config.InsecureSkipVerify = tlsConfig.InsecureSkipVerify
+
+	return config, nil
+}
+
 // newUpstreamHTTPClient creates the client used for outbound upstream calls.
 // The dial and TLS handshake limits bound connection establishment while the
 // client timeout bounds the complete request, including waiting for a response.
 func newUpstreamHTTPClient() *http.Client {
+	return newUpstreamHTTPClientWithTLS(nil, DefaultUpstreamCADir)
+}
+
+// newUpstreamHTTPClientWithTLS creates a client with optional TLS configuration.
+// If tlsConfig is nil, uses system trust store with hostname checking.
+func newUpstreamHTTPClientWithTLS(tlsConfig *UpstreamTLSConfig, upstreamCADir string) *http.Client {
 	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           (&net.Dialer{Timeout: upstreamConnectTimeout, KeepAlive: 30 * time.Second}).DialContext,
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   upstreamConnectTimeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          upstreamMaxIdleConns,
 		MaxIdleConnsPerHost:   upstreamMaxIdleConns,
@@ -39,6 +98,22 @@ func newUpstreamHTTPClient() *http.Client {
 		TLSHandshakeTimeout:   upstreamConnectTimeout,
 		ResponseHeaderTimeout: upstreamRequestTimeout,
 		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// Configure TLS if specified
+	if tlsConfig != nil {
+		tlsConf, err := buildTLSConfig(tlsConfig, upstreamCADir)
+		if err != nil {
+			log.Printf("[proxy] Failed to build TLS config: %v, using system trust store", err)
+			// Fall back to system trust store on error
+			tlsConf = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		transport.TLSClientConfig = tlsConf
+	} else {
+		// Default: system trust store with hostname checking
+		transport.TLSClientConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
 	}
 
 	return &http.Client{
@@ -279,7 +354,37 @@ func remoteClientIP(r *http.Request) string {
 // live upstream response. The response body is left open for the caller to
 // stream and must be closed by the caller.
 func ForwardRequest(ctx context.Context, in *http.Request, match *RouteMatch, upstreamBase string) (*http.Response, error) {
-	return forwardRequestWithClient(ctx, in, match, upstreamBase, defaultUpstreamClient, upstreamRequestTimeout)
+	return ForwardRequestWithConfig(ctx, in, match, upstreamBase, DefaultUpstreamCADir)
+}
+
+// ForwardRequestWithConfig forwards an incoming request with upstream TLS configuration.
+// The TLS configuration is extracted from the route's TLSConfig field.
+func ForwardRequestWithConfig(ctx context.Context, in *http.Request, match *RouteMatch, upstreamBase string, upstreamCADir string) (*http.Response, error) {
+	if in == nil {
+		return nil, fmt.Errorf("incoming request is nil")
+	}
+	if in.URL == nil {
+		return nil, fmt.Errorf("incoming request URL is nil")
+	}
+	// Validate the upstream base URL format
+	_, err := parseUpstreamBaseURL(upstreamBase)
+	if err != nil {
+		return nil, err
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// Extract TLS configuration from the route
+	var tlsConfig *UpstreamTLSConfig
+	if match != nil && match.Route.TLSConfig != nil {
+		tlsConfig = match.Route.TLSConfig
+	}
+
+	// Build client with route-specific TLS configuration
+	client := newUpstreamHTTPClientWithTLS(tlsConfig, upstreamCADir)
+
+	return forwardRequestWithClient(ctx, in, match, upstreamBase, client, upstreamRequestTimeout)
 }
 
 func forwardRequestWithClient(ctx context.Context, in *http.Request, _ *RouteMatch, upstreamBase string, client *http.Client, timeout time.Duration) (*http.Response, error) {
