@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: Request validation fixture
+  version: 1.0.0
+servers: []
+paths:
+  /widgets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Widget identifier
+        schema:
+          type: string
+        example: widget-123
+    get:
+      operationId: getWidget
+      summary: Get a widget
+      x-seam-fixture: read-annotation
+      parameters:
+        - name: verbose
+          in: query
+          required: false
+          schema:
+            type: boolean
+          example: true
+      responses:
+        '200':
+          description: Widget response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+              example:
+                id: widget-123
+                name: Example widget
+    post:
+      operationId: createWidget
+      summary: Create a widget
+      x-seam-fixture: write-annotation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                count:
+                  type: integer
+            example:
+              name: Example widget
+              count: 1
+      responses:
+        '201':
+          description: Widget created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                properties:
+                  id:
+                    type: string

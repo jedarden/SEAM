@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -598,11 +599,11 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(html))
 }
 
-// docsRouteHandler returns route documentation for a specific endpoint
+// docsRouteHandler returns the route slice of the served OpenAPI document.
 // Query parameters:
 //
 //	path - the OpenAPI path template (required)
-//	method - the HTTP method (required)
+//	method - the HTTP method (optional; omitted means every method on path)
 //	version - the API version (optional, defaults to _unversioned)
 func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -634,7 +635,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	query := r.URL.Query()
 	path := query.Get("path")
-	method := query.Get("method")
+	method := strings.ToUpper(strings.TrimSpace(query.Get("method")))
 	version := query.Get("version")
 
 	// Set default version
@@ -670,8 +671,6 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Note: method parameter is optional - if not provided, returns all methods for the path
-
 	// Get route information from the spec loader
 	routeInfo, err := s.specLoader.GetRoute(path, method, version)
 	if err != nil {
@@ -687,10 +686,35 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build the response
+	// Read the same served document that /openapi.json returns. Using its raw
+	// path item keeps request/response schemas, examples, and x-* annotations
+	// intact instead of rebuilding a lossy approximation from the high-level
+	// model.
+	specJSON, err := s.specLoader.GetRawJSON()
+	if err != nil {
+		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load API specification").WithDetail("error", err.Error()).Write(w, r)
+		return
+	}
+	var document map[string]interface{}
+	if err := json.Unmarshal(specJSON, &document); err != nil {
+		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification is not valid JSON").WithDetail("error", err.Error()).Write(w, r)
+		return
+	}
+	pathItems, ok := document["paths"].(map[string]interface{})
+	if !ok {
+		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification has no paths").Write(w, r)
+		return
+	}
+	pathItem, ok := pathItems[path].(map[string]interface{})
+	if !ok {
+		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification route is not an object").Write(w, r)
+		return
+	}
+
 	response := map[string]interface{}{
-		"path":    routeInfo.Path,
-		"version": routeInfo.Version,
+		"path":                           routeInfo.Path,
+		"version":                        routeInfo.Version,
+		"isDefaultForUnversionedCallers": true,
 		"metadata": map[string]interface{}{
 			"description":  "Route documentation for SEAM API",
 			"spec_version": s.specLoader.GetVersion(),
@@ -698,186 +722,45 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// If we have multiple methods (no specific method requested)
+	if parameters, ok := pathItem["parameters"]; ok {
+		response["parameters"] = parameters
+	}
+
+	var exampleMethod string
+	var exampleOperation map[string]interface{}
+	// If we have multiple methods (no specific method requested), return the
+	// complete operation objects keyed by their HTTP method.
 	if method == "" && len(routeInfo.Operations) > 0 {
 		methods := map[string]interface{}{}
 		for _, op := range routeInfo.Operations {
-			methodData := map[string]interface{}{
-				"summary":     op.Operation.Summary,
-				"description": op.Operation.Description,
-				"operationId": op.Operation.OperationId,
-				"tags":        op.Operation.Tags,
+			methodData, found := rawRouteOperation(pathItem, op.Method)
+			if !found {
+				continue
 			}
-
-			// Add parameters if present
-			if len(op.Operation.Parameters) > 0 {
-				params := []map[string]interface{}{}
-				for _, param := range op.Operation.Parameters {
-					params = append(params, map[string]interface{}{
-						"name":        param.Name,
-						"in":          param.In,
-						"description": param.Description,
-						"required":    param.Required,
-						"schema":      param.Schema,
-					})
-				}
-				methodData["parameters"] = params
-			}
-
-			// Add request body if present
-			if op.Operation.RequestBody != nil {
-				methodData["request_body"] = map[string]interface{}{
-					"description": op.Operation.RequestBody.Description,
-					"required":    op.Operation.RequestBody.Required,
-					"content":     op.Operation.RequestBody.Content,
-				}
-			}
-
-			// Add responses if present
-			if op.Operation.Responses != nil && op.Operation.Responses.Codes != nil {
-				responses := map[string]interface{}{}
-				for code, response := range op.Operation.Responses.Codes.FromOldest() {
-					responses[code] = map[string]interface{}{
-						"description": response.Description,
-						"content":     response.Content,
-					}
-				}
-				methodData["responses"] = responses
-			}
-
+			methodData["method"] = op.Method
 			methods[op.Method] = methodData
+			if exampleOperation == nil {
+				exampleMethod = op.Method
+				exampleOperation = methodData
+			}
 		}
 		response["methods"] = methods
 	} else if routeInfo.Operation != nil {
 		// Single method requested
 		response["method"] = method
-		methodData := map[string]interface{}{
-			"method":      method,
-			"summary":     routeInfo.Operation.Summary,
-			"description": routeInfo.Operation.Description,
-			"operationId": routeInfo.Operation.OperationId,
-			"tags":        routeInfo.Operation.Tags,
+		methodData, found := rawRouteOperation(pathItem, method)
+		if !found {
+			NewErrorResponse(ErrCodeSpecLoadFailed, "API specification route operation is missing").Write(w, r)
+			return
 		}
-
-		// Add parameters if present
-		if len(routeInfo.Operation.Parameters) > 0 {
-			params := []map[string]interface{}{}
-			for _, param := range routeInfo.Operation.Parameters {
-				paramData := map[string]interface{}{
-					"name":        param.Name,
-					"in":          param.In,
-					"description": param.Description,
-					"required":    param.Required,
-					"schema":      param.Schema,
-				}
-				// Include example if present
-				if param.Example != nil {
-					paramData["example"] = param.Example
-				}
-				if param.Examples != nil {
-					examples := map[string]interface{}{}
-					for name, ex := range param.Examples.FromOldest() {
-						if ex != nil && ex.Value != nil {
-							examples[name] = ex.Value
-						}
-					}
-					if len(examples) > 0 {
-						paramData["examples"] = examples
-					}
-				}
-				params = append(params, paramData)
-			}
-			methodData["parameters"] = params
-		}
-
-		// Add request body if present
-		if routeInfo.Operation.RequestBody != nil {
-			requestBodyData := map[string]interface{}{
-				"description": routeInfo.Operation.RequestBody.Description,
-				"required":    routeInfo.Operation.RequestBody.Required,
-				"content":     routeInfo.Operation.RequestBody.Content,
-			}
-
-			// Extract examples from request body content
-			if routeInfo.Operation.RequestBody.Content != nil {
-				contentWithExamples := map[string]interface{}{}
-				for mediaType, mediaTypeObj := range routeInfo.Operation.RequestBody.Content.FromOldest() {
-					contentData := map[string]interface{}{
-						"schema": mediaTypeObj.Schema,
-					}
-
-					// Add examples if present
-					if mediaTypeObj.Examples != nil {
-						examples := map[string]interface{}{}
-						for name, ex := range mediaTypeObj.Examples.FromOldest() {
-							if ex != nil && ex.Value != nil {
-								examples[name] = ex.Value
-							}
-						}
-						if len(examples) > 0 {
-							contentData["examples"] = examples
-						}
-					}
-
-					// Add single example if present
-					if mediaTypeObj.Example != nil {
-						contentData["example"] = mediaTypeObj.Example
-					}
-
-					contentWithExamples[mediaType] = contentData
-				}
-				requestBodyData["content"] = contentWithExamples
-			}
-
-			methodData["request_body"] = requestBodyData
-		}
-
-		// Add responses if present
-		if routeInfo.Operation.Responses != nil && routeInfo.Operation.Responses.Codes != nil {
-			responses := map[string]interface{}{}
-			for code, response := range routeInfo.Operation.Responses.Codes.FromOldest() {
-				responseData := map[string]interface{}{
-					"description": response.Description,
-				}
-
-				// Extract examples from response content
-				if response.Content != nil {
-					contentWithExamples := map[string]interface{}{}
-					for mediaType, mediaTypeObj := range response.Content.FromOldest() {
-						contentData := map[string]interface{}{
-							"schema": mediaTypeObj.Schema,
-						}
-
-						// Add examples if present
-						if mediaTypeObj.Examples != nil {
-							examples := map[string]interface{}{}
-							for name, ex := range mediaTypeObj.Examples.FromOldest() {
-								if ex != nil && ex.Value != nil {
-									examples[name] = ex.Value
-								}
-							}
-							if len(examples) > 0 {
-								contentData["examples"] = examples
-							}
-						}
-
-						// Add single example if present
-						if mediaTypeObj.Example != nil {
-							contentData["example"] = mediaTypeObj.Example
-						}
-
-						contentWithExamples[mediaType] = contentData
-					}
-					responseData["content"] = contentWithExamples
-				}
-
-				responses[code] = responseData
-			}
-			methodData["responses"] = responses
-		}
-
+		methodData["method"] = method
 		response["operation"] = methodData
+		exampleMethod = method
+		exampleOperation = methodData
 	}
+
+	response["annotations"] = routeAnnotations(pathItem, exampleOperation)
+	response["example"] = buildWorkedExample(path, exampleMethod, pathItem, exampleOperation, document)
 
 	// Set headers and return response
 	w.Header().Set("Content-Type", "application/json")
@@ -886,6 +769,212 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+func rawRouteOperation(pathItem map[string]interface{}, method string) (map[string]interface{}, bool) {
+	operation, ok := pathItem[strings.ToLower(method)].(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	clone := make(map[string]interface{}, len(operation)+1)
+	for key, value := range operation {
+		clone[key] = value
+	}
+	return clone, true
+}
+
+func routeAnnotations(pathItem, operation map[string]interface{}) map[string]interface{} {
+	annotations := make(map[string]interface{})
+	for _, source := range []map[string]interface{}{pathItem, operation} {
+		for key, value := range source {
+			if strings.HasPrefix(strings.ToLower(key), "x-") {
+				annotations[key] = value
+			}
+		}
+	}
+	return annotations
+}
+
+func buildWorkedExample(path, method string, pathItem, operation, document map[string]interface{}) map[string]interface{} {
+	example := map[string]interface{}{
+		"method": method,
+		"path":   path,
+	}
+	if operation == nil {
+		return example
+	}
+
+	components, _ := document["components"].(map[string]interface{})
+	parameters := append([]interface{}{}, toInterfaceSlice(pathItem["parameters"])...)
+	parameters = append(parameters, toInterfaceSlice(operation["parameters"])...)
+	query := make(map[string]interface{})
+	headers := make(map[string]interface{})
+	pathValues := make(map[string]string)
+	for _, rawParameter := range parameters {
+		parameter, ok := rawParameter.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := parameter["name"].(string)
+		location, _ := parameter["in"].(string)
+		if name == "" {
+			continue
+		}
+		value := parameterExample(parameter, components)
+		switch location {
+		case "path":
+			pathValues[name] = fmt.Sprint(value)
+		case "query":
+			query[name] = value
+		case "header":
+			headers[name] = value
+		}
+	}
+
+	for name, value := range pathValues {
+		path = strings.ReplaceAll(path, "{"+name+"}", value)
+	}
+	example["path"] = path
+	if len(query) > 0 {
+		example["query"] = query
+	}
+
+	requestBody, _ := operation["requestBody"].(map[string]interface{})
+	if requestBody != nil {
+		content, _ := requestBody["content"].(map[string]interface{})
+		mediaType, media, ok := firstMapEntry(content)
+		if ok {
+			headers["Content-Type"] = mediaType
+			exampleValue := media["example"]
+			if exampleValue == nil {
+				exampleValue = firstNamedExampleValue(media["examples"])
+			}
+			if exampleValue == nil {
+				exampleValue = exampleFromSchema(media["schema"], components, make(map[string]bool), 0)
+			}
+			if exampleValue != nil {
+				example["body"] = exampleValue
+			}
+		}
+	}
+	if len(headers) > 0 {
+		example["headers"] = headers
+	}
+	return example
+}
+
+func toInterfaceSlice(value interface{}) []interface{} {
+	values, _ := value.([]interface{})
+	return values
+}
+
+func parameterExample(parameter map[string]interface{}, components map[string]interface{}) interface{} {
+	if value, ok := parameter["example"]; ok {
+		return value
+	}
+	if value := firstNamedExampleValue(parameter["examples"]); value != nil {
+		return value
+	}
+	if value := exampleFromSchema(parameter["schema"], components, make(map[string]bool), 0); value != nil {
+		return value
+	}
+	return "example"
+}
+
+func firstNamedExampleValue(value interface{}) interface{} {
+	examples, ok := value.(map[string]interface{})
+	if !ok || len(examples) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(examples))
+	for key := range examples {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	selected, _ := examples[keys[0]].(map[string]interface{})
+	if selected != nil {
+		if example, ok := selected["value"]; ok {
+			return example
+		}
+	}
+	return examples[keys[0]]
+}
+
+func firstMapEntry(value map[string]interface{}) (string, map[string]interface{}, bool) {
+	if len(value) == 0 {
+		return "", nil, false
+	}
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	entry, _ := value[keys[0]].(map[string]interface{})
+	if entry == nil {
+		return "", nil, false
+	}
+	return keys[0], entry, true
+}
+
+func exampleFromSchema(value interface{}, components map[string]interface{}, seen map[string]bool, depth int) interface{} {
+	if depth > 6 {
+		return nil
+	}
+	schema, ok := value.(map[string]interface{})
+	if !ok || schema == nil {
+		return nil
+	}
+	if example, ok := schema["example"]; ok {
+		return example
+	}
+	if defaultValue, ok := schema["default"]; ok {
+		return defaultValue
+	}
+	if enum, ok := schema["enum"].([]interface{}); ok && len(enum) > 0 {
+		return enum[0]
+	}
+	if ref, ok := schema["$ref"].(string); ok {
+		const prefix = "#/components/schemas/"
+		if strings.HasPrefix(ref, prefix) && !seen[ref] {
+			seen[ref] = true
+			if schemas, ok := components["schemas"].(map[string]interface{}); ok {
+				return exampleFromSchema(schemas[strings.TrimPrefix(ref, prefix)], components, seen, depth+1)
+			}
+		}
+	}
+	if properties, ok := schema["properties"].(map[string]interface{}); ok {
+		object := make(map[string]interface{}, len(properties))
+		keys := make([]string, 0, len(properties))
+		for key := range properties {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if propertyExample := exampleFromSchema(properties[key], components, seen, depth+1); propertyExample != nil {
+				object[key] = propertyExample
+			}
+		}
+		return object
+	}
+	if items, ok := schema["items"]; ok {
+		if itemExample := exampleFromSchema(items, components, seen, depth+1); itemExample != nil {
+			return []interface{}{itemExample}
+		}
+		return []interface{}{}
+	}
+	switch schema["type"] {
+	case "string":
+		return "example"
+	case "integer", "number":
+		return 1
+	case "boolean":
+		return true
+	case "array":
+		return []interface{}{}
+	case "object":
+		return map[string]interface{}{}
+	}
+	return nil
 }
 
 // Start begins listening on both ports

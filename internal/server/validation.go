@@ -37,7 +37,11 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 		validationErr := s.specLoader.ValidateRequest(r)
 		if validationErr != nil {
 			// Request validation failed - return structured 400 error
-			errJSON := validationErr.ToJSON(r.URL.Path, r.Method)
+			path := validationErr.PathTemplate
+			if path == "" {
+				path = r.URL.Path
+			}
+			errJSON := validationErr.ToJSON(path, r.Method)
 			writeValidationError(w, errJSON)
 			return
 		}
@@ -52,9 +56,9 @@ func writeValidationError(w http.ResponseWriter, validationErrors map[string]int
 	w.Header().Set("Content-Type", "application/json")
 
 	response := SpecValidationResponse{
-		Error:   validationErrors["error"].(string),
-		Message: validationErrors["message"].(string),
-		DocsURL: validationErrors["docs_url"].(string),
+		Error:   getStringField(validationErrors, "error"),
+		Message: getStringField(validationErrors, "message"),
+		DocsURL: getStringField(validationErrors, "docs_url"),
 	}
 
 	// Handle validation errors array
@@ -69,6 +73,9 @@ func writeValidationError(w http.ResponseWriter, validationErrors map[string]int
 				Column:        getIntField(err, "column"),
 			})
 		}
+	}
+	if response.ValidationErrors == nil {
+		response.ValidationErrors = []ValidationFieldError{}
 	}
 
 	w.WriteHeader(http.StatusBadRequest)

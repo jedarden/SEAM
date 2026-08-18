@@ -290,6 +290,56 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /docs/route:
+    get:
+      summary: Get documentation for one route
+      description: |
+        Returns the served OpenAPI slice for the path template in `path`.
+        Omit `method` to receive every operation declared on that path. The
+        route selector is a query parameter so encoded slashes in templates
+        remain normalization-safe through the caller-facing stack.
+      operationId: getRouteDocs
+      tags:
+        - Documentation
+      parameters:
+        - name: path
+          in: query
+          required: true
+          description: OpenAPI path template, such as /widgets/{id}
+          schema:
+            type: string
+          example: /openapi.json
+        - name: method
+          in: query
+          required: false
+          description: HTTP method to select; omit for every method on the path
+          schema:
+            type: string
+            enum: [GET, PUT, POST, DELETE, PATCH, OPTIONS, HEAD, TRACE]
+          example: GET
+        - name: version
+          in: query
+          required: false
+          description: Served API contract version (the only Phase 1a contract)
+          schema:
+            type: string
+            enum: [_unversioned]
+            default: _unversioned
+      responses:
+        '200':
+          description: Route parameters, schemas, annotations, and worked example
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
   /_seam/healthz:
     get:
       summary: Liveness probe
