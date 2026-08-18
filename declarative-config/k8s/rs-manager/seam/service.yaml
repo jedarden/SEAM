@@ -1,0 +1,54 @@
+---
+# SEAM Gateway Service (ClusterIP)
+# Exposes both caller-facing (8080) and operator (8081) ports within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: seam
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+  ports:
+  - name: caller
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: operator
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+---
+# SEAM Tailscale Service
+# Exposes SEAM on the Tailscale mesh for VPN access
+# Accessible at: https://seam-rs-manager.tail1b1987.ts.net
+apiVersion: v1
+kind: Service
+metadata:
+  name: seam-tailscale
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: "seam-rs-manager"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: seam
+    app.kubernetes.io/component: gateway
+  ports:
+  - name: caller
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: operator
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
