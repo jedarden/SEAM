@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ardenone/seam/internal/server"
 )
 
 // The container image's HEALTHCHECK depends on these semantics: exit zero only
@@ -57,5 +59,14 @@ func TestRunHealthcheckUnreachable(t *testing.T) {
 
 	if err := runHealthcheck(url, 500*time.Millisecond); err == nil {
 		t.Fatal("expected an error probing a closed listener, got nil")
+	}
+}
+
+func TestAllowlistPathIsFixedInCluster(t *testing.T) {
+	if got := resolveAllowlistFile("/tmp/developer-allowlist.yaml", true); got != server.DefaultUpstreamAllowlistFile {
+		t.Fatalf("in-cluster allowlist path = %q, want fixed mount %q", got, server.DefaultUpstreamAllowlistFile)
+	}
+	if got := resolveAllowlistFile("/tmp/developer-allowlist.yaml", false); got != "/tmp/developer-allowlist.yaml" {
+		t.Fatalf("local allowlist path = %q, want developer path", got)
 	}
 }

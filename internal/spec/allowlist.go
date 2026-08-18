@@ -35,6 +35,8 @@ type UpstreamAllowlist struct {
 	ParseError string
 }
 
+const defaultMountedAllowlistFile = "/etc/gateway/allowlist.yaml"
+
 // NewAllowlistEnforcer creates a new allowlist enforcer
 func NewAllowlistEnforcer(vaultBaseDir string, allowlistFile string) (*AllowlistEnforcer, error) {
 	if vaultBaseDir == "" {
@@ -61,7 +63,11 @@ func NewAllowlistEnforcer(vaultBaseDir string, allowlistFile string) (*Allowlist
 			log.Printf("[Allowlist] Failed to load allowlist from %s: %v", allowlistFile, err)
 			enforcer.upstreamAllowlist.ParseError = err.Error()
 		} else {
-			enforcer.allowlistSource = "dev-file"
+			if allowlistFile == defaultMountedAllowlistFile {
+				enforcer.allowlistSource = "mounted-file"
+			} else {
+				enforcer.allowlistSource = "dev-file"
+			}
 		}
 	}
 

@@ -27,6 +27,11 @@ const (
 	// Local development can override this with --upstream-ca-dir.
 	// This is the ConfigMap mount point in production deployments.
 	DefaultUpstreamCADir = "/etc/gateway/upstream-ca"
+
+	// DefaultUpstreamAllowlistFile is the fixed mount point for the upstream
+	// allowlist ConfigMap in production deployments. Local development can
+	// override it with --allowlist-file.
+	DefaultUpstreamAllowlistFile = "/etc/gateway/allowlist.yaml"
 )
 
 // Context key type for storing replayable body in request context
