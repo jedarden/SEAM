@@ -315,7 +315,10 @@ func TestCaptureInvalidPathCharacters(t *testing.T) {
 	}
 
 	for _, path := range testPaths {
-		req := httptest.NewRequest("GET", path, nil)
+		// Encode spaces in the request target so httptest.NewRequest does not
+		// interpret the remainder of the path as an HTTP version.
+		requestTarget := strings.ReplaceAll(path, " ", "%20")
+		req := httptest.NewRequest("GET", requestTarget, nil)
 		w := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(w, req)
 
