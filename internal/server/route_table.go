@@ -267,7 +267,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
-			upstreamStripPrefix, err := extractStringExtension(methodOp.operation, nil, spec, "x-upstream-strip-prefix")
+			upstreamStripPrefix, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-upstream-strip-prefix")
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}

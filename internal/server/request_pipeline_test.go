@@ -1,10 +1,14 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/ardenone/seam/internal/spec"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"go.yaml.in/yaml/v4"
@@ -193,6 +197,72 @@ func TestBuildRouteTableExtractsInjectionAndPathItemRewrite(t *testing.T) {
 	route := table.GetRoutes()[0]
 	if route.UpstreamPathTemplate != "/api/{name}" || route.InjectAs == nil || route.InjectAs.Name != "X-Api-Key" {
 		t.Fatalf("route metadata was not extracted: %+v", route)
+	}
+}
+
+func TestFragmentRootStripPrefixReachesOutboundPath(t *testing.T) {
+	var outboundPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		outboundPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	fragmentsDir := filepath.Join(t.TempDir(), "fragments.d")
+	fragmentPath := filepath.Join(fragmentsDir, "argocd-ro", "route.json")
+	if err := os.MkdirAll(filepath.Dir(fragmentPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	fragment := fmt.Sprintf(`{
+		"x-seam-schema": "v1",
+		"x-seam-owner": "argocd-ro",
+		"x-api-version": "v1",
+		"x-upstream": %q,
+		"x-upstream-strip-prefix": "/argocd",
+		"paths": {
+			"/argocd/api/v1/clusters": {
+				"get": {
+					"responses": {"200": {"description": "ok"}}
+				}
+			}
+		}
+	}`, upstream.URL)
+	if err := os.WriteFile(fragmentPath, []byte(fragment), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader, err := spec.NewWithFragments("", "http://localhost:8080", "", fragmentsDir)
+	if err != nil {
+		t.Fatalf("load fragment: %v", err)
+	}
+	table, err := BuildRouteTable(loader.OpenAPIModel())
+	if err != nil {
+		t.Fatalf("build route table: %v", err)
+	}
+	routes := table.GetRoutes()
+	if len(routes) != 1 {
+		t.Fatalf("route count = %d, want 1", len(routes))
+	}
+	if got, want := routes[0].UpstreamStripPrefix, "/argocd"; got != want {
+		t.Fatalf("route strip prefix = %q, want %q", got, want)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/argocd/api/v1/clusters", nil)
+	match, err := table.Match(req)
+	if err != nil {
+		t.Fatalf("match route: %v", err)
+	}
+	proxy, err := NewReverseProxy(match.Route.UpstreamTarget)
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, req)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("proxy status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+	if got, want := outboundPath, "/api/v1/clusters"; got != want {
+		t.Fatalf("outbound path = %q, want %q", got, want)
 	}
 }
 
