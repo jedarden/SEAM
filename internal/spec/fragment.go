@@ -274,13 +274,22 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 
 	reservedPrefixes := []string{"/docs/", "/health/", "/config/", "/approvals/", "/_seam/"}
 
+	// Check exact matches first so a fragment declaring both an exact reserved
+	// path and a reserved-prefix path gets the more specific reason. Sort the
+	// paths to keep quarantine reasons deterministic across map iteration.
+	pathNames := make([]string, 0, len(paths))
 	for path := range paths {
-		// Check exact matches
+		pathNames = append(pathNames, path)
+	}
+	sort.Strings(pathNames)
+
+	for _, path := range pathNames {
 		if reservedPaths[path] {
 			return fmt.Errorf("fragment declares reserved path: %s", path)
 		}
+	}
 
-		// Check prefix matches
+	for _, path := range pathNames {
 		for _, prefix := range reservedPrefixes {
 			if strings.HasPrefix(path, prefix) {
 				return fmt.Errorf("fragment declares path with reserved prefix: %s (prefix: %s)", path, prefix)
