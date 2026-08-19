@@ -65,10 +65,11 @@ func TestHealthzHandlerWrongMethod(t *testing.T) {
 
 func TestReadyzHandler(t *testing.T) {
 	cfg := &Config{
-		CallerPort:   8080,
-		OperatorPort: 8081,
-		BaseURL:      "http://localhost:8080",
-		SpecDir:      "../../spec",
+		CallerPort:    8080,
+		OperatorPort:  8081,
+		BaseURL:       "http://localhost:8080",
+		SpecDir:       "../../spec",
+		AllowlistFile: newBaselineAllowlistFile(t),
 	}
 
 	s := New(cfg)

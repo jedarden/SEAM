@@ -324,13 +324,6 @@ func addBuiltRoute(table *RouteTable, seen map[routeKey]struct{}, entry RouteEnt
 	return nil
 }
 
-// extractAPIVersion extracts the API version from operation extensions.
-// It looks for the "x-api-version" extension and returns its value.
-// If not found, defaults to "v1".
-func extractAPIVersion(operation *v3.Operation) (string, error) {
-	return extractAPIVersionWithContext(operation, nil, nil)
-}
-
 func extractAPIVersionWithContext(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (string, error) {
 	if operation == nil {
 		return "", fmt.Errorf("operation cannot be nil")

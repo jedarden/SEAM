@@ -126,7 +126,7 @@ func TestInjectedResponseScrubsBodyHeadersAndTrailers(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	proxy.ServeHTTP(recorder, req)
 	response := recorder.Result()
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusTeapot {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusTeapot)
@@ -171,7 +171,7 @@ func TestInjectedGzipResponseIsDecodedScrubbedAndReencoded(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	proxy.ServeHTTP(recorder, req)
 	response := recorder.Result()
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.Header.Get("Content-Encoding") != "gzip" {
 		t.Fatalf("Content-Encoding = %q, want gzip", response.Header.Get("Content-Encoding"))
 	}
@@ -212,7 +212,7 @@ func TestInjectedOversizedResponseUsesIncrementalScrubbing(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	proxy.ServeHTTP(recorder, req)
 	response := recorder.Result()
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	got, _ := io.ReadAll(response.Body)
 	assertNoSecret(t, secret, got)
 	if !bytes.Contains(got, []byte(RedactedSecret)) {

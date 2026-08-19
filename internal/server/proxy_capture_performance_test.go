@@ -97,7 +97,7 @@ func (f *proxyCaptureLatencyFixture) request(payload []byte) (time.Duration, int
 	if err != nil {
 		return elapsed, 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, readErr := io.Copy(io.Discard, resp.Body)
 	if readErr != nil {
 		return elapsed, resp.StatusCode, readErr

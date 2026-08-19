@@ -234,7 +234,7 @@ func TestArgoCDCapturedCorpusEntriesAreCompleteAndMockable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request mock response: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	gotBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read mock response: %v", err)

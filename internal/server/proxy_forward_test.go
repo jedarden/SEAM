@@ -29,7 +29,7 @@ func TestForwardRequestSimpleGET(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -62,7 +62,7 @@ func TestForwardRequestPOSTWithBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusCreated)
 	}
@@ -103,7 +103,7 @@ func TestForwardRequestPreservesHeadersAndAddsForwardingHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }
 
 func TestForwardRequestAcceptsRouteMatch(t *testing.T) {
@@ -120,7 +120,7 @@ func TestForwardRequestAcceptsRouteMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }
 
 func TestForwardRequestTimeout(t *testing.T) {
@@ -185,7 +185,7 @@ func TestStreamResponseOKWithBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Stream response to a test ResponseRecorder
 	recorder := httptest.NewRecorder()
@@ -227,7 +227,7 @@ func TestStreamResponseNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	recorder := httptest.NewRecorder()
 	if err := StreamResponse(recorder, resp); err != nil {
@@ -257,7 +257,7 @@ func TestStreamResponseServerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	recorder := httptest.NewRecorder()
 	if err := StreamResponse(recorder, resp); err != nil {
@@ -294,7 +294,7 @@ func TestStreamResponseLargeBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	recorder := httptest.NewRecorder()
 	if err := StreamResponse(recorder, resp); err != nil {
@@ -337,7 +337,7 @@ func TestStreamResponseFiltersHopByHopHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ForwardRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	recorder := httptest.NewRecorder()
 	if err := StreamResponse(recorder, resp); err != nil {

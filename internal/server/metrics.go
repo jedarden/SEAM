@@ -68,6 +68,7 @@ var (
 	}, []string{"origin"})
 
 	// OpenBao cache metrics (placeholder for future OpenBao integration)
+	//nolint:unused // Awaiting OpenBao response-cache wiring; recordOpenBaoCacheHit has no caller yet.
 	metricOpenBaoCacheHits = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "seam_openbao_cache_hits_total",
 		Help: "Total number of OpenBao cache hits (placeholder - OpenBao integration not yet implemented)",
@@ -182,6 +183,8 @@ func decrementInFlight(route, method string) {
 }
 
 // recordOpenBaoCacheHit records an OpenBao cache hit
+//
+//nolint:unused // Awaiting OpenBao response-cache wiring; no caller yet.
 func recordOpenBaoCacheHit() {
 	metricOpenBaoCacheHits.Inc()
 }

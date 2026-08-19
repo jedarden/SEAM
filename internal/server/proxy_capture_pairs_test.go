@@ -18,7 +18,7 @@ func TestProxyCaptureEnabledPreservesSuccessfulResponsePair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proxy request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	actualBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestProxyCaptureEnabledPreservesErrorResponsePair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proxy request failed before receiving upstream error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	actualBody, err := io.ReadAll(resp.Body)
 	if err != nil {

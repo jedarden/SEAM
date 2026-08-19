@@ -311,10 +311,7 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Check allowlist status
-	ready := true
-	if s.allowlistEnforcer != nil && s.allowlistEnforcer.IsFailClosed() {
-		ready = false
-	}
+	ready := s.allowlistEnforcer == nil || !s.allowlistEnforcer.IsFailClosed()
 	if !s.isOpenBaoReady() {
 		ready = false
 	}

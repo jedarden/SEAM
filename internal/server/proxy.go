@@ -49,7 +49,11 @@ func contextWithReplayableBody(ctx context.Context, rb *replayableBody) context.
 	return context.WithValue(ctx, replayableBodyKey, rb)
 }
 
-// replayableBodyFromContext extracts the replayable body from the context
+// replayableBodyFromContext extracts the replayable body from the context.
+// Read side of the Phase 2.5 replay-body context key; contextWithReplayableBody
+// already stores it, but no caller reads it back yet.
+//
+//nolint:unused
 func replayableBodyFromContext(ctx context.Context) *replayableBody {
 	if rb, ok := ctx.Value(replayableBodyKey).(*replayableBody); ok {
 		return rb
@@ -319,13 +323,6 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// buildUpstreamURL constructs the full upstream URL from the base URL and the
-// incoming request path and query.
-func (p *ReverseProxy) buildUpstreamURL(r *http.Request) string {
-	url, _ := p.buildUpstreamURLForMatch(r, nil)
-	return url
-}
-
 func (p *ReverseProxy) buildUpstreamURLForMatch(r *http.Request, match *RouteMatch) (string, error) {
 	if p == nil || p.UpstreamURL == nil || r == nil || r.URL == nil {
 		return "", nil
@@ -352,7 +349,7 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 	}
 
 	// Phase 2.5: Wrap request body with replayable tee if present
-	var requestBody io.ReadCloser = inboundReq.Body
+	var requestBody = inboundReq.Body
 	if inboundReq.Body != nil {
 		// Detect unreplayable conditions (protocol upgrades)
 		if isProtocolUpgrade(inboundReq) {
@@ -488,14 +485,6 @@ func hopByHopHeaders(headers http.Header) map[string]struct{} {
 		}
 	}
 	return hopByHop
-}
-
-// isHopByHopHeader reports whether header is one of the standard hop-by-hop
-// headers. Connection-listed headers are handled by hopByHopHeaders, where
-// the complete source header set is available.
-func isHopByHopHeader(header string) bool {
-	_, ok := hopByHopHeaders(nil)[http.CanonicalHeaderKey(header)]
-	return ok
 }
 
 // setForwardedHeaders adds forwarding metadata for upstream logging.
@@ -707,18 +696,6 @@ func joinURLPaths(basePath, requestPath string) string {
 		return "/" + requestPath
 	}
 	return strings.TrimRight(basePath, "/") + "/" + strings.TrimLeft(requestPath, "/")
-}
-
-func (p *ReverseProxy) copyHeaders(inbound, outbound http.Header, _ string) {
-	copyHeaders(inbound, outbound)
-}
-
-func (p *ReverseProxy) setForwardedHeaders(inboundReq, outboundReq *http.Request) {
-	setForwardedHeaders(inboundReq, outboundReq)
-}
-
-func (p *ReverseProxy) copyResponseHeaders(upstream, caller http.Header) {
-	copyHeaders(upstream, caller)
 }
 
 func (p *ReverseProxy) streamResponse(w http.ResponseWriter, body io.Reader) error {

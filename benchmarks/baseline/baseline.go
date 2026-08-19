@@ -163,13 +163,13 @@ func SaveBaseline(benchmarkType string, metrics map[string]BenchmarkMetric) erro
 		return fmt.Errorf("failed to create temporary baseline file: %w", err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	defer func() { _ = os.Remove(tmpName) }()
 	if err := tmp.Chmod(0644); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("failed to set baseline file permissions: %w", err)
 	}
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("failed to write baseline file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
@@ -412,11 +412,6 @@ func baseBenchmarkName(fullName string) string {
 	return name
 }
 
-// extractBenchmarkName is retained for callers that need the base name.
-func extractBenchmarkName(fullName string) string {
-	return baseBenchmarkName(fullName)
-}
-
 func metricDirection(metricName string) (lowerBetter, comparable bool) {
 	name := strings.ToLower(metricName)
 	if strings.Contains(name, "ns_per_op") ||
@@ -451,10 +446,10 @@ func metricDirection(metricName string) (lowerBetter, comparable bool) {
 func FormatReport(report *ComparisonReport) string {
 	var buf bytes.Buffer
 
-	buf.WriteString(fmt.Sprintf("\n=== Benchmark Regression Report ===\n"))
-	buf.WriteString(fmt.Sprintf("Baseline Commit: %s (%s)\n", shortSHA(report.BaselineCommitSHA), report.BaselineTimestamp))
-	buf.WriteString(fmt.Sprintf("Current Commit: %s (%s)\n", shortSHA(report.CurrentCommitSHA), report.Timestamp))
-	buf.WriteString(fmt.Sprintf("Regression Threshold: %.1f%%\n\n", report.RegressionThreshold))
+	buf.WriteString("\n=== Benchmark Regression Report ===\n")
+	_, _ = fmt.Fprintf(&buf, "Baseline Commit: %s (%s)\n", shortSHA(report.BaselineCommitSHA), report.BaselineTimestamp)
+	_, _ = fmt.Fprintf(&buf, "Current Commit: %s (%s)\n", shortSHA(report.CurrentCommitSHA), report.Timestamp)
+	_, _ = fmt.Fprintf(&buf, "Regression Threshold: %.1f%%\n\n", report.RegressionThreshold)
 
 	if len(report.Regressions) > 0 {
 		buf.WriteString("❌ REGRESSIONS DETECTED:\n")
@@ -463,9 +458,9 @@ func FormatReport(report *ComparisonReport) string {
 			if r.PercentChange < 0 {
 				symbol = "⬇"
 			}
-			buf.WriteString(fmt.Sprintf("  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
+			_, _ = fmt.Fprintf(&buf, "  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
 				symbol, r.BenchmarkName, r.MetricName, r.PercentChange,
-				r.BaselineValue, r.CurrentValue))
+				r.BaselineValue, r.CurrentValue)
 		}
 		buf.WriteString("\n")
 	}
@@ -477,9 +472,9 @@ func FormatReport(report *ComparisonReport) string {
 			if w.PercentChange < 0 {
 				symbol = "⬇"
 			}
-			buf.WriteString(fmt.Sprintf("  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
+			_, _ = fmt.Fprintf(&buf, "  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
 				symbol, w.BenchmarkName, w.MetricName, w.PercentChange,
-				w.BaselineValue, w.CurrentValue))
+				w.BaselineValue, w.CurrentValue)
 		}
 		buf.WriteString("\n")
 	}
@@ -491,9 +486,9 @@ func FormatReport(report *ComparisonReport) string {
 			if i.PercentChange < 0 {
 				symbol = "⬆"
 			}
-			buf.WriteString(fmt.Sprintf("  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
+			_, _ = fmt.Fprintf(&buf, "  %s %s.%s: %.2f%% (%.2f → %.2f)\n",
 				symbol, i.BenchmarkName, i.MetricName, i.PercentChange,
-				i.BaselineValue, i.CurrentValue))
+				i.BaselineValue, i.CurrentValue)
 		}
 		buf.WriteString("\n")
 	}
@@ -501,7 +496,7 @@ func FormatReport(report *ComparisonReport) string {
 	if report.Passed {
 		buf.WriteString("✅ PASSED: No regressions detected\n")
 	} else {
-		buf.WriteString(fmt.Sprintf("❌ FAILED: %d regression(s) detected\n", len(report.Regressions)))
+		_, _ = fmt.Fprintf(&buf, "❌ FAILED: %d regression(s) detected\n", len(report.Regressions))
 	}
 
 	return buf.String()

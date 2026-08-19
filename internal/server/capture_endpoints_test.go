@@ -33,7 +33,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 
 	t.Run("status on operator mux", func(t *testing.T) {
 		resp := serveMuxRequest(s.operatorMux, http.MethodGet, "/_seam/capture/status")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -54,7 +54,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 
 	t.Run("save on operator mux", func(t *testing.T) {
 		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -94,7 +94,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := serveMuxRequest(s.callerMux, tc.method, tc.path)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusNotFound {
 				t.Fatalf("expected caller mux status %d, got %d", http.StatusNotFound, resp.StatusCode)
 			}
@@ -121,7 +121,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				resp := serveMuxRequest(s.operatorMux, tc.method, tc.path)
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode != http.StatusMethodNotAllowed {
 					t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, resp.StatusCode)
 				}
@@ -138,7 +138,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 		})
 
 		resp := serveMuxRequest(s.operatorMux, http.MethodGet, "/_seam/capture/status")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
 		}
@@ -161,7 +161,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 		})
 
 		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusServiceUnavailable {
 			t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, resp.StatusCode)
 		}
@@ -183,7 +183,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 		})
 
 		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 		}
