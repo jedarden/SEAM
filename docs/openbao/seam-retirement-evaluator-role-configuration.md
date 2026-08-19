@@ -6,6 +6,8 @@
 **Bead:** seam-d70c5345  
 **OpenBao Server:** `http://openbao-ardenone.tail1b1987.ts.net:8200`
 
+**Prepared artifacts:** [role parameters](seam-retirement-evaluator-role-parameters.json) and [policy HCL](seam-retirement-evaluator-policy.hcl). These files are ready for a later OpenBao API/CLI application and do not perform writes.
+
 ---
 
 ## Executive Summary
