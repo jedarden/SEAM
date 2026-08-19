@@ -268,7 +268,7 @@ func decodeBody(body io.Reader, encodings []string) (io.Reader, []io.Closer, err
 		case "gzip":
 			reader, err := gzip.NewReader(current)
 			if err != nil {
-				closeAll(closers)
+				_ = closeAll(closers)
 				return nil, nil, fmt.Errorf("decode gzip response: %w", err)
 			}
 			current = reader
@@ -276,7 +276,7 @@ func decodeBody(body io.Reader, encodings []string) (io.Reader, []io.Closer, err
 		case "deflate":
 			reader, err := zlib.NewReader(current)
 			if err != nil {
-				closeAll(closers)
+				_ = closeAll(closers)
 				return nil, nil, fmt.Errorf("decode deflate response: %w", err)
 			}
 			current = reader

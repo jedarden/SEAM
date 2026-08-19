@@ -76,13 +76,13 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 		report, err = seamspec.LintFiles(positional, options)
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "seam lint: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "seam lint: %v\n", err)
 		return 2
 	}
 
 	if jsonOutput {
 		if err := writeLintJSON(stdout, report); err != nil {
-			fmt.Fprintf(stderr, "seam lint: write JSON report: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "seam lint: write JSON report: %v\n", err)
 			return 2
 		}
 	} else {
@@ -137,14 +137,14 @@ func writeLintJSON(stdout io.Writer, report seamspec.LintReport) error {
 
 func writeLintText(stdout io.Writer, report seamspec.LintReport) {
 	for _, finding := range report.Errors {
-		fmt.Fprintf(stdout, "ERROR [%s] %s: %s\n", finding.Code, finding.File, finding.Message)
+		_, _ = fmt.Fprintf(stdout, "ERROR [%s] %s: %s\n", finding.Code, finding.File, finding.Message)
 	}
 	for _, finding := range report.Warnings {
-		fmt.Fprintf(stdout, "WARNING [%s] %s: %s\n", finding.Code, finding.File, finding.Message)
+		_, _ = fmt.Fprintf(stdout, "WARNING [%s] %s: %s\n", finding.Code, finding.File, finding.Message)
 	}
 	status := "passed"
 	if report.HasErrors() {
 		status = "failed"
 	}
-	fmt.Fprintf(stdout, "seam lint: %s (%d file(s), %d error(s), %d warning(s))\n", status, report.Files, len(report.Errors), len(report.Warnings))
+	_, _ = fmt.Fprintf(stdout, "seam lint: %s (%d file(s), %d error(s), %d warning(s))\n", status, report.Files, len(report.Errors), len(report.Warnings))
 }

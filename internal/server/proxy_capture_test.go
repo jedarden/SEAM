@@ -190,7 +190,7 @@ func (h *ProxyTestHarness) GetCaptureStatus() (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get capture status: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("capture status returned %d", resp.StatusCode)
 	}
@@ -209,7 +209,7 @@ func (h *ProxyTestHarness) TriggerManualSave() (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("save corpus: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("save corpus returned %d", resp.StatusCode)
 	}
@@ -238,7 +238,7 @@ func (h *ProxyTestHarness) LoadCorpus() (*CorpusFile, error) {
 // AssertResponseCorrect checks a proxy response and consumes its body.
 func (h *ProxyTestHarness) AssertResponseCorrect(t *testing.T, resp *http.Response, expectedStatus int, expectedBody string) {
 	t.Helper()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != expectedStatus {
 		t.Errorf("expected status %d, got %d", expectedStatus, resp.StatusCode)

@@ -318,7 +318,7 @@ func TestCaptureResponseIntegrity(t *testing.T) {
 			w.Header().Set(k, v)
 		}
 		w.WriteHeader(expectedStatus)
-		w.Write([]byte(expectedBody))
+		_, _ = w.Write([]byte(expectedBody))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -431,7 +431,7 @@ func TestCaptureRequestIntegrity(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"result": "ok"}`))
+		_, _ = w.Write([]byte(`{"result": "ok"}`))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -517,7 +517,7 @@ func TestCaptureHeaderCanonicalization(t *testing.T) {
 		w.Header().Set("x-custom-header", "value1")
 		w.Header().Set("X-Another-Header", "value2")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -624,7 +624,7 @@ func TestCaptureBodyEncodingDecoding(t *testing.T) {
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", tc.contentType)
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(tc.body))
+				_, _ = w.Write([]byte(tc.body))
 			})
 
 			wrappedHandler := cm.Wrap(nextHandler)
@@ -698,7 +698,7 @@ func TestCaptureCompleteness(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Response-Id", "resp-123")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id": 456}`))
+		_, _ = w.Write([]byte(`{"id": 456}`))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -795,7 +795,7 @@ func TestCaptureMinimality(t *testing.T) {
 		w.Header().Set("Server", "TestServer/1.0")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -1018,7 +1018,7 @@ func TestCaptureMultipleRequests(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{"path": "%s"}`, r.URL.Path)))
+		_, _ = fmt.Fprintf(w, `{"path": "%s"}`, r.URL.Path)
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -1084,7 +1084,7 @@ func TestCaptureAutoSaveInterval(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -1131,7 +1131,7 @@ func TestCaptureLoadAppend(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	wrappedHandler := cm1.Wrap(nextHandler)

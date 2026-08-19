@@ -53,12 +53,12 @@ func NewOpenBaoBenchmarkSuite(t testing.TB) *OpenBaoBenchmarkSuite {
 	defer cancel()
 
 	if err := srv.SetupTestSecrets(ctx); err != nil {
-		srv.Close()
+		_ = srv.Close()
 		t.Fatalf("Failed to setup test secrets: %v", err)
 	}
 
 	t.Cleanup(func() {
-		srv.Close()
+		_ = srv.Close()
 	})
 
 	return &OpenBaoBenchmarkSuite{
@@ -204,7 +204,7 @@ func BenchmarkOpenBaoConcurrentAccess(b *testing.B) {
 			b.ReportAllocs()
 
 			b.RunParallel(func(pb *testing.PB) {
-				secretPath := fmt.Sprintf("seam/routes/testservice/token")
+				secretPath := "seam/routes/testservice/token"
 
 				for pb.Next() {
 					start := time.Now()
@@ -299,9 +299,7 @@ func BenchmarkOpenBaoComprehensive(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				path := fmt.Sprintf("bench/comprehensive/cold/%d", i%10)
 				_, err := s.client.ReadSecret(ctx, path)
-				if err != nil {
-					// Expected for non-existent paths
-				}
+				_ = err // expected for non-existent paths
 			}
 		}},
 		{"WarmCache", func(b *testing.B, s *OpenBaoBenchmarkSuite) {
@@ -322,9 +320,7 @@ func BenchmarkOpenBaoComprehensive(b *testing.B) {
 					path := fmt.Sprintf("bench/comprehensive/concurrent/%d", i%50)
 					i++
 					_, err := s.client.ReadSecret(ctx, path)
-					if err != nil {
-						// Expected for some non-existent paths
-					}
+					_ = err // expected for some non-existent paths
 				}
 			})
 		}},
@@ -389,7 +385,7 @@ func TestOpenBaoBenchmarkJSONOutput(t *testing.T) {
 	}
 
 	tmpFile := "/tmp/benchmark-test-output.json"
-	defer os.Remove(tmpFile)
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	if err := saveBenchmarkResults(results, tmpFile); err != nil {
 		t.Fatalf("Failed to save results: %v", err)

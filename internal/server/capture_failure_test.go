@@ -46,7 +46,7 @@ func TestCaptureSaveToReadOnlyDirectory(t *testing.T) {
 	// Create a test handler that returns a response
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -129,7 +129,7 @@ func TestCaptureRequestBodyReadFailure(t *testing.T) {
 	// Create a test handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -164,7 +164,7 @@ func TestCaptureResponseBodyCaptureFailure(t *testing.T) {
 	largeBody := strings.Repeat("x", 100*1024*1024) // 100MB
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(largeBody))
+		_, _ = w.Write([]byte(largeBody))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -195,7 +195,7 @@ func TestCaptureConcurrentSaveOperations(t *testing.T) {
 	// Capture some entries first
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -269,7 +269,7 @@ func TestCaptureDiskSpacePressure(t *testing.T) {
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Return a large response
-		w.Write([]byte(strings.Repeat("x", 1024*1024))) // 1MB
+		_, _ = w.Write([]byte(strings.Repeat("x", 1024*1024))) // 1MB
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -299,7 +299,7 @@ func TestCaptureInvalidPathCharacters(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -351,7 +351,7 @@ func TestCaptureReservedPathsExcluded(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -387,7 +387,7 @@ func TestCaptureMemoryPressure(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -424,7 +424,7 @@ func TestCaptureWithSpecialHeaderValues(t *testing.T) {
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -464,7 +464,7 @@ func TestCaptureResponseRecorderFlushMethod(t *testing.T) {
 			flusher.Flush()
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -525,7 +525,7 @@ func TestCaptureDirectoryCreationFailure(t *testing.T) {
 	// Capture an entry
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -589,7 +589,7 @@ func TestCaptureWriteErrorDuringRequestHandling(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -643,7 +643,7 @@ func TestCaptureFilesystemFullSimulated(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -688,7 +688,7 @@ func TestCaptureJsonMarshalFailure(t *testing.T) {
 	// Capture a request
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -736,7 +736,7 @@ func TestCaptureErrorIsolation(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Response from " + r.URL.Path))
+		_, _ = w.Write([]byte("Response from " + r.URL.Path))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -803,7 +803,7 @@ func TestCaptureSaveFailureDoesNotCrashProxy(t *testing.T) {
 	// Capture some entries
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)
@@ -872,7 +872,7 @@ func TestCaptureWithUnwritableParentDirectory(t *testing.T) {
 	// Capture an entry
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	wrappedHandler := cm.Wrap(nextHandler)

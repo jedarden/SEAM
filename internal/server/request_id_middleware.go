@@ -13,6 +13,8 @@ const requestIDKey contextKey = iota
 
 // requestIDMiddleware generates a unique request ID for each incoming request
 // and stores it in the request context for use in error responses and logging
+//
+//nolint:unused // Intentional scaffolding: not yet wired into setupRoutes.
 func (s *Server) requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate or extract request ID
@@ -50,7 +52,7 @@ func GetRequestID(r *http.Request) string {
 func MustGetRequestID(r *http.Request) string {
 	requestID := GetRequestID(r)
 	if requestID == "" {
-		return fmt.Sprintf("req_unknown")
+		return "req_unknown"
 	}
 	return fmt.Sprintf("req_%s", requestID[:8])
 }

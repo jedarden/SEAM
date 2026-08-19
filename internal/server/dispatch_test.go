@@ -114,7 +114,7 @@ func TestDispatchHandler_RouteTableMatch(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -136,7 +136,7 @@ func TestDispatchHandler_RouteTableMatch(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp = w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -171,7 +171,7 @@ func TestDispatchHandler_NoRoute(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected status 404, got %d", resp.StatusCode)
@@ -223,7 +223,7 @@ func TestDispatchHandler_NoUpstream(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected status 503, got %d", resp.StatusCode)
@@ -275,7 +275,7 @@ func TestDispatchHandler_ProxyCreationFailed(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected status 503, got %d", resp.StatusCode)
@@ -583,7 +583,7 @@ func TestDispatchHandler_PathParameters(t *testing.T) {
 	srv.dispatchHandler(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)

@@ -10,10 +10,11 @@ import (
 
 func TestConfigStatusReportsRuntimeStateWithoutSecrets(t *testing.T) {
 	s := New(&Config{
-		CallerPort:   8080,
-		OperatorPort: 8081,
-		BaseURL:      "https://operator:REPLACE@example.test:8443?token=REPLACE",
-		SpecDir:      "../../spec",
+		CallerPort:    8080,
+		OperatorPort:  8081,
+		BaseURL:       "https://operator:REPLACE@example.test:8443?token=REPLACE",
+		SpecDir:       "../../spec",
+		AllowlistFile: newBaselineAllowlistFile(t),
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/config/status", nil)

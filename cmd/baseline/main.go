@@ -22,17 +22,17 @@ var (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: baseline [options]\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Benchmark baseline management tool for SEAM\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: baseline [options]\n\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Benchmark baseline management tool for SEAM\n\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  Save baseline:  go test -bench=. ./benches/... | baseline -type=openbao -save-baseline\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  Check regression: go test -bench=. ./benches/... | baseline -type=memory -check-regression\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "\nBenchmark types:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  openbao   - OpenBao latency benchmarks\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  memory    - Memory and concurrency benchmarks\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  throughput - Connection scaling and throughput benchmarks\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  Save baseline:  go test -bench=. ./benches/... | baseline -type=openbao -save-baseline\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  Check regression: go test -bench=. ./benches/... | baseline -type=memory -check-regression\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "\nBenchmark types:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  openbao   - OpenBao latency benchmarks\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  memory    - Memory and concurrency benchmarks\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  throughput - Connection scaling and throughput benchmarks\n")
 	}
 
 	flag.Parse()

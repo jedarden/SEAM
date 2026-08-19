@@ -62,10 +62,10 @@ func TestNewRouteTable(t *testing.T) {
 		t.Fatal("NewRouteTable returned nil")
 	}
 
-	// Building the table from spec is out of scope for this bead (child 2);
-	// NewRouteTable must return an empty table.
-	if table.RouteCount() != 0 {
-		t.Errorf("expected RouteCount=0 (spec-driven population is child bead 2), got %d", table.RouteCount())
+	// Spec-driven population now populates the table at construction time.
+	// createTestSpecLoader's fixture defines one operation (GET /test).
+	if table.RouteCount() != 1 {
+		t.Errorf("expected RouteCount=1 (spec-driven population from GET /test), got %d", table.RouteCount())
 	}
 }
 

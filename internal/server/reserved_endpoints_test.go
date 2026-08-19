@@ -122,10 +122,11 @@ func testHealthzEndpointResponses(t *testing.T) {
 // testReadyzEndpointResponse tests /_seam/readyz endpoint returns correct JSON response
 func testReadyzEndpointResponses(t *testing.T) {
 	cfg := &Config{
-		CallerPort:   8080,
-		OperatorPort: 8081,
-		BaseURL:      "http://localhost:8080",
-		SpecDir:      "../../spec",
+		CallerPort:    8080,
+		OperatorPort:  8081,
+		BaseURL:       "http://localhost:8080",
+		SpecDir:       "../../spec",
+		AllowlistFile: newBaselineAllowlistFile(t),
 	}
 
 	s := New(cfg)
@@ -599,9 +600,14 @@ func testCrossListenerAccess(t *testing.T) {
 			resp := w.Result()
 			defer func() { _ = resp.Body.Close() }()
 
-			// Operator endpoints should return 404 on caller mux
-			if resp.StatusCode != http.StatusNotFound {
-				t.Errorf("Operator endpoint %s should return 404 on caller mux, got %d", tc.path, resp.StatusCode)
+			// Operator endpoints must not be served on the caller mux. Most
+			// return 404 (unmatched route). /_seam/metrics and /config/status
+			// are also self-documented in the base OpenAPI spec (for /docs),
+			// so the route table matches them with no upstream target and the
+			// catch-all dispatcher correctly reports 503 (no_upstream_configured)
+			// instead - still proof the request never reaches an operator handler.
+			if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusServiceUnavailable {
+				t.Errorf("Operator endpoint %s should return 404 or 503 on caller mux, got %d", tc.path, resp.StatusCode)
 			}
 		})
 	}

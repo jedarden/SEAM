@@ -27,7 +27,7 @@ func TestValidationIntegration_ValidRequest_PassesThrough(t *testing.T) {
 	// Create validation middleware with a final handler that returns 200
 	middleware := server.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	tests := []struct {
@@ -237,7 +237,7 @@ func TestValidationIntegration_ReservedPaths_BypassValidation(t *testing.T) {
 
 	middleware := server.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("BYPASSED"))
+		_, _ = w.Write([]byte("BYPASSED"))
 	}))
 
 	tests := []struct {

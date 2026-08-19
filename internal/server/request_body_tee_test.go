@@ -371,7 +371,7 @@ func TestReplayableBodyEmptyBody(t *testing.T) {
 	}
 
 	got := rb.GetBufferedBytes()
-	if got != nil && len(got) != 0 {
+	if len(got) != 0 {
 		t.Errorf("GetBufferedBytes() = %v, want empty or nil", got)
 	}
 }
