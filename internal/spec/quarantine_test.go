@@ -36,7 +36,8 @@ func TestFragmentQuarantineSchemaValidation(t *testing.T) {
 	validFragment := `{
 		"openapi": "3.1.0",
 		"info": {"title": "Valid", "version": "1.0.0"},
-		"paths": {"/test": {}}
+		"paths": {"/test": {}},
+		"x-seam-owner": "fragments"
 	}`
 	validPath := filepath.Join(fragmentsDir, "valid.yaml")
 	if err := os.MkdirAll(filepath.Dir(validPath), 0755); err != nil {
@@ -279,7 +280,8 @@ func TestQuarantinedFragmentsNotInMergedSpec(t *testing.T) {
 	validFragment := `{
 		"openapi": "3.1.0",
 		"info": {"title": "Valid"},
-		"paths": {"/valid": {"get": {"summary": "Valid endpoint"}}}
+		"paths": {"/valid": {"get": {"summary": "Valid endpoint"}}},
+		"x-seam-owner": "fragments"
 	}`
 	validPath := filepath.Join(fragmentsDir, "valid.yaml")
 	if err := os.MkdirAll(filepath.Dir(validPath), 0755); err != nil {
@@ -484,7 +486,8 @@ func TestFragmentStatusEndpoint(t *testing.T) {
 		"info": {"title": "Valid Service", "version": "1.0.0"},
 		"paths": {"/api/test": {"get": {"summary": "Test endpoint"}}},
 		"x-seam-schema": "1.0.0",
-		"x-api-version": "v1"
+		"x-api-version": "v1",
+		"x-seam-owner": "myservice"
 	}`
 	validPath := filepath.Join(fragmentsDir, "myservice", "fragment.yaml")
 	if err := os.MkdirAll(filepath.Dir(validPath), 0755); err != nil {
