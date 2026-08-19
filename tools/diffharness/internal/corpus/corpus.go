@@ -23,6 +23,7 @@ import (
 	"net/textproto"
 	"os"
 	"sort"
+	"strings"
 )
 
 // SchemaVersion is the version string stamped on every corpus file. A change
@@ -42,11 +43,13 @@ type Corpus struct {
 
 // Entry is a single captured request plus the expectations for its replay.
 type Entry struct {
-	ID          string   `json:"id"`                    // stable, human-readable (e.g. "list-apps")
-	Description string   `json:"description,omitempty"` // what this entry exercises
-	Request     Request  `json:"request"`               // the caller's request, replayed verbatim
-	Secrets     []Secret `json:"secrets,omitempty"`     // injected-credential refs (never values)
-	Expect      *Expect  `json:"expect,omitempty"`      // per-entry comparison overrides
+	ID          string    `json:"id"`                    // stable, human-readable (e.g. "list-apps")
+	Timestamp   string    `json:"timestamp,omitempty"`   // RFC3339 timestamp captured for this exchange
+	Description string    `json:"description,omitempty"` // what this entry exercises
+	Request     Request   `json:"request"`               // the caller's request, replayed verbatim
+	Response    *Response `json:"response,omitempty"`    // incumbent response observed during capture
+	Secrets     []Secret  `json:"secrets,omitempty"`     // injected-credential refs (never values)
+	Expect      *Expect   `json:"expect,omitempty"`      // per-entry comparison overrides
 }
 
 // Request is the caller-supplied request, recorded at the incumbent and
@@ -58,6 +61,17 @@ type Request struct {
 	Query           string              `json:"query,omitempty"`   // query without the leading '?'
 	Headers         map[string][]string `json:"headers,omitempty"` // canonicalized keys
 	BodyB64         string              `json:"bodyB64,omitempty"` // base64 of the body; "" == empty
+	BodyContentType string              `json:"bodyContentType,omitempty"`
+}
+
+// Response is the incumbent response observed by seam-capture. Replay still
+// obtains fresh responses from both targets; retaining the original response
+// makes the corpus a complete request/response record and preserves the
+// incumbent behavior that was used to build the test case.
+type Response struct {
+	StatusCode      int                 `json:"statusCode"`
+	Headers         map[string][]string `json:"headers,omitempty"`
+	BodyB64         string              `json:"bodyB64,omitempty"`
 	BodyContentType string              `json:"bodyContentType,omitempty"`
 }
 
@@ -133,7 +147,7 @@ func Load(path string) (*Corpus, error) {
 		if e.Request.Method == "" {
 			e.Request.Method = http.MethodGet
 		}
-		e.Request.Method = textproto.CanonicalMIMEHeaderKey(e.Request.Method)
+		e.Request.Method = canonicalMethod(e.Request.Method)
 	}
 	return &c, nil
 }
@@ -170,9 +184,13 @@ func (c *Corpus) AppendEntry(e Entry) error {
 	if e.Request.Method == "" {
 		e.Request.Method = http.MethodGet
 	}
-	e.Request.Method = textproto.CanonicalMIMEHeaderKey(e.Request.Method)
+	e.Request.Method = canonicalMethod(e.Request.Method)
 	c.Entries = append(c.Entries, e)
 	return nil
+}
+
+func canonicalMethod(method string) string {
+	return strings.ToUpper(method)
 }
 
 // ErrEmpty is returned when an operation expects at least one replayable entry.

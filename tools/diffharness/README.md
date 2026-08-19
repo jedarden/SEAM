@@ -20,7 +20,9 @@ seam-capture \
 
 - Listens on `--listen` (default `:8080`)
 - Forwards requests to `--incumbent`
-- Captures each request/response pair into `--corpus`
+- Captures the full request and forwarded response (status, headers, and body) into `--corpus`
+- Redacts credential-bearing headers before persisting the corpus; add secret references manually for replay
+- Can be disabled with `--capture-enabled=false` or `SEAM_CAPTURE_ENABLED=false` while retaining transparent forwarding
 - Use `X-Seam-Capture-Skip` header to skip capture for health checks
 
 ### `seam-replay` - Conformance Tester
@@ -65,6 +67,12 @@ A corpus is a JSON file containing captured request/response pairs:
         "bodyB64": "",
         "bodyContentType": ""
       },
+      "response": {
+        "statusCode": 200,
+        "headers": {"Content-Type": ["application/json"]},
+        "bodyB64": "eyJvayI6dHJ1ZX0=",
+        "bodyContentType": "application/json"
+      },
       "secrets": [
         {
           "ref": "vault:seam/routes/argocd/ro-token",
@@ -82,6 +90,7 @@ A corpus is a JSON file containing captured request/response pairs:
 ### Entry Structure
 
 - `id`: Stable identifier for the entry
+- `timestamp`: RFC3339 timestamp for the captured exchange
 - `description`: What this entry exercises
 - `request`: The caller's request (replayed verbatim)
   - `method`: HTTP method
@@ -89,6 +98,11 @@ A corpus is a JSON file containing captured request/response pairs:
   - `query`: Query string without leading `?`
   - `headers`: Request headers (canonicalized keys)
   - `bodyB64`: Base64-encoded body (empty if no body)
+  - `bodyContentType`: Content-Type header for body
+- `response`: The incumbent response observed during capture
+  - `statusCode`: HTTP status code
+  - `headers`: Response headers (credential-bearing values are redacted)
+  - `bodyB64`: Base64-encoded response body
   - `bodyContentType`: Content-Type header for body
 - `secrets`: References to injected credentials (never literal values)
 - `expect`: Per-entry comparison overrides

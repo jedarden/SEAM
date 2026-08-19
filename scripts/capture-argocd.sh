@@ -17,6 +17,7 @@ INCUMBENT_URL="${SEAM_ARGOCD_INCUMBENT_URL:-https://argocd-ro-ardenone-manager-t
 SERVICE="argocd"
 CORPUS_PATH="corpus/argocd-proxy/corpus.json"
 CAPTURE_PORT="${SEAM_CAPTURE_PORT:-8082}"
+CAPTURE_ENABLED="${SEAM_CAPTURE_ENABLED:-true}"
 DESCRIPTION="ArgoCD read-only proxy corpus captured from production"
 BINARY="./seam-capture"
 PIDFILE=".seam-capture.pid"
@@ -69,6 +70,7 @@ start_capture() {
     log_info "Starting corpus capture for argocd-ro proxy"
     log_info "  Incumbent URL: $INCUMBENT_URL"
     log_info "  Listen port: $CAPTURE_PORT"
+    log_info "  Capture enabled: $CAPTURE_ENABLED"
     log_info "  Corpus path: $CORPUS_PATH"
     log_info ""
     log_info "To make test requests:"
@@ -81,6 +83,7 @@ start_capture() {
         --service "$SERVICE" \
         --corpus "$CORPUS_PATH" \
         --listen ":$CAPTURE_PORT" \
+        --capture-enabled="$CAPTURE_ENABLED" \
         --description "$DESCRIPTION" \
         > /tmp/seam-capture.log 2>&1 &
 
