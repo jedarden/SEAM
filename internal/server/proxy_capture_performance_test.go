@@ -150,6 +150,10 @@ func checkedProxyCaptureRequest(t *testing.T, fixture *proxyCaptureLatencyFixtur
 // capture enabled and disabled. The p95 difference is the regression signal:
 // capture must add less than the documented 10 ms per request budget.
 func TestProxyCaptureLatencyByPayloadSize(t *testing.T) {
+	if raceEnabled {
+		t.Skip("latency budget is not meaningful under -race: instrumentation overhead dominates and is non-uniform across payload sizes")
+	}
+
 	cases := []proxyCaptureLatencyCase{
 		{name: "small", requestBytes: 128, responseBytes: 256},
 		{name: "medium", requestBytes: 16 * 1024, responseBytes: 64 * 1024},
