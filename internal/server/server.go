@@ -137,8 +137,9 @@ type Server struct {
 	wg                sync.WaitGroup
 	specLoader        *spec.Loader
 	routeTable        *RouteTable              // Route table for request matching (stage 4)
-	proxyMap          map[string]*ReverseProxy // Map of upstream URL -> proxy instance (stages 6-11)
+	proxyMap          map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
 	proxyMapMu        sync.RWMutex             // Protects proxyMap
+	upstreamClientMap map[string]*http.Client  // Map of TLS identity -> connection-pooled client
 	captureMiddleware *CaptureMiddleware
 	cache             *ResponseCache
 	singleFlight      *SingleFlight
@@ -206,6 +207,7 @@ func New(cfg *Config) *Server {
 		specLoader:        specLoader,
 		routeTable:        NewRouteTable(specLoader),
 		proxyMap:          make(map[string]*ReverseProxy),
+		upstreamClientMap: make(map[string]*http.Client),
 		cache:             NewResponseCache(),
 		singleFlight:      NewSingleFlight(),
 		cacheTTLs:         make(map[string]int),
@@ -1260,7 +1262,7 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get or create proxy for this upstream
-	proxy := s.getOrCreateProxy(upstreamURL)
+	proxy := s.getOrCreateProxy(upstreamURL, routeMatch.Route.TLSConfig)
 	if proxy == nil {
 		// Proxy creation failed - return 503
 		s.handleProxyCreationFailed(w, r, upstreamURL)
@@ -1272,29 +1274,72 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// getOrCreateProxy gets an existing proxy from the proxyMap or creates a new one
-// This is the swap point for hot reload (Phase 3.1) - proxies are cached by upstream URL
-func (s *Server) getOrCreateProxy(upstreamURL string) *ReverseProxy {
+// getOrCreateProxy gets an existing proxy from the proxyMap or creates a new one.
+// Proxies are keyed by upstream URL and TLS identity so routes sharing an
+// upstream cannot accidentally reuse a client configured for another route.
+// The client itself is shared by TLS identity to preserve connection pooling.
+func (s *Server) getOrCreateProxy(upstreamURL string, tlsConfigs ...*UpstreamTLSConfig) *ReverseProxy {
 	s.proxyMapMu.Lock()
 	defer s.proxyMapMu.Unlock()
 
+	var tlsConfig *UpstreamTLSConfig
+	if len(tlsConfigs) > 0 {
+		tlsConfig = tlsConfigs[0]
+	}
+	if s.proxyMap == nil {
+		s.proxyMap = make(map[string]*ReverseProxy)
+	}
+
+	proxyKey := upstreamProxyCacheKey(upstreamURL, tlsConfig)
 	// Check if proxy already exists
-	if proxy, exists := s.proxyMap[upstreamURL]; exists {
+	if proxy, exists := s.proxyMap[proxyKey]; exists {
 		return proxy
+	}
+
+	clientKey := upstreamTLSConfigKey(tlsConfig)
+	if s.upstreamClientMap == nil {
+		s.upstreamClientMap = make(map[string]*http.Client)
+	}
+	client, exists := s.upstreamClientMap[clientKey]
+	if !exists {
+		if tlsConfig == nil {
+			client = defaultUpstreamClient
+		} else {
+			upstreamCADir := DefaultUpstreamCADir
+			if s.config != nil && s.config.UpstreamCADir != "" {
+				upstreamCADir = s.config.UpstreamCADir
+			}
+			var err error
+			client, err = newUpstreamHTTPClientWithTLS(tlsConfig, upstreamCADir)
+			if err != nil {
+				log.Printf("[dispatch] Failed to create upstream client for TLS config %s: %v", clientKey, err)
+				return nil
+			}
+		}
+		s.upstreamClientMap[clientKey] = client
+	}
+
+	maxReplayableRequestBytes := int64(0)
+	maxBufferedResponseBytes := int64(0)
+	if s.config != nil {
+		maxReplayableRequestBytes = s.config.MaxReplayableRequestBytes
+		maxBufferedResponseBytes = s.config.MaxBufferedResponseBytes
 	}
 
 	// Create new proxy
 	proxy, err := NewReverseProxyWithConfig(upstreamURL, &ReverseProxyConfig{
-		MaxReplayableRequestBytes: s.config.MaxReplayableRequestBytes,
-		MaxBufferedResponseBytes:  s.config.MaxBufferedResponseBytes,
+		MaxReplayableRequestBytes: maxReplayableRequestBytes,
+		MaxBufferedResponseBytes:  maxBufferedResponseBytes,
+		TLSConfig:                 tlsConfig,
+		Client:                    client,
 	})
 	if err != nil {
 		log.Printf("[dispatch] Failed to create proxy for upstream %s: %v", upstreamURL, err)
 		return nil
 	}
 
-	s.proxyMap[upstreamURL] = proxy
-	log.Printf("[dispatch] Created new proxy for upstream %s", upstreamURL)
+	s.proxyMap[proxyKey] = proxy
+	log.Printf("[dispatch] Created new proxy for upstream %s (TLS identity %s)", upstreamURL, clientKey)
 	return proxy
 }
 
