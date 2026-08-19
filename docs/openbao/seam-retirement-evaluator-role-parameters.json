@@ -1,0 +1,97 @@
+{
+  "description": "Prepared, unapplied OpenBao Kubernetes-auth role configuration for seam-retirement-evaluator.",
+  "status": "prepared-not-applied",
+  "role": {
+    "name": "seam-retirement-evaluator",
+    "auth_mount": "kubernetes",
+    "auth_mount_path": "auth/kubernetes",
+    "role_path": "auth/kubernetes/role/seam-retirement-evaluator",
+    "login_path": "auth/kubernetes/login",
+    "bound_service_account_names": [
+      "seam-retirement-evaluator"
+    ],
+    "bound_service_account_namespaces": [
+      "seam"
+    ],
+    "policies": [
+      "seam-retirement-evaluator-policy"
+    ],
+    "token_default_policies": [
+      "seam-retirement-evaluator-policy"
+    ],
+    "token_ttl": "24h",
+    "token_max_ttl": "72h",
+    "token_type": "default",
+    "token_num_uses": 0
+  },
+  "policy": {
+    "name": "seam-retirement-evaluator-policy",
+    "source": "docs/openbao/seam-retirement-evaluator-policy.hcl",
+    "kv_mount": "secret",
+    "allowed_paths": [
+      {
+        "path": "secret/data/evaluators/seam-retirement-evaluator/*",
+        "capabilities": [
+          "read"
+        ],
+        "purpose": "Read evaluator-owned credentials."
+      },
+      {
+        "path": "secret/data/monitoring/victoriametrics/*",
+        "capabilities": [
+          "read"
+        ],
+        "purpose": "Read the evaluator's VictoriaMetrics credentials."
+      }
+    ],
+    "denied_paths": [
+      {
+        "path": "secret/data/seam/routes/*",
+        "capabilities": [
+          "deny"
+        ],
+        "purpose": "Prevent access to SEAM route credentials."
+      },
+      {
+        "path": "secret/data/*",
+        "capabilities": [
+          "deny"
+        ],
+        "purpose": "Default deny for unrelated KV data."
+      }
+    ]
+  },
+  "openbao_api": {
+    "method": "POST",
+    "path": "/v1/auth/kubernetes/role/seam-retirement-evaluator",
+    "body": {
+      "bound_service_account_names": [
+        "seam-retirement-evaluator"
+      ],
+      "bound_service_account_namespaces": [
+        "seam"
+      ],
+      "policies": [
+        "seam-retirement-evaluator-policy"
+      ],
+      "token_default_policies": [
+        "seam-retirement-evaluator-policy"
+      ],
+      "token_ttl": "24h",
+      "token_max_ttl": "72h",
+      "token_type": "default",
+      "token_num_uses": 0
+    }
+  },
+  "cli": {
+    "policy_write": "bao policy write seam-retirement-evaluator-policy docs/openbao/seam-retirement-evaluator-policy.hcl",
+    "role_write": "bao write auth/kubernetes/role/seam-retirement-evaluator bound_service_account_names=seam-retirement-evaluator bound_service_account_namespaces=seam policies=seam-retirement-evaluator-policy token_default_policies=seam-retirement-evaluator-policy token_ttl=24h token_max_ttl=72h token_type=default token_num_uses=0",
+    "role_readback": "bao read auth/kubernetes/role/seam-retirement-evaluator"
+  },
+  "prerequisites": [
+    "The kubernetes auth mount must be enabled at auth/kubernetes.",
+    "ServiceAccount seam-retirement-evaluator must exist in namespace seam.",
+    "An authorized OpenBao operator must apply the policy before the role is used.",
+    "No OpenBao writes are performed by this artifact."
+  ]
+}
