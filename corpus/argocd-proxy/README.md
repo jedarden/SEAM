@@ -55,11 +55,16 @@ The capture behavior can be configured via environment variables:
 
 - `SEAM_ARGOCD_INCUMBENT_URL` - The ArgoCD proxy URL (default: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444)
 - `SEAM_CAPTURE_PORT` - The listen port for the capture proxy (default: 8082)
+- `SEAM_CAPTURE_ENABLED` - Set to `false` to keep the forwarding proxy running without recording entries (default: `true`)
 
 Example:
 ```bash
 SEAM_CAPTURE_PORT=9999 ./scripts/capture-argocd.sh start
 ```
+
+The same switch is available directly on `seam-capture` as
+`--capture-enabled=false`. Disabled capture still forwards traffic and strips
+the local `X-Seam-Capture-Skip` control header before forwarding.
 
 ## Corpus Format
 
@@ -75,6 +80,7 @@ The corpus is stored in JSON format with the following structure:
   "entries": [
     {
       "id": "list-apps-get",
+      "timestamp": "2026-07-27T12:00:00Z",
       "description": "List all applications",
       "request": {
         "method": "GET",
@@ -85,6 +91,14 @@ The corpus is stored in JSON format with the following structure:
         },
         "bodyB64": "",
         "bodyContentType": ""
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": ["application/json"]
+        },
+        "bodyB64": "eyJvayI6dHJ1ZX0=",
+        "bodyContentType": "application/json"
       },
       "secrets": [
         {
