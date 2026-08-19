@@ -3,10 +3,15 @@
 This document records the integrity checks for captured corpus data. The
 repository uses two related formats:
 
-- `corpus/**/corpus.json` and `corpus-template.json` are standalone
-  differential-harness inputs. They persist complete request data and replay
+- Most `corpus/**/corpus.json` and `corpus-template.json` files are standalone
+  differential-harness inputs. They persist request data and replay
   expectations; response values are collected from the incumbent and SEAM at
-  replay time.
+  replay time. The live ArgoCD capture is the exception: its eight entries
+  also retain the incumbent response for capture auditing.
+- `corpus/argocd-proxy/*.json` includes the complete ArgoCD corpus, its schema
+  template, and response-body snapshots. The request plus response pair is
+  always the entry in `corpus/argocd-proxy/corpus.json`; snapshots are
+  developer-friendly response fixtures and are checked against those entries.
 - `internal/server` capture files persist complete request/response pairs for
   middleware-level capture tests. Request and response bodies are encoded as
   standard base64 strings.
@@ -22,8 +27,10 @@ go test ./corpus
 This walks every checked-in `.json` file below `corpus/`, rejects empty files,
 and verifies JSON syntax. It also checks the metadata, unique entry IDs,
 request method/path, header shape, and base64 request bodies in each primary
-differential corpus. The two optional ArgoCD endpoint files are valid empty
-JSON arrays because no endpoint capture has been recorded for them yet.
+differential corpus. The ArgoCD-specific tests additionally require complete
+request/response pairs, validate response bodies, check route coverage, and
+match each response snapshot to its captured pair; see
+[`corpus/argocd-proxy/COMPLETENESS.md`](../corpus/argocd-proxy/COMPLETENESS.md).
 
 Run the request/response round-trip check and the existing response-pair
 regressions with:
@@ -45,7 +52,7 @@ Last verified: 2026-08-19.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
-| `go test ./corpus` | PASS | All checked-in corpus JSON documents and differential request records |
+| `go test ./corpus` | PASS | All checked-in corpus JSON documents, differential request records, and the complete ArgoCD capture |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
 
 The full `internal/server` package contains broader infrastructure and

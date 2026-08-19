@@ -59,6 +59,10 @@ Captured request/response pairs in structured JSON format.
 
 **Location:** `corpus/<service>/corpus.json`
 
+The live ArgoCD route checklist, pair-completeness checks, response-snapshot
+mapping, and mock-response sample are documented in
+[`argocd-proxy/COMPLETENESS.md`](argocd-proxy/COMPLETENESS.md).
+
 ## Quick Start
 
 ### 1. Build the Capture Tool
