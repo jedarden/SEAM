@@ -50,6 +50,10 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 		t.Fatalf("Failed to start server: %v", err)
 	}
 	defer func() { _ = s.Shutdown(ctx) }()
+	// This baseline exercises the server in an already-ready state. Startup
+	// OpenBao login is covered separately; construct readiness explicitly so
+	// an ambient OpenBao configuration cannot hold this test at 503.
+	s.setOpenBaoReady(true)
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -184,6 +188,9 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 		t.Fatalf("Failed to start server: %v", err)
 	}
 	defer func() { _ = s.Shutdown(ctx) }()
+	// Keep the response-time baseline focused on endpoint overhead after the
+	// server is ready; startup login has its own readiness tests.
+	s.setOpenBaoReady(true)
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
