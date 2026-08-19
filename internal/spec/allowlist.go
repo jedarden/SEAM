@@ -111,6 +111,12 @@ func (ae *AllowlistEnforcer) loadUpstreamAllowlist(allowlistFile string) error {
 		if strings.HasPrefix(line, "- ") && len(line) > 2 {
 			host := strings.TrimPrefix(line, "- ")
 			host = strings.TrimSpace(host)
+			// The operator-owned allowlist is YAML; entries are conventionally
+			// double-quoted (see configmap-allowlist.yaml). This parser reads
+			// lines directly rather than through a YAML unmarshaller, so an
+			// unstripped quote becomes part of the comparison value and no
+			// real hostname can ever match it again.
+			host = strings.Trim(host, `"'`)
 
 			// Check if it's a suffix (starts with dot)
 			if strings.HasPrefix(host, ".") {

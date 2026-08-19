@@ -19,11 +19,9 @@ const (
 	defaultLintFragmentsDir = "./fragments"
 	defaultLintSchemaPath   = "./spec/route-fragment-schema.json"
 
-	// This must match the deployed OpenBao ACL policy's granted path prefix
-	// (rs-manager's seam-openbao-policy.hcl: secret/data/rs-manager/seam/routes/*)
-	// so a fragment that passes lint also succeeds at runtime. The owner
+	// This is the prefix encoded by the v1 route-fragment schema. The owner
 	// segment after it is checked separately against x-seam-owner.
-	vaultRoutesPrefix = "rs-manager/seam/routes/"
+	vaultRoutesPrefix = "seam/routes/"
 )
 
 var (
