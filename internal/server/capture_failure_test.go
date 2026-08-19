@@ -32,6 +32,10 @@ func captureFailureLogs(t *testing.T) *bytes.Buffer {
 
 // TestCaptureSaveToReadOnlyDirectory tests that save failures are handled gracefully
 func TestCaptureSaveToReadOnlyDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission enforcement is not observable when running as root")
+	}
+
 	tmpDir := t.TempDir()
 
 	// Create a read-only subdirectory
@@ -563,6 +567,10 @@ func TestCaptureDirectoryCreationFailure(t *testing.T) {
 
 // TestCaptureWriteErrorDuringRequestHandling tests write failures during active requests
 func TestCaptureWriteErrorDuringRequestHandling(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission enforcement is not observable when running as root")
+	}
+
 	tmpDir := t.TempDir()
 
 	// Create a writable directory first
@@ -847,6 +855,10 @@ func TestCaptureSaveFailureDoesNotCrashProxy(t *testing.T) {
 
 // TestCaptureWithUnwritableParentDirectory tests when parent directory is not writable
 func TestCaptureWithUnwritableParentDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission enforcement is not observable when running as root")
+	}
+
 	tmpDir := t.TempDir()
 
 	// Create a nested directory structure

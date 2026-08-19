@@ -167,6 +167,10 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 // TestArgoCDProxyBaselineResponseTimes establishes baseline response time metrics
 // for the ArgoCD proxy operating without capture overhead.
 func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
+	if raceEnabled {
+		t.Skip("absolute latency budget is not meaningful under -race: instrumentation overhead dominates")
+	}
+
 	callerPort := getAvailablePort(t)
 	operatorPort := getAvailablePort(t)
 
