@@ -120,7 +120,7 @@ type Config struct {
 	UpstreamURL               string // Default upstream URL for proxying (Phase 2.0: single upstream)
 	UpstreamCADir             string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
 	AllowlistFile             string // Path to upstream host allowlist file (optional, for dev mode)
-	VaultBaseDir              string // Base directory for vault path validation (default: "seam/routes")
+	VaultBaseDir              string // Base directory for vault path validation (default: "rs-manager/seam/routes")
 	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
 	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
 }
@@ -162,10 +162,15 @@ func New(cfg *Config) *Server {
 	var specLoader *spec.Loader
 	var err error
 
-	// Set default vault base directory
+	// Set default vault base directory. This must match the path prefix
+	// actually granted by the deployed OpenBao ACL policy (rs-manager's
+	// seam-openbao-policy.hcl grants secret/data/rs-manager/seam/routes/*,
+	// not secret/data/seam/routes/*) — otherwise a fragment can pass this
+	// package's own allowlist check yet still 403 against OpenBao at request
+	// time, or vice versa.
 	vaultBaseDir := cfg.VaultBaseDir
 	if vaultBaseDir == "" {
-		vaultBaseDir = "seam/routes"
+		vaultBaseDir = "rs-manager/seam/routes"
 	}
 
 	// Initialize allowlist enforcer
