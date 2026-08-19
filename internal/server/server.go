@@ -162,15 +162,18 @@ func New(cfg *Config) *Server {
 	var specLoader *spec.Loader
 	var err error
 
-	// Set default vault base directory. This must match the path prefix
-	// actually granted by the deployed OpenBao ACL policy (rs-manager's
-	// seam-openbao-policy.hcl grants secret/data/rs-manager/seam/routes/*,
-	// not secret/data/seam/routes/*) — otherwise a fragment can pass this
-	// package's own allowlist check yet still 403 against OpenBao at request
-	// time, or vice versa.
+	// Set default vault base directory. This is the canonical, portable
+	// prefix documented in docs/notes/route-fragment-schema.md and encoded
+	// in the route-fragment-schema.json pattern — it must stay cluster-
+	// agnostic. A cluster's own OpenBao ACL policy is what's responsible for
+	// granting read on secret/data/seam/routes/*; backup/replication
+	// coverage for that prefix is a cluster-ops concern (see rs-manager's
+	// openbao-replicator-config, which explicitly walks both "seam/" and
+	// its own cluster-name prefix), not something this default should bend
+	// to accommodate.
 	vaultBaseDir := cfg.VaultBaseDir
 	if vaultBaseDir == "" {
-		vaultBaseDir = "rs-manager/seam/routes"
+		vaultBaseDir = "seam/routes"
 	}
 
 	// Initialize allowlist enforcer
