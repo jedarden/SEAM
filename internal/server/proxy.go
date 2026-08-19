@@ -12,9 +12,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ardenone/seam/internal/vault"
 )
 
 const (
@@ -239,25 +242,26 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 
 // ServeHTTP implements http.Handler for the reverse proxy.
 func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	trackedWriter := &responseWriterTracker{ResponseWriter: w}
 	ctx := r.Context()
 	match := routeMatchFromRequest(r)
 	if match != nil && match.Route.InjectAs != nil {
 		if isProtocolUpgrade(r) && !match.Route.Unscrubbable {
-			p.handleError(w, r, errUnscannableResponse, "refusing credential injection into protocol upgrade")
+			p.handleError(trackedWriter, r, errUnscannableResponse, "refusing credential injection into protocol upgrade")
 			return
 		}
 		resolver := routeSecretResolverFromRequest(r)
 		if resolver == nil {
-			p.handleError(w, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
+			p.handleError(trackedWriter, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
 			return
 		}
 		secret, err := resolver(ctx, match.Route)
 		if err != nil {
-			p.handleError(w, r, err, "resolving upstream credential")
+			p.handleError(trackedWriter, r, err, "resolving upstream credential")
 			return
 		}
 		if err := InjectSecret(r, match.Route.InjectAs, secret); err != nil {
-			p.handleError(w, r, err, "injecting upstream credential")
+			p.handleError(trackedWriter, r, err, "injecting upstream credential")
 			return
 		}
 		ctx = withResponseScrub(ctx, secret, match.Route.Unscrubbable)
@@ -265,17 +269,17 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	outgoingURL, err := p.buildUpstreamURLForMatch(r, match)
 	if err != nil {
-		p.handleError(w, r, err, "building upstream path")
+		p.handleError(trackedWriter, r, err, "building upstream path")
 		return
 	}
 	upstreamReq, err := p.buildUpstreamRequest(ctx, r, outgoingURL)
 	if err != nil {
-		p.handleError(w, r, err, "building upstream request")
+		p.handleError(trackedWriter, r, err, "building upstream request")
 		return
 	}
 
-	if err := p.dispatchAndServe(ctx, w, r, upstreamReq); err != nil {
-		p.handleError(w, r, err, "upstream request")
+	if err := p.dispatchAndServe(ctx, trackedWriter, r, upstreamReq); err != nil {
+		p.handleError(trackedWriter, r, err, "upstream request")
 	}
 }
 
@@ -712,11 +716,57 @@ func StreamResponse(w http.ResponseWriter, resp *http.Response) error {
 	return nil
 }
 
-func (p *ReverseProxy) handleError(w http.ResponseWriter, _ *http.Request, err error, phase string) {
+func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err error, phase string) {
 	log.Printf("[proxy] Error during %s: %v", phase, err)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadGateway)
-	_, _ = fmt.Fprintf(w, `{"error":"bad_gateway","message":"Upstream request failed: %s"}`, err.Error())
+	if responseStarted(w) {
+		return
+	}
+
+	code := ErrCodeUpstreamFailed
+	message := "Upstream request failed"
+	if vault.IsSecretStoreUnavailable(err) {
+		code = ErrCodeServiceUnavailable
+		message = "Secret store unavailable"
+		if retryAfter := vault.RetryAfterSeconds(err); retryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+		}
+	}
+	NewErrorResponse(code, message).Write(w, r)
+}
+
+// responseWriterTracker records whether a response has been committed so an
+// error from a streaming response cannot append a second response body.
+type responseWriterTracker struct {
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+func (w *responseWriterTracker) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *responseWriterTracker) Write(body []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+func (w *responseWriterTracker) ResponseStarted() bool {
+	return w.wroteHeader
+}
+
+func (w *responseWriterTracker) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func responseStarted(w http.ResponseWriter) bool {
+	tracker, ok := w.(interface{ ResponseStarted() bool })
+	return ok && tracker.ResponseStarted()
 }
 
 // bufferPool manages buffers for copying response bodies.
