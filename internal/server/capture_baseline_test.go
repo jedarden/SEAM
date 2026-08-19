@@ -8,10 +8,21 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func newBaselineAllowlistFile(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "allowlist.yaml")
+	if err := os.WriteFile(path, []byte("allowed_hosts:\n  - localhost\n"), 0o600); err != nil {
+		t.Fatalf("write baseline allowlist: %v", err)
+	}
+	return path
+}
 
 // TestArgoCDProxyBaselineOperation tests the baseline operation of the SEAM server
 // acting as an ArgoCD read-only proxy without corpus capture enabled.
@@ -28,6 +39,7 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 		SpecDir:        "../../spec",
 		CaptureEnabled: false, // BASELINE: No capture enabled
 		CorpusDir:      "",
+		AllowlistFile:  newBaselineAllowlistFile(t),
 	}
 
 	s := New(cfg)
@@ -161,6 +173,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 		SpecDir:        "../../spec",
 		CaptureEnabled: false,
 		CorpusDir:      "",
+		AllowlistFile:  newBaselineAllowlistFile(t),
 	}
 
 	s := New(cfg)
@@ -258,6 +271,7 @@ func TestArgoCDProxyBaselineConsistency(t *testing.T) {
 		SpecDir:        "../../spec",
 		CaptureEnabled: false,
 		CorpusDir:      "",
+		AllowlistFile:  newBaselineAllowlistFile(t),
 	}
 
 	s := New(cfg)
