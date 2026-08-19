@@ -132,12 +132,28 @@ func buildTLSConfig(tlsConfig *UpstreamTLSConfig, upstreamCADir string) (*tls.Co
 // The dial and TLS handshake limits bound connection establishment while the
 // client timeout bounds the complete request, including waiting for a response.
 func newUpstreamHTTPClient() *http.Client {
-	return newUpstreamHTTPClientWithTLS(nil, DefaultUpstreamCADir)
+	client, err := newUpstreamHTTPClientWithTLS(nil, DefaultUpstreamCADir)
+	if err != nil {
+		// The default configuration does not read any files, so this should be
+		// unreachable. Keep package initialization fail-fast if that invariant
+		// ever changes.
+		panic(fmt.Sprintf("create default upstream HTTP client: %v", err))
+	}
+	return client
 }
 
 // newUpstreamHTTPClientWithTLS creates a client with optional TLS configuration.
-// If tlsConfig is nil, uses system trust store with hostname checking.
-func newUpstreamHTTPClientWithTLS(tlsConfig *UpstreamTLSConfig, upstreamCADir string) *http.Client {
+// If tlsConfig is nil, it uses the system trust store with hostname checking.
+// It returns an error when the requested TLS configuration cannot be built.
+func newUpstreamHTTPClientWithTLS(tlsConfig *UpstreamTLSConfig, upstreamCADir string) (*http.Client, error) {
+	// Build the TLS configuration before constructing the transport. A route
+	// configuration error must be returned to the caller; silently replacing it
+	// with the system trust store could send credentials to an unintended host.
+	tlsConf, err := buildTLSConfig(tlsConfig, upstreamCADir)
+	if err != nil {
+		return nil, fmt.Errorf("build upstream TLS config: %w", err)
+	}
+
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -151,28 +167,27 @@ func newUpstreamHTTPClientWithTLS(tlsConfig *UpstreamTLSConfig, upstreamCADir st
 		TLSHandshakeTimeout:   upstreamConnectTimeout,
 		ResponseHeaderTimeout: upstreamRequestTimeout,
 		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	// Configure TLS if specified
-	if tlsConfig != nil {
-		tlsConf, err := buildTLSConfig(tlsConfig, upstreamCADir)
-		if err != nil {
-			log.Printf("[proxy] Failed to build TLS config: %v, using system trust store", err)
-			// Fall back to system trust store on error
-			tlsConf = &tls.Config{MinVersion: tls.VersionTLS12}
-		}
-		transport.TLSClientConfig = tlsConf
-	} else {
-		// Default: system trust store with hostname checking
-		transport.TLSClientConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		}
+		TLSClientConfig:       tlsConf,
 	}
 
 	return &http.Client{
 		Transport: transport,
 		Timeout:   upstreamRequestTimeout,
+	}, nil
+}
+
+// upstreamTLSConfigKey returns a stable identity for the effective per-route
+// TLS settings. It is used to share one connection-pooled client for each
+// distinct TLS configuration.
+func upstreamTLSConfigKey(tlsConfig *UpstreamTLSConfig) string {
+	if tlsConfig == nil {
+		return "tls:default"
 	}
+	return fmt.Sprintf("tls:%q:%q:%t:%t", tlsConfig.CaBundle, tlsConfig.ServerName, tlsConfig.InsecureSkipVerify, tlsConfig.PlaintextAck)
+}
+
+func upstreamProxyCacheKey(upstreamURL string, tlsConfig *UpstreamTLSConfig) string {
+	return fmt.Sprintf("upstream:%q:%s", upstreamURL, upstreamTLSConfigKey(tlsConfig))
 }
 
 // ReverseProxy is an HTTP reverse proxy that forwards requests to upstream
@@ -211,6 +226,13 @@ func NewReverseProxy(upstreamURL string) (*ReverseProxy, error) {
 type ReverseProxyConfig struct {
 	MaxReplayableRequestBytes int64
 	MaxBufferedResponseBytes  int64
+	// TLSConfig selects the route-specific TLS settings for the upstream
+	// client. It is ignored when Client is supplied.
+	TLSConfig *UpstreamTLSConfig
+	// UpstreamCADir is the directory containing named CA bundles.
+	UpstreamCADir string
+	// Client can be supplied by a server-level TLS client cache.
+	Client *http.Client
 }
 
 // NewReverseProxyWithConfig creates a reverse proxy with custom configuration.
@@ -229,8 +251,22 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 		maxBufferedResponse = cfg.MaxBufferedResponseBytes
 	}
 
+	client := defaultUpstreamClient
+	if cfg != nil && cfg.Client != nil {
+		client = cfg.Client
+	} else if cfg != nil && cfg.TLSConfig != nil {
+		upstreamCADir := cfg.UpstreamCADir
+		if upstreamCADir == "" {
+			upstreamCADir = DefaultUpstreamCADir
+		}
+		client, err = newUpstreamHTTPClientWithTLS(cfg.TLSConfig, upstreamCADir)
+		if err != nil {
+			return nil, fmt.Errorf("create upstream HTTP client: %w", err)
+		}
+	}
+
 	return &ReverseProxy{
-		Client:                    defaultUpstreamClient,
+		Client:                    client,
 		UpstreamURL:               parsedURL,
 		UpstreamHost:              parsedURL.Host,
 		RequestTimeout:            upstreamRequestTimeout,
@@ -548,7 +584,10 @@ func ForwardRequestWithConfig(ctx context.Context, in *http.Request, match *Rout
 	}
 
 	// Build client with route-specific TLS configuration
-	client := newUpstreamHTTPClientWithTLS(tlsConfig, upstreamCADir)
+	client, err := newUpstreamHTTPClientWithTLS(tlsConfig, upstreamCADir)
+	if err != nil {
+		return nil, fmt.Errorf("build upstream HTTP client: %w", err)
+	}
 
 	return forwardRequestWithClient(ctx, in, match, upstreamBase, client, upstreamRequestTimeout)
 }
@@ -610,6 +649,11 @@ func parseUpstreamBaseURL(rawURL string) (*url.URL, error) {
 	}
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return nil, fmt.Errorf("invalid upstream base URL: unsupported scheme %q", parsedURL.Scheme)
+	}
+	if port := parsedURL.Port(); port != "" {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return nil, fmt.Errorf("invalid upstream base URL: invalid port %q", port)
+		}
 	}
 	parsedURL.Fragment = ""
 	parsedURL.RawFragment = ""
