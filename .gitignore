@@ -1,5 +1,6 @@
 # Build artifacts - Go binaries
 /seam
+/seam_test
 /seam-test
 *.test
 *.exe
