@@ -10,3 +10,6 @@
 !internal/**
 !spec/
 !spec/**
+!containers/
+!containers/seam/
+!containers/seam/VERSION
