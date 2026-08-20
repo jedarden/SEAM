@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,7 @@ type CaptureMiddleware struct {
 	retentionLimit int
 	autoSave       bool
 	saveCount      int
+	routeTable     *RouteTable
 
 	// Keep serialization and persistence replaceable per middleware so tests
 	// can exercise failures that cannot be represented by CorpusFile itself.
@@ -185,6 +187,12 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+// setRouteTable supplies the immutable route metadata used to identify
+// caller-controlled values that SEAM would replace with injected credentials.
+func (cm *CaptureMiddleware) setRouteTable(routeTable *RouteTable) {
+	cm.routeTable = routeTable
+}
+
 // appendEntryLocked adds an entry to the bounded in-memory ring and returns
 // the number of retained entries. Replacing the complete CorpusEntry drops all
 // references to the evicted request and response data so the garbage collector
@@ -217,12 +225,16 @@ func (cm *CaptureMiddleware) entriesInCaptureOrderLocked() []CorpusEntry {
 
 // captureRequest captures the relevant parts of an HTTP request
 func (cm *CaptureMiddleware) captureRequest(r *http.Request) CapturedRequest {
+	headerNames, queryNames := cm.injectableNames(r)
+	headers := r.Header.Clone()
+	redactCapturedHeaders(headers, headerNames)
+
 	req := CapturedRequest{
 		Method:          r.Method,
 		Path:            r.URL.Path,
-		Query:           r.URL.RawQuery,
-		Headers:         canonicalHeaders(r.Header.Clone()),
-		BodyContentType: r.Header.Get("Content-Type"),
+		Query:           redactCapturedQuery(r.URL.RawQuery, queryNames),
+		Headers:         canonicalHeaders(headers),
+		BodyContentType: headers.Get("Content-Type"),
 	}
 
 	// Capture body if present
@@ -238,6 +250,61 @@ func (cm *CaptureMiddleware) captureRequest(r *http.Request) CapturedRequest {
 	}
 
 	return req
+}
+
+func (cm *CaptureMiddleware) injectableNames(r *http.Request) (map[string]bool, map[string]bool) {
+	if cm.routeTable == nil {
+		return nil, nil
+	}
+	return cm.routeTable.injectableNames(r)
+}
+
+func redactCapturedHeaders(headers http.Header, injectableNames map[string]bool) {
+	for name := range headers {
+		if isCredentialHeader(name) || injectableNames[strings.ToLower(name)] {
+			headers[name] = []string{RedactedSecret}
+		}
+	}
+}
+
+func isCredentialHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key":
+		return true
+	default:
+		return false
+	}
+}
+
+func redactCapturedQuery(rawQuery string, injectableNames map[string]bool) string {
+	if rawQuery == "" {
+		return ""
+	}
+
+	parts := strings.Split(rawQuery, "&")
+	for index, part := range parts {
+		encodedName := part
+		if equal := strings.IndexByte(part, '='); equal >= 0 {
+			encodedName = part[:equal]
+		}
+		name, err := url.QueryUnescape(encodedName)
+		if err != nil {
+			continue
+		}
+		if isCredentialQueryName(name) || injectableNames[name] {
+			parts[index] = encodedName + "=" + url.QueryEscape(RedactedSecret)
+		}
+	}
+	return strings.Join(parts, "&")
+}
+
+func isCredentialQueryName(name string) bool {
+	switch strings.ToLower(name) {
+	case "api_key", "api-key", "apikey", "access_token", "access-token", "auth_token", "auth-token":
+		return true
+	default:
+		return false
+	}
 }
 
 // captureResponse captures the relevant parts of an HTTP response

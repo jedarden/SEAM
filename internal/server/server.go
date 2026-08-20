@@ -236,6 +236,7 @@ func New(cfg *Config) *Server {
 			corpusDir = "corpus"
 		}
 		s.captureMiddleware = NewCaptureMiddleware(corpusDir, "seam", "seam-incumbent", true)
+		s.captureMiddleware.setRouteTable(s.routeTable)
 		// Load existing corpus if present
 		if err := s.captureMiddleware.Load(); err != nil {
 			log.Printf("Warning: failed to load existing corpus: %v", err)
