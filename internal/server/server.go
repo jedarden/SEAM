@@ -414,31 +414,6 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse and validate version parameter
-	query := r.URL.Query()
-	version := query.Get("version")
-
-	// Set default version
-	if version == "" {
-		version = "_unversioned"
-	}
-
-	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
-	if version != "_unversioned" {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":            "invalid_version_parameter",
-			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
-			"expected_version": "_unversioned",
-			"actual_version":   version,
-			"docs_url":         "/docs",
-		})
-		return
-	}
-
 	// Get the spec JSON with servers populated
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
@@ -474,31 +449,6 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		MethodNotAllowed("Only GET method is allowed").Write(w, r)
-		return
-	}
-
-	// Parse and validate version parameter
-	query := r.URL.Query()
-	version := query.Get("version")
-
-	// Set default version
-	if version == "" {
-		version = "_unversioned"
-	}
-
-	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
-	if version != "_unversioned" {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":            "invalid_version_parameter",
-			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
-			"expected_version": "_unversioned",
-			"actual_version":   version,
-			"docs_url":         "/docs",
-		})
 		return
 	}
 
@@ -647,23 +597,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set default version
 	if version == "" {
-		version = "_unversioned"
-	}
-
-	// Validate version parameter - only "_unversioned" is accepted in Phase 1a
-	if version != "_unversioned" {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":            "invalid_version_parameter",
-			"message":          fmt.Sprintf("Invalid version parameter: %s. Only _unversioned is supported in Phase 1a.", version),
-			"expected_version": "_unversioned",
-			"actual_version":   version,
-			"docs_url":         "/docs",
-		})
-		return
+		version = unversionedAPIVersion
 	}
 
 	// Validate required parameters
@@ -1044,15 +978,23 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Wrap with version injection middleware (outermost - adds version headers to all responses)
+	callerHandler = s.versionMiddleware(callerHandler)
 	callerHandler = s.versionInjectionMiddleware(callerHandler)
-	log.Printf("Version injection middleware active on caller-facing port")
+	log.Printf("Version validation and injection middleware active on caller-facing port")
+
+	// Version validation applies to the operator listener as well. Keep header
+	// injection outermost so rejected operator requests also identify the API
+	// and spec versions that evaluated them.
+	operatorHandler := s.versionMiddleware(s.operatorMux)
+	operatorHandler = s.versionInjectionMiddleware(operatorHandler)
+	log.Printf("Version validation and injection middleware active on operator-only port")
 
 	// Create servers
 	s.callerServer = &http.Server{
 		Handler: callerHandler,
 	}
 	s.operatorServer = &http.Server{
-		Handler: s.operatorMux,
+		Handler: operatorHandler,
 	}
 
 	// Start caller-facing server

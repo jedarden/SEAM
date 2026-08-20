@@ -114,7 +114,7 @@ func (vw *versionWriter) injectHeaders() {
 	}
 
 	// Add API version header (currently unversioned)
-	vw.ResponseWriter.Header().Set("X-Seam-Api-Version", "_unversioned")
+	vw.ResponseWriter.Header().Set("X-Seam-Api-Version", unversionedAPIVersion)
 }
 
 // headerStrippingMiddleware implements Stage 2 of the control-plane pipeline.
