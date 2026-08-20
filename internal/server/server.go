@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ardenone/seam/internal/buildinfo"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/vault"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
@@ -147,6 +147,7 @@ type Server struct {
 	circuitBreakers   *CircuitBreakerStateRegistry
 	quotaTracker      *QuotaTracker
 	costPerCalls      map[string]float64 // route -> cost per call
+	metrics           *Metrics
 	mu                sync.RWMutex
 	allowlistEnforcer *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
 	openBaoMu         sync.RWMutex
@@ -225,6 +226,7 @@ func New(cfg *Config) *Server {
 		allowlistEnforcer: allowlistEnforcer,
 		openBaoReady:      true,
 	}
+	s.metrics = newMetrics(s.cache, s.routeTable, s.circuitBreakers, buildinfo.Read())
 	log.Printf("Route table initialized with %d routes", s.routeTable.RouteCount())
 
 	// Initialize capture middleware if enabled
@@ -325,19 +327,33 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ready": ready})
 }
 
-// metricsHandler returns Prometheus-style metrics
-// Exposes Go runtime metrics, cache metrics (hits, misses, hit rate, size, evictions),
-// and quota metrics via the Prometheus handler.
+// metricsHandler exposes the server-scoped Prometheus registry on the
+// operator-only listener.
 func (s *Server) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
-	// Use Prometheus handler to expose all registered metrics
-	// This includes cache metrics (seam_cache_hits_total, seam_cache_misses_total, etc.)
-	// and quota metrics (seam_quota_cost_total, seam_quota_remaining, etc.)
-	promhttp.Handler().ServeHTTP(w, r)
+	s.ensureMetrics().handler().ServeHTTP(w, r)
+}
+
+func (s *Server) ensureMetrics() *Metrics {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.metrics == nil {
+		if s.cache == nil {
+			s.cache = NewResponseCache()
+		}
+		if s.routeTable == nil {
+			s.routeTable = NewRouteTable(nil)
+		}
+		if s.circuitBreakers == nil {
+			s.circuitBreakers = NewCircuitBreakerStateRegistry()
+		}
+		s.metrics = newMetrics(s.cache, s.routeTable, s.circuitBreakers, buildinfo.Read())
+	}
+	return s.metrics
 }
 
 // configStatusHandler returns comprehensive runtime configuration status
@@ -1170,9 +1186,7 @@ func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.cache.Cleanup()
 
-	// Update metrics after cleanup
 	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -1337,42 +1351,81 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Track route and method
-		route := r.URL.Path
-		method := r.Method
+		metrics := s.ensureMetrics()
+		labels := s.metricLabels(r)
+		ctx := context.WithValue(r.Context(), metricRouteContextKey{}, labels)
+		*r = *r.WithContext(ctx)
 
-		// Increment in-flight counter
-		incrementInFlight(route, method)
-		defer decrementInFlight(route, method)
-
-		// Record start time
+		metrics.incrementInFlight(labels, r.Method)
 		startTime := time.Now()
 
 		// Wrap response writer to capture status code
 		wrapped := &metricsResponseWriter{
 			ResponseWriter: w,
-			statusCode:     http.StatusOK, // Default status code
+			statusCode:     http.StatusOK,
 		}
+		defer func() {
+			metrics.decrementInFlight(labels, r.Method)
+			metrics.recordHTTPRequest(labels, r.Method, wrapped.statusCode, time.Since(startTime))
+		}()
 
-		// Call next handler
 		next.ServeHTTP(wrapped, r)
-
-		// Calculate duration
-		duration := time.Since(startTime).Seconds()
-
-		// Record request metrics
-		recordHTTPRequest(route, method, wrapped.statusCode, duration)
 	})
+}
+
+func (s *Server) metricLabels(r *http.Request) metricRouteLabels {
+	if s.routeTable != nil {
+		requestCopy := r.Clone(r.Context())
+		if match, err := s.routeTable.Match(requestCopy); err == nil {
+			return metricRouteLabels{
+				Route:   match.Route.PathTemplate,
+				Version: match.Route.APIVersion,
+			}
+		}
+	}
+	return metricRouteLabels{Route: unmatchedMetricRoute, Version: "unknown"}
+}
+
+func metricLabelsFromRequest(r *http.Request) metricRouteLabels {
+	if r != nil {
+		if labels, ok := r.Context().Value(metricRouteContextKey{}).(metricRouteLabels); ok {
+			return labels
+		}
+		version := r.Header.Get("X-SEAM-API-Version")
+		if version == "" {
+			version = unversionedAPIVersion
+		}
+		return metricRouteLabels{Route: r.URL.Path, Version: version}
+	}
+	return metricRouteLabels{Route: unmatchedMetricRoute, Version: "unknown"}
 }
 
 // metricsResponseWriter wraps http.ResponseWriter to capture status code
 type metricsResponseWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
 }
 
 // WriteHeader captures the status code
 func (w *metricsResponseWriter) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *metricsResponseWriter) Write(body []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+// Unwrap lets net/http.ResponseController preserve streaming, flushing, and
+// connection-hijacking capabilities of the underlying writer.
+func (w *metricsResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }

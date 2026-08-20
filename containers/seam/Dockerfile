@@ -6,6 +6,8 @@
 # Stage 1: compile a static Linux binary.
 FROM golang:1.25.7-bookworm AS builder
 
+ARG REVISION
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -20,9 +22,13 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY spec ./spec
+COPY containers/seam/VERSION ./containers/seam/VERSION
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath -ldflags='-s -w' -o /out/seam ./cmd/seam
+RUN SEAM_VERSION="$(tr -d '\r\n' < containers/seam/VERSION)" && \
+	CGO_ENABLED=0 GOOS=linux go build \
+	-trimpath \
+	-ldflags="-s -w -X github.com/ardenone/seam/internal/buildinfo.Version=${SEAM_VERSION} -X github.com/ardenone/seam/internal/buildinfo.Revision=${REVISION}" \
+	-o /out/seam ./cmd/seam
 
 # Stage 2: no shell, package manager, or compiler in the runtime image.
 FROM scratch

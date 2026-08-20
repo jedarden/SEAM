@@ -5,6 +5,9 @@ BENCH_TIME ?= 10s
 BENCH_FILTER ?= .
 PROFILE_DIR ?= benchmark-results
 THRESHOLD ?= 10
+VERSION ?= $(shell tr -d '\r\n' < containers/seam/VERSION)
+REVISION ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null)
+BUILD_LDFLAGS := -X github.com/ardenone/seam/internal/buildinfo.Version=$(VERSION) -X github.com/ardenone/seam/internal/buildinfo.Revision=$(REVISION)
 
 .PHONY: run build test clean benchmark benchmark-cpu benchmark-mem benchmark-ci \
 	benchmark-save-baseline benchmark-check-regression benchmark-ci-regression \
@@ -16,7 +19,7 @@ run:
 
 # Build the seam binary
 build:
-	go build -o seam cmd/seam/main.go
+	go build -ldflags "$(BUILD_LDFLAGS)" -o seam ./cmd/seam
 
 # Run tests
 test:

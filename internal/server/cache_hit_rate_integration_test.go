@@ -79,10 +79,6 @@ func TestCacheHitRateAllMisses(t *testing.T) {
 		t.Errorf("expected 1 upstream call after miss, got %d", upstreamCallCount)
 	}
 
-	// Trigger metrics update (normally done by cleanup ticker)
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
-
 	// Get metrics
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)
 	wMetrics := httptest.NewRecorder()
@@ -139,10 +135,6 @@ func TestCacheHitRateFiftyPercent(t *testing.T) {
 	if w2.Header().Get("X-SEAM-Cache") != "HIT" {
 		t.Error("second request should have cache hit header")
 	}
-
-	// Trigger metrics update
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
 
 	// Get metrics
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)
@@ -204,10 +196,6 @@ func TestCacheHitRateSeventyFivePercent(t *testing.T) {
 		t.Errorf("expected 1 upstream call (3 hits, 1 miss), got %d", upstreamCallCount)
 	}
 
-	// Trigger metrics update
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
-
 	// Get metrics
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)
 	wMetrics := httptest.NewRecorder()
@@ -260,10 +248,6 @@ func TestCacheHitRateAllHits(t *testing.T) {
 			t.Errorf("request %d should have cache hit header", i+2)
 		}
 	}
-
-	// Trigger metrics update
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
 
 	// Get metrics
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)
@@ -327,10 +311,6 @@ func TestCacheHitRateConcurrent(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		<-done
 	}
-
-	// Trigger metrics update
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
 
 	// Get metrics - should not panic or produce invalid values
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)

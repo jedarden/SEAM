@@ -589,6 +589,22 @@ func (t *RouteTable) RouteCount() int {
 	return len(t.routes)
 }
 
+// OpenBaoCacheStats exposes only aggregate, non-secret cache counters to the
+// Prometheus collector. A route table that has not fetched a credential yet
+// reports zeros.
+func (t *RouteTable) OpenBaoCacheStats() vault.CacheStats {
+	if t == nil {
+		return vault.CacheStats{}
+	}
+	t.secretMu.Lock()
+	client := t.secretClient
+	t.secretMu.Unlock()
+	if client == nil {
+		return vault.CacheStats{}
+	}
+	return client.CacheStats()
+}
+
 // Match returns the route matching req and extracts values for path
 // parameters. When the request does not select an API version explicitly,
 // the oldest matching version is selected, with _unversioned taking
