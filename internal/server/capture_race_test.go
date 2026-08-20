@@ -87,7 +87,9 @@ func TestConcurrentCaptureStressWithRaceDetector(t *testing.T) {
 	}
 
 	// Finish with a deterministic enabled batch. It proves that all worker
-	// locks were released and that capture remains usable after the stress.
+	// locks were released and that capture remains usable after the stress. If
+	// the retention ring is already full, the batch replaces old entries rather
+	// than increasing the retained count, so verify the captured IDs too.
 	cm.Enable()
 	before := cm.GetEntryCount()
 	var finalGroup sync.WaitGroup
@@ -105,8 +107,22 @@ func TestConcurrentCaptureStressWithRaceDetector(t *testing.T) {
 	}
 	waitForCaptureRaceWorkers(t, &finalGroup, 5*time.Second)
 
-	if got, want := cm.GetEntryCount()-before, workers; got != want {
-		t.Fatalf("final enabled batch captured %d entries, want %d", got, want)
+	wantCount := min(before+workers, DefaultCaptureRetentionLimit)
+	if got := cm.GetEntryCount(); got != wantCount {
+		t.Fatalf("retained entries after final enabled batch = %d, want %d", got, wantCount)
+	}
+	cm.mu.Lock()
+	finalEntries := cm.entriesInCaptureOrderLocked()
+	cm.mu.Unlock()
+	finalIDs := make(map[string]struct{}, workers)
+	for _, entry := range finalEntries {
+		finalIDs[entry.ID] = struct{}{}
+	}
+	for worker := 0; worker < workers; worker++ {
+		wantID := fmt.Sprintf("final-%d-get", worker)
+		if _, ok := finalIDs[wantID]; !ok {
+			t.Errorf("final enabled batch did not retain entry %q", wantID)
+		}
 	}
 	if err := cm.Save(); err != nil {
 		t.Fatalf("save after stress failed: %v", err)
