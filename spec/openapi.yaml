@@ -43,7 +43,7 @@ components:
             - missing_required_parameter
             - invalid_payload
             - route_not_found
-            - validation_error
+            - validation_failed
             - quota_exceeded
             - rate_limit_exceeded
             - internal_server_error
@@ -51,6 +51,8 @@ components:
             - service_unavailable
             - gateway_timeout
             - upstream_failed
+            - no_upstream_configured
+            - proxy_creation_failed
             - capture_failed
             - spec_load_failed
             - config_error
@@ -59,12 +61,17 @@ components:
           description: Human-readable error description
         details:
           type: object
-          description: Additional error context and metadata
+          description: Caller-safe error context and metadata; internal causes are never exposed
           additionalProperties: true
+        validation_errors:
+          type: array
+          description: Field-level diagnostics, present only when error is validation_failed
+          items:
+            $ref: '#/components/schemas/ValidationError'
         docs_url:
           type: string
           description: Link to relevant documentation
-          format: uri
+          format: uri-reference
         request_id:
           type: string
           description: Unique request identifier for tracing
@@ -77,35 +84,29 @@ components:
         docs_url: /docs
         request_id: req_123456
 
-    # Validation error response format
+    # Validation errors use the same envelope and add field-level diagnostics.
     ValidationErrorResponse:
-      type: object
       description: Detailed validation error response with field-level errors
-      required:
-        - error
-        - message
-        - errors
-      properties:
-        error:
-          type: string
-          enum: [validation_error]
-          description: Error code for validation failures
-        message:
-          type: string
-          description: Human-readable validation error summary
-        errors:
-          type: array
-          description: Array of field-level validation errors
-          items:
-            $ref: '#/components/schemas/ValidationError'
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          required:
+            - validation_errors
+            - docs_url
+          properties:
+            error:
+              type: string
+              enum: [validation_failed]
       example:
-        error: validation_error
-        message: Request validation failed
-        errors:
+        error: validation_failed
+        message: Request does not conform to the OpenAPI specification
+        validation_errors:
           - field: version
-            expected: _unversioned
+            expected_shape: Parameter validation; expected _unversioned
             actual: v1
-            docs_url: /docs/route?path=/openapi.json&method=GET&version=_unversioned
+            reason: Value is not in the allowed enum
+        docs_url: /docs/route?path=/openapi.json&method=GET&version=_unversioned
+        request_id: req_123456
 
     # Individual field validation error
     ValidationError:
@@ -113,21 +114,29 @@ components:
       description: Field-level validation error
       required:
         - field
-        - expected
+        - expected_shape
+        - reason
       properties:
         field:
           type: string
           description: Field or parameter name that failed validation
-        expected:
+        expected_shape:
           type: string
           description: Expected value or format for the field
         actual:
           type: string
           description: Actual value received (optional)
-        docs_url:
+        reason:
           type: string
-          description: Link to documentation for this field
-          format: uri
+          description: Why validation failed
+        line:
+          type: integer
+          minimum: 0
+          description: OpenAPI source line when supplied by the validator
+        column:
+          type: integer
+          minimum: 0
+          description: OpenAPI source column when supplied by the validator
 
   # Reusable response templates
   responses:

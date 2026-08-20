@@ -285,9 +285,13 @@ func TestCaptureNonIntrusion(t *testing.T) {
 				captureHeaders := observation.headers.Clone()
 				baselineHeaders := baselineObservation.headers.Clone()
 				// Date is generated per response, so it can differ when the
-				// baseline and capture requests cross a second boundary.
+				// baseline and capture requests cross a second boundary. The
+				// request correlation ID is also unique per request; neither
+				// difference is caused by capture middleware.
 				captureHeaders.Del("Date")
 				baselineHeaders.Del("Date")
+				captureHeaders.Del("X-Request-ID")
+				baselineHeaders.Del("X-Request-ID")
 				if !reflect.DeepEqual(captureHeaders, baselineHeaders) {
 					t.Errorf("capture changed response headers: got %v, want %v", captureHeaders, baselineHeaders)
 				}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -51,15 +50,17 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		// Check quota (cache hits check without deducting)
 		allowed, remaining, err := s.quotaTracker.CheckAndRecordQuota(r.Context(), route, cost, token, user)
 		if err != nil {
-			log.Printf("[Quota] Error checking quota for %s: %v", route, err)
-			NewErrorResponse(ErrCodeInternalServer, "Error checking quota").WithDetail("route", route).WithDetail("error", err.Error()).Write(w, r)
+			requestErr := WrapRequestError(ErrCodeInternalServer, "Error checking quota", err).
+				WithDetail("route", route)
+			logRequestError(r, "quota-check", requestErr)
+			requestErr.Write(w, r)
 			return
 		}
 
 		if !allowed {
 			// Quota exceeded
 			log.Printf("[Quota] Quota exceeded for %s - remaining: %.2f", route, remaining)
-			s.writeQuotaExceededResponse(w, route, remaining)
+			s.writeQuotaExceededResponse(w, r, route, remaining)
 			return
 		}
 		if cost > 0 {
@@ -100,22 +101,13 @@ func (s *Server) getCostPerCall(route string) float64 {
 }
 
 // writeQuotaExceededResponse writes a 429 Quota Exceeded response
-func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, route string, remaining float64) {
-	w.Header().Set("Content-Type", "application/json")
+func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, r *http.Request, route string, remaining float64) {
 	w.Header().Set("Retry-After", "60") // Suggest retry after 1 minute
-	w.WriteHeader(http.StatusTooManyRequests)
-
-	response := map[string]interface{}{
-		"error":   "quota_exceeded",
-		"message": "Request quota exceeded. Please retry later.",
-		"route":   route,
-		"quota": map[string]interface{}{
-			"remaining": formatCost(remaining),
-		},
-		"docs_url": "/docs/rate-limiting",
-	}
-
-	_ = json.NewEncoder(w).Encode(response)
+	NewErrorResponse(ErrCodeQuotaExceeded, "Request quota exceeded. Please retry later.").
+		WithDetail("route", route).
+		WithDetail("quota", map[string]interface{}{"remaining": formatCost(remaining)}).
+		WithDocsURL("/docs/rate-limiting").
+		Write(w, r)
 
 	// Record quota exceeded metric
 	s.ensureMetrics().recordQuotaExceeded(route)
