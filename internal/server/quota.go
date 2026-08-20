@@ -243,9 +243,6 @@ func (qt *QuotaTracker) recordCost(route string, cost float64, token, user strin
 	if user != "" {
 		qt.usersCosts[user] += cost
 	}
-
-	// Record quota cost metric
-	recordQuotaCost(route, cost)
 }
 
 // resetWindow resets the quota window

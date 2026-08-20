@@ -37,6 +37,7 @@ func (s *Server) cacheMiddleware(next http.Handler) http.Handler {
 
 		// Try to get from cache
 		if cachedResponse, found := s.cache.Get(cacheKey); found {
+			s.ensureMetrics().recordCacheHit(metricLabelsFromRequest(r))
 			// Cache hit - set context before serving response
 			ctx := context.WithValue(r.Context(), cacheHitKey, true)
 			r = r.WithContext(ctx)
@@ -44,6 +45,7 @@ func (s *Server) cacheMiddleware(next http.Handler) http.Handler {
 			s.serveCachedResponse(w, r, cachedResponse, true)
 			return
 		}
+		s.ensureMetrics().recordCacheMiss(metricLabelsFromRequest(r))
 
 		// Cache miss - use single-flight to coalesce concurrent identical requests
 		ttl := s.getRouteCacheTTL(r.URL.Path)
@@ -142,13 +144,8 @@ func (s *Server) serveCachedResponse(w http.ResponseWriter, r *http.Request, cac
 		// Remove quota cost headers for cache hits (they don't apply since quota was bypassed)
 		w.Header().Del("X-Quota-Cost-Per-Call")
 		w.Header().Del("X-Quota-Remaining")
-		// Record metrics for cache hit
-		recordCacheHit(r.URL.Path)
 		// Record quota bypass
-		recordQuotaBypassed(r.URL.Path)
-	} else {
-		// Record metrics for cache miss (fresh execution)
-		recordCacheMiss(r.URL.Path)
+		s.ensureMetrics().recordQuotaBypassed(r.URL.Path)
 	}
 
 	// Write status code and body
@@ -195,21 +192,14 @@ func (r *cacheResponseRecorder) Write(b []byte) (int, error) {
 	return len(b), nil // Only write to buffer, not underlying
 }
 
-// startCacheCleanup starts a background goroutine to periodically clean expired entries and update metrics
+// startCacheCleanup starts a background goroutine to periodically clean expired entries.
 func (s *Server) startCacheCleanup() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
-		// Initialize metrics on startup
-		stats := s.cache.Stats()
-		updateCacheMetrics(stats)
-
 		for range ticker.C {
 			s.cache.Cleanup()
-			// Update cache metrics (size, evictions, hit rate)
-			stats := s.cache.Stats()
-			updateCacheMetrics(stats)
 		}
 	}()
 }

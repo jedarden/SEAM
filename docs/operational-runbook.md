@@ -434,29 +434,31 @@ curl http://localhost:8080/health/upstreams
 
 ### Metrics Endpoint (`/_seam/metrics`)
 
-**Purpose:** Expose Prometheus metrics for monitoring.
+**Purpose:** Expose Prometheus metrics for monitoring. The endpoint binds only
+to the operator listener (port 8081), accepts `GET`, and uses Prometheus text
+exposition. Each server owns an isolated registry; control-plane requests are
+excluded from caller request and response-cache series.
 
-**Key Metrics:**
+**Metric taxonomy:**
 
-```prometheus
-# Build info
-seam_build_info{version="...",commit="...",go_version="..."} 1
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `seam_build_info` | gauge | `version`, `commit`, `go_version`, `modified` | Exactly one sample identifying the running build. Container builds read the release version from `containers/seam/VERSION` and accept the source revision as the `REVISION` build argument. |
+| `seam_http_requests_total` | counter | `route`, `method`, `version`, `status` | Completed caller requests. `route` is the bounded OpenAPI path template, not a concrete URL; `version` is the selected `x-api-version`. |
+| `seam_http_request_duration_seconds` | histogram | `route`, `method`, `version` | End-to-end caller request latency, including cache and upstream work. |
+| `seam_http_requests_in_flight` | gauge | `route`, `method`, `version` | Caller requests currently executing. |
+| `seam_cache_hits_total`, `seam_cache_misses_total` | counter | `route`, `version` | Response-cache lookup outcomes. |
+| `seam_cache_hit_rate` | gauge | none | Process-wide response-cache hit ratio. |
+| `seam_cache_size`, `seam_cache_evictions_total` | gauge, counter | none | Current response-cache entries and lifetime evictions. |
+| `seam_openbao_cache_hits_total`, `seam_openbao_cache_misses_total` | counter | none | Real secret-cache lookup outcomes reported by the OpenBao client. |
+| `seam_openbao_cache_fetches_total`, `seam_openbao_cache_entries` | counter, gauge | none | Remote fetches after single-flight coalescing and current cached secret count. No secret path or value is exposed. |
+| `seam_upstream_health` | gauge | `origin`, `state` | One-hot breaker state. Every known origin has `closed`, `open`, and `half_open` series; exactly one is `1`. |
+| `seam_upstream_breaker_enabled`, `seam_upstream_consecutive_failures` | gauge | `origin` | Current breaker policy status and qualifying failure streak. Removed origins disappear on the next scrape. |
 
-# Cache metrics
-seam_cache_hits_total
-seam_cache_misses_total
-seam_cache_evictions_total
-seam_cache_size
-
-# Quota metrics
-seam_quota_cost_total{route="..."}
-seam_quota_bypassed_total{reason="cache-hit"}
-seam_quota_remaining
-
-# HTTP metrics (if instrumented)
-http_requests_total{method="",path="",status=""}
-http_request_duration_seconds{path=""}
-```
+Quota metrics retain the `seam_quota_*` prefix and use route or scope labels.
+Runtime/process metrics use the standard `go_*` and `process_*` names. Labels
+must remain bounded: never add request paths, query values, caller tokens,
+secret references, or error strings.
 
 **Monitoring Queries:**
 
@@ -464,11 +466,14 @@ http_request_duration_seconds{path=""}
 # Cache hit rate
 rate(seam_cache_hits_total[5m]) / (rate(seam_cache_hits_total[5m]) + rate(seam_cache_misses_total[5m]))
 
-# Quota utilization
-(1 - seam_quota_remaining / seam_quota_limit) * 100
+# Requests to one route version
+sum by (method, status) (rate(seam_http_requests_total{route="/widgets/{id}",version="v2"}[5m]))
 
 # Error rate
-rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+sum(rate(seam_http_requests_total{status=~"5.."}[5m])) / sum(rate(seam_http_requests_total[5m]))
+
+# Open upstream breakers
+seam_upstream_health{state="open"} == 1
 ```
 
 ---

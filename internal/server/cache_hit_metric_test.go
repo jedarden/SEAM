@@ -346,10 +346,6 @@ func TestCacheHitMetric_ConsecutiveHits(t *testing.T) {
 		t.Errorf("expected 5 cache hits, got %d", hitCount)
 	}
 
-	// Trigger metrics update
-	stats := s.cache.Stats()
-	updateCacheMetrics(stats)
-
 	// Check that hit rate reflects the hits (5 hits, 1 miss = ~83%)
 	reqMetrics := httptest.NewRequest(http.MethodGet, "/_seam/metrics", nil)
 	wMetrics := httptest.NewRecorder()

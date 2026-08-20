@@ -1,208 +1,341 @@
 package server
 
 import (
-	"fmt"
-	"runtime"
+	"net/http"
+	"strconv"
+	"time"
 
+	"github.com/ardenone/seam/internal/buildinfo"
+	"github.com/ardenone/seam/internal/vault"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var (
-	// Track previous eviction count to calculate deltas
-	previousEvictions int64
+const unmatchedMetricRoute = "unmatched"
 
-	// Cache metrics
-	metricCacheHits = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_cache_hits_total",
-		Help: "Total number of cache hits by route",
-	}, []string{"route"})
-
-	metricCacheMisses = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_cache_misses_total",
-		Help: "Total number of cache misses by route",
-	}, []string{"route"})
-
-	metricCacheHitRate = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "seam_cache_hit_rate",
-		Help: "Overall cache hit rate (0-1)",
-	})
-
-	metricCacheSize = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "seam_cache_size",
-		Help: "Current number of entries in the cache",
-	})
-
-	metricCacheEvictions = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "seam_cache_evictions_total",
-		Help: "Total number of cache evictions",
-	})
-
-	// HTTP request metrics
-	metricHTTPRequests = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_http_requests_total",
-		Help: "Total number of HTTP requests by route and method",
-	}, []string{"route", "method", "status"})
-
-	metricHTTPLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "seam_http_latency_seconds",
-		Help:    "HTTP request latency in seconds by route and method",
-		Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
-	}, []string{"route", "method"})
-
-	metricHTTPInFlight = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "seam_http_requests_in_flight",
-		Help: "Current number of in-flight HTTP requests by route and method",
-	}, []string{"route", "method"})
-
-	// Upstream health metrics
-	metricUpstreamHealth = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "seam_upstream_health",
-		Help: "Upstream health status: 0=closed, 1=open, 2=half_open",
-	}, []string{"origin"})
-
-	metricUpstreamConsecutiveFailures = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "seam_upstream_consecutive_failures",
-		Help: "Number of consecutive failures for upstream circuit breaker",
-	}, []string{"origin"})
-
-	// OpenBao cache metrics (placeholder for future OpenBao integration)
-	//nolint:unused // Awaiting OpenBao response-cache wiring; recordOpenBaoCacheHit has no caller yet.
-	metricOpenBaoCacheHits = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "seam_openbao_cache_hits_total",
-		Help: "Total number of OpenBao cache hits (placeholder - OpenBao integration not yet implemented)",
-	})
-
-	// Quota metrics
-	metricQuotaCost = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_quota_cost_total",
-		Help: "Total accumulated cost by route in USD",
-	}, []string{"route"})
-
-	// Registered with Prometheus at init but not yet populated by any caller.
-	//nolint:unused // Awaiting the quota-accounting wiring.
-	metricQuotaRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "seam_quota_remaining",
-		Help: "Remaining quota by scope",
-	}, []string{"scope"})
-
-	metricQuotaExceeded = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_quota_exceeded_total",
-		Help: "Total number of quota exceeded errors by route",
-	}, []string{"route"})
-
-	metricQuotaBypassed = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "seam_quota_bypassed_total",
-		Help: "Total number of quota checks bypassed due to cache hit",
-	}, []string{"route"})
-
-	// SEAM build info metric
-	seamBuildInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "seam_build_info",
-		Help: "SEAM gateway build information",
-	}, []string{"version", "go_version"})
-)
-
-func init() {
-	// Register Go runtime collectors (goroutines, memory stats, GC stats, etc.)
-	// Use Register instead of MustRegister to handle potential duplicates gracefully
-	_ = prometheus.Register(collectors.NewGoCollector())
-	_ = prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-
-	// Set SEAM build info metrics
-	// TODO: Populate version from build info (e.g., via ldflags)
-	// For now, use runtime version as a placeholder
-	seamBuildInfo.WithLabelValues("dev", runtime.Version()).Set(1)
+// metricRouteLabels is attached to a request before cache and dispatch
+// middleware run. Route is always the OpenAPI template, never the concrete URL,
+// which keeps label cardinality bounded when paths contain IDs.
+type metricRouteLabels struct {
+	Route   string
+	Version string
 }
 
-// recordCacheHit records a cache hit for metrics
-func recordCacheHit(route string) {
-	metricCacheHits.WithLabelValues(route).Inc()
+type metricRouteContextKey struct{}
+
+// Metrics owns one Prometheus registry per Server. Keeping instrumentation out
+// of the global registry prevents tests and multiple in-process servers from
+// leaking counters into one another.
+type Metrics struct {
+	registry *prometheus.Registry
+
+	httpRequests *prometheus.CounterVec
+	httpDuration *prometheus.HistogramVec
+	httpInFlight *prometheus.GaugeVec
+
+	cacheHits   *prometheus.CounterVec
+	cacheMisses *prometheus.CounterVec
+
+	quotaCost      *prometheus.CounterVec
+	quotaRemaining *prometheus.GaugeVec
+	quotaExceeded  *prometheus.CounterVec
+	quotaBypassed  *prometheus.CounterVec
 }
 
-// recordCacheMiss records a cache miss for metrics
-func recordCacheMiss(route string) {
-	metricCacheMisses.WithLabelValues(route).Inc()
+type responseCacheStatsProvider interface {
+	Stats() CacheStats
 }
 
-// updateCacheHitRate updates the overall cache hit rate gauge
-// Hit rate is calculated as hits / (hits + misses)
-func updateCacheHitRate(stats CacheStats) {
-	total := stats.Hits + stats.Misses
-	if total > 0 {
-		hitRate := float64(stats.Hits) / float64(total)
-		metricCacheHitRate.Set(hitRate)
+type openBaoCacheStatsProvider interface {
+	OpenBaoCacheStats() vault.CacheStats
+}
+
+func newMetrics(
+	cache responseCacheStatsProvider,
+	openBao openBaoCacheStatsProvider,
+	upstreams CircuitBreakerStateProvider,
+	build buildinfo.Info,
+) *Metrics {
+	registry := prometheus.NewRegistry()
+	metrics := &Metrics{
+		registry: registry,
+		httpRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_http_requests_total",
+			Help: "Total caller requests by OpenAPI route template, method, API version, and HTTP status.",
+		}, []string{"route", "method", "version", "status"}),
+		httpDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_http_request_duration_seconds",
+			Help:    "Caller request duration by OpenAPI route template, method, and API version.",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"route", "method", "version"}),
+		httpInFlight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "seam_http_requests_in_flight",
+			Help: "Current caller requests by OpenAPI route template, method, and API version.",
+		}, []string{"route", "method", "version"}),
+		cacheHits: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_cache_hits_total",
+			Help: "Total response-cache hits by OpenAPI route template and API version.",
+		}, []string{"route", "version"}),
+		cacheMisses: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_cache_misses_total",
+			Help: "Total response-cache misses by OpenAPI route template and API version.",
+		}, []string{"route", "version"}),
+		quotaCost: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_quota_cost_total",
+			Help: "Total accumulated route cost in USD.",
+		}, []string{"route"}),
+		quotaRemaining: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "seam_quota_remaining",
+			Help: "Remaining quota by scope.",
+		}, []string{"scope"}),
+		quotaExceeded: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_quota_exceeded_total",
+			Help: "Total quota-exceeded responses by route.",
+		}, []string{"route"}),
+		quotaBypassed: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_quota_bypassed_total",
+			Help: "Total quota checks bypassed by response-cache hits.",
+		}, []string{"route"}),
+	}
+
+	registry.MustRegister(
+		metrics.httpRequests,
+		metrics.httpDuration,
+		metrics.httpInFlight,
+		metrics.cacheHits,
+		metrics.cacheMisses,
+		metrics.quotaCost,
+		metrics.quotaRemaining,
+		metrics.quotaExceeded,
+		metrics.quotaBypassed,
+		newStateMetricsCollector(cache, openBao, upstreams, build),
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+	return metrics
+}
+
+func (m *Metrics) handler() http.Handler {
+	return promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{EnableOpenMetrics: true})
+}
+
+func (m *Metrics) recordHTTPRequest(labels metricRouteLabels, method string, statusCode int, duration time.Duration) {
+	if m == nil {
+		return
+	}
+	m.httpRequests.WithLabelValues(labels.Route, method, labels.Version, strconv.Itoa(statusCode)).Inc()
+	m.httpDuration.WithLabelValues(labels.Route, method, labels.Version).Observe(duration.Seconds())
+}
+
+func (m *Metrics) incrementInFlight(labels metricRouteLabels, method string) {
+	if m != nil {
+		m.httpInFlight.WithLabelValues(labels.Route, method, labels.Version).Inc()
 	}
 }
 
-// updateCacheMetrics updates cache size, eviction, and hit rate metrics
-func updateCacheMetrics(stats CacheStats) {
-	metricCacheSize.Set(float64(stats.Size))
-
-	// Calculate delta for evictions to avoid double-counting
-	delta := stats.Evictions - previousEvictions
-	if delta > 0 {
-		metricCacheEvictions.Add(float64(delta))
-		previousEvictions = stats.Evictions
+func (m *Metrics) decrementInFlight(labels metricRouteLabels, method string) {
+	if m != nil {
+		m.httpInFlight.WithLabelValues(labels.Route, method, labels.Version).Dec()
 	}
-
-	// Update cache hit rate
-	updateCacheHitRate(stats)
 }
 
-// recordQuotaCost records quota cost accumulation
-func recordQuotaCost(route string, cost float64) {
-	metricQuotaCost.WithLabelValues(route).Add(cost)
-}
-
-// recordQuotaExceeded records a quota exceeded event
-func recordQuotaExceeded(route string) {
-	metricQuotaExceeded.WithLabelValues(route).Inc()
-}
-
-// recordQuotaBypassed records a quota check bypassed due to cache hit
-func recordQuotaBypassed(route string) {
-	metricQuotaBypassed.WithLabelValues(route).Inc()
-}
-
-// recordHTTPRequest records an HTTP request completion with status code
-func recordHTTPRequest(route, method string, statusCode int, duration float64) {
-	metricHTTPRequests.WithLabelValues(route, method, fmt.Sprintf("%d", statusCode)).Inc()
-	metricHTTPLatency.WithLabelValues(route, method).Observe(duration)
-}
-
-// incrementInFlight increments the in-flight request counter
-func incrementInFlight(route, method string) {
-	metricHTTPInFlight.WithLabelValues(route, method).Inc()
-}
-
-// decrementInFlight decrements the in-flight request counter
-func decrementInFlight(route, method string) {
-	metricHTTPInFlight.WithLabelValues(route, method).Dec()
-}
-
-// recordOpenBaoCacheHit records an OpenBao cache hit
-//
-//nolint:unused // Awaiting OpenBao response-cache wiring; no caller yet.
-func recordOpenBaoCacheHit() {
-	metricOpenBaoCacheHits.Inc()
-}
-
-// setUpstreamHealth records upstream circuit breaker state
-func setUpstreamHealth(origin string, state CircuitBreakerState, consecutiveFailures int) {
-	var stateValue float64
-	switch state {
-	case CircuitBreakerClosed:
-		stateValue = 0
-	case CircuitBreakerOpen:
-		stateValue = 1
-	case CircuitBreakerHalfOpen:
-		stateValue = 2
-	default:
-		stateValue = 0
+func (m *Metrics) recordCacheHit(labels metricRouteLabels) {
+	if m != nil {
+		m.cacheHits.WithLabelValues(labels.Route, labels.Version).Inc()
 	}
+}
 
-	metricUpstreamHealth.WithLabelValues(origin).Set(stateValue)
-	metricUpstreamConsecutiveFailures.WithLabelValues(origin).Set(float64(consecutiveFailures))
+func (m *Metrics) recordCacheMiss(labels metricRouteLabels) {
+	if m != nil {
+		m.cacheMisses.WithLabelValues(labels.Route, labels.Version).Inc()
+	}
+}
+
+func (m *Metrics) recordQuotaCost(route string, cost float64) {
+	if m != nil {
+		m.quotaCost.WithLabelValues(route).Add(cost)
+	}
+}
+
+func (m *Metrics) recordQuotaExceeded(route string) {
+	if m != nil {
+		m.quotaExceeded.WithLabelValues(route).Inc()
+	}
+}
+
+func (m *Metrics) recordQuotaBypassed(route string) {
+	if m != nil {
+		m.quotaBypassed.WithLabelValues(route).Inc()
+	}
+}
+
+// stateMetricsCollector translates existing in-memory health and cache state
+// into Prometheus samples at scrape time. Pulling these values avoids a second
+// mutable copy and means removed upstreams disappear on the next scrape.
+type stateMetricsCollector struct {
+	cache     responseCacheStatsProvider
+	openBao   openBaoCacheStatsProvider
+	upstreams CircuitBreakerStateProvider
+	build     buildinfo.Info
+
+	buildInfo                   *prometheus.Desc
+	cacheHitRate                *prometheus.Desc
+	cacheSize                   *prometheus.Desc
+	cacheEvictions              *prometheus.Desc
+	openBaoCacheHits            *prometheus.Desc
+	openBaoCacheMisses          *prometheus.Desc
+	openBaoCacheFetches         *prometheus.Desc
+	openBaoCacheEntries         *prometheus.Desc
+	upstreamHealth              *prometheus.Desc
+	upstreamBreakerEnabled      *prometheus.Desc
+	upstreamConsecutiveFailures *prometheus.Desc
+}
+
+func newStateMetricsCollector(
+	cache responseCacheStatsProvider,
+	openBao openBaoCacheStatsProvider,
+	upstreams CircuitBreakerStateProvider,
+	build buildinfo.Info,
+) *stateMetricsCollector {
+	return &stateMetricsCollector{
+		cache:     cache,
+		openBao:   openBao,
+		upstreams: upstreams,
+		build:     build,
+		buildInfo: prometheus.NewDesc(
+			"seam_build_info",
+			"SEAM build and runtime information.",
+			[]string{"version", "commit", "go_version", "modified"}, nil,
+		),
+		cacheHitRate: prometheus.NewDesc(
+			"seam_cache_hit_rate",
+			"Process-wide response-cache hit ratio from zero to one.", nil, nil,
+		),
+		cacheSize: prometheus.NewDesc(
+			"seam_cache_size",
+			"Current number of response-cache entries.", nil, nil,
+		),
+		cacheEvictions: prometheus.NewDesc(
+			"seam_cache_evictions_total",
+			"Total response-cache evictions.", nil, nil,
+		),
+		openBaoCacheHits: prometheus.NewDesc(
+			"seam_openbao_cache_hits_total",
+			"Total OpenBao secret-cache hits.", nil, nil,
+		),
+		openBaoCacheMisses: prometheus.NewDesc(
+			"seam_openbao_cache_misses_total",
+			"Total OpenBao secret-cache misses.", nil, nil,
+		),
+		openBaoCacheFetches: prometheus.NewDesc(
+			"seam_openbao_cache_fetches_total",
+			"Total remote OpenBao secret fetches after request coalescing.", nil, nil,
+		),
+		openBaoCacheEntries: prometheus.NewDesc(
+			"seam_openbao_cache_entries",
+			"Current number of OpenBao secret-cache entries.", nil, nil,
+		),
+		upstreamHealth: prometheus.NewDesc(
+			"seam_upstream_health",
+			"Upstream circuit-breaker state as a one-hot gauge.",
+			[]string{"origin", "state"}, nil,
+		),
+		upstreamBreakerEnabled: prometheus.NewDesc(
+			"seam_upstream_breaker_enabled",
+			"Whether the upstream circuit breaker is enabled (1) or disabled (0).",
+			[]string{"origin"}, nil,
+		),
+		upstreamConsecutiveFailures: prometheus.NewDesc(
+			"seam_upstream_consecutive_failures",
+			"Current consecutive qualifying failures for an upstream.",
+			[]string{"origin"}, nil,
+		),
+	}
+}
+
+func (c *stateMetricsCollector) Describe(descriptions chan<- *prometheus.Desc) {
+	for _, description := range []*prometheus.Desc{
+		c.buildInfo,
+		c.cacheHitRate,
+		c.cacheSize,
+		c.cacheEvictions,
+		c.openBaoCacheHits,
+		c.openBaoCacheMisses,
+		c.openBaoCacheFetches,
+		c.openBaoCacheEntries,
+		c.upstreamHealth,
+		c.upstreamBreakerEnabled,
+		c.upstreamConsecutiveFailures,
+	} {
+		descriptions <- description
+	}
+}
+
+func (c *stateMetricsCollector) Collect(metrics chan<- prometheus.Metric) {
+	metrics <- prometheus.MustNewConstMetric(
+		c.buildInfo,
+		prometheus.GaugeValue,
+		1,
+		c.build.Version,
+		c.build.Revision,
+		c.build.GoVersion,
+		c.build.Modified,
+	)
+
+	cacheStats := CacheStats{}
+	if c.cache != nil {
+		cacheStats = c.cache.Stats()
+	}
+	hitRate := float64(0)
+	if requests := cacheStats.Hits + cacheStats.Misses; requests > 0 {
+		hitRate = float64(cacheStats.Hits) / float64(requests)
+	}
+	metrics <- prometheus.MustNewConstMetric(c.cacheHitRate, prometheus.GaugeValue, hitRate)
+	metrics <- prometheus.MustNewConstMetric(c.cacheSize, prometheus.GaugeValue, float64(cacheStats.Size))
+	metrics <- prometheus.MustNewConstMetric(c.cacheEvictions, prometheus.CounterValue, float64(cacheStats.Evictions))
+
+	openBaoStats := vault.CacheStats{}
+	if c.openBao != nil {
+		openBaoStats = c.openBao.OpenBaoCacheStats()
+	}
+	metrics <- prometheus.MustNewConstMetric(c.openBaoCacheHits, prometheus.CounterValue, float64(openBaoStats.Hits))
+	metrics <- prometheus.MustNewConstMetric(c.openBaoCacheMisses, prometheus.CounterValue, float64(openBaoStats.Misses))
+	metrics <- prometheus.MustNewConstMetric(c.openBaoCacheFetches, prometheus.CounterValue, float64(openBaoStats.Fetches))
+	metrics <- prometheus.MustNewConstMetric(c.openBaoCacheEntries, prometheus.GaugeValue, float64(openBaoStats.Entries))
+
+	if c.upstreams == nil {
+		return
+	}
+	for _, upstream := range c.upstreams.Snapshot() {
+		for _, state := range []CircuitBreakerState{CircuitBreakerClosed, CircuitBreakerOpen, CircuitBreakerHalfOpen} {
+			value := float64(0)
+			if upstream.State == state {
+				value = 1
+			}
+			metrics <- prometheus.MustNewConstMetric(
+				c.upstreamHealth,
+				prometheus.GaugeValue,
+				value,
+				upstream.Origin,
+				string(state),
+			)
+		}
+		enabled := float64(0)
+		if upstream.Enabled {
+			enabled = 1
+		}
+		metrics <- prometheus.MustNewConstMetric(
+			c.upstreamBreakerEnabled,
+			prometheus.GaugeValue,
+			enabled,
+			upstream.Origin,
+		)
+		metrics <- prometheus.MustNewConstMetric(
+			c.upstreamConsecutiveFailures,
+			prometheus.GaugeValue,
+			float64(upstream.ConsecutiveFailures),
+			upstream.Origin,
+		)
+	}
 }

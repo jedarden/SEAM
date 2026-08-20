@@ -62,6 +62,9 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 			s.writeQuotaExceededResponse(w, route, remaining)
 			return
 		}
+		if cost > 0 {
+			s.ensureMetrics().recordQuotaCost(route, cost)
+		}
 
 		// Add quota headers to response
 		if costPerCall > 0 && !cacheHit {
@@ -72,7 +75,7 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		// Cache hits get a special header and metric
 		if cacheHit {
 			w.Header().Set("X-Quota-Bypassed", "cache-hit")
-			recordQuotaBypassed(route)
+			s.ensureMetrics().recordQuotaBypassed(route)
 		}
 
 		// Proceed to next handler
@@ -115,7 +118,7 @@ func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, route string,
 	_ = json.NewEncoder(w).Encode(response)
 
 	// Record quota exceeded metric
-	recordQuotaExceeded(route)
+	s.ensureMetrics().recordQuotaExceeded(route)
 }
 
 // formatCost formats a cost value as USD string
@@ -149,18 +152,4 @@ func sprintfInt(val int) string {
 		val = val / 10
 	}
 	return result
-}
-
-// updateMetrics updates Prometheus metrics for quota
-//
-// recordCacheHit/recordCacheMiss. Reconcile the two when quota wiring lands.
-//
-//nolint:unused // Not yet called; cache hit/miss is currently recorded via
-func (s *Server) updateMetrics(route string, cacheHit bool, cost float64) {
-	if cacheHit {
-		metricCacheHits.WithLabelValues(route).Inc()
-	} else {
-		metricCacheMisses.WithLabelValues(route).Inc()
-		metricQuotaCost.WithLabelValues(route).Add(cost)
-	}
 }
