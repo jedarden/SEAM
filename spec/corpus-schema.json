@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ardenone.com/seam/corpus-schema/v1.json",
+  "title": "SEAM Differential Corpus v1",
+  "description": "Schema for complete or request-only captures used by the SEAM differential replay harness.",
+  "type": "object",
+  "required": ["schema", "service", "incumbent", "capturedAt", "description", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "seam-diff-corpus/v1" },
+    "service": { "type": "string", "minLength": 1 },
+    "incumbent": { "type": "string", "format": "uri" },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "description": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "headers": {
+      "type": "object",
+      "propertyNames": { "minLength": 1 },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "type": "string" }
+      }
+    },
+    "base64Body": {
+      "type": "string",
+      "contentEncoding": "base64"
+    },
+    "request": {
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "type": "string", "pattern": "^[A-Z]+$" },
+        "path": { "type": "string", "pattern": "^/", "not": { "pattern": "\\?" } },
+        "query": { "type": "string" },
+        "headers": { "$ref": "#/$defs/headers" },
+        "bodyB64": { "$ref": "#/$defs/base64Body" },
+        "bodyContentType": { "type": "string" }
+      }
+    },
+    "response": {
+      "type": "object",
+      "required": ["statusCode"],
+      "additionalProperties": false,
+      "properties": {
+        "statusCode": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "headers": { "$ref": "#/$defs/headers" },
+        "bodyB64": { "$ref": "#/$defs/base64Body" },
+        "bodyContentType": { "type": "string" }
+      }
+    },
+    "injectAs": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["header", "bearer", "query"] },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "enum": ["header", "query"] } }, "required": ["kind"] },
+          "then": { "required": ["name"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "bearer" } }, "required": ["kind"] },
+          "then": { "not": { "required": ["name"] } }
+        }
+      ]
+    },
+    "secret": {
+      "type": "object",
+      "required": ["ref", "injectAs"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "injectAs": { "$ref": "#/$defs/injectAs" }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "ignoreHeaders": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "ignoreBody": { "type": "boolean" },
+        "skip": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "request"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "request": { "$ref": "#/$defs/request" },
+        "response": { "$ref": "#/$defs/response" },
+        "secrets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/secret" }
+        },
+        "expect": { "$ref": "#/$defs/expect" }
+      }
+    }
+  }
+}
