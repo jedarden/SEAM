@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 )
 
@@ -686,47 +688,197 @@ func TestCaptureFilesystemFullSimulated(t *testing.T) {
 	t.Log("Simulated disk full condition handled - proxy continues serving requests")
 }
 
-// TestCaptureJsonMarshalFailure tests handling of JSON marshal failures
+// TestCaptureDiskWriteFailuresAreNonBlocking deterministically covers the two
+// most important filesystem failures even on hosts where the test process is
+// root or /dev/full is unavailable.
+func TestCaptureDiskWriteFailuresAreNonBlocking(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{name: "disk full", err: syscall.ENOSPC},
+		{name: "permission denied", err: os.ErrPermission},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := captureFailureLogs(t)
+			cm := NewCaptureMiddleware(t.TempDir(), "test-service", "test-incumbent", true)
+			writeAttempts := 0
+			cm.writeCorpusFile = func(string, []byte, os.FileMode) error {
+				writeAttempts++
+				return tc.err
+			}
+
+			wrappedHandler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusAccepted)
+				_, _ = w.Write([]byte("upstream response"))
+			}))
+
+			for i := 0; i < 10; i++ {
+				req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/test%d", i), nil)
+				w := httptest.NewRecorder()
+				wrappedHandler.ServeHTTP(w, req)
+				if w.Code != http.StatusAccepted || w.Body.String() != "upstream response" {
+					t.Fatalf("request %d changed by capture failure: status=%d body=%q", i, w.Code, w.Body.String())
+				}
+			}
+
+			if got := cm.GetEntryCount(); got != 10 {
+				t.Fatalf("retained entries after failed auto-save = %d, want 10", got)
+			}
+			if writeAttempts != 1 {
+				t.Fatalf("auto-save write attempts = %d, want 1", writeAttempts)
+			}
+			if !strings.Contains(logs.String(), "failed to auto-save corpus") ||
+				!strings.Contains(logs.String(), "write corpus file") ||
+				!strings.Contains(logs.String(), tc.err.Error()) {
+				t.Errorf("expected observable %s failure, got logs %q", tc.name, logs.String())
+			}
+
+			if err := cm.Save(); !errors.Is(err, tc.err) {
+				t.Fatalf("direct save error = %v, want wrapped %v", err, tc.err)
+			}
+		})
+	}
+}
+
+// TestCaptureJsonMarshalFailure tests graceful handling of corpus
+// serialization errors. CorpusFile only contains JSON-safe field types, so a
+// per-instance serializer seam is used to reach this otherwise impossible
+// failure path without introducing invalid production data.
 func TestCaptureJsonMarshalFailure(t *testing.T) {
-	tmpDir := t.TempDir()
+	logs := captureFailureLogs(t)
+	serializationErr := errors.New("simulated corpus serialization failure")
+	cm := NewCaptureMiddleware(t.TempDir(), "test-service", "test-incumbent", true)
+	cm.marshalCorpus = func(CorpusFile) ([]byte, error) {
+		return nil, serializationErr
+	}
 
-	cm := NewCaptureMiddleware(tmpDir, "test-service", "test-incumbent", false)
-	cm.Enable()
+	wrappedHandler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for i := 0; i < 10; i++ {
+		w := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/serialize/%d", i), nil))
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("request %d changed by serialization failure: status=%d", i, w.Code)
+		}
+	}
 
-	// Capture a request
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	if got := cm.GetEntryCount(); got != 10 {
+		t.Fatalf("retained entries after serialization failure = %d, want 10", got)
+	}
+	if !strings.Contains(logs.String(), "failed to auto-save corpus") ||
+		!strings.Contains(logs.String(), "marshal corpus") ||
+		!strings.Contains(logs.String(), serializationErr.Error()) {
+		t.Errorf("expected serialization failure to be logged, got %q", logs.String())
+	}
+	if err := cm.Save(); !errors.Is(err, serializationErr) {
+		t.Fatalf("direct save error = %v, want wrapped serialization error", err)
+	}
+	if _, err := os.Stat(filepath.Join(cm.corpusDir, "corpus.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("corpus file exists after serialization failure: %v", err)
+	}
+}
+
+// TestCaptureRetentionLimitExceededKeepsProxyOperating verifies that exceeding
+// corpus storage limits evicts the oldest captures without rejecting traffic,
+// and that the bounded corpus remains chronologically ordered on disk.
+func TestCaptureRetentionLimitExceededKeepsProxyOperating(t *testing.T) {
+	const retentionLimit = 3
+	cm := newCaptureMiddlewareWithRetentionLimit(
+		t.TempDir(),
+		"test-service",
+		"test-incumbent",
+		false,
+		retentionLimit,
+	)
+	wrappedHandler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
+		_, _ = w.Write([]byte("served " + r.URL.Path))
+	}))
 
-	wrappedHandler := cm.Wrap(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
-	w := httptest.NewRecorder()
-	wrappedHandler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected initial request to succeed, got %d", w.Code)
+	const requestCount = retentionLimit + 3
+	for i := 0; i < requestCount; i++ {
+		path := fmt.Sprintf("/limit/%d", i)
+		w := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusOK || w.Body.String() != "served "+path {
+			t.Fatalf("request %d changed after storage limit: status=%d body=%q", i, w.Code, w.Body.String())
+		}
 	}
 
-	// The save should succeed with normal data
-	err := cm.Save()
+	if got := cm.GetEntryCount(); got != retentionLimit {
+		t.Fatalf("retained entries = %d, want limit %d", got, retentionLimit)
+	}
+	if err := cm.Save(); err != nil {
+		t.Fatalf("save bounded corpus: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(cm.corpusDir, "corpus.json"))
 	if err != nil {
-		t.Logf("Save with normal data succeeded: %v", err)
+		t.Fatalf("read bounded corpus: %v", err)
 	}
-
-	// Verify the corpus file is valid JSON
-	corpusPath := filepath.Join(tmpDir, "corpus.json")
-	data, err := os.ReadFile(corpusPath)
-	if err != nil {
-		t.Fatalf("Failed to read corpus file: %v", err)
-	}
-
 	var corpus CorpusFile
 	if err := json.Unmarshal(data, &corpus); err != nil {
-		t.Errorf("Corpus file should contain valid JSON: %v", err)
+		t.Fatalf("decode bounded corpus: %v", err)
+	}
+	wantIDs := []string{"limit-3-get", "limit-4-get", "limit-5-get"}
+	if len(corpus.Entries) != len(wantIDs) {
+		t.Fatalf("persisted entries = %d, want %d", len(corpus.Entries), len(wantIDs))
+	}
+	for i, wantID := range wantIDs {
+		if got := corpus.Entries[i].ID; got != wantID {
+			t.Errorf("persisted entry %d ID = %q, want %q", i, got, wantID)
+		}
+	}
+}
+
+// TestCaptureRecoversAfterTransientAutoSaveFailure proves auto-save retries on
+// the next interval and persists all retained entries after the filesystem
+// becomes writable again.
+func TestCaptureRecoversAfterTransientAutoSaveFailure(t *testing.T) {
+	logs := captureFailureLogs(t)
+	cm := NewCaptureMiddleware(t.TempDir(), "test-service", "test-incumbent", true)
+	writeAttempts := 0
+	cm.writeCorpusFile = func(name string, data []byte, perm os.FileMode) error {
+		writeAttempts++
+		if writeAttempts == 1 {
+			return syscall.ENOSPC
+		}
+		return os.WriteFile(name, data, perm)
+	}
+	wrappedHandler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("upstream response"))
+	}))
+
+	for i := 0; i < 20; i++ {
+		w := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/recover/%d", i), nil))
+		if w.Code != http.StatusOK || w.Body.String() != "upstream response" {
+			t.Fatalf("request %d changed during transient failure: status=%d body=%q", i, w.Code, w.Body.String())
+		}
 	}
 
-	t.Log("JSON marshaling works correctly with normal captured data")
+	if writeAttempts != 2 {
+		t.Fatalf("auto-save write attempts = %d, want failed attempt plus retry", writeAttempts)
+	}
+	if !strings.Contains(logs.String(), "failed to auto-save corpus: write corpus file") ||
+		!strings.Contains(logs.String(), syscall.ENOSPC.Error()) ||
+		!strings.Contains(logs.String(), "corpus saved to") {
+		t.Errorf("expected failure and recovery logs, got %q", logs.String())
+	}
+
+	data, err := os.ReadFile(filepath.Join(cm.corpusDir, "corpus.json"))
+	if err != nil {
+		t.Fatalf("read corpus after recovery: %v", err)
+	}
+	var corpus CorpusFile
+	if err := json.Unmarshal(data, &corpus); err != nil {
+		t.Fatalf("decode corpus after recovery: %v", err)
+	}
+	if got := len(corpus.Entries); got != 20 {
+		t.Fatalf("persisted entries after recovery = %d, want 20", got)
+	}
 }
 
 // TestCaptureErrorIsolation verifies that capture errors don't affect concurrent requests

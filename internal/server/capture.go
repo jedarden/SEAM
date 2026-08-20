@@ -33,6 +33,12 @@ type CaptureMiddleware struct {
 	retentionLimit int
 	autoSave       bool
 	saveCount      int
+
+	// Keep serialization and persistence replaceable per middleware so tests
+	// can exercise failures that cannot be represented by CorpusFile itself.
+	// Production instances use the standard library implementations below.
+	marshalCorpus   func(CorpusFile) ([]byte, error)
+	writeCorpusFile func(string, []byte, os.FileMode) error
 }
 
 // CorpusEntry represents a single captured request/response pair
@@ -100,6 +106,10 @@ func newCaptureMiddlewareWithRetentionLimit(
 		autoSave:       autoSave,
 		retentionLimit: retentionLimit,
 		entries:        make([]CorpusEntry, 0, min(100, retentionLimit)),
+		marshalCorpus: func(corpus CorpusFile) ([]byte, error) {
+			return json.MarshalIndent(corpus, "", "  ")
+		},
+		writeCorpusFile: os.WriteFile,
 	}
 }
 
@@ -280,7 +290,13 @@ func (cm *CaptureMiddleware) Save() error {
 	}
 
 	// Marshal to JSON
-	data, err := json.MarshalIndent(corpus, "", "  ")
+	marshalCorpus := cm.marshalCorpus
+	if marshalCorpus == nil {
+		marshalCorpus = func(corpus CorpusFile) ([]byte, error) {
+			return json.MarshalIndent(corpus, "", "  ")
+		}
+	}
+	data, err := marshalCorpus(corpus)
 	if err != nil {
 		return fmt.Errorf("marshal corpus: %w", err)
 	}
@@ -292,7 +308,11 @@ func (cm *CaptureMiddleware) Save() error {
 	savePath := filepath.Join(cm.corpusDir, "corpus.json")
 
 	// Write to file
-	if err := os.WriteFile(savePath, data, 0o644); err != nil {
+	writeCorpusFile := cm.writeCorpusFile
+	if writeCorpusFile == nil {
+		writeCorpusFile = os.WriteFile
+	}
+	if err := writeCorpusFile(savePath, data, 0o644); err != nil {
 		return fmt.Errorf("write corpus file: %w", err)
 	}
 
