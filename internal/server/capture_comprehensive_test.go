@@ -496,6 +496,9 @@ func TestCaptureRequestIntegrity(t *testing.T) {
 
 	// Verify captured headers
 	for k, expectedV := range expectedHeaders {
+		if k == "Authorization" {
+			expectedV = RedactedSecret
+		}
 		capturedValues, ok := capturedRequest.Headers[k]
 		if !ok {
 			t.Errorf("Header %s not found in captured request", k)
