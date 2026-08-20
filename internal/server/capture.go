@@ -16,16 +16,23 @@ import (
 	"time"
 )
 
+// DefaultCaptureRetentionLimit bounds the number of request/response pairs
+// retained in memory and persisted to one corpus. Once the limit is reached,
+// the oldest entry is replaced by the next capture.
+const DefaultCaptureRetentionLimit = 1000
+
 // CaptureMiddleware handles HTTP request/response capture for corpus collection
 type CaptureMiddleware struct {
-	enabled   bool
-	corpusDir string
-	service   string
-	incumbent string
-	mu        sync.Mutex
-	entries   []CorpusEntry
-	autoSave  bool
-	saveCount int
+	enabled        bool
+	corpusDir      string
+	service        string
+	incumbent      string
+	mu             sync.Mutex
+	entries        []CorpusEntry
+	nextEntry      int
+	retentionLimit int
+	autoSave       bool
+	saveCount      int
 }
 
 // CorpusEntry represents a single captured request/response pair
@@ -67,13 +74,32 @@ type CorpusFile struct {
 
 // NewCaptureMiddleware creates a new capture middleware instance
 func NewCaptureMiddleware(corpusDir, service, incumbent string, autoSave bool) *CaptureMiddleware {
+	return newCaptureMiddlewareWithRetentionLimit(
+		corpusDir,
+		service,
+		incumbent,
+		autoSave,
+		DefaultCaptureRetentionLimit,
+	)
+}
+
+func newCaptureMiddlewareWithRetentionLimit(
+	corpusDir, service, incumbent string,
+	autoSave bool,
+	retentionLimit int,
+) *CaptureMiddleware {
+	if retentionLimit <= 0 {
+		retentionLimit = DefaultCaptureRetentionLimit
+	}
+
 	return &CaptureMiddleware{
-		enabled:   true,
-		corpusDir: corpusDir,
-		service:   service,
-		incumbent: incumbent,
-		autoSave:  autoSave,
-		entries:   make([]CorpusEntry, 0, 100),
+		enabled:        true,
+		corpusDir:      corpusDir,
+		service:        service,
+		incumbent:      incumbent,
+		autoSave:       autoSave,
+		retentionLimit: retentionLimit,
+		entries:        make([]CorpusEntry, 0, min(100, retentionLimit)),
 	}
 }
 
@@ -129,10 +155,9 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// Add to entries
 		cm.mu.Lock()
-		cm.entries = append(cm.entries, entry)
+		entryCount := cm.appendEntryLocked(entry)
 		cm.saveCount++
 		shouldSave := cm.autoSave && cm.saveCount%10 == 0
-		entryCount := len(cm.entries)
 		cm.mu.Unlock()
 
 		log.Printf("captured: %s %s (total %d entries)", r.Method, r.URL.Path, entryCount)
@@ -144,6 +169,36 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 			}
 		}
 	})
+}
+
+// appendEntryLocked adds an entry to the bounded in-memory ring and returns
+// the number of retained entries. Replacing the complete CorpusEntry drops all
+// references to the evicted request and response data so the garbage collector
+// can reclaim their bodies and header maps.
+func (cm *CaptureMiddleware) appendEntryLocked(entry CorpusEntry) int {
+	if len(cm.entries) < cm.retentionLimit {
+		cm.entries = append(cm.entries, entry)
+		return len(cm.entries)
+	}
+
+	cm.entries[cm.nextEntry] = entry
+	cm.nextEntry = (cm.nextEntry + 1) % cm.retentionLimit
+	return len(cm.entries)
+}
+
+// entriesInCaptureOrderLocked returns a snapshot ordered from oldest to newest.
+// entries uses a ring once it reaches the retention limit, while corpus files
+// keep their historical chronological ordering.
+func (cm *CaptureMiddleware) entriesInCaptureOrderLocked() []CorpusEntry {
+	entries := make([]CorpusEntry, len(cm.entries))
+	if len(cm.entries) < cm.retentionLimit || cm.nextEntry == 0 {
+		copy(entries, cm.entries)
+		return entries
+	}
+
+	copied := copy(entries, cm.entries[cm.nextEntry:])
+	copy(entries[copied:], cm.entries[:cm.nextEntry])
+	return entries
 }
 
 // captureRequest captures the relevant parts of an HTTP request
@@ -207,6 +262,7 @@ func (cm *CaptureMiddleware) generateEntryID(r *http.Request) string {
 func (cm *CaptureMiddleware) Save() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
+	entries := cm.entriesInCaptureOrderLocked()
 
 	// Ensure corpus directory exists
 	if err := os.MkdirAll(cm.corpusDir, 0o755); err != nil {
@@ -220,7 +276,7 @@ func (cm *CaptureMiddleware) Save() error {
 		Incumbent:   cm.incumbent,
 		CapturedAt:  time.Now().Format(time.RFC3339),
 		Description: fmt.Sprintf("%s corpus captured from incumbent proxy", cm.service),
-		Entries:     cm.entries,
+		Entries:     entries,
 	}
 
 	// Marshal to JSON
@@ -240,7 +296,7 @@ func (cm *CaptureMiddleware) Save() error {
 		return fmt.Errorf("write corpus file: %w", err)
 	}
 
-	log.Printf("corpus saved to %s (%d entries)", savePath, len(cm.entries))
+	log.Printf("corpus saved to %s (%d entries)", savePath, len(entries))
 	return nil
 }
 
@@ -265,7 +321,12 @@ func (cm *CaptureMiddleware) Load() error {
 		return fmt.Errorf("parse corpus file: %w", err)
 	}
 
-	cm.entries = corpus.Entries
+	entries := corpus.Entries
+	if len(entries) > cm.retentionLimit {
+		entries = entries[len(entries)-cm.retentionLimit:]
+	}
+	cm.entries = append(make([]CorpusEntry, 0, len(entries)), entries...)
+	cm.nextEntry = 0
 	log.Printf("loaded existing corpus (%d entries)", len(cm.entries))
 	return nil
 }
