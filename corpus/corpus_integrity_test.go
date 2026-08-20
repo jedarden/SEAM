@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // TestCorpusJSONDocumentsAreValid keeps every checked-in corpus artifact
@@ -63,31 +65,67 @@ func TestCorpusJSONDocumentsAreValid(t *testing.T) {
 	}
 }
 
+// TestDifferentialCorpusDocumentsValidateAgainstSchema proves each checked-in
+// differential corpus conforms to the versioned schema it declares. Other
+// JSON files under corpus/ are raw upstream response snapshots and therefore
+// intentionally do not use the differential corpus schema.
+func TestDifferentialCorpusDocumentsValidateAgainstSchema(t *testing.T) {
+	root := corpusDirectory(t)
+	schemaPath := filepath.Join(root, "..", "spec", "corpus-schema.json")
+	schemaRaw, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("read corpus schema: %v", err)
+	}
+	var schemaDocument any
+	if err := json.Unmarshal(schemaRaw, &schemaDocument); err != nil {
+		t.Fatalf("parse corpus schema: %v", err)
+	}
+
+	const schemaID = "https://ardenone.com/seam/corpus-schema/v1.json"
+	compiler := jsonschema.NewCompiler()
+	compiler.AssertFormat()
+	compiler.AssertContent()
+	if err := compiler.AddResource(schemaID, schemaDocument); err != nil {
+		t.Fatalf("load corpus schema: %v", err)
+	}
+	schema, err := compiler.Compile(schemaID)
+	if err != nil {
+		t.Fatalf("compile corpus schema: %v", err)
+	}
+
+	paths := differentialCorpusPaths(t, root)
+	if len(paths) == 0 {
+		t.Fatal("no differential corpus documents found")
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.ToSlash(mustRelativePath(t, root, path)), func(t *testing.T) {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read corpus: %v", err)
+			}
+			var document any
+			if err := json.Unmarshal(raw, &document); err != nil {
+				t.Fatalf("parse corpus: %v", err)
+			}
+			if err := schema.Validate(document); err != nil {
+				t.Fatalf("corpus does not validate against seam-diff-corpus/v1: %v", err)
+			}
+		})
+	}
+}
+
 // TestDifferentialCorpusRequestsAreComplete verifies the request portion of
 // the standalone differential corpus format. Responses are intentionally
 // observed during replay rather than stored in this format; the server-side
 // capture test covers the full request/response pair format.
 func TestDifferentialCorpusRequestsAreComplete(t *testing.T) {
 	root := corpusDirectory(t)
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || filepath.Ext(path) != ".json" {
-			return nil
-		}
-		base := filepath.Base(path)
-		if base != "corpus.json" && base != "corpus-template.json" {
-			return nil
-		}
-
+	for _, path := range differentialCorpusPaths(t, root) {
+		path := path
 		t.Run(filepath.ToSlash(mustRelativePath(t, root, path)), func(t *testing.T) {
 			validateDifferentialCorpus(t, path)
 		})
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk corpus directory: %v", err)
 	}
 }
 
@@ -408,4 +446,26 @@ func mustRelativePath(t *testing.T, root, path string) string {
 		t.Fatalf("relative path for %q: %v", path, err)
 	}
 	return relative
+}
+
+func differentialCorpusPaths(t *testing.T, root string) []string {
+	t.Helper()
+	var paths []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".json" {
+			return nil
+		}
+		base := filepath.Base(path)
+		if base == "corpus.json" || base == "corpus-template.json" {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk corpus directory: %v", err)
+	}
+	return paths
 }
