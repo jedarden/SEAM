@@ -53,10 +53,9 @@ policies, Kubernetes manifests — belongs in `jedarden/declarative-config` unde
 the retirement evaluator opens PRs against declarative-config to remove retired
 route fragments, so config has to be reviewable there.
 
-`declarative-config/infra/` in this repo is a **staging copy scheduled for
-removal** (`bf-2abnu`). Do not add to it and do not treat it as authoritative —
-it has already drifted from the real repo. New infra config goes to
-declarative-config directly.
+`declarative-config/infra/` in this repo is a retirement pointer only. Do not
+restore manifests there. New infrastructure configuration goes directly to the
+authoritative `declarative-config` repository paths named by that pointer.
 
 ## Beads
 
