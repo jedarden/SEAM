@@ -290,6 +290,15 @@ func (s *Server) setupRoutes() {
 	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
 	s.operatorMux.HandleFunc("/health/credentials", s.credentialsHealthHandler)
+	s.operatorMux.HandleFunc("/", s.operatorNotFoundHandler)
+}
+
+func (s *Server) operatorNotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	NotFound("Operator endpoint not found").
+		WithDetail("method", r.Method).
+		WithDetail("path", r.URL.Path).
+		WithDocsURL("/docs").
+		Write(w, r)
 }
 
 // healthzHandler returns 200 OK for liveness checks
@@ -360,7 +369,7 @@ func (s *Server) ensureMetrics() *Metrics {
 // Returns: current configuration values, spec hash, corpus status, enabled route count, and health status
 func (s *Server) configStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
 
@@ -382,8 +391,9 @@ func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.captureMiddleware.Save(); err != nil {
-		log.Printf("Failed to save corpus: %v", err)
-		NewErrorResponse(ErrCodeInternalServer, "Failed to save corpus").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeCaptureFailed, "Failed to save corpus", err)
+		logRequestError(r, "capture-save", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 
@@ -433,8 +443,9 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the spec JSON with servers populated
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
-		log.Printf("[openapi.json] Failed to get spec JSON: %v", err)
-		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load spec").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
+		logRequestError(r, "openapi-document", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 
@@ -471,16 +482,18 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch the merged OpenAPI spec from internal spec loader
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
-		log.Printf("[/docs] Failed to fetch merged spec: %v", err)
-		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load API specification").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
+		logRequestError(r, "docs-document", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 
 	// Validate that the spec is valid JSON
 	var specJSONCheck interface{}
 	if err := json.Unmarshal(specJSON, &specJSONCheck); err != nil {
-		log.Printf("[/docs] Spec validation failed - invalid JSON: %v", err)
-		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification is not valid JSON").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "API specification is not valid JSON", err)
+		logRequestError(r, "docs-document", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 
@@ -618,28 +631,24 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if path == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":   "missing_required_parameter",
-			"message": "The 'path' query parameter is required",
-			"example": "/docs/route?path=/test/get&method=GET",
-		})
+		MissingParameter("path").
+			WithDetail("location", "query").
+			WithDetail("example", "/docs/route?path=/test/get&method=GET").
+			WithDocsURL("/docs/route").
+			Write(w, r)
 		return
 	}
 
 	// Get route information from the spec loader
 	routeInfo, err := s.specLoader.GetRoute(path, method, version)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"error":   "route_not_found",
-			"message": fmt.Sprintf("Route not found: %s", err),
-			"path":    path,
-			"method":  method,
-			"version": version,
-		})
+		requestErr := WrapRequestError(ErrCodeRouteNotFound, "Requested route documentation was not found", err).
+			WithDetail("path", path).
+			WithDetail("method", method).
+			WithDetail("version", version).
+			WithDocsURL("/docs")
+		logRequestError(r, "docs-route", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 
@@ -649,12 +658,16 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// model.
 	specJSON, err := s.specLoader.GetRawJSON()
 	if err != nil {
-		NewErrorResponse(ErrCodeSpecLoadFailed, "Failed to load API specification").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
+		logRequestError(r, "docs-route", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 	var document map[string]interface{}
 	if err := json.Unmarshal(specJSON, &document); err != nil {
-		NewErrorResponse(ErrCodeSpecLoadFailed, "API specification is not valid JSON").WithDetail("error", err.Error()).Write(w, r)
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "API specification is not valid JSON", err)
+		logRequestError(r, "docs-route", requestErr)
+		requestErr.Write(w, r)
 		return
 	}
 	pathItems, ok := document["paths"].(map[string]interface{})
@@ -996,14 +1009,16 @@ func (s *Server) Start(ctx context.Context) error {
 	// Wrap with version injection middleware (outermost - adds version headers to all responses)
 	callerHandler = s.versionMiddleware(callerHandler)
 	callerHandler = s.versionInjectionMiddleware(callerHandler)
-	log.Printf("Version validation and injection middleware active on caller-facing port")
+	callerHandler = s.requestIDMiddleware(callerHandler)
+	log.Printf("Version validation, injection, and request ID middleware active on caller-facing port")
 
 	// Version validation applies to the operator listener as well. Keep header
 	// injection outermost so rejected operator requests also identify the API
 	// and spec versions that evaluated them.
 	operatorHandler := s.versionMiddleware(s.operatorMux)
 	operatorHandler = s.versionInjectionMiddleware(operatorHandler)
-	log.Printf("Version validation and injection middleware active on operator-only port")
+	operatorHandler = s.requestIDMiddleware(operatorHandler)
+	log.Printf("Version validation, injection, and request ID middleware active on operator-only port")
 
 	// Create servers
 	s.callerServer = &http.Server{
@@ -1223,10 +1238,10 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get or create proxy for this upstream
-	proxy := s.getOrCreateProxy(upstreamURL, routeMatch.Route.TLSConfig)
-	if proxy == nil {
+	proxy, err := s.getOrCreateProxyWithError(upstreamURL, routeMatch.Route.TLSConfig)
+	if err != nil {
 		// Proxy creation failed - return 503
-		s.handleProxyCreationFailed(w, r, upstreamURL)
+		s.handleProxyCreationFailed(w, r, err)
 		return
 	}
 
@@ -1240,6 +1255,14 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 // upstream cannot accidentally reuse a client configured for another route.
 // The client itself is shared by TLS identity to preserve connection pooling.
 func (s *Server) getOrCreateProxy(upstreamURL string, tlsConfigs ...*UpstreamTLSConfig) *ReverseProxy {
+	proxy, _ := s.getOrCreateProxyWithError(upstreamURL, tlsConfigs...)
+	return proxy
+}
+
+// getOrCreateProxyWithError is the error-preserving form used by the request
+// path. The compatibility wrapper above remains useful to construction-only
+// callers that only need the proxy-or-nil result.
+func (s *Server) getOrCreateProxyWithError(upstreamURL string, tlsConfigs ...*UpstreamTLSConfig) (*ReverseProxy, error) {
 	s.proxyMapMu.Lock()
 	defer s.proxyMapMu.Unlock()
 
@@ -1254,7 +1277,7 @@ func (s *Server) getOrCreateProxy(upstreamURL string, tlsConfigs ...*UpstreamTLS
 	proxyKey := upstreamProxyCacheKey(upstreamURL, tlsConfig)
 	// Check if proxy already exists
 	if proxy, exists := s.proxyMap[proxyKey]; exists {
-		return proxy
+		return proxy, nil
 	}
 
 	clientKey := upstreamTLSConfigKey(tlsConfig)
@@ -1273,8 +1296,7 @@ func (s *Server) getOrCreateProxy(upstreamURL string, tlsConfigs ...*UpstreamTLS
 			var err error
 			client, err = newUpstreamHTTPClientWithTLS(tlsConfig, upstreamCADir)
 			if err != nil {
-				log.Printf("[dispatch] Failed to create upstream client for TLS config %s: %v", clientKey, err)
-				return nil
+				return nil, fmt.Errorf("create upstream client for TLS config %s: %w", clientKey, err)
 			}
 		}
 		s.upstreamClientMap[clientKey] = client
@@ -1295,51 +1317,34 @@ func (s *Server) getOrCreateProxy(upstreamURL string, tlsConfigs ...*UpstreamTLS
 		Client:                    client,
 	})
 	if err != nil {
-		log.Printf("[dispatch] Failed to create proxy for upstream %s: %v", upstreamURL, err)
-		return nil
+		return nil, fmt.Errorf("create proxy: %w", err)
 	}
 
 	s.proxyMap[proxyKey] = proxy
 	log.Printf("[dispatch] Created new proxy for upstream %s (TLS identity %s)", upstreamURL, clientKey)
-	return proxy
+	return proxy, nil
 }
 
 // handleNotFound returns a 404 response when no route matches
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotFound)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":   "route_not_found",
-		"message": fmt.Sprintf("No route found for %s %s", r.Method, r.URL.Path),
-		"path":    r.URL.Path,
-		"method":  r.Method,
-		"docs":    "/docs",
-	})
+	RouteNotFound(r.Method, r.URL.Path).Write(w, r)
 }
 
 // handleNoUpstream returns a 503 response when no upstream is configured
 func (s *Server) handleNoUpstream(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusServiceUnavailable)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":   "no_upstream_configured",
-		"message": "No upstream URL configured for this route",
-		"path":    r.URL.Path,
-		"method":  r.Method,
-	})
+	NewErrorResponse(ErrCodeNoUpstreamConfigured, "No upstream URL configured for this route").
+		WithDetail("path", r.URL.Path).
+		WithDetail("method", r.Method).
+		Write(w, r)
 }
 
 // handleProxyCreationFailed returns a 503 response when proxy creation fails
-func (s *Server) handleProxyCreationFailed(w http.ResponseWriter, r *http.Request, upstreamURL string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusServiceUnavailable)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":        "proxy_creation_failed",
-		"message":      "Failed to create proxy for upstream",
-		"upstream_url": upstreamURL,
-		"path":         r.URL.Path,
-		"method":       r.Method,
-	})
+func (s *Server) handleProxyCreationFailed(w http.ResponseWriter, r *http.Request, cause error) {
+	requestErr := WrapRequestError(ErrCodeProxyCreationFailed, "Failed to create proxy for upstream", cause).
+		WithDetail("path", r.URL.Path).
+		WithDetail("method", r.Method)
+	logRequestError(r, "dispatch", requestErr)
+	requestErr.Write(w, r)
 }
 
 // metricsMiddleware tracks HTTP request metrics (count, latency, in-flight)

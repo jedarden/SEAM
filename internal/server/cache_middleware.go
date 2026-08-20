@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -60,12 +61,22 @@ func (s *Server) cacheMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			// Check if it's a context error (cancellation/timeout)
 			if ctxErr := ctxError(err); ctxErr != nil {
-				// Request was cancelled - return structured error
-				NewErrorResponse(ErrCodeServiceUnavailable, "Request cancelled").WithDetail("reason", "context_cancelled").Write(w, r)
+				code := ErrCodeServiceUnavailable
+				message := "Request cancelled"
+				reason := "context_cancelled"
+				if errors.Is(ctxErr, context.DeadlineExceeded) {
+					code = ErrCodeGatewayTimeout
+					message = "Upstream request timed out"
+					reason = "deadline_exceeded"
+				}
+				requestErr := WrapRequestError(code, message, err).WithDetail("reason", reason)
+				logRequestError(r, "cache-request", requestErr)
+				requestErr.Write(w, r)
 				return
 			}
-			// Some other error occurred - return structured error
-			NewErrorResponse(ErrCodeBadGateway, "Upstream request failed").WithDetail("error", err.Error()).Write(w, r)
+			requestErr := WrapRequestError(ErrCodeBadGateway, "Upstream request failed", err)
+			logRequestError(r, "cache-request", requestErr)
+			requestErr.Write(w, r)
 			return
 		}
 
@@ -123,7 +134,7 @@ func ctxError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if err == context.Canceled || err == context.DeadlineExceeded {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	return nil

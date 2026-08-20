@@ -74,7 +74,7 @@ func TestInvalidVersionReturns400WithHeaders(t *testing.T) {
 				t.Errorf("X-SEAM-API-Version = %q, want %q", apiVersion, unversionedAPIVersion)
 			}
 
-			var body invalidVersionParameterResponse
+			var body ErrorResponse
 			if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
@@ -84,11 +84,11 @@ func TestInvalidVersionReturns400WithHeaders(t *testing.T) {
 			if body.Message != "Invalid version parameter. Expected: _unversioned" {
 				t.Errorf("message = %q, want expected alphabet named explicitly", body.Message)
 			}
-			if body.ExpectedVersion != unversionedAPIVersion {
-				t.Errorf("expected_version = %q, want %q", body.ExpectedVersion, unversionedAPIVersion)
+			if body.Details["expected_version"] != unversionedAPIVersion {
+				t.Errorf("expected_version = %q, want %q", body.Details["expected_version"], unversionedAPIVersion)
 			}
-			if body.ActualVersion != "v1" {
-				t.Errorf("actual_version = %q, want v1", body.ActualVersion)
+			if body.Details["actual_version"] != "v1" {
+				t.Errorf("actual_version = %q, want v1", body.Details["actual_version"])
 			}
 		})
 	}
@@ -129,7 +129,7 @@ func TestVersionValidationIsWiredToBothListeners(t *testing.T) {
 				t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
 			}
 
-			var body invalidVersionParameterResponse
+			var body ErrorResponse
 			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
@@ -176,12 +176,12 @@ func TestVersionMiddlewareAcceptsOnlyUnversioned(t *testing.T) {
 				t.Errorf("nextCalled = %t for status %d", nextCalled, tt.wantStatus)
 			}
 			if tt.wantStatus == http.StatusBadRequest {
-				var body invalidVersionParameterResponse
+				var body ErrorResponse
 				if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 					t.Fatalf("decode response: %v", err)
 				}
-				if body.ActualVersion != tt.wantActual {
-					t.Errorf("actual_version = %q, want %q", body.ActualVersion, tt.wantActual)
+				if body.Details["actual_version"] != tt.wantActual {
+					t.Errorf("actual_version = %q, want %q", body.Details["actual_version"], tt.wantActual)
 				}
 			}
 		})

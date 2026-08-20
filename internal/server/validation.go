@@ -1,27 +1,11 @@
 package server
 
-import (
-	"encoding/json"
-	"net/http"
-)
+import "net/http"
 
-// SpecValidationResponse is the structured error response for OpenAPI spec validation failures
-type SpecValidationResponse struct {
-	Error            string                 `json:"error"`
-	Message          string                 `json:"message"`
-	ValidationErrors []ValidationFieldError `json:"validation_errors"`
-	DocsURL          string                 `json:"docs_url"`
-}
-
-// ValidationFieldError represents a single field validation error
-type ValidationFieldError struct {
-	Field         string `json:"field"`
-	ExpectedShape string `json:"expected_shape"`
-	Actual        string `json:"actual"`
-	Reason        string `json:"reason"`
-	Line          int    `json:"line,omitempty"`
-	Column        int    `json:"column,omitempty"`
-}
+// SpecValidationResponse is retained as an alias for callers that decode
+// validation errors directly. Validation failures now use the common error
+// envelope returned by every other API path.
+type SpecValidationResponse = ErrorResponse
 
 // validationMiddleware returns a middleware that validates requests against the OpenAPI spec
 // It only validates non-reserved paths (routes that will be proxied)
@@ -42,7 +26,7 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 				path = r.URL.Path
 			}
 			errJSON := validationErr.ToJSON(path, r.Method)
-			writeValidationError(w, errJSON)
+			writeValidationError(w, r, errJSON)
 			return
 		}
 
@@ -52,14 +36,11 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 }
 
 // writeValidationError writes a structured 400 error response
-func writeValidationError(w http.ResponseWriter, validationErrors map[string]interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-
-	response := SpecValidationResponse{
-		Error:   getStringField(validationErrors, "error"),
-		Message: getStringField(validationErrors, "message"),
-		DocsURL: getStringField(validationErrors, "docs_url"),
-	}
+func writeValidationError(w http.ResponseWriter, r *http.Request, validationErrors map[string]interface{}) {
+	response := NewErrorResponse(
+		ErrCodeValidationFailed,
+		getStringField(validationErrors, "message"),
+	).WithDocsURL(getStringField(validationErrors, "docs_url"))
 
 	// Handle validation errors array
 	if validationErrorsSlice, ok := validationErrors["validation_errors"].([]map[string]interface{}); ok {
@@ -74,12 +55,10 @@ func writeValidationError(w http.ResponseWriter, validationErrors map[string]int
 			})
 		}
 	}
-	if response.ValidationErrors == nil {
-		response.ValidationErrors = []ValidationFieldError{}
+	if response.Message == "" {
+		response.Message = "Request does not conform to the OpenAPI specification"
 	}
-
-	w.WriteHeader(http.StatusBadRequest)
-	_ = json.NewEncoder(w).Encode(response)
+	response.Write(w, r)
 }
 
 // getStringField safely extracts a string field from a map

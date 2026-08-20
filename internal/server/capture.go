@@ -175,7 +175,11 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 		// Auto-save every 10 entries
 		if shouldSave {
 			if err := cm.Save(); err != nil {
-				log.Printf("failed to auto-save corpus: %v", err)
+				logRequestError(r, "capture-auto-save", WrapRequestError(
+					ErrCodeCaptureFailed,
+					"failed to auto-save corpus",
+					err,
+				))
 			}
 		}
 	})

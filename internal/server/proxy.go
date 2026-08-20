@@ -738,8 +738,8 @@ func StreamResponse(w http.ResponseWriter, resp *http.Response) error {
 }
 
 func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err error, phase string) {
-	log.Printf("[proxy] Error during %s: %v", phase, err)
 	if responseStarted(w) {
+		log.Printf("[proxy] Error after response started during %s: %v", phase, err)
 		return
 	}
 
@@ -752,7 +752,9 @@ func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err e
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 		}
 	}
-	NewErrorResponse(code, message).Write(w, r)
+	requestErr := WrapRequestError(code, message, err)
+	logRequestError(r, "proxy-"+phase, requestErr)
+	requestErr.Write(w, r)
 }
 
 // responseWriterTracker records whether a response has been committed so an
