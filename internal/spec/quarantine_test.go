@@ -200,6 +200,86 @@ func TestFragmentQuarantinePathCollisions(t *testing.T) {
 	}
 }
 
+// TestFragmentLoaderSkipsKubernetesAtomicWriterEntries verifies that a
+// ConfigMap-mounted fragment is loaded only through its canonical symlink,
+// not again from Kubernetes' ..<timestamp> directory or ..data symlink.
+func TestFragmentLoaderSkipsKubernetesAtomicWriterEntries(t *testing.T) {
+	fragmentsDir := filepath.Join(t.TempDir(), "fragments.d")
+	ownerDir := filepath.Join(fragmentsDir, "argocd-ro")
+	timestampName := "..2026_08_19_06_32_37.3941861081"
+	timestampDir := filepath.Join(ownerDir, timestampName)
+	fragmentName := "argocd-read-only-proxy.yaml"
+
+	if err := os.MkdirAll(timestampDir, 0755); err != nil {
+		t.Fatalf("Failed to create ConfigMap timestamp directory: %v", err)
+	}
+
+	fragment := `{
+		"openapi": "3.1.0",
+		"info": {"title": "ArgoCD read-only proxy", "version": "1.0.0"},
+		"paths": {"/api/v1/applications": {"get": {"summary": "List applications"}}},
+		"x-seam-owner": "argocd-ro"
+	}`
+	realFragmentPath := filepath.Join(timestampDir, fragmentName)
+	if err := os.WriteFile(realFragmentPath, []byte(fragment), 0644); err != nil {
+		t.Fatalf("Failed to write projected fragment: %v", err)
+	}
+
+	if err := os.Symlink(timestampName, filepath.Join(ownerDir, "..data")); err != nil {
+		t.Fatalf("Failed to create ..data symlink: %v", err)
+	}
+	canonicalPath := filepath.Join(ownerDir, fragmentName)
+	if err := os.Symlink(filepath.Join("..data", fragmentName), canonicalPath); err != nil {
+		t.Fatalf("Failed to create canonical fragment symlink: %v", err)
+	}
+
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths", "x-seam-owner"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"},
+			"x-seam-owner": {"type": "string"}
+		}
+	}`
+	schemaPath := filepath.Join(t.TempDir(), "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+	loader.DetectPathCollisions()
+
+	if got := loader.GetValidFragmentCount(); got != 1 {
+		t.Errorf("Expected 1 valid fragment, got %d", got)
+	}
+	if got := loader.GetQuarantinedCount(); got != 0 {
+		t.Errorf("Expected 0 quarantined fragments, got %d", got)
+	}
+
+	statuses, ok := loader.GetFragmentStatus()["fragments"].([]FragmentStatus)
+	if !ok || len(statuses) != 1 {
+		t.Fatalf("Expected exactly one fragment status, got %#v", loader.GetFragmentStatus()["fragments"])
+	}
+	if statuses[0].SourceFile != canonicalPath {
+		t.Errorf("Expected canonical source path %s, got %s", canonicalPath, statuses[0].SourceFile)
+	}
+	if statuses[0].Owner != "argocd-ro" {
+		t.Errorf("Expected canonical owner argocd-ro, got %s", statuses[0].Owner)
+	}
+}
+
 // TestFragmentCollisionKeyAllowsMethodAndVersionCoexistence verifies that
 // different methods and API versions do not collide on the same path.
 func TestFragmentCollisionKeyAllowsMethodAndVersionCoexistence(t *testing.T) {

@@ -86,6 +86,19 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 			return err
 		}
 
+		// Kubernetes projects ConfigMap volumes through an atomic-writer layout:
+		// a real ..<timestamp> directory, a ..data symlink to that directory,
+		// and canonical fragment symlinks through ..data. Ignore every internal
+		// entry so the timestamped copy is not loaded alongside its canonical
+		// fragment path. filepath.Walk does not follow the ..data symlink, but
+		// handling all .. entries here keeps that behavior explicit.
+		if path != fragmentsDir && strings.HasPrefix(info.Name(), "..") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if info.IsDir() {
 			return nil
 		}
