@@ -7,16 +7,19 @@
   "x-seam-owner": "weather-service",
 
   "x-loop-guard": {
-    "max_depth": 10,
-    "max_redirects": 5
+    "maxRepeats": 10,
+    "window": "1h"
   },
 
-  "x-cost-per-call": 0.001,
+  "x-cost-per-call": {
+    "amount": 0.001,
+    "unit": "credits"
+  },
 
   "x-quota": {
-    "limit": 1000,
-    "window": "1h",
-    "scope": "per-token"
+    "amount": 1000,
+    "unit": "credits",
+    "window": "1h"
   },
 
   "x-upstream-map": {
@@ -54,15 +57,18 @@
         "summary": "Update forecast data with higher cost and stricter limits",
         "operationId": "updateForecast",
         "x-required-scope": ["weather:write"],
-        "x-cost-per-call": 0.01,
+        "x-cost-per-call": {
+          "amount": 0.01,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 100,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 100,
+          "unit": "credits",
+          "window": "1h"
         },
         "x-loop-guard": {
-          "max_depth": 5,
-          "max_redirects": 3
+          "maxRepeats": 5,
+          "window": "30m"
         },
 
         "responses": {
@@ -80,7 +86,10 @@
         "summary": "Get current weather conditions",
         "operationId": "getCurrentConditions",
         "x-required-scope": ["weather:read"],
-        "x-cost-per-call": 0.002,
+        "x-cost-per-call": {
+          "amount": 0.002,
+          "unit": "credits"
+        },
 
         "responses": {
           "200": {

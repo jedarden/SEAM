@@ -3,6 +3,7 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/url"
 	"os"
@@ -25,7 +26,8 @@ const (
 )
 
 var (
-	apiVersionPattern = regexp.MustCompile(`^v[1-9][0-9]*$`)
+	apiVersionPattern  = regexp.MustCompile(`^v[1-9][0-9]*$`)
+	guardWindowPattern = regexp.MustCompile(`^([0-9]+)([smhd])$`)
 
 	reservedExactPaths = map[string]struct{}{
 		"/docs":               {},
@@ -322,6 +324,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
 	f.checkPathRewrite(report)
+	f.checkRouteGuards(report)
 }
 
 func (f *lintFragment) addError(report *LintReport, code, message string) {
@@ -580,6 +583,129 @@ func (f *lintFragment) checkUnscrubbable(report *LintReport) {
 			}
 		}
 	}
+}
+
+func (f *lintFragment) checkRouteGuards(report *LintReport) {
+	for _, message := range quotaUnitMismatchMessages(f.data) {
+		f.addError(report, "quota.unit-mismatch", message)
+	}
+	f.warnLongGuardWindow(report, f.data, "x-loop-guard", "fragment-root x-loop-guard.window")
+	f.warnLongGuardWindow(report, f.data, "x-quota", "fragment-root x-quota.window")
+
+	paths, ok := f.data["paths"].(map[string]any)
+	if !ok {
+		return
+	}
+	for path, pathValue := range paths {
+		pathItem, ok := pathValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, ok := operationValue.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			context := strings.ToUpper(method) + " " + path
+			f.warnLongGuardWindow(report, operation, "x-loop-guard", context+" x-loop-guard.window")
+			f.warnLongGuardWindow(report, operation, "x-quota", context+" x-quota.window")
+		}
+	}
+}
+
+func guardUnit(container map[string]any, field string) (string, bool) {
+	guard, ok := container[field].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	unit, ok := guard["unit"].(string)
+	return unit, ok
+}
+
+func quotaUnitMismatchMessages(fragment map[string]any) []string {
+	var messages []string
+	rootCostUnit, rootCostValid := guardUnit(fragment, "x-cost-per-call")
+	rootQuotaUnit, rootQuotaValid := guardUnit(fragment, "x-quota")
+	if rootCostValid && rootQuotaValid && rootCostUnit != rootQuotaUnit {
+		messages = append(messages, fmt.Sprintf("fragment-root x-quota.unit %q must be byte-identical to x-cost-per-call.unit %q", rootQuotaUnit, rootCostUnit))
+	}
+
+	paths, ok := fragment["paths"].(map[string]any)
+	if !ok {
+		return messages
+	}
+	for path, pathValue := range paths {
+		pathItem, ok := pathValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, ok := operationValue.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			operationCostUnit, operationCostValid := guardUnit(operation, "x-cost-per-call")
+			operationQuotaUnit, operationQuotaValid := guardUnit(operation, "x-quota")
+			_, operationCostPresent := operation["x-cost-per-call"]
+			_, operationQuotaPresent := operation["x-quota"]
+			switch {
+			case operationQuotaPresent && operationQuotaValid && operationCostPresent && operationCostValid:
+				messages = appendQuotaUnitMismatch(messages, path, method, operationQuotaUnit, operationCostUnit, "operation-level x-cost-per-call")
+			case operationQuotaPresent && operationQuotaValid && !operationCostPresent && rootCostValid:
+				messages = appendQuotaUnitMismatch(messages, path, method, operationQuotaUnit, rootCostUnit, "fragment-root x-cost-per-call default")
+			case !operationQuotaPresent && rootQuotaValid && operationCostPresent && operationCostValid:
+				messages = appendQuotaUnitMismatch(messages, path, method, rootQuotaUnit, operationCostUnit, "operation-level x-cost-per-call")
+			}
+		}
+	}
+	sort.Strings(messages)
+	return messages
+}
+
+func appendQuotaUnitMismatch(messages []string, path, method, quotaUnit, costUnit, costSource string) []string {
+	if quotaUnit == costUnit {
+		return messages
+	}
+	return append(messages, fmt.Sprintf("x-quota.unit %q on %s %s must be byte-identical to %s unit %q", quotaUnit, strings.ToUpper(method), path, costSource, costUnit))
+}
+
+func (f *lintFragment) warnLongGuardWindow(report *LintReport, container map[string]any, field, location string) {
+	guard, ok := container[field].(map[string]any)
+	if !ok {
+		return
+	}
+	window, ok := guard["window"].(string)
+	if !ok || !guardWindowExceeds168Hours(window) {
+		return
+	}
+	f.addWarning(report, "guard.window-over-168h", fmt.Sprintf("%s %q exceeds 168h; tumbling guard state resets on process restart", location, window))
+}
+
+func guardWindowExceeds168Hours(window string) bool {
+	matches := guardWindowPattern.FindStringSubmatch(window)
+	if matches == nil {
+		return false
+	}
+	amount, ok := new(big.Int).SetString(matches[1], 10)
+	if !ok {
+		return false
+	}
+	secondsPerUnit := map[string]int64{
+		"s": 1,
+		"m": 60,
+		"h": 60 * 60,
+		"d": 24 * 60 * 60,
+	}
+	seconds := new(big.Int).Mul(amount, big.NewInt(secondsPerUnit[matches[2]]))
+	return seconds.Cmp(big.NewInt(168*60*60)) > 0
 }
 
 type lintCollisionKey struct {

@@ -50,9 +50,9 @@
     "x-unscrubbable": { "$ref": "#/$defs/acknowledged", "$comment": "Allowed at fragment-root OR operation level. Acknowledgement that a route runs unscrubbed (response cannot be scanned for echoed secrets)." },
     "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." },
 
-    "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for loop protection. Applied to all operations unless overridden at operation level. Prevents infinite recursion and excessive redirect chains." },
-    "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default cost per call in USD. Applied to all operations unless overridden at operation level. Used for quota tracking and cost monitoring. Must be non-negative with max 2 decimal places." },
-    "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default quota for rate limiting based on accumulated cost. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." }
+    "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for repeated-identical-request loop protection. Applied to all operations unless overridden at operation level." },
+    "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default unit-bearing cost per call. Applied to all operations unless overridden at operation level. SEAM never converts between units." },
+    "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default unit-bearing budget in a tumbling, restart-scoped window. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." }
   },
 
   "allOf": [
@@ -65,7 +65,8 @@
     { "$ref": "#/$defs/constraint-vault-inject-paired" },
     { "$ref": "#/$defs/constraint-passthrough-has-no-probe" },
     { "$ref": "#/$defs/constraint-plaintext-required-on-http" },
-    { "$ref": "#/$defs/constraint-plaintext-excludes-map" }
+    { "$ref": "#/$defs/constraint-plaintext-excludes-map" },
+    { "$ref": "#/$defs/constraint-quota-unit-matches-cost" }
   ],
 
   "$defs": {
@@ -175,37 +176,36 @@
     },
     "loopGuard": {
       "type": "object",
-      "description": "Rate limiting and monitoring field for loop protection. Applied at fragment-root default or operation-level override.",
-      "required": ["max_depth", "max_redirects"],
+      "description": "Repeated-identical-request loop protection. Applied at fragment-root default or operation-level override.",
+      "required": ["maxRepeats", "window"],
       "properties": {
-        "max_depth": { "type": "integer", "minimum": 1, "description": "Maximum recursion depth allowed before the loop guard intervenes. Must be at least 1." },
-        "max_redirects": { "type": "integer", "minimum": 0, "description": "Maximum number of HTTP redirects allowed before the loop guard intervenes. Zero means no redirects allowed." }
+        "maxRepeats": { "type": "integer", "minimum": 1, "description": "Identical failing requests tolerated within one window before the loop guard intervenes." },
+        "window": { "$ref": "#/$defs/duration", "description": "Tumbling window anchored at process start; a restart clears it." }
       },
       "additionalProperties": false,
-      "$comment": "Fragment-root default applied to all operations unless overridden at operation level. Prevents infinite loops and excessive redirect chains."
+      "$comment": "A 2xx response clears the counter for the same normalized request hash (runtime, Phase 13.1). A value above 168h is a lint WARNING, not a schema failure."
     },
     "costPerCall": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Cost per call in USD. Used for quota tracking and cost monitoring. Must be non-negative with maximum 2 decimal places.",
-      "pattern": "^\\d+(\\.\\d{1,2})?$",
-      "$comment": "Cost per call in USD with max 2 decimal places. Must be non-negative (negative costs rejected). Pattern enforces max 2 decimal places."
+      "type": "object",
+      "description": "Unit-bearing cost per upstream call. SEAM performs arithmetic only within one byte-identical unit and never converts between units.",
+      "required": ["amount", "unit"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0, "description": "Non-negative amount charged per dispatched upstream call." },
+        "unit": { "type": "string", "minLength": 1, "description": "Opaque non-empty unit label, for example credits, USD, or requests." }
+      },
+      "additionalProperties": false
     },
     "quota": {
       "type": "object",
-      "description": "Rate limiting quota for controlling request volume based on cost. Requires x-cost-per-call when specified at fragment-root or operation level.",
-      "required": ["limit", "window"],
+      "description": "Unit-bearing budget enforced over a tumbling, restart-scoped window. Requires x-cost-per-call when specified at fragment-root or operation level.",
+      "required": ["amount", "unit", "window"],
       "properties": {
-        "limit": { "type": "integer", "minimum": 1, "description": "Maximum number of cost units allowed within the time window. Must be at least 1." },
-        "window": { "$ref": "#/$defs/duration", "description": "Time window as RFC3339 duration (e.g., '60s', '5m', '1h'). Tumbling window anchored at process start." },
-        "scope": {
-          "type": "string",
-          "enum": ["global", "per-token", "per-user", "per-route"],
-          "description": "Scope of quota enforcement. Default is 'global' if not specified."
-        }
+        "amount": { "type": "number", "minimum": 0, "description": "Non-negative budget restored at the start of each window." },
+        "unit": { "type": "string", "minLength": 1, "description": "Opaque non-empty unit label; must byte-match the effective x-cost-per-call.unit." },
+        "window": { "$ref": "#/$defs/duration", "description": "Tumbling window anchored at process start; a restart restores the budget." }
       },
       "additionalProperties": false,
-      "$comment": "Fragment-root default applied to all operations unless overridden at operation level. Requires x-cost-per-call to be meaningful."
+      "$comment": "Fragment-root default applied to all operations unless overridden at operation level. A value above 168h is a lint WARNING, not a schema failure."
     },
     "credentialProbe": {
       "type": "object",
@@ -314,7 +314,8 @@
       },
       "additionalProperties": true,
       "allOf": [
-        { "$ref": "#/$defs/constraint-quota-requires-cost" }
+        { "$ref": "#/$defs/constraint-quota-requires-cost" },
+        { "$ref": "#/$defs/constraint-quota-unit-matches-cost" }
       ]
     },
 
@@ -322,6 +323,11 @@
       "if": { "required": ["x-quota"] },
       "then": { "required": ["x-cost-per-call"] },
       "$comment": "A budget with no per-call draw can never be decremented, so it caps nothing while reading as though it does."
+    },
+    "constraint-quota-unit-matches-cost": {
+      "if": { "required": ["x-quota", "x-cost-per-call"] },
+      "then": {},
+      "$comment": "Declares the byte-identical x-quota.unit == x-cost-per-call.unit invariant at fragment-root and operation levels. Draft 2020-12 cannot compare arbitrary instance strings, so internal/spec enforces this declaration, including an operation x-quota against a fragment-root x-cost-per-call default."
     },
     "constraint-entry-vault-inject-paired": {
       "if": { "anyOf": [{}] },

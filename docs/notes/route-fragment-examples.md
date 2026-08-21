@@ -75,13 +75,15 @@ x-seam-deprecated:
   since: "2026-08-01"
   sunset: "2026-12-31"
 x-loop-guard:
-  max_depth: 5
-  max_redirects: 3
-x-cost-per-call: 0.001
+  maxRepeats: 5
+  window: 10m
+x-cost-per-call:
+  amount: 0.001
+  unit: credits
 x-quota:
-  limit: 1000
+  amount: 1000
+  unit: credits
   window: 1h
-  scope: per-token
 x-unscrubbable: acknowledged
 
 paths:
@@ -91,11 +93,14 @@ paths:
       operationId: getForecast
       x-required-scope: weather:forecast
       x-loop-guard:
-        max_depth: 10
-        max_redirects: 0
-      x-cost-per-call: 0.005
+        maxRepeats: 10
+        window: 10m
+      x-cost-per-call:
+        amount: 0.005
+        unit: credits
       x-quota:
-        limit: 100
+        amount: 100
+        unit: credits
         window: 1h
       parameters:
         - name: location
@@ -122,9 +127,10 @@ paths:
 - `x-credential-probe` present because credentials are injected
 - `x-upstream-tls` provides custom CA configuration
 - `x-seam-deprecated` includes required `since` date and optional `sunset`
-- `x-loop-guard` has both `max_depth` (minimum 1) and `max_redirects` (minimum 0)
-- `x-cost-per-call` is non-negative with max 2 decimal places
+- `x-loop-guard` has both `maxRepeats` (minimum 1) and a duration `window`
+- `x-cost-per-call.amount` is non-negative and carries the opaque unit `credits`
 - `x-quota` requires `x-cost-per-call` (constraint satisfied)
+- `x-quota.unit` byte-matches `x-cost-per-call.unit`
 - Operation-level extensions override fragment-level defaults
 
 ---
@@ -381,14 +387,15 @@ paths:
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
-x-quota:
-  limit: 1000
-  window: 1h
-# Missing x-cost-per-call
 
 paths:
   /api/v1/data:
     get:
+      x-quota:
+        amount: 1000
+        unit: credits
+        window: 1h
+      # Missing x-cost-per-call
       responses:
         "200":
           description: OK
@@ -457,7 +464,9 @@ paths:
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
-x-cost-per-call: -0.001
+x-cost-per-call:
+  amount: -0.001
+  unit: credits
 
 paths:
   /api/v1/data:
@@ -468,21 +477,21 @@ paths:
 ```
 
 **What's wrong:**
-- `x-cost-per-call` is negative (must be >= 0)
+- `x-cost-per-call.amount` is negative (must be >= 0)
 
 ---
 
 ### 2.9 Invalid: Loop Guard Missing Required Fields
 
-**Expected error:** `x-loop-guard` requires `max_depth` and `max_redirects`
+**Expected error:** `x-loop-guard` requires `maxRepeats` and `window`
 
 ```yaml
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
 x-loop-guard:
-  max_depth: 5
-# Missing max_redirects
+  maxRepeats: 5
+# Missing window
 
 paths:
   /api/v1/data:
@@ -493,7 +502,7 @@ paths:
 ```
 
 **What's wrong:**
-- `x-loop-guard` is missing required field `max_redirects`
+- `x-loop-guard` is missing required field `window`
 
 ---
 
@@ -526,17 +535,17 @@ paths:
 
 ## Part 3: Edge Cases
 
-### 3.1 Edge Case: Zero Max Redirects
+### 3.1 Edge Case: Exact Seven-Day Loop Window
 
-Legal value for `x-loop-guard.max_redirects` (minimum is 0).
+`168h` is valid and does not trigger the warning reserved for longer windows.
 
 ```yaml
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
 x-loop-guard:
-  max_depth: 5
-  max_redirects: 0
+  maxRepeats: 5
+  window: 168h
 
 paths:
   /api/v1/data:
@@ -556,7 +565,9 @@ Legal value for `x-cost-per-call` (minimum is 0).
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
-x-cost-per-call: 0
+x-cost-per-call:
+  amount: 0
+  unit: requests
 
 paths:
   /api/v1/data:
@@ -598,8 +609,12 @@ Legal but large duration window.
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
+x-cost-per-call:
+  amount: 1
+  unit: requests
 x-quota:
-  limit: 10000
+  amount: 10000
+  unit: requests
   window: 168h
 
 paths:

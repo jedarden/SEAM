@@ -16,13 +16,16 @@ paths:
       summary: Run ML model inference
       tags:
         - Inference
-      x-cost-per-call: 0.001
+      x-cost-per-call:
+        amount: 0.001
+        unit: credits
       x-quota:
-        limit: 1000
+        amount: 1000
+        unit: credits
         window: 1h
       x-loop-guard:
-        max_depth: 5
-        max_redirects: 0
+        maxRepeats: 5
+        window: 10m
       requestBody:
         required: true
         content:
@@ -71,13 +74,16 @@ paths:
       summary: Run ML model inference on multiple inputs
       tags:
         - Inference
-      x-cost-per-call: 0.005
+      x-cost-per-call:
+        amount: 0.005
+        unit: credits
       x-quota:
-        limit: 500
+        amount: 500
+        unit: credits
         window: 1h
       x-loop-guard:
-        max_depth: 3
-        max_redirects: 0
+        maxRepeats: 3
+        window: 10m
       requestBody:
         required: true
         content:

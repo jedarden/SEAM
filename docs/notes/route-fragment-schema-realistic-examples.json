@@ -318,10 +318,14 @@
               "summary": "Get weather forecast with cost and quota",
               "description": "Fetch weather forecast for a specific event. Each call costs 0.005 units against a 100-unit hourly quota (20 calls/hour max).",
               "operationId": "getForecast",
-              "x-cost-per-call": 0.005,
+              "x-cost-per-call": {
+                "amount": 0.005,
+                "unit": "credits"
+              },
               "x-quota": {
-                "limit": 100,
-                "window_seconds": 3600
+                "amount": 100,
+                "unit": "credits",
+                "window": "1h"
               },
               "parameters": [
                 {
@@ -366,10 +370,14 @@
               "summary": "Batch forecast requests with higher cost",
               "description": "Request multiple forecasts at once. Higher cost per call (0.02) against a larger hourly quota (500 units).",
               "operationId": "batchForecasts",
-              "x-cost-per-call": 0.02,
+              "x-cost-per-call": {
+                "amount": 0.02,
+                "unit": "credits"
+              },
               "x-quota": {
-                "limit": 500,
-                "window_seconds": 3600
+                "amount": 500,
+                "unit": "credits",
+                "window": "1h"
               },
               "requestBody": {
                 "required": true,
@@ -478,13 +486,17 @@
               "description": "Fetch weather forecast for a specific region instance. Demonstrates loop guard, cost tracking, and quota limits working together.",
               "operationId": "getForecastByRegion",
               "x-loop-guard": {
-                "max_iterations": 5,
-                "backoff_ms": 10000
+                "maxRepeats": 5,
+                "window": "10s"
               },
-              "x-cost-per-call": 0.001,
+              "x-cost-per-call": {
+                "amount": 0.001,
+                "unit": "credits"
+              },
               "x-quota": {
-                "limit": 1000,
-                "window_seconds": 3600
+                "amount": 1000,
+                "unit": "credits",
+                "window": "1h"
               },
               "parameters": [
                 {
@@ -520,16 +532,20 @@
           "/{region}/historical": {
             "get": {
               "summary": "Get historical weather data (stricter limits)",
-              "description": "Historical data endpoint with stricter loop guard (3 iterations max) and higher cost (0.005 per call).",
+              "description": "Historical data endpoint with stricter loop guard (3 repeated failures max per window) and higher cost (0.005 credits per call).",
               "operationId": "getHistoricalData",
               "x-loop-guard": {
-                "max_iterations": 3,
-                "backoff_ms": 30000
+                "maxRepeats": 3,
+                "window": "30s"
               },
-              "x-cost-per-call": 0.005,
+              "x-cost-per-call": {
+                "amount": 0.005,
+                "unit": "credits"
+              },
               "x-quota": {
-                "limit": 200,
-                "window_seconds": 3600
+                "amount": 200,
+                "unit": "credits",
+                "window": "1h"
               },
               "parameters": [
                 {
