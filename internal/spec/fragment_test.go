@@ -942,3 +942,187 @@ func TestReservedPathCaseSensitivity(t *testing.T) {
 		})
 	}
 }
+
+// TestKubernetesConfigMapLayout tests that fragments mounted from Kubernetes ConfigMaps
+// are loaded exactly once, ignoring the timestamped atomic-update directory.
+// This verifies the fix for the duplicate fragment quarantine issue.
+func TestKubernetesConfigMapLayout(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	// Create a ConfigMap-shaped mount layout:
+	// fragments.d/argocd-ro/
+	//   ..2026_08_19_06_32_37.3941861081/  (timestamped directory)
+	//     argocd-read-only-proxy.yaml
+	//   ..data -> ..2026_08_19_06_32_37.3941861081  (symlink)
+	//   argocd-read-only-proxy.yaml -> ..data/argocd-read-only-proxy.yaml  (canonical symlink)
+
+	serviceDir := filepath.Join(fragmentsDir, "argocd-ro")
+	if err := os.MkdirAll(serviceDir, 0755); err != nil {
+		t.Fatalf("Failed to create service directory: %v", err)
+	}
+
+	// Create the timestamped directory (the actual data directory)
+	timestampedDir := filepath.Join(serviceDir, "..2026_08_19_06_32_37.3941861081")
+	if err := os.Mkdir(timestampedDir, 0755); err != nil {
+		t.Fatalf("Failed to create timestamped directory: %v", err)
+	}
+
+	// Create the actual fragment file in the timestamped directory
+	fragmentContent := `{
+		"openapi": "3.1.0",
+		"info": {"title": "ArgoCD Read-Only Proxy", "version": "1.0.0"},
+		"paths": {
+			"/api/v1": {
+				"get": {"summary": "Get API v1"}
+			}
+		},
+		"x-seam-owner": "argocd-ro",
+		"x-api-version": "v1"
+	}`
+	actualFragmentPath := filepath.Join(timestampedDir, "argocd-read-only-proxy.yaml")
+	if err := os.WriteFile(actualFragmentPath, []byte(fragmentContent), 0644); err != nil {
+		t.Fatalf("Failed to write actual fragment: %v", err)
+	}
+
+	// Create the ..data symlink pointing to the timestamped directory
+	dataSymlinkPath := filepath.Join(serviceDir, "..data")
+	if err := os.Symlink("..2026_08_19_06_32_37.3941861081", dataSymlinkPath); err != nil {
+		t.Fatalf("Failed to create ..data symlink: %v", err)
+	}
+
+	// Create the canonical symlink through ..data
+	canonicalSymlinkPath := filepath.Join(serviceDir, "argocd-read-only-proxy.yaml")
+	if err := os.Symlink("..data/argocd-read-only-proxy.yaml", canonicalSymlinkPath); err != nil {
+		t.Fatalf("Failed to create canonical symlink: %v", err)
+	}
+
+	// Load the fragments
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+
+	if err := loader.LoadDirectory(fragmentsDir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if err := loader.ValidateFragments(schemaPath); err != nil {
+		t.Fatalf("ValidateFragments failed: %v", err)
+	}
+
+	// The fragment should be loaded exactly once (via the canonical symlink)
+	// The timestamped directory should be skipped, so no duplicate is loaded
+	if loader.GetValidFragmentCount() != 1 {
+		t.Errorf("Expected 1 valid fragment, got %d", loader.GetValidFragmentCount())
+	}
+	if loader.GetQuarantinedCount() != 0 {
+		t.Errorf("Expected 0 quarantined fragments, got %d", loader.GetQuarantinedCount())
+		quarantined := loader.GetQuarantined()
+		for _, q := range quarantined {
+			t.Logf("Quarantined fragment: %s, reasons: %v", q.SourceFile, q.QuarantineReasons)
+		}
+	}
+
+	// Verify the loaded fragment has the correct owner
+	validFragments := loader.fragments
+	if len(validFragments) != 1 {
+		t.Fatalf("Expected exactly 1 valid fragment, got %d", len(validFragments))
+	}
+	if validFragments[0].Owner != "argocd-ro" {
+		t.Errorf("Expected fragment owner to be 'argocd-ro', got '%s'", validFragments[0].Owner)
+	}
+}
+
+// TestKubernetesInternalDirectoriesSkipped tests that various Kubernetes internal
+// directory names are all properly skipped during fragment loading.
+func TestKubernetesInternalDirectoriesSkipped(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	schemaDir := t.TempDir()
+
+	schema := `{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"required": ["openapi", "info", "paths"],
+		"properties": {
+			"openapi": {"type": "string"},
+			"info": {"type": "object"},
+			"paths": {"type": "object"}
+		}
+	}`
+	schemaPath := filepath.Join(schemaDir, "schema.json")
+	if err := os.WriteFile(schemaPath, []byte(schema), 0644); err != nil {
+		t.Fatalf("Failed to write schema: %v", err)
+	}
+
+	// Test various Kubernetes-internal directory patterns
+	internalDirNames := []string{
+		"..2026_08_19_06_32_37.3941861081",
+		"..2026_08_20_00_00_00.1234567890",
+		"..2025_12_31_23_59_59.9999999999",
+		"..data",
+		"..backup",
+		"..tmp",
+	}
+
+	for _, internalDir := range internalDirNames {
+		serviceDir := filepath.Join(fragmentsDir, "test-service")
+		if err := os.MkdirAll(serviceDir, 0755); err != nil {
+			t.Fatalf("Failed to create service directory: %v", err)
+		}
+
+		// Create the internal directory with a fragment inside
+		internalPath := filepath.Join(serviceDir, internalDir)
+		if err := os.Mkdir(internalPath, 0755); err != nil {
+			t.Fatalf("Failed to create internal directory %s: %v", internalDir, err)
+		}
+
+		fragmentContent := fmt.Sprintf(`{
+			"openapi": "3.1.0",
+			"info": {"title": "Test", "version": "1.0.0"},
+			"paths": {"/test": {"get": {"summary": "Test"}}},
+			"x-seam-owner": "wrong-owner",
+			"x-api-version": "v1"
+		}`)
+		fragmentPath := filepath.Join(internalPath, "fragment.yaml")
+		if err := os.WriteFile(fragmentPath, []byte(fragmentContent), 0644); err != nil {
+			t.Fatalf("Failed to write fragment in internal dir: %v", err)
+		}
+
+		// Load and verify the fragment inside the internal directory is skipped
+		loader, err := NewFragmentLoader()
+		if err != nil {
+			t.Fatalf("Failed to create fragment loader: %v", err)
+		}
+
+		if err := loader.LoadDirectory(fragmentsDir); err != nil {
+			t.Fatalf("Failed to load fragments: %v", err)
+		}
+
+		if loader.GetValidFragmentCount() != 0 {
+			t.Errorf("Internal directory %s: expected 0 valid fragments (should be skipped), got %d", internalDir, loader.GetValidFragmentCount())
+		}
+
+		// Clean up for next iteration
+		if err := os.RemoveAll(serviceDir); err != nil {
+			t.Fatalf("Failed to clean up service directory: %v", err)
+		}
+	}
+}
