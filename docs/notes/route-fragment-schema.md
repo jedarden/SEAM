@@ -75,9 +75,9 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | Field | Shape (→ `$def`) | Notes |
 |---|---|---|
 | `x-required-scope` | `scopeArray` | **The authority** wherever both root and operation are present; *replaces* the root default. Per-method granularity is what makes the visible-but-not-invocable 403 expressible. |
-| `x-loop-guard` | `loopGuard` | `{max_depth, max_redirects}`. Prevents infinite recursion and excessive redirect chains. `max_depth >= 1`, `max_redirects >= 0`. Absent = no loop guard on that route. |
-| `x-cost-per-call` | `costPerCall` | Number (>= 0) in USD with max 2 decimal places. Required if `x-quota` is present. Used for quota tracking and cost monitoring. |
-| `x-quota` | `quota` | `{limit, window, scope}`. Rate limiting quota based on accumulated cost. `limit >= 1`, `window` in RFC3339 duration (e.g., '60s', '5m'), `scope` enum (global, per-token, per-user, per-route). Requires `x-cost-per-call` (schema-encoded). |
+| `x-loop-guard` | `loopGuard` | `{maxRepeats, window}`. `maxRepeats` is a positive integer; `window` matches `^[0-9]+(s|m|h|d)$` and is tumbling/restart-scoped. A 2xx response clears the same request hash's counter at runtime. Absent = no loop guard on that route. |
+| `x-cost-per-call` | `costPerCall` | `{amount, unit}`. `amount` is a number >= 0; `unit` is a non-empty opaque string such as `credits`, `USD`, or `requests`. SEAM never converts units. |
+| `x-quota` | `quota` | `{amount, unit, window}`. `amount` is a number >= 0; `unit` is non-empty and must byte-match the effective `x-cost-per-call.unit`; `window` uses the shared duration grammar. Requires `x-cost-per-call` (schema-encoded at operation level). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-requires-approval` | boolean | RESERVED forward-compat. |
 
@@ -105,9 +105,9 @@ The schema validates shape + intra-object relations. **Every constraint below ne
 - **`x-credential-probe.path` must be a route the fragment itself serves** (a path+method declared in `paths`).
 - **Reserved control-plane namespace**: no path in `paths` may collide with SEAM's reserved set (`/docs`, `/docs/{route}`, `/openapi.json`, `/whoami`, `/scopes`, `/changes`, `/health/credentials`, `/health/upstreams`, `/config/status`, and the prefixes `/docs/`, `/health/`, `/config/`, `/approvals/`, `/_seam/`). A fragment declaring any is quarantined whole (Fragment Toolchain).
 
-### 4.2 Cross-object value equality (within one operation)
+### 4.2 Cross-object value equality (on the effective route)
 
-- **`x-quota.unit` must be byte-identical to the same route's `x-cost-per-call.unit`.** A mixed pair draws a credit balance down in dollars. (The schema encodes *that quota requires cost* — `constraint-quota-requires-cost` — but not unit equality across two sibling keys.)
+- **`x-quota.unit` must be byte-identical to the same route's `x-cost-per-call.unit`.** Root/root and operation/operation pairs compare directly; an operation-level quota with no operation-level cost compares against the fragment-root cost default. A mixed pair draws a credit balance down in dollars. The schema declares this invariant as `constraint-quota-unit-matches-cost`, but draft 2020-12 cannot compare arbitrary instance strings, so the Go validator performs the equality check.
 
 ### 4.3 Effective per-instance resolution (on a map fragment)
 
@@ -137,7 +137,7 @@ The schema validates shape + intra-object relations. **Every constraint below ne
 
 ## 5. What the schema encodes (its own `allOf`)
 
-For completeness, these are the cross-field constraints the schema **does** express at the fragment root (its ten `allOf` entries) plus the one operation-level one. Each is exercised by the validation corpus (see [§7](#7-validation-and-conformance-corpus)):
+For completeness, these are the named cross-field constraints exposed by the schema. Ten root constraints and `constraint-quota-requires-cost` are directly expressible in draft 2020-12. The unit-match constraint is referenced at root and operation levels as a declared validator obligation because draft 2020-12 has no arbitrary sibling-value equality operator. Each is exercised by the validation corpus (see [§7](#7-validation-and-conformance-corpus)):
 
 | Constraint | What it catches |
 |---|---|
@@ -152,6 +152,7 @@ For completeness, these are the cross-field constraints the schema **does** expr
 | `constraint-plaintext-required-on-http` | an `http://` `x-upstream` without `x-upstream-plaintext` |
 | `constraint-plaintext-excludes-map` | `x-upstream-plaintext` alongside `x-upstream-map` |
 | `constraint-quota-requires-cost` (operation) | `x-quota` without `x-cost-per-call` on the same route |
+| `constraint-quota-unit-matches-cost` (root + operation; validator-evaluated) | byte-different effective `x-quota.unit` / `x-cost-per-call.unit` values |
 
 The `acknowledged` singleton (no `false` form) for `insecureSkipVerify` / `x-upstream-plaintext` / `x-unscrubbable`, the `apiVersion` grammar, the `duration` grammar, the IP-literal rejection on `upstreamUrl`, and the `injectAs` kind↔name conditionals are all encoded inline in their `$def`s.
 
@@ -268,34 +269,43 @@ Demonstrates fragment-root defaults for loop protection, cost tracking, and quot
   "x-seam-owner": "analytics",
   "x-upstream": "https://analytics.service.example.com",
   "x-loop-guard": {
-    "max_depth": 10,
-    "max_redirects": 5
+    "maxRepeats": 10,
+    "window": "1h"
   },
-  "x-cost-per-call": 0.01,
+  "x-cost-per-call": {
+    "amount": 0.01,
+    "unit": "credits"
+  },
   "x-quota": {
-    "limit": 1000,
-    "window": "1h",
-    "scope": "per-token"
+    "amount": 1000,
+    "unit": "credits",
+    "window": "1h"
   },
   "paths": {
     "/analytics/data": {
       "get": {
         "x-required-scope": ["analytics:read"],
-        "x-cost-per-call": 0.001,
+        "x-cost-per-call": {
+          "amount": 0.001,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10000,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 10000,
+          "unit": "credits",
+          "window": "1h"
         },
         "summary": "List data (cheap, high quota)"
       },
       "post": {
         "x-required-scope": ["analytics:analyze"],
-        "x-cost-per-call": 0.05,
+        "x-cost-per-call": {
+          "amount": 0.05,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 200,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 200,
+          "unit": "credits",
+          "window": "1h"
         },
         "summary": "Analyze data (expensive, low quota)"
       }
@@ -304,8 +314,8 @@ Demonstrates fragment-root defaults for loop protection, cost tracking, and quot
       "get": {
         "x-required-scope": ["analytics:export"],
         "x-loop-guard": {
-          "max_depth": 5,
-          "max_redirects": 0
+          "maxRepeats": 5,
+          "window": "30m"
         },
         "summary": "Export data (strict loop guard, inherits cost/quota from fragment-root)"
       }
@@ -314,21 +324,19 @@ Demonstrates fragment-root defaults for loop protection, cost tracking, and quot
 }
 ```
 
-**Fragment-root defaults apply to all operations** unless overridden: the `GET /analytics/export` operation inherits `x-cost-per-call: 0.01` and the `per-token` quota from the fragment root, but applies a stricter loop guard (max_depth 5, no redirects). The `GET /analytics/data` operation overrides both cost and quota with more generous limits for cheap reads, while `POST /analytics/data` overrides with tighter limits for expensive analysis.
-
-The `scope: per-token` quota means each caller's API token has its own cost bucket — token A's heavy `POST` consumption doesn't affect token B's allowance. Other scope options: `global` (fleet-wide), `per-user` (by user identity), `per-route` (per route path).
+**Fragment-root defaults apply to all operations** unless overridden: the `GET /analytics/export` operation inherits the `{amount: 0.01, unit: credits}` cost and matching quota from the fragment root, but applies a stricter loop guard (`maxRepeats: 5` in a `30m` window). The `GET /analytics/data` operation overrides both cost and quota with a larger budget for cheap reads, while `POST /analytics/data` overrides them with a tighter budget for expensive analysis. Every cost/quota pair uses the byte-identical unit `credits`; SEAM does no conversion.
 
 ---
 
 ## 7. Validation and conformance corpus
 
-The schema is verified by a fixture suite (draft 2020-12, exercised with Ajv 8.20 — the battle-tested 2020-12 engine named in ADR-001's research). **Executed 2026-07-22 against the committed `route-fragment-schema.json` with Ajv 8.20.0:** the schema meta-validates against the bundled 2020-12 meta-schema, compiles with no dangling `$ref`, accepts every canonical shape below, and rejects every violation below — **31/31 checks green** (meta-valid + compile + 8 accept + 21 reject). The runner and fixtures live in `~/scratch/seam-schema-verify/` (`harness.js` + `valid.js`/`invalid.js`) until Phase 9a provides a checked-in home; re-running is `node harness.js`. Three guarantees:
+The schema was originally verified by an off-repo Ajv 8.20 fixture suite. **Executed 2026-07-22 against that revision of `route-fragment-schema.json`: 31/31 checks green** (meta-valid + compile + 8 accept + 21 reject). The 2026-08-21 guard-field realignment supersedes the guard cases in that historical corpus; its current checks are committed in `internal/spec/guard_schema_test.go` and run through the same Go schema/validator path used by `seam lint` and merge-time quarantine. Three guarantees:
 
 1. **It is a valid draft 2020-12 document** (meta-validated against the 2020-12 meta-schema) and **compiles cleanly** (no dangling `$ref`).
-2. **It accepts** every canonical shape — single-instance inject, https/http pass-through, multi-instance map with per-instance vault/inject and plaintext, adapter fragment, operation-level cost+quota, operation-level scope replacing a root default, and the deprecated-with-brownout object.
-3. **It rejects** every cross-field violation the schema is responsible for — unpaired vault/inject, map-without-instance-param (and the reverse), upstream+map together, adapter+upstream together, an upstream-less non-adapter fragment, `http://` without plaintext, quota without cost, bare `x-seam-deprecated: true`, a `v2` schema marker, missing `x-seam-owner`/`paths`, an IP-literal host, `injectAs` kind↔name violations, plaintext alongside a map, a probe on a pass-through fragment, an authored `_unversioned`, a calendar-aligned duration (`1mo`), and brownout without sunset.
+2. **It accepts** every canonical shape — including `{maxRepeats, window}`, unit-bearing cost/quota objects with identical units, single-instance inject, https/http pass-through, multi-instance maps, adapters, operation-level scope replacement, and deprecated-with-brownout objects.
+3. **It rejects** the schema/validator violations it owns — including the retired loop shape, bare-number cost, byte-different cost/quota units, bad guard-window grammar, quota without cost, and the previously enumerated transport, ownership, adapter, map, version, injection, and deprecation violations.
 
-The suite lives off-repo for now (experimental, `~/scratch`); the authoritative home for a checked-in conformance corpus is Phase 9a's `seam lint`/`seam diff` test tree, which should pin these fixtures as golden valid/invalid cases so the schema and the Go validator stay in lockstep.
+The historical Ajv harness remains experimental under `~/scratch`; checked-in Go tests are authoritative for guard-field behavior and keep the schema and Go validator in lockstep.
 
 ---
 

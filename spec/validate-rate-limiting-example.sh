@@ -112,34 +112,43 @@ cat > "$VALIDATOR_DIR/rate-limiting-valid.json" <<'EOF'
   "x-seam-owner": "analytics",
   "x-upstream": "https://analytics.service.example.com",
   "x-loop-guard": {
-    "max_depth": 10,
-    "max_redirects": 5
+    "maxRepeats": 10,
+    "window": "1h"
   },
-  "x-cost-per-call": 0.01,
+  "x-cost-per-call": {
+    "amount": 0.01,
+    "unit": "credits"
+  },
   "x-quota": {
-    "limit": 1000,
-    "window": "1h",
-    "scope": "per-token"
+    "amount": 1000,
+    "unit": "credits",
+    "window": "1h"
   },
   "paths": {
     "/analytics/data": {
       "get": {
         "x-required-scope": ["analytics:read"],
-        "x-cost-per-call": 0.001,
+        "x-cost-per-call": {
+          "amount": 0.001,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10000,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 10000,
+          "unit": "credits",
+          "window": "1h"
         },
         "summary": "List data (cheap, high quota)"
       },
       "post": {
         "x-required-scope": ["analytics:analyze"],
-        "x-cost-per-call": 0.05,
+        "x-cost-per-call": {
+          "amount": 0.05,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 200,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 200,
+          "unit": "credits",
+          "window": "1h"
         },
         "summary": "Analyze data (expensive, low quota)"
       }
@@ -148,8 +157,8 @@ cat > "$VALIDATOR_DIR/rate-limiting-valid.json" <<'EOF'
       "get": {
         "x-required-scope": ["analytics:export"],
         "x-loop-guard": {
-          "max_depth": 5,
-          "max_redirects": 0
+          "maxRepeats": 5,
+          "window": "30m"
         },
         "summary": "Export data"
       }
@@ -172,7 +181,10 @@ cat > "$VALIDATOR_DIR/invalid-negative-cost.json" <<'EOF'
   "x-seam-schema": "v1",
   "x-seam-owner": "analytics",
   "x-upstream": "https://analytics.service.example.com",
-  "x-cost-per-call": -0.01,
+  "x-cost-per-call": {
+    "amount": -0.01,
+    "unit": "credits"
+  },
   "paths": { "/test": { "get": {} } }
 }
 EOF
@@ -186,7 +198,8 @@ cat > "$VALIDATOR_DIR/invalid-quota-without-cost.json" <<'EOF'
     "/test": {
       "get": {
         "x-quota": {
-          "limit": 100,
+          "amount": 100,
+          "unit": "credits",
           "window": "1h"
         }
       }
@@ -201,21 +214,25 @@ cat > "$VALIDATOR_DIR/invalid-loop-guard-bounds.json" <<'EOF'
   "x-seam-owner": "analytics",
   "x-upstream": "https://analytics.service.example.com",
   "x-loop-guard": {
-    "max_depth": 0,
-    "max_redirects": -1
+    "maxRepeats": 0,
+    "window": "1w"
   },
   "paths": { "/test": { "get": {} } }
 }
 EOF
 
-cat > "$VALIDATOR_DIR/invalid-quota-limit.json" <<'EOF'
+cat > "$VALIDATOR_DIR/invalid-quota-amount.json" <<'EOF'
 {
   "x-seam-schema": "v1",
   "x-seam-owner": "analytics",
   "x-upstream": "https://analytics.service.example.com",
-  "x-cost-per-call": 0.01,
+  "x-cost-per-call": {
+    "amount": 0.01,
+    "unit": "credits"
+  },
   "x-quota": {
-    "limit": 0,
+    "amount": -1,
+    "unit": "credits",
     "window": "1h"
   },
   "paths": { "/test": { "get": {} } }
@@ -247,9 +264,8 @@ echo "The following fragments should be ${RED}REJECTED${NC} by the schema:"
 echo "  ✗ Missing x-seam-schema (invalid-no-schema.json)"
 echo "  ✗ Negative x-cost-per-call (invalid-negative-cost.json)"
 echo "  ✗ x-quota without x-cost-per-call (invalid-quota-without-cost.json)"
-echo "  ✗ Loop guard max_depth < 1 (invalid-loop-guard-bounds.json)"
-echo "  ✗ Loop guard max_redirects < 0 (invalid-loop-guard-bounds.json)"
-echo "  ✗ Quota limit < 1 (invalid-quota-limit.json)"
+echo "  ✗ Loop guard maxRepeats < 1 and bad window grammar (invalid-loop-guard-bounds.json)"
+echo "  ✗ Quota amount < 0 (invalid-quota-amount.json)"
 echo ""
 
 echo "${BLUE}=== Schema Validation Rules Summary ===${NC}"
@@ -264,27 +280,28 @@ echo ""
 
 echo "x-loop-guard:"
 echo "  - Type: object"
-echo "  - Required: max_depth, max_redirects"
-echo "  - max_depth: integer >= 1"
-echo "  - max_redirects: integer >= 0"
-echo "  - Example: { \"max_depth\": 10, \"max_redirects\": 5 }"
+echo "  - Required: maxRepeats, window"
+echo "  - maxRepeats: integer >= 1"
+echo "  - window: ^[0-9]+(s|m|h|d)$"
+echo "  - Example: { \"maxRepeats\": 10, \"window\": \"1h\" }"
 echo ""
 
 echo "x-cost-per-call:"
-echo "  - Type: number"
-echo "  - Minimum: 0"
-echo "  - Pattern: ^\\d+(\\.\\d{1,2})?$ (max 2 decimal places)"
-echo "  - Example: 0.01 (USD per call)"
+echo "  - Type: object"
+echo "  - Required: amount, unit"
+echo "  - amount: number >= 0"
+echo "  - unit: non-empty opaque string"
+echo "  - Example: { \"amount\": 0.01, \"unit\": \"credits\" }"
 echo ""
 
 echo "x-quota:"
 echo "  - Type: object"
-echo "  - Required: limit, window"
-echo "  - limit: integer >= 1"
-echo "  - window: RFC3339 duration (e.g., '60s', '5m', '1h')"
-echo "  - scope: enum [global, per-token, per-user, per-route]"
+echo "  - Required: amount, unit, window"
+echo "  - amount: number >= 0"
+echo "  - unit: non-empty and byte-identical to x-cost-per-call.unit"
+echo "  - window: ^[0-9]+(s|m|h|d)$ (e.g., '60s', '5m', '1h')"
 echo "  - Constraint: requires x-cost-per-call"
-echo "  - Example: { \"limit\": 1000, \"window\": \"1h\", \"scope\": \"per-token\" }"
+echo "  - Example: { \"amount\": 1000, \"unit\": \"credits\", \"window\": \"1h\" }"
 echo ""
 
 echo "x-upstream-map:"
@@ -320,7 +337,7 @@ echo "✓ Validation test fixtures: $VALIDATOR_DIR/"
 echo ""
 echo "All rate limiting and monitoring extension field schemas are:"
 echo "  ✓ x-seam-schema: Version marker (required)"
-echo "  ✓ x-loop-guard: Loop protection (max_depth, max_redirects)"
-echo "  ✓ x-cost-per-call: Cost tracking (USD, non-negative)"
-echo "  ✓ x-quota: Rate limiting (limit, window, scope)"
+echo "  ✓ x-loop-guard: Repeated-request protection (maxRepeats, window)"
+echo "  ✓ x-cost-per-call: Unit-bearing cost tracking (amount, unit)"
+echo "  ✓ x-quota: Unit-bearing budget (amount, unit, window)"
 echo "  ✓ x-upstream-map: Multi-instance routing"

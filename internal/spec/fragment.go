@@ -245,6 +245,13 @@ func (fl *FragmentLoader) ValidateFragments(schemaPath string) error {
 
 // validateFragment validates a single fragment against the schema
 func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschema.Schema) error {
+	// JSON Schema draft 2020-12 cannot compare arbitrary instance strings.
+	// Evaluate the declared quota-unit constraint before shape validation so an
+	// operation quota can still be compared with its fragment-root cost default.
+	if mismatches := quotaUnitMismatchMessages(fragment.ParsedFragment); len(mismatches) != 0 {
+		return fmt.Errorf("quota unit validation failed: %s", mismatches[0])
+	}
+
 	// Validate the parsed fragment
 	if err := schema.Validate(fragment.ParsedFragment); err != nil {
 		return fmt.Errorf("schema validation failed: %w", err)
