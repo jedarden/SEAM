@@ -792,20 +792,37 @@ func responseStarted(w http.ResponseWriter) bool {
 	return ok && tracker.ResponseStarted()
 }
 
-// bufferPool manages buffers for copying response bodies.
+// bufferPool manages buffers for copying response bodies using sync.Pool
+// for efficient reuse across requests.
 type bufferPool struct {
-	bufSize int
+	pool *sync.Pool
+}
+
+// sharedBufferPool is a package-wide pool that all ReverseProxy instances share.
+// This reduces allocations by reusing buffers across all proxy operations.
+var sharedBufferPool = &bufferPool{
+	pool: &sync.Pool{
+		New: func() interface{} {
+			// Allocate 32 KiB buffers - optimal for most response streaming
+			buf := make([]byte, 32*1024)
+			return &buf
+		},
+	},
 }
 
 func newBufferPool() *bufferPool {
-	return &bufferPool{bufSize: 32 * 1024}
+	return sharedBufferPool
 }
 
 func (p *bufferPool) Get() []byte {
-	return make([]byte, p.bufSize)
+	bufPtr := p.pool.Get().(*[]byte)
+	return *bufPtr
 }
 
-func (p *bufferPool) Put(_ []byte) {}
+func (p *bufferPool) Put(buf []byte) {
+	// Return the buffer to the pool for reuse
+	p.pool.Put(&buf)
+}
 
 // cancelOnClose keeps the request context alive while the caller streams the
 // response, then releases its timer as soon as the body is closed.
