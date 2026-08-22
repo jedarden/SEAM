@@ -1,0 +1,15 @@
+/* ReDoc base styles for SEAM API documentation */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f6f6f6;
+}
+
+#api-doc {
+  display: flex;
+  height: 100vh;
+}
+
+#api-doc > div {
+  flex: 1;
+}
