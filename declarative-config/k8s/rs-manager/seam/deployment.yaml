@@ -81,6 +81,9 @@ spec:
         - name: routes-argocd
           mountPath: /spec/routes.d/argocd-ro
           readOnly: true
+        - name: routes-zai
+          mountPath: /spec/routes.d/zai
+          readOnly: true
         - name: upstream-ca
           mountPath: /etc/gateway/upstream-ca
           readOnly: true
@@ -129,6 +132,10 @@ spec:
       - name: routes-argocd
         configMap:
           name: seam-routes-argocd
+      # z.ai/GLM route fragment (Phase 4)
+      - name: routes-zai
+        configMap:
+          name: seam-routes-zai
       # Upstream CA bundles for TLS verification
       - name: upstream-ca
         configMap:

@@ -29,6 +29,12 @@ configMapGenerator:
     files:
       # ArgoCD read-only proxy route fragment
       - routes/argocd-ro/argocd-read-only-proxy.yaml
+  - name: seam-routes-zai
+    options:
+      disableNameSuffixHash: true
+    files:
+      # z.ai/GLM proxy route fragment (Phase 4)
+      - routes/zai/zai-glm-proxy.yaml
 
 # Labels to apply to all resources
 commonLabels:
