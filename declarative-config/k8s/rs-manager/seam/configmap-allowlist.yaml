@@ -16,12 +16,13 @@ data:
     # Defines allowed upstream hosts and vault paths for dual validation
     #
     # Format:
-    #   upstream_hosts: List of allowed upstream hostnames
+    #   upstreamHosts: List of allowed upstream hostnames
     #   vault_paths: List of allowed vault path prefixes
     #
     # Phase 6a: Initial allowlist for testing
-    upstream_hosts:
+    upstreamHosts:
       - "openbao.openbao.svc.cluster.local"
       - "*.tail1b1987.ts.net"
+      - "*.ardenone.com"
     vault_paths:
       - "seam/routes/"

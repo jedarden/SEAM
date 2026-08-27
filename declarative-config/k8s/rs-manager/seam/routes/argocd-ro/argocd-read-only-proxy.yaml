@@ -1,0 +1,113 @@
+# ArgoCD Read-Only Proxy Route Fragment
+# PASS-THROUGH fragment - declares neither x-vault-path nor x-inject-as
+# The ArgoCD read-only proxy injects its own bearer token server-side
+x-seam-schema: v1
+x-seam-owner: argocd-ro
+x-api-version: v1
+x-upstream: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
+x-upstream-strip-prefix: /argocd
+x-required-scope: argocd:read
+
+openapi: 3.1.0
+info:
+  title: ArgoCD Read-Only Proxy
+  version: 1.0.0
+  description: |
+    Read-only proxy to ArgoCD API for querying applications, projects, and clusters.
+
+    This is a PASS-THROUGH fragment - SEAM forwards requests with TLS, guards, health,
+    and versioning intact but injects no credentials. The upstream ArgoCD read-only
+    proxy injects its own bearer token server-side.
+
+paths:
+  /argocd/api/v1/applications:
+    get:
+      summary: List all applications
+      operationId: listApplications
+      responses:
+        '200':
+          description: Successfully retrieved applications list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+        - BearerAuth: []
+
+  /argocd/api/v1/applications/{name}:
+    get:
+      summary: Get specific application details
+      operationId: getApplication
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved application
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Application not found
+      security:
+        - BearerAuth: []
+
+  /argocd/api/v1/clusters:
+    get:
+      summary: List all clusters
+      operationId: listClusters
+      responses:
+        '200':
+          description: Successfully retrieved clusters list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+        - BearerAuth: []
+
+  /argocd/api/v1/projects:
+    get:
+      summary: List all projects
+      operationId: listProjects
+      responses:
+        '200':
+          description: Successfully retrieved projects list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+        - BearerAuth: []
+
+  /argocd/api/v1/repositories:
+    get:
+      summary: List all repositories
+      operationId: listRepositories
+      responses:
+        '200':
+          description: Successfully retrieved repositories list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      security:
+        - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
