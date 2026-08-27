@@ -78,6 +78,9 @@ spec:
         - name: spec
           mountPath: /spec
           readOnly: true
+        - name: routes-argocd
+          mountPath: /spec/routes.d/argocd-ro
+          readOnly: true
         - name: upstream-ca
           mountPath: /etc/gateway/upstream-ca
           readOnly: true
@@ -122,6 +125,10 @@ spec:
       - name: spec
         configMap:
           name: seam-routes-seam
+      # ArgoCD route fragment
+      - name: routes-argocd
+        configMap:
+          name: seam-routes-argocd
       # Upstream CA bundles for TLS verification
       - name: upstream-ca
         configMap:

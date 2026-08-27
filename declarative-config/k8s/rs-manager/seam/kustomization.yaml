@@ -21,10 +21,14 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
     files:
-      # Route fragments loaded from spec/fragments.d
-      - fragments.d/argocd-read-only-proxy.yaml
       # Fragment schema for validation
       - fragment-schema.json
+  - name: seam-routes-argocd
+    options:
+      disableNameSuffixHash: true
+    files:
+      # ArgoCD read-only proxy route fragment
+      - routes/argocd-ro/argocd-read-only-proxy.yaml
 
 # Labels to apply to all resources
 commonLabels:
