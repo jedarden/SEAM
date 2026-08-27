@@ -62,29 +62,9 @@ func TestE2E_TwitterAPIInjection(t *testing.T) {
 	// Phase 2: Start stub upstream server that verifies x-api-key injection
 	t.Log("=== Phase 2: Starting stub upstream server ===")
 
-	var receivedHeaders http.Header
 	stub := stubupstream.New(stubupstream.Config{
-		Addr: "localhost:15840",
-		Behavior: func(w http.ResponseWriter, r *http.Request) {
-			// Capture headers for verification
-			receivedHeaders = r.Header.Clone()
-
-			// Return mock twitterapi.io response
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			// Mock response matching twitterapi.io envelope
-			mockResponse := map[string]interface{}{
-				"status": "success",
-				"msg":    "success",
-				"data": map[string]interface{}{
-					"id":        "123456789",
-					"userName":  "testuser",
-					"followers": 100,
-				},
-			}
-			json.NewEncoder(w).Encode(mockResponse)
-		},
+		Addr:     "localhost:15840",
+		Behavior: stubupstream.BehaviorNormal,
 	})
 
 	if err := stub.Start(); err != nil {
@@ -158,7 +138,13 @@ func TestE2E_TwitterAPIInjection(t *testing.T) {
 	// Phase 5: Verify credential was injected upstream
 	t.Log("=== Phase 5: Verifying upstream credential injection ===")
 
-	receivedAPIKey := receivedHeaders.Get("x-api-key")
+	callLog := stub.GetCallLog()
+	if len(callLog) == 0 {
+		t.Fatal("Stub upstream received no requests")
+	}
+
+	lastCall := callLog[len(callLog)-1]
+	receivedAPIKey := lastCall.CustomAuth
 	if receivedAPIKey == "" {
 		t.Fatal("x-api-key header was NOT injected into upstream request")
 	}
