@@ -84,6 +84,9 @@ spec:
         - name: routes-zai
           mountPath: /spec/routes.d/zai
           readOnly: true
+        - name: routes-twitterapi
+          mountPath: /spec/routes.d/twitterapi
+          readOnly: true
         - name: upstream-ca
           mountPath: /etc/gateway/upstream-ca
           readOnly: true
@@ -136,6 +139,10 @@ spec:
       - name: routes-zai
         configMap:
           name: seam-routes-zai
+      # twitterapi.io route fragment (Phase 4)
+      - name: routes-twitterapi
+        configMap:
+          name: seam-routes-twitterapi
       # Upstream CA bundles for TLS verification
       - name: upstream-ca
         configMap:

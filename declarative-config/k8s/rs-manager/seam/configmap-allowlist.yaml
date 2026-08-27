@@ -20,11 +20,12 @@ data:
     #   vault_paths: List of allowed vault path prefixes
     #
     # Phase 6a: Initial allowlist for testing
-    # Phase 4: z.ai/GLM public upstream (explicit enumeration per plan)
+    # Phase 4: z.ai/GLM and twitterapi.io public upstreams (explicit enumeration per plan)
     upstreamHosts:
       - "openbao.openbao.svc.cluster.local"
       - "*.tail1b1987.ts.net"
       - "*.ardenone.com"
       - "api.z.ai"
+      - "api.twitterapi.io"
     vault_paths:
       - "seam/routes/"

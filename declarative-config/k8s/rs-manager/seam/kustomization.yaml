@@ -35,6 +35,12 @@ configMapGenerator:
     files:
       # z.ai/GLM proxy route fragment (Phase 4)
       - routes/zai/zai-glm-proxy.yaml
+  - name: seam-routes-twitterapi
+    options:
+      disableNameSuffixHash: true
+    files:
+      # twitterapi.io proxy route fragment (Phase 4)
+      - routes/twitterapi/twitterapi-proxy.yaml
 
 # Labels to apply to all resources
 commonLabels:
