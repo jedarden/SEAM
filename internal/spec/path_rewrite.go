@@ -20,6 +20,7 @@ var internalRouteMetadata = map[string]string{
 	"x-unscrubbable":          internalRouteMetadataPrefix + "unscrubbable",
 	"x-instance-param":        internalRouteMetadataPrefix + "instance-param",
 	"x-upstream-strip-prefix": internalRouteMetadataPrefix + "upstream-strip-prefix",
+	"x-fanout-scope":          internalRouteMetadataPrefix + "fanout-scope",
 }
 
 type pathRewriteFinding struct {
@@ -127,6 +128,124 @@ func ValidatePathRewriteFragment(data map[string]any) error {
 func (f *lintFragment) checkPathRewrite(report *LintReport) {
 	for _, finding := range pathRewriteFindings(f.data) {
 		f.addError(report, finding.code, finding.message)
+	}
+	f.checkInstanceParamRequirements(report)
+	f.checkUpstreamMapEntries(report)
+}
+
+// checkInstanceParamRequirements validates Phase 10 constraints:
+// - x-instance-param is required with x-upstream-map
+// - x-instance-param is forbidden without x-upstream-map
+// Note: The per-path validation (named param exists in EVERY declared path) is
+// already handled by pathRewriteFindings via the path-rewrite.instance-param-missing error.
+func (f *lintFragment) checkInstanceParamRequirements(report *LintReport) {
+	hasUpstreamMap := f.data["x-upstream-map"] != nil
+	hasInstanceParam := f.data["x-instance-param"] != nil
+
+	if hasUpstreamMap && !hasInstanceParam {
+		f.addError(report, "instance-param.missing-with-map", "x-upstream-map requires x-instance-param at fragment root")
+		return
+	}
+
+	if !hasUpstreamMap && hasInstanceParam {
+		f.addError(report, "instance-param.forbidden-without-map", "x-instance-param is only valid with x-upstream-map")
+		return
+	}
+
+	if hasInstanceParam {
+		instanceParam, _ := f.data["x-instance-param"].(string)
+		if instanceParam == "" {
+			f.addError(report, "instance-param.empty", "x-instance-param must be a non-empty string")
+			return
+		}
+	}
+}
+
+// checkUpstreamMapEntries validates Phase 10 map entry constraints:
+// - Object-form entries with url (required), vaultPath, injectAs, tls, plaintext, probeInterval, breaker, requiredScope
+// - Fragment-level fields default to map entries EXCEPT plaintext (per-entry, never inherited)
+// - requiredScope is per-entry with no default (PARSE AND CARRY only)
+func (f *lintFragment) checkUpstreamMapEntries(report *LintReport) {
+	entries, ok := f.data["x-upstream-map"].(map[string]any)
+	if !ok || len(entries) == 0 {
+		return
+	}
+
+	keys := make([]string, 0, len(entries))
+	for key := range entries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		entry, ok := entries[key].(map[string]any)
+		if !ok {
+			f.addError(report, "upstream-map.entry-invalid", fmt.Sprintf("x-upstream-map[%q] must be an object", key))
+			continue
+		}
+
+		// url is required
+		if _, hasURL := entry["url"]; !hasURL {
+			f.addError(report, "upstream-map.missing-url", fmt.Sprintf("x-upstream-map[%q].url is required", key))
+		}
+
+		// vaultPath and injectAs must both be present or both absent (per-entry pairing)
+		_, hasVaultPath := entry["vaultPath"]
+		_, hasInjectAs := entry["injectAs"]
+		if (hasVaultPath && !hasInjectAs) || (!hasVaultPath && hasInjectAs) {
+			f.addError(report, "upstream-map.vault-inject-pairing", fmt.Sprintf("x-upstream-map[%q] must have both vaultPath and injectAs, or neither", key))
+		}
+
+		// plaintext is per-entry, never inherited from fragment level
+		// This is already enforced by checkTransport's "plaintext-excludes-map" rule
+		// which rejects fragment-root x-upstream-plaintext alongside x-upstream-map
+
+		// requiredScope is per-entry with no default; PARSE AND CARRY only
+		// Validation here just ensures it's a valid scope array if present
+		if scope, hasScope := entry["requiredScope"]; hasScope {
+			if err := validateScopeArray(scope); err != nil {
+				f.addError(report, "upstream-map.invalid-scope", fmt.Sprintf("x-upstream-map[%q].requiredScope is invalid: %v", key, err))
+			}
+		}
+
+		// Validate other field types if present
+		if tls, hasTLS := entry["tls"].(map[string]any); hasTLS {
+			// tls validation - already handled by schema
+			_ = tls
+		}
+
+		if breaker, hasBreaker := entry["breaker"].(map[string]any); hasBreaker {
+			// breaker validation - already handled by schema
+			_ = breaker
+		}
+
+		if probeInterval, hasProbe := entry["probeInterval"].(string); hasProbe {
+			// probeInterval validation - already handled by schema
+			_ = probeInterval
+		}
+	}
+}
+
+// validateScopeArray checks if a scope value is valid (string or array of strings)
+func validateScopeArray(value any) error {
+	switch v := value.(type) {
+	case string:
+		if v == "" {
+			return fmt.Errorf("scope string cannot be empty")
+		}
+		return nil
+	case []any:
+		if len(v) == 0 {
+			return fmt.Errorf("scope array cannot be empty")
+		}
+		for i, item := range v {
+			if _, ok := item.(string); !ok {
+				return fmt.Errorf("scope array element %d must be a string", i)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("scope must be a string or array of strings")
 	}
 }
 
