@@ -87,6 +87,9 @@ spec:
         - name: routes-twitterapi
           mountPath: /spec/routes.d/twitterapi
           readOnly: true
+        - name: routes-k8s
+          mountPath: /spec/routes.d/k8s
+          readOnly: true
         - name: upstream-ca
           mountPath: /etc/gateway/upstream-ca
           readOnly: true
@@ -143,6 +146,10 @@ spec:
       - name: routes-twitterapi
         configMap:
           name: seam-routes-twitterapi
+      # Kubernetes API multi-cluster route fragment (Phase 5.2)
+      - name: routes-k8s
+        configMap:
+          name: seam-routes-k8s
       # Upstream CA bundles for TLS verification
       - name: upstream-ca
         configMap:
