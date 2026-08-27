@@ -1,0 +1,218 @@
+# Kubernetes API Proxy Route Fragment
+# Phase 5.2: Nine-cluster x-upstream-map with per-instance credentials
+# Multi-instance Kubernetes API proxy with observer/admin access patterns
+x-seam-schema: v1
+x-seam-owner: k8s
+x-api-version: v1
+x-instance-param: cluster
+x-upstream-map:
+  ardenone-cluster:
+    url: http://traefik-ardenone-cluster:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/ardenone-cluster-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  apexalgo-iad:
+    url: http://traefik-apexalgo-iad:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/apexalgo-iad-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  ardenone-manager:
+    url: http://traefik-ardenone-manager:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/ardenone-manager-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  rs-manager:
+    url: http://traefik-rs-manager:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/rs-manager-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  iad-ci:
+    url: http://traefik-iad-ci:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/iad-ci-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  iad-kalshi:
+    url: http://kubectl-proxy-iad-kalshi:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/iad-kalshi-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  ord-devimprint:
+    url: http://traefik-ord-devimprint:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/ord-devimprint-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  iad-options:
+    url: http://traefik-iad-options:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/iad-options-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
+  rs-manager-admin:
+    url: https://kubernetes.default.svc
+    vaultPath: seam/routes/k8s/rs-manager-admin-token
+    injectAs:
+      kind: bearer
+    probeInterval: 45m
+    requiredScope: k8s-rw:get
+x-credential-probe:
+  path: /api/v1/namespaces/default
+  method: GET
+  interval: 1h
+x-required-scope: k8s-ro:get
+x-fanout-scope: k8s-ro:fanout
+
+openapi: 3.1.0
+info:
+  title: Kubernetes API Multi-Cluster Proxy
+  version: 1.0.0
+  description: |
+    Multi-instance Kubernetes API proxy with per-instance credential injection.
+
+    This fragment routes to nine Kubernetes clusters via x-upstream-map:
+    - Eight observer endpoints (read-only, long-lived SA tokens)
+    - One rs-manager admin endpoint (in-cluster Service DNS, ~3-day OIDC token)
+
+    Path parameter {cluster} selects the target instance. Reserved names:
+    - _all: Fan-out to all nine instances and merge responses
+    - _default: Routes to rs-manager-admin (primary admin endpoint)
+
+    Observer endpoints use http:// over Tailscale VPN with plaintext acknowledgement.
+    The rs-manager admin endpoint uses in-cluster https:// with Service DNS.
+
+    Per-instance credentials:
+    - Observer clusters: long-lived SA tokens (1h probe interval)
+    - rs-manager-admin: ~3-day OIDC token (45m probe interval for tight cadence)
+
+    Authorization:
+    - Observer endpoints: k8s-ro:get (default)
+    - Admin endpoint: k8s-rw:get (distinct scope)
+    - Fan-out to _all: requires k8s-ro:fanout in addition to operation scope
+
+paths:
+  /k8s/{cluster}/api/v1/namespaces/{namespace}/pods:
+    get:
+      summary: List pods in namespace
+      operationId: listPods
+      tags:
+        - Pods
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+            description: |
+              Target cluster instance. Use a specific cluster name or _all for fan-out.
+              Examples: ardenone-cluster, rs-manager-admin, _all
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Kubernetes namespace
+      responses:
+        "200":
+          description: List of pods
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (insufficient scope)
+        "502":
+          description: Upstream cluster unavailable
+      security:
+        - BearerAuth: []
+
+  /k8s/{cluster}/api/v1/namespaces:
+    get:
+      summary: List all namespaces
+      operationId: listNamespaces
+      tags:
+        - Namespaces
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+            description: |
+              Target cluster instance. Use a specific cluster name or _all for fan-out.
+              Examples: ardenone-cluster, rs-manager-admin, _all
+      responses:
+        "200":
+          description: List of namespaces
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (insufficient scope)
+        "502":
+          description: Upstream cluster unavailable
+      security:
+        - BearerAuth: []
+
+  /k8s/{cluster}/api/v1/pods:
+    get:
+      summary: List pods across all namespaces
+      operationId: listAllPods
+      tags:
+        - Pods
+      parameters:
+        - name: cluster
+          in: path
+          required: true
+          schema:
+            type: string
+            description: |
+              Target cluster instance. Use a specific cluster name or _all for fan-out.
+              Examples: ardenone-cluster, rs-manager-admin, _all
+      responses:
+        "200":
+          description: List of pods across all namespaces
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (insufficient scope)
+        "502":
+          description: Upstream cluster unavailable
+      security:
+        - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer

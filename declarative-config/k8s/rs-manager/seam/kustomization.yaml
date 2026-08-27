@@ -41,6 +41,12 @@ configMapGenerator:
     files:
       # twitterapi.io proxy route fragment (Phase 4)
       - routes/twitterapi/twitterapi-proxy.yaml
+  - name: seam-routes-k8s
+    options:
+      disableNameSuffixHash: true
+    files:
+      # Kubernetes API multi-cluster proxy route fragment (Phase 5.2)
+      - routes/k8s/k8s-api-proxy.yaml
 
 # Labels to apply to all resources
 commonLabels:

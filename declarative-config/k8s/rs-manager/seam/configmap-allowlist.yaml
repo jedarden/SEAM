@@ -21,11 +21,23 @@ data:
     #
     # Phase 6a: Initial allowlist for testing
     # Phase 4: z.ai/GLM and twitterapi.io public upstreams (explicit enumeration per plan)
+    # Phase 5.2: Nine-cluster k8s API proxy endpoints (each enumerated individually)
     upstreamHosts:
       - "openbao.openbao.svc.cluster.local"
       - "*.tail1b1987.ts.net"
       - "*.ardenone.com"
       - "api.z.ai"
       - "api.twitterapi.io"
+      # Phase 5.2: Nine-cluster k8s API proxy - observer endpoints (http:// over Tailscale)
+      - "traefik-ardenone-cluster:8001"
+      - "traefik-apexalgo-iad:8001"
+      - "traefik-ardenone-manager:8001"
+      - "traefik-rs-manager:8001"
+      - "traefik-iad-ci:8001"
+      - "kubectl-proxy-iad-kalshi:8001"
+      - "traefik-ord-devimprint:8001"
+      - "traefik-iad-options:8001"
+      # Phase 5.2: Nine-cluster k8s API proxy - admin endpoint (in-cluster Service DNS)
+      - "kubernetes.default.svc"
     vault_paths:
       - "seam/routes/"
