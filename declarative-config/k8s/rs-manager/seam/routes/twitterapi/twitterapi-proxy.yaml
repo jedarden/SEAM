@@ -1,0 +1,293 @@
+# twitterapi.io Proxy Route Fragment
+# Phase 4: End-to-end credential injection proof
+# Generic pass-through proxy to api.twitterapi.io with credit metering
+x-seam-schema: v1
+x-seam-owner: twitterapi
+x-api-version: v1
+x-upstream: https://api.twitterapi.io
+x-vault-path: seam/routes/twitterapi/api-key
+x-inject-as:
+  kind: header
+  name: x-api-key
+x-credential-probe:
+  path: /twitter/user/info
+  method: GET
+  interval: 15m
+
+openapi: 3.1.0
+info:
+  title: twitterapi.io API Proxy
+  version: 1.0.0
+  description: |
+    Generic pass-through proxy to twitterapi.io with server-side credential injection.
+
+    This route injects the twitterapi.io API key from OpenBao (seam/routes/twitterapi/api-key)
+    as an x-api-key header on every upstream request. Callers do not see the credential;
+    it is injected server-side and scrubbed from responses.
+
+    The upstream is metered in credits per call. SEAM enforces per-caller quotas and costs
+    to prevent runaway spend. A credential probe validates the secret every 15 minutes
+    against the /twitter/user/info endpoint.
+
+    This is a generic pass-through proxy: any path under /twitter/ is forwarded verbatim
+    to api.twitterapi.io. The proxy defines exactly one endpoint of its own (/health),
+    which is local and requires no upstream call or credential.
+
+paths:
+  /twitterapi/health:
+    get:
+      summary: Health check
+      operationId: health
+      tags:
+        - Health
+      description: |
+        Local health endpoint with no upstream call. Always returns 200 with empty body.
+        This is the only endpoint the proxy defines itself; it requires no credential.
+      x-pass-through: true
+      responses:
+        "200":
+          description: Healthy
+        "503":
+          description: Service unavailable
+
+  /twitterapi/user/info:
+    get:
+      summary: Get Twitter user information
+      operationId: getUserInfo
+      tags:
+        - Users
+      x-cost-per-call:
+        amount: 18
+        unit: credits
+      x-quota:
+        amount: 10000
+        unit: credits
+        window: 1h
+      parameters:
+        - name: userName
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Twitter username to look up
+      responses:
+        "200":
+          description: User information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      userName:
+                        type: string
+                      followers:
+                        type: integer
+                      createdAt:
+                        type: string
+                      pinnedTweetIds:
+                        type: array
+                        items:
+                          type: string
+        "400":
+          description: Missing required parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+        "401":
+          description: Invalid API key
+        "429":
+          description: Rate limit exceeded or loop detected
+        "402":
+          description: Quota exceeded
+
+  /twitterapi/user/last_tweets:
+    get:
+      summary: Get user's last tweets
+      operationId: getLastTweets
+      tags:
+        - Users
+      x-cost-per-call:
+        amount: 18
+        unit: credits
+      x-quota:
+        amount: 10000
+        unit: credits
+        window: 1h
+      parameters:
+        - name: userName
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Twitter username
+      responses:
+        "200":
+          description: Tweets retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  code:
+                    type: integer
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      pin_tweet:
+                        type: object
+                      tweets:
+                        type: array
+                        items:
+                          type: object
+        "400":
+          description: Missing required parameter
+        "401":
+          description: Invalid API key
+        "429":
+          description: Rate limit exceeded or loop detected
+        "402":
+          description: Quota exceeded
+
+  /twitterapi/tweets:
+    get:
+      summary: Get tweets by IDs
+      operationId: getTweets
+      tags:
+        - Tweets
+      x-cost-per-call:
+        amount: 18
+        unit: credits
+      x-quota:
+        amount: 10000
+        unit: credits
+        window: 1h
+      parameters:
+        - name: tweet_ids
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated tweet IDs
+      responses:
+        "200":
+          description: Tweets retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tweets:
+                    type: array
+                    items:
+                      type: object
+        "401":
+          description: Invalid API key
+        "429":
+          description: Rate limit exceeded or loop detected
+        "402":
+          description: Quota exceeded
+
+  /twitterapi/tweet/advanced_search:
+    get:
+      summary: Advanced tweet search
+      operationId: advancedSearch
+      tags:
+        - Search
+      x-cost-per-call:
+        amount: 100
+        unit: credits
+      x-quota:
+        amount: 50000
+        unit: credits
+        window: 1h
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tweets:
+                    type: array
+                    items:
+                      type: object
+        "401":
+          description: Invalid API key
+        "429":
+          description: Rate limit exceeded or loop detected
+        "402":
+          description: Quota exceeded
+
+  /twitterapi/user/followers:
+    get:
+      summary: Get user's followers
+      operationId: getFollowers
+      tags:
+        - Users
+      x-cost-per-call:
+        amount: 18
+        unit: credits
+      x-quota:
+        amount: 10000
+        unit: credits
+        window: 1h
+      parameters:
+        - name: userName
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Twitter username
+      responses:
+        "200":
+          description: Followers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  followers:
+                    type: array
+                    items:
+                      type: object
+                  has_next_page:
+                    type: boolean
+                  next_cursor:
+                    type: string
+                  status:
+                    type: string
+                  msg:
+                    type: string
+                  code:
+                    type: integer
+        "401":
+          description: Invalid API key
+        "429":
+          description: Rate limit exceeded or loop detected
+        "402":
+          description: Quota exceeded
