@@ -1,0 +1,1318 @@
+{
+  "kind": "NamespaceList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "71143013"
+  },
+  "items": [
+    {
+      "metadata": {
+        "name": "applications",
+        "uid": "ae9cf6f4-82ba-4a42-b82f-a77397acb196",
+        "resourceVersion": "65248370",
+        "creationTimestamp": "2026-08-19T06:32:24Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "applications"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-19T06:32:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {}
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd",
+        "uid": "425bd1ef-d2b6-4c67-845f-430c30c44b5c",
+        "resourceVersion": "62744726",
+        "creationTimestamp": "2026-04-16T03:26:53Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "argocd-ns-rs-manager",
+          "kubernetes.io/metadata.name": "argocd",
+          "name": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:21Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:53Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "armor",
+        "uid": "abd1ecf0-6927-4092-a24f-43966aab377d",
+        "resourceVersion": "62745685",
+        "creationTimestamp": "2026-05-05T10:48:26Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "armor-ns-rs-manager",
+          "kubernetes.io/metadata.name": "armor"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "kubectl-create",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-05T10:48:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-apiserver",
+        "uid": "cba582d1-b0d0-4025-82c9-291ad9127a42",
+        "resourceVersion": "4552",
+        "creationTimestamp": "2026-04-16T03:45:14Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "calico-apiserver",
+          "name": "calico-apiserver",
+          "pod-security.kubernetes.io/enforce": "privileged",
+          "pod-security.kubernetes.io/enforce-version": "latest"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "APIServer",
+            "name": "default",
+            "uid": "575fa4b0-e12d-40c0-957a-acfebde25d4f",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:45:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {},
+                  "f:pod-security.kubernetes.io/enforce": {},
+                  "f:pod-security.kubernetes.io/enforce-version": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"575fa4b0-e12d-40c0-957a-acfebde25d4f\"}": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-system",
+        "uid": "1d1ca70e-f6c7-4e91-ae2f-b92860555466",
+        "resourceVersion": "3570",
+        "creationTimestamp": "2026-04-16T03:43:59Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "calico-system",
+          "name": "calico-system",
+          "pod-security.kubernetes.io/enforce": "privileged",
+          "pod-security.kubernetes.io/enforce-version": "latest"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "Installation",
+            "name": "default",
+            "uid": "d4472269-09c1-4f2b-b6c3-1c9fb0b5b802",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:43:59Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {},
+                  "f:pod-security.kubernetes.io/enforce": {},
+                  "f:pod-security.kubernetes.io/enforce-version": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"d4472269-09c1-4f2b-b6c3-1c9fb0b5b802\"}": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager",
+        "uid": "bab86929-9fd6-446e-a0aa-f13bcd21a228",
+        "resourceVersion": "62745115",
+        "creationTimestamp": "2026-04-16T03:26:33Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "cert-manager-ns-rs-manager",
+          "kubernetes.io/metadata.name": "cert-manager",
+          "name": "cert-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:50Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "default",
+        "uid": "f73b371b-7494-45ae-a028-c4255db70a0d",
+        "resourceVersion": "37",
+        "creationTimestamp": "2026-04-16T03:25:24Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "default"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "devpod-observer",
+        "uid": "d34d185a-a692-4cd6-8971-a2a9761ee67e",
+        "resourceVersion": "62744686",
+        "creationTimestamp": "2026-04-16T03:47:49Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "devpod-observer-ns-rs-manager",
+          "kubernetes.io/metadata.name": "devpod-observer"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "drawrace",
+        "uid": "97e69233-70f4-4e40-938a-a57b69970310",
+        "resourceVersion": "9122575",
+        "creationTimestamp": "2026-05-05T04:57:40Z",
+        "labels": {
+          "app": "drawrace",
+          "app.kubernetes.io/managed-by": "argocd",
+          "kubernetes.io/metadata.name": "drawrace"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"drawrace\",\"app.kubernetes.io/managed-by\":\"argocd\"},\"name\":\"drawrace\"}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-05T04:57:40Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-dns",
+        "uid": "a0e0045c-56d0-48aa-aef0-d8e7b6409fd2",
+        "resourceVersion": "62744288",
+        "creationTimestamp": "2026-04-16T11:37:07Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "external-dns-ns-rs-manager",
+          "kubernetes.io/metadata.name": "external-dns"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:02:40Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets",
+        "uid": "c41b91a4-c5e7-4b7a-9d3e-f971f32fca21",
+        "resourceVersion": "12529",
+        "creationTimestamp": "2026-04-16T03:48:08Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "external-secrets-ns-rs-manager",
+          "kubernetes.io/metadata.name": "external-secrets"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T04:06:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "garage-operator",
+        "uid": "f957c0fc-6c4d-400e-ac9e-d1ac0ba49bf5",
+        "resourceVersion": "70457394",
+        "creationTimestamp": "2026-04-16T03:47:53Z",
+        "deletionTimestamp": "2026-05-22T11:19:01Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "garage-operator-ns-rs-manager",
+          "kubernetes.io/metadata.name": "garage-operator"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-22T22:26:58Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "kube-controller-manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-26T22:32:29Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"NamespaceContentRemaining\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamespaceDeletionContentFailure\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamespaceDeletionDiscoveryFailure\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamespaceDeletionGroupVersionParsingFailure\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamespaceFinalizersRemaining\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Terminating",
+        "conditions": [
+          {
+            "type": "NamespaceDeletionDiscoveryFailure",
+            "status": "False",
+            "lastTransitionTime": "2026-08-19T06:32:54Z",
+            "reason": "ResourcesDiscovered",
+            "message": "All resources successfully discovered"
+          },
+          {
+            "type": "NamespaceDeletionGroupVersionParsingFailure",
+            "status": "False",
+            "lastTransitionTime": "2026-05-22T11:19:10Z",
+            "reason": "ParsedGroupVersions",
+            "message": "All legacy kube types successfully parsed"
+          },
+          {
+            "type": "NamespaceDeletionContentFailure",
+            "status": "False",
+            "lastTransitionTime": "2026-08-26T22:32:29Z",
+            "reason": "ContentDeleted",
+            "message": "All content successfully deleted, may be waiting on finalization"
+          },
+          {
+            "type": "NamespaceContentRemaining",
+            "status": "True",
+            "lastTransitionTime": "2026-05-22T11:19:10Z",
+            "reason": "SomeResourcesRemain",
+            "message": "Some resources are remaining: garagebuckets.garage.rajsingh.info has 1 resource instances, garageclusters.garage.rajsingh.info has 1 resource instances, garagekeys.garage.rajsingh.info has 1 resource instances"
+          },
+          {
+            "type": "NamespaceFinalizersRemaining",
+            "status": "True",
+            "lastTransitionTime": "2026-05-22T11:19:10Z",
+            "reason": "SomeFinalizersRemain",
+            "message": "Some content in the namespace has finalizers remaining: garagebucket.garage.rajsingh.info/finalizer in 1 resource instances, garagecluster.garage.rajsingh.info/finalizer in 1 resource instances, garagekey.garage.rajsingh.info/finalizer in 1 resource instances"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-node-lease",
+        "uid": "61fe39d6-698b-4e10-8f02-3cd0b4c3bb49",
+        "resourceVersion": "41",
+        "creationTimestamp": "2026-04-16T03:25:24Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "kube-node-lease"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-public",
+        "uid": "9f1cbef3-b12d-4bf5-b45c-70697e7ceb98",
+        "resourceVersion": "29",
+        "creationTimestamp": "2026-04-16T03:25:24Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "kube-public"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-system",
+        "uid": "8a2d983e-cb4f-4c65-89e2-b1736c79e565",
+        "resourceVersion": "11",
+        "creationTimestamp": "2026-04-16T03:25:24Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubernetes-reflector",
+        "uid": "75f75a63-a5ac-4729-bf21-ba373f6908c1",
+        "resourceVersion": "5651",
+        "creationTimestamp": "2026-04-16T03:47:45Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "kubernetes-reflector-ns-rs-manager",
+          "kubernetes.io/metadata.name": "kubernetes-reflector"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:47:48Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "openbao",
+        "uid": "95ffbc12-1153-4578-8971-19cbbc5020c1",
+        "resourceVersion": "62745479",
+        "creationTimestamp": "2026-04-16T03:47:49Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "openbao-ns-rs-manager",
+          "kubernetes.io/metadata.name": "openbao"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:16Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "pihole",
+        "uid": "cf816831-4cd7-426c-8620-f9659d73d0f6",
+        "resourceVersion": "62744492",
+        "creationTimestamp": "2026-05-09T19:45:03Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "pihole-ns-rs-manager",
+          "kubernetes.io/metadata.name": "pihole"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:01Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "projectsveltos",
+        "uid": "dca6535e-2831-4947-8d48-46d180f9610b",
+        "resourceVersion": "298",
+        "creationTimestamp": "2026-04-16T03:25:40Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "projectsveltos"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:40Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "reloader",
+        "uid": "9a318879-026e-46ac-b7c7-a558084d454e",
+        "resourceVersion": "5822",
+        "creationTimestamp": "2026-04-16T03:47:53Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "reloader"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:47:53Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {}
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam",
+        "uid": "8a2390bc-0535-43c2-80db-1a334b6aedb9",
+        "resourceVersion": "64397109",
+        "creationTimestamp": "2026-08-09T15:15:24Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "seam-retirement-evaluator-ns-rs-manager",
+          "argocd.argoproj.io/project": "rs-manager",
+          "kubernetes.io/metadata.name": "seam"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-18T02:11:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:argocd.argoproj.io/project": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-retirement-evaluator",
+        "uid": "d22765a5-8c4f-46ac-94cf-ed2937350423",
+        "resourceVersion": "59071435",
+        "creationTimestamp": "2026-08-09T15:15:07Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "seam-retirement-evaluator"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-09T15:15:07Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {}
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "tailnet-external-dns",
+        "uid": "24c3b79b-7199-4cc6-a3e2-195dcf457b35",
+        "resourceVersion": "62745322",
+        "creationTimestamp": "2026-05-09T19:20:13Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "tailnet-external-dns-ns-rs-manager",
+          "kubernetes.io/metadata.name": "tailnet-external-dns"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:05Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "tailscale",
+        "uid": "ae8c8dcd-2a8f-4f16-ae16-1534c6501d47",
+        "resourceVersion": "556",
+        "creationTimestamp": "2026-04-16T03:26:19Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "tailscale"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"annotations\":{},\"name\":\"tailscale\"},\"spec\":{},\"status\":{}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "tigera-operator",
+        "uid": "dcc4e57d-93d6-4007-a465-020bb2967b30",
+        "resourceVersion": "510",
+        "creationTimestamp": "2026-04-16T03:26:12Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "tigera-operator",
+          "name": "tigera-operator"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:12Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "tofu-controller",
+        "uid": "4796d857-bbca-4fdb-97b1-b432abc86b2f",
+        "resourceVersion": "2783292",
+        "creationTimestamp": "2026-04-22T14:39:56Z",
+        "labels": {
+          "kubernetes.io/metadata.name": "tofu-controller"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-22T14:39:56Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {}
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik",
+        "uid": "aba1519c-9f82-427b-a062-d9f878f54696",
+        "resourceVersion": "62745341",
+        "creationTimestamp": "2026-04-16T03:26:33Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "traefik-ns-rs-manager",
+          "kubernetes.io/metadata.name": "traefik",
+          "name": "traefik"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:kubernetes.io/metadata.name": {},
+                  "f:name": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "unifi-agent-proxy",
+        "uid": "128d11be-f21c-40af-b3af-1e8629f6896b",
+        "resourceVersion": "65248756",
+        "creationTimestamp": "2026-08-19T06:32:43Z",
+        "labels": {
+          "app.kubernetes.io/name": "unifi-agent-proxy",
+          "argocd.argoproj.io/instance": "unifi-agent-proxy-ns-rs-manager",
+          "kubernetes.io/metadata.name": "unifi-agent-proxy"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-19T06:32:43Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "vista",
+        "uid": "30b4fdfd-9003-444e-b36f-630660364e15",
+        "resourceVersion": "62745436",
+        "creationTimestamp": "2026-08-08T20:12:16Z",
+        "labels": {
+          "app.kubernetes.io/managed-by": "argocd",
+          "argocd.argoproj.io/instance": "vista-ns-rs-manager",
+          "kubernetes.io/metadata.name": "vista"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:13Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    },
+    {
+      "metadata": {
+        "name": "warden",
+        "uid": "61ddba64-b304-44ae-80e3-6c909435f19c",
+        "resourceVersion": "62746879",
+        "creationTimestamp": "2026-07-30T17:39:37Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "warden-ns-rs-manager",
+          "kubernetes.io/metadata.name": "warden"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      },
+      "status": {
+        "phase": "Active"
+      }
+    }
+  ]
+}

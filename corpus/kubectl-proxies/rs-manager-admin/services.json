@@ -1,0 +1,5742 @@
+{
+  "kind": "ServiceList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "71143037"
+  },
+  "items": [
+    {
+      "metadata": {
+        "name": "argocd-applicationset-controller",
+        "namespace": "argocd",
+        "uid": "e0adc20e-9d53-4c5c-a0c7-f3161471afed",
+        "resourceVersion": "31468885",
+        "creationTimestamp": "2026-04-16T03:46:51Z",
+        "labels": {
+          "app.kubernetes.io/component": "applicationset-controller",
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argocd-applicationset-controller",
+          "app.kubernetes.io/part-of": "argocd",
+          "app.kubernetes.io/version": "v3.4.3",
+          "helm.sh/chart": "argo-cd-9.5.21"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "argocd",
+          "meta.helm.sh/release-namespace": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-14T18:24:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":7000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-webhook",
+            "protocol": "TCP",
+            "port": 7000,
+            "targetPort": "webhook"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/name": "argocd-applicationset-controller"
+        },
+        "clusterIP": "10.21.13.112",
+        "clusterIPs": [
+          "10.21.13.112"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-dex-server",
+        "namespace": "argocd",
+        "uid": "099ffabf-2b16-40e6-b129-a1819a16d524",
+        "resourceVersion": "31468900",
+        "creationTimestamp": "2026-04-16T03:46:52Z",
+        "labels": {
+          "app.kubernetes.io/component": "dex-server",
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argocd-dex-server",
+          "app.kubernetes.io/part-of": "argocd",
+          "app.kubernetes.io/version": "v3.4.3",
+          "helm.sh/chart": "argo-cd-9.5.21"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "argocd",
+          "meta.helm.sh/release-namespace": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-14T18:24:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5556,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":5557,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 5556,
+            "targetPort": "http"
+          },
+          {
+            "name": "grpc",
+            "protocol": "TCP",
+            "port": 5557,
+            "targetPort": "grpc"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/name": "argocd-dex-server"
+        },
+        "clusterIP": "10.21.80.223",
+        "clusterIPs": [
+          "10.21.80.223"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-readonly-proxy",
+        "namespace": "argocd",
+        "uid": "3d572bb4-f689-40c3-9251-847ec0317627",
+        "resourceVersion": "62744732",
+        "creationTimestamp": "2026-05-26T19:31:36Z",
+        "labels": {
+          "app": "argocd-readonly-proxy",
+          "argocd.argoproj.io/instance": "argocd-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:22Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "argocd-readonly-proxy"
+        },
+        "clusterIP": "10.21.37.51",
+        "clusterIPs": [
+          "10.21.37.51"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-redis",
+        "namespace": "argocd",
+        "uid": "e8bb7495-c2eb-47df-911a-7236ee9f71b9",
+        "resourceVersion": "31468904",
+        "creationTimestamp": "2026-04-16T03:46:52Z",
+        "labels": {
+          "app.kubernetes.io/component": "redis",
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argocd-redis",
+          "app.kubernetes.io/part-of": "argocd",
+          "app.kubernetes.io/version": "v3.4.3",
+          "helm.sh/chart": "argo-cd-9.5.21"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "argocd",
+          "meta.helm.sh/release-namespace": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-14T18:24:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":6379,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "redis",
+            "protocol": "TCP",
+            "port": 6379,
+            "targetPort": "redis"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/name": "argocd-redis"
+        },
+        "clusterIP": "10.21.77.220",
+        "clusterIPs": [
+          "10.21.77.220"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-repo-server",
+        "namespace": "argocd",
+        "uid": "8dba677c-c0f8-4176-a884-ef106dad4f9c",
+        "resourceVersion": "31468889",
+        "creationTimestamp": "2026-04-16T03:46:51Z",
+        "labels": {
+          "app.kubernetes.io/component": "repo-server",
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argocd-repo-server",
+          "app.kubernetes.io/part-of": "argocd",
+          "app.kubernetes.io/version": "v3.4.3",
+          "helm.sh/chart": "argo-cd-9.5.21"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "argocd",
+          "meta.helm.sh/release-namespace": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-14T18:24:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8081,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-repo-server",
+            "protocol": "TCP",
+            "port": 8081,
+            "targetPort": "repo-server"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/name": "argocd-repo-server"
+        },
+        "clusterIP": "10.21.240.158",
+        "clusterIPs": [
+          "10.21.240.158"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argocd-server",
+        "namespace": "argocd",
+        "uid": "06b11b4a-90a5-4749-8c08-9976eaa161fc",
+        "resourceVersion": "31468893",
+        "creationTimestamp": "2026-04-16T03:46:51Z",
+        "labels": {
+          "app.kubernetes.io/component": "server",
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argocd-server",
+          "app.kubernetes.io/part-of": "argocd",
+          "app.kubernetes.io/version": "v3.4.3",
+          "helm.sh/chart": "argo-cd-9.5.21"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "argocd",
+          "meta.helm.sh/release-namespace": "argocd"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-14T18:24:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 8080
+          },
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argocd",
+          "app.kubernetes.io/name": "argocd-server"
+        },
+        "clusterIP": "10.21.16.223",
+        "clusterIPs": [
+          "10.21.16.223"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "armor",
+        "namespace": "armor",
+        "uid": "53774a7d-34b0-4093-863d-48f3da09f55d",
+        "resourceVersion": "62745686",
+        "creationTimestamp": "2026-05-05T17:14:16Z",
+        "labels": {
+          "app": "armor",
+          "argocd.argoproj.io/instance": "armor-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "s3-api",
+            "protocol": "TCP",
+            "port": 9000,
+            "targetPort": 9000
+          },
+          {
+            "name": "admin-api",
+            "protocol": "TCP",
+            "port": 9001,
+            "targetPort": 9001
+          }
+        ],
+        "selector": {
+          "app": "armor"
+        },
+        "clusterIP": "10.21.118.151",
+        "clusterIPs": [
+          "10.21.118.151"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "restore-verifier",
+        "namespace": "armor",
+        "uid": "56ce9076-44dc-4ec8-b317-6e550d1cc4af",
+        "resourceVersion": "62745687",
+        "creationTimestamp": "2026-08-08T20:11:51Z",
+        "labels": {
+          "app": "restore-verifier",
+          "app.kubernetes.io/name": "restore-verifier",
+          "argocd.argoproj.io/instance": "armor-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9002,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9002,
+            "targetPort": 9002
+          }
+        ],
+        "selector": {
+          "app": "restore-verifier"
+        },
+        "clusterIP": "10.21.187.129",
+        "clusterIPs": [
+          "10.21.187.129"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "restore-verifier-acb",
+        "namespace": "armor",
+        "uid": "661860d3-f4f8-4811-ac39-6aff4b79ff94",
+        "resourceVersion": "62745688",
+        "creationTimestamp": "2026-08-08T20:11:51Z",
+        "labels": {
+          "app": "restore-verifier-acb",
+          "app.kubernetes.io/name": "restore-verifier-acb",
+          "argocd.argoproj.io/instance": "armor-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9002,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9002,
+            "targetPort": 9002
+          }
+        ],
+        "selector": {
+          "app": "restore-verifier-acb"
+        },
+        "clusterIP": "10.21.218.143",
+        "clusterIPs": [
+          "10.21.218.143"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-api",
+        "namespace": "calico-apiserver",
+        "uid": "26cee16b-a5b7-47ff-a385-7785e64b89b2",
+        "resourceVersion": "4562",
+        "creationTimestamp": "2026-04-16T03:45:14Z",
+        "labels": {
+          "k8s-app": "tigera-api"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "APIServer",
+            "name": "default",
+            "uid": "575fa4b0-e12d-40c0-957a-acfebde25d4f",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:45:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"575fa4b0-e12d-40c0-957a-acfebde25d4f\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "apiserver",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 5443
+          }
+        ],
+        "selector": {
+          "apiserver": "true"
+        },
+        "clusterIP": "10.21.170.189",
+        "clusterIPs": [
+          "10.21.170.189"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-kube-controllers-metrics",
+        "namespace": "calico-system",
+        "uid": "7d7bd667-da1b-438e-892a-ddf6f48f8794",
+        "resourceVersion": "4458",
+        "creationTimestamp": "2026-04-16T03:45:02Z",
+        "labels": {
+          "k8s-app": "calico-kube-controllers"
+        },
+        "annotations": {
+          "prometheus.io/port": "9094",
+          "prometheus.io/scrape": "true"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "Installation",
+            "name": "default",
+            "uid": "d4472269-09c1-4f2b-b6c3-1c9fb0b5b802",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:45:02Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"d4472269-09c1-4f2b-b6c3-1c9fb0b5b802\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9094,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics-port",
+            "protocol": "TCP",
+            "port": 9094,
+            "targetPort": 9094
+          }
+        ],
+        "selector": {
+          "k8s-app": "calico-kube-controllers"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-typha",
+        "namespace": "calico-system",
+        "uid": "7b7f7090-d59e-4512-a32a-4b29db5e9a93",
+        "resourceVersion": "3592",
+        "creationTimestamp": "2026-04-16T03:44:01Z",
+        "labels": {
+          "k8s-app": "calico-typha"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "Installation",
+            "name": "default",
+            "uid": "d4472269-09c1-4f2b-b6c3-1c9fb0b5b802",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:44:01Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"d4472269-09c1-4f2b-b6c3-1c9fb0b5b802\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5473,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "calico-typha",
+            "protocol": "TCP",
+            "port": 5473,
+            "targetPort": "calico-typha"
+          }
+        ],
+        "selector": {
+          "k8s-app": "calico-typha"
+        },
+        "clusterIP": "10.21.251.250",
+        "clusterIPs": [
+          "10.21.251.250"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager",
+        "namespace": "cert-manager",
+        "uid": "68986c5d-5e79-4fc3-99c4-ca129f5e7497",
+        "resourceVersion": "822",
+        "creationTimestamp": "2026-04-16T03:26:39Z",
+        "labels": {
+          "app": "cert-manager",
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cert-manager",
+          "app.kubernetes.io/version": "v1.17.1",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "cert-manager",
+          "meta.helm.sh/release-namespace": "cert-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-prometheus-servicemonitor",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": 9402
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/name": "cert-manager"
+        },
+        "clusterIP": "10.21.129.91",
+        "clusterIPs": [
+          "10.21.129.91"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-cainjector",
+        "namespace": "cert-manager",
+        "uid": "c0d1ff70-cb04-4a1d-9d2a-faaabe1512ca",
+        "resourceVersion": "829",
+        "creationTimestamp": "2026-04-16T03:26:39Z",
+        "labels": {
+          "app": "cainjector",
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cainjector",
+          "app.kubernetes.io/version": "v1.17.1",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "cert-manager",
+          "meta.helm.sh/release-namespace": "cert-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": 9402
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/name": "cainjector"
+        },
+        "clusterIP": "10.21.237.58",
+        "clusterIPs": [
+          "10.21.237.58"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-rs-manager",
+        "namespace": "cert-manager",
+        "uid": "1e3cf098-0570-4113-8933-04f9d1410743",
+        "resourceVersion": "6147",
+        "creationTimestamp": "2026-04-16T03:48:08Z",
+        "labels": {
+          "app": "cert-manager",
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cert-manager",
+          "app.kubernetes.io/version": "v1.17.1",
+          "argocd.argoproj.io/instance": "cert-manager-rs-manager",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:48:08Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-prometheus-servicemonitor",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": 9402
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/name": "cert-manager"
+        },
+        "clusterIP": "10.21.119.36",
+        "clusterIPs": [
+          "10.21.119.36"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-rs-manager-cainjector",
+        "namespace": "cert-manager",
+        "uid": "337350fa-27e8-4ae2-9f54-62c6b8589b3c",
+        "resourceVersion": "6162",
+        "creationTimestamp": "2026-04-16T03:48:09Z",
+        "labels": {
+          "app": "cainjector",
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cainjector",
+          "app.kubernetes.io/version": "v1.17.1",
+          "argocd.argoproj.io/instance": "cert-manager-rs-manager",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:48:09Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": 9402
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/name": "cainjector"
+        },
+        "clusterIP": "10.21.208.113",
+        "clusterIPs": [
+          "10.21.208.113"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-rs-manager-webhook",
+        "namespace": "cert-manager",
+        "uid": "b39b44bf-e36c-4fbd-885a-801a104a002b",
+        "resourceVersion": "6152",
+        "creationTimestamp": "2026-04-16T03:48:09Z",
+        "labels": {
+          "app": "webhook",
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "webhook",
+          "app.kubernetes.io/version": "v1.17.1",
+          "argocd.argoproj.io/instance": "cert-manager-rs-manager",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:48:09Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "https"
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": "http-metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager-rs-manager",
+          "app.kubernetes.io/name": "webhook"
+        },
+        "clusterIP": "10.21.204.75",
+        "clusterIPs": [
+          "10.21.204.75"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-webhook",
+        "namespace": "cert-manager",
+        "uid": "d4990ca4-e7a3-4a87-bd8c-2cde45daa0f1",
+        "resourceVersion": "825",
+        "creationTimestamp": "2026-04-16T03:26:39Z",
+        "labels": {
+          "app": "webhook",
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "webhook",
+          "app.kubernetes.io/version": "v1.17.1",
+          "helm.sh/chart": "cert-manager-v1.17.1"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "cert-manager",
+          "meta.helm.sh/release-namespace": "cert-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "https"
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": "http-metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager",
+          "app.kubernetes.io/name": "webhook"
+        },
+        "clusterIP": "10.21.94.219",
+        "clusterIPs": [
+          "10.21.94.219"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubernetes",
+        "namespace": "default",
+        "uid": "c2a6ce15-fa83-48d1-9a05-14775132768c",
+        "resourceVersion": "197",
+        "creationTimestamp": "2026-04-16T03:25:26Z",
+        "labels": {
+          "component": "apiserver",
+          "provider": "kubernetes"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:component": {},
+                  "f:provider": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 443
+          }
+        ],
+        "clusterIP": "10.21.0.1",
+        "clusterIPs": [
+          "10.21.0.1"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy",
+        "namespace": "devpod-observer",
+        "uid": "e0fba51b-fcba-472b-9b7a-156f9b553277",
+        "resourceVersion": "62744699",
+        "creationTimestamp": "2026-04-16T03:47:51Z",
+        "labels": {
+          "app": "kubectl-proxy",
+          "argocd.argoproj.io/instance": "devpod-observer-ns-rs-manager",
+          "component": "cross-cluster-access",
+          "target-cluster": "rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:19Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "proxy",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "selector": {
+          "app": "kubectl-proxy"
+        },
+        "clusterIP": "10.21.189.11",
+        "clusterIPs": [
+          "10.21.189.11"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "b2-us-west-002-cname",
+        "namespace": "external-dns",
+        "uid": "f848720e-f869-46c6-bbd8-b021ae0e44d1",
+        "resourceVersion": "62744289",
+        "creationTimestamp": "2026-05-10T14:38:38Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "external-dns-ns-rs-manager"
+        },
+        "annotations": {
+          "external-dns.alpha.kubernetes.io/cloudflare-proxied": "true",
+          "external-dns.alpha.kubernetes.io/hostname": "b2-us-west-002.ardenone.com",
+          "external-dns.alpha.kubernetes.io/target": "f002.backblazeb2.com"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:02:40Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:external-dns.alpha.kubernetes.io/cloudflare-proxied": {},
+                  "f:external-dns.alpha.kubernetes.io/hostname": {},
+                  "f:external-dns.alpha.kubernetes.io/target": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:protocol": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 443
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "f002.backblazeb2.com"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-dns-rs-manager",
+        "namespace": "external-dns",
+        "uid": "b6720634-3ebc-4db2-a614-e361805c7dcc",
+        "resourceVersion": "136532",
+        "creationTimestamp": "2026-04-16T11:38:05Z",
+        "labels": {
+          "app.kubernetes.io/instance": "external-dns-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-dns",
+          "app.kubernetes.io/version": "0.20.0",
+          "argocd.argoproj.io/instance": "external-dns-rs-manager",
+          "helm.sh/chart": "external-dns-1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T11:38:05Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":7979,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 7979,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "external-dns-rs-manager",
+          "app.kubernetes.io/name": "external-dns"
+        },
+        "clusterIP": "10.21.194.78",
+        "clusterIPs": [
+          "10.21.194.78"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets-rs-manager-webhook",
+        "namespace": "external-secrets",
+        "uid": "84545a16-7bb0-477b-a48b-38931a56998d",
+        "resourceVersion": "12352",
+        "creationTimestamp": "2026-04-16T03:48:48Z",
+        "labels": {
+          "app.kubernetes.io/instance": "external-secrets-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-secrets-webhook",
+          "app.kubernetes.io/version": "v2.1.0",
+          "argocd.argoproj.io/instance": "external-secrets-rs-manager",
+          "external-secrets.io/component": "webhook",
+          "helm.sh/chart": "external-secrets-2.1.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T04:06:01Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:external-secrets.io/component": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "webhook",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "webhook"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "external-secrets-rs-manager",
+          "app.kubernetes.io/name": "external-secrets-webhook"
+        },
+        "clusterIP": "10.21.148.197",
+        "clusterIPs": [
+          "10.21.148.197"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ceph-csi-rbd-provisioner-http-metrics",
+        "namespace": "kube-system",
+        "uid": "2f8bc170-a40a-4f91-b993-44ad46fe66c6",
+        "resourceVersion": "49083899",
+        "creationTimestamp": "2026-07-23T10:49:26Z",
+        "labels": {
+          "app": "ceph-csi-rbd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "chart": "ceph-csi-rbd-3.15.1",
+          "component": "provisioner",
+          "heritage": "Helm",
+          "release": "ceph-csi-rbd"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "ceph-csi-rbd",
+          "meta.helm.sh/release-namespace": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-07-23T10:49:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:chart": {},
+                  "f:component": {},
+                  "f:heritage": {},
+                  "f:release": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-metrics",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "ceph-csi-rbd",
+          "component": "provisioner",
+          "release": "ceph-csi-rbd"
+        },
+        "clusterIP": "10.21.87.105",
+        "clusterIPs": [
+          "10.21.87.105"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-dns",
+        "namespace": "kube-system",
+        "uid": "aaa86ca7-8b8d-41d3-a7c6-7c068149ea98",
+        "resourceVersion": "374",
+        "creationTimestamp": "2026-04-16T03:25:51Z",
+        "labels": {
+          "k8s-app": "kube-dns",
+          "kamaji.clastix.io/project": "kamaji",
+          "kubernetes.io/cluster-service": "true",
+          "kubernetes.io/name": "CoreDNS"
+        },
+        "annotations": {
+          "prometheus.io/port": "9153",
+          "prometheus.io/scrape": "true"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRoleBinding",
+            "name": "system:coredns",
+            "uid": "254a4fce-05fe-46f0-b3e7-7fe26744a618",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "kamaji",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:53Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  "f:k8s-app": {},
+                  "f:kamaji.clastix.io/project": {},
+                  "f:kubernetes.io/cluster-service": {},
+                  "f:kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  "k:{\"uid\":\"254a4fce-05fe-46f0-b3e7-7fe26744a618\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":53,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9153,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {}
+              }
+            }
+          },
+          {
+            "manager": "kamaji",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:51Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {},
+                  "f:kamaji.clastix.io/project": {},
+                  "f:kubernetes.io/cluster-service": {},
+                  "f:kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"254a4fce-05fe-46f0-b3e7-7fe26744a618\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":53,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9153,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "dns",
+            "protocol": "UDP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "dns-tcp",
+            "protocol": "TCP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9153,
+            "targetPort": 9153
+          }
+        ],
+        "selector": {
+          "k8s-app": "kube-dns"
+        },
+        "clusterIP": "10.21.0.10",
+        "clusterIPs": [
+          "10.21.0.10"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "metrics-server",
+        "namespace": "kube-system",
+        "uid": "15f1fef5-32e7-4ada-bbbc-1297849c62ad",
+        "resourceVersion": "29681865",
+        "creationTimestamp": "2026-06-11T08:23:10Z",
+        "labels": {
+          "app.kubernetes.io/instance": "metrics-server",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "metrics-server",
+          "app.kubernetes.io/version": "0.7.0",
+          "helm.sh/chart": "metrics-server-3.12.0"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "metrics-server",
+          "meta.helm.sh/release-namespace": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-11T08:23:10Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "https"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "metrics-server",
+          "app.kubernetes.io/name": "metrics-server"
+        },
+        "clusterIP": "10.21.34.153",
+        "clusterIPs": [
+          "10.21.34.153"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "vcp-proxy",
+        "namespace": "kube-system",
+        "uid": "a50f343b-1e6d-4a6f-ac25-158ff17bf62f",
+        "resourceVersion": "325",
+        "creationTimestamp": "2026-04-16T03:25:45Z",
+        "labels": {
+          "projectsveltos.io/reason": "Resources",
+          "projectsveltos.io/reference-kind": "ConfigMap",
+          "projectsveltos.io/reference-name": "vcp-proxy-cluster-configmap",
+          "projectsveltos.io/reference-namespace": "kube-system"
+        },
+        "annotations": {
+          "projectsveltos.io/hash": "sha256:e4bffc47e04522f86b1ec86a02dddee67501770666bc6c9853d4c39279895834",
+          "projectsveltos.io/owner-tier": "100"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "config.projectsveltos.io/v1beta1",
+            "kind": "ClusterProfile",
+            "name": "proxy-addons",
+            "uid": "6dade94d-b9e3-4871-98cb-28740b854611"
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "application/apply-patch",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:25:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:projectsveltos.io/hash": {},
+                  "f:projectsveltos.io/owner-tier": {}
+                },
+                "f:labels": {
+                  "f:projectsveltos.io/reason": {},
+                  "f:projectsveltos.io/reference-kind": {},
+                  "f:projectsveltos.io/reference-name": {},
+                  "f:projectsveltos.io/reference-namespace": {}
+                },
+                "f:ownerReferences": {
+                  "k:{\"uid\":\"6dade94d-b9e3-4871-98cb-28740b854611\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:clusterIPs": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilies": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  "k:{\"port\":6443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 6443,
+            "targetPort": 6443
+          }
+        ],
+        "selector": {
+          "app": "vcp-proxy"
+        },
+        "clusterIP": "10.21.0.40",
+        "clusterIPs": [
+          "10.21.0.40"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "openbao-rs-manager",
+        "namespace": "openbao",
+        "uid": "9e2684b8-e266-4b24-87f6-3401cbc0cd2f",
+        "resourceVersion": "62746930",
+        "creationTimestamp": "2026-04-16T03:48:02Z",
+        "labels": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "openbao",
+          "argocd.argoproj.io/instance": "openbao-rs-manager",
+          "helm.sh/chart": "openbao-0.26.1"
+        },
+        "annotations": {
+          "tailscale.com/ts-proxy": "true"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:appProtocol": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8201,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:publishNotReadyAddresses": {},
+                "f:selector": {}
+              }
+            }
+          },
+          {
+            "manager": "kubectl-annotate",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-06T19:48:22Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:tailscale.com/ts-proxy": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "appProtocol": "HTTP",
+            "port": 8200,
+            "targetPort": 8200
+          },
+          {
+            "name": "https-internal",
+            "protocol": "TCP",
+            "port": 8201,
+            "targetPort": 8201
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/name": "openbao",
+          "component": "server"
+        },
+        "clusterIP": "10.21.56.119",
+        "clusterIPs": [
+          "10.21.56.119"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "publishNotReadyAddresses": true,
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "openbao-rs-manager-internal",
+        "namespace": "openbao",
+        "uid": "f76a8a5a-9f70-435b-8246-dd9b2b8c51d8",
+        "resourceVersion": "62746935",
+        "creationTimestamp": "2026-04-16T03:48:02Z",
+        "labels": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "openbao",
+          "argocd.argoproj.io/instance": "openbao-rs-manager",
+          "helm.sh/chart": "openbao-0.26.1",
+          "openbao-internal": "true"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {},
+                  "f:openbao-internal": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:appProtocol": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8201,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:publishNotReadyAddresses": {},
+                "f:selector": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "appProtocol": "HTTP",
+            "port": 8200,
+            "targetPort": 8200
+          },
+          {
+            "name": "https-internal",
+            "protocol": "TCP",
+            "port": 8201,
+            "targetPort": 8201
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/name": "openbao",
+          "component": "server"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "publishNotReadyAddresses": true,
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "openbao-rs-manager-ui",
+        "namespace": "openbao",
+        "uid": "98e395cc-128d-4c64-b757-923658ca9edd",
+        "resourceVersion": "62746931",
+        "creationTimestamp": "2026-04-16T03:48:02Z",
+        "labels": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "openbao-ui",
+          "argocd.argoproj.io/instance": "openbao-rs-manager",
+          "helm.sh/chart": "openbao-0.26.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:publishNotReadyAddresses": {},
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8200,
+            "targetPort": 8200
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "openbao-rs-manager",
+          "app.kubernetes.io/name": "openbao",
+          "component": "server"
+        },
+        "clusterIP": "10.21.227.188",
+        "clusterIPs": [
+          "10.21.227.188"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "publishNotReadyAddresses": true,
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik-ardenone-cluster-egress",
+        "namespace": "openbao",
+        "uid": "25923e2e-d817-4736-8d4c-64323bb63c6d",
+        "resourceVersion": "62745483",
+        "creationTimestamp": "2026-04-19T20:05:24Z",
+        "labels": {
+          "app": "openbao-replicator",
+          "argocd.argoproj.io/instance": "openbao-ns-rs-manager",
+          "component": "egress",
+          "target-cluster": "ardenone-cluster"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "traefik-ardenone-cluster.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:16Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-19T20:16:13Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-13T08:54:21Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": 8444
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-traefik-ardenone-cluster-egress-8dwr7.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-05-13T08:54:21Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik-ardenone-manager-egress",
+        "namespace": "openbao",
+        "uid": "3fe64fad-e075-4637-a478-8571f25b3141",
+        "resourceVersion": "62745481",
+        "creationTimestamp": "2026-04-19T20:05:24Z",
+        "labels": {
+          "app": "openbao-replicator",
+          "argocd.argoproj.io/instance": "openbao-ns-rs-manager",
+          "component": "egress",
+          "target-cluster": "ardenone-manager"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "traefik-ardenone-manager.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:16Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-19T20:16:13Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-07-30T18:32:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": 8444
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-traefik-ardenone-manager-egress-2xd87.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-07-30T18:32:20Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "pihole",
+        "namespace": "pihole",
+        "uid": "2c50cb7e-94db-4b74-b665-864809a03c8d",
+        "resourceVersion": "62744493",
+        "creationTimestamp": "2026-05-09T19:45:03Z",
+        "labels": {
+          "app": "pihole",
+          "argocd.argoproj.io/instance": "pihole-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:01Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":53,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "dns-udp",
+            "protocol": "UDP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "dns-tcp",
+            "protocol": "TCP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "app": "pihole"
+        },
+        "clusterIP": "10.21.35.81",
+        "clusterIPs": [
+          "10.21.35.81"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam",
+        "namespace": "seam",
+        "uid": "103c1be9-a83b-40b0-9652-2537102f8f1e",
+        "resourceVersion": "65806678",
+        "creationTimestamp": "2026-08-19T06:32:33Z",
+        "labels": {
+          "app.kubernetes.io/component": "gateway",
+          "app.kubernetes.io/name": "seam",
+          "argocd.argoproj.io/instance": "seam-ns-rs-manager"
+        },
+        "annotations": {
+          "prometheus.io/path": "/_seam/metrics",
+          "prometheus.io/port": "8081",
+          "prometheus.io/scrape": "true"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-20T03:58:55Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:prometheus.io/path": {},
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8081,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "caller",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 8080
+          },
+          {
+            "name": "operator",
+            "protocol": "TCP",
+            "port": 8081,
+            "targetPort": 8081
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "gateway",
+          "app.kubernetes.io/name": "seam"
+        },
+        "clusterIP": "10.21.7.190",
+        "clusterIPs": [
+          "10.21.7.190"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-tailscale",
+        "namespace": "seam",
+        "uid": "7f04a46b-1187-43dd-9db7-cfa7b04be11e",
+        "resourceVersion": "70024350",
+        "creationTimestamp": "2026-08-25T20:38:33Z",
+        "labels": {
+          "app.kubernetes.io/component": "gateway",
+          "app.kubernetes.io/name": "seam",
+          "argocd.argoproj.io/instance": "seam-ns-rs-manager"
+        },
+        "annotations": {
+          "tailscale.com/expose": "true",
+          "tailscale.com/hostname": "seam-rs-manager",
+          "tailscale.com/tags": "tag:seam"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-26T08:20:46Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/expose": {},
+                  "f:tailscale.com/hostname": {},
+                  "f:tailscale.com/tags": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8081,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-25T20:38:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-25T20:42:31Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "caller",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 8080
+          },
+          {
+            "name": "operator",
+            "protocol": "TCP",
+            "port": 8081,
+            "targetPort": 8081
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "gateway",
+          "app.kubernetes.io/name": "seam"
+        },
+        "clusterIP": "10.21.136.133",
+        "clusterIPs": [
+          "10.21.136.133"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-25T20:42:31Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "victoriametrics-query",
+        "namespace": "seam",
+        "uid": "46023a0d-d26c-4306-88b0-7f7722ddef51",
+        "resourceVersion": "65918133",
+        "creationTimestamp": "2026-08-20T07:29:14Z",
+        "labels": {
+          "app.kubernetes.io/component": "metrics-egress",
+          "app.kubernetes.io/name": "seam-vmagent",
+          "argocd.argoproj.io/instance": "seam-retirement-evaluator-ns-rs-manager"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "seam-victoriametrics-query.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-20T07:29:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8427,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-20T07:29:15Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-20T07:29:16Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8427,
+            "targetPort": 8427
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-victoriametrics-query-6xzqf.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-20T07:29:16Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "tailnet-external-dns",
+        "namespace": "tailnet-external-dns",
+        "uid": "9e9cbafb-6a7b-43f9-94e2-c944f90e2979",
+        "resourceVersion": "11648298",
+        "creationTimestamp": "2026-05-09T19:21:52Z",
+        "labels": {
+          "app.kubernetes.io/instance": "tailnet-external-dns",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-dns",
+          "app.kubernetes.io/version": "0.20.0",
+          "argocd.argoproj.io/instance": "tailnet-external-dns-rs-manager",
+          "helm.sh/chart": "external-dns-1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-05-09T19:21:52Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":7979,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 7979,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "tailnet-external-dns",
+          "app.kubernetes.io/name": "external-dns"
+        },
+        "clusterIP": "10.21.253.47",
+        "clusterIPs": [
+          "10.21.253.47"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-apexalgo-iad-egress",
+        "namespace": "tailscale",
+        "uid": "69143851-2c51-4d6e-be27-e2cf522cfa4d",
+        "resourceVersion": "62745643",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "apexalgo-iad"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "traefik-apexalgo-iad.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-apexalgo-iad-egress-kpj8t.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:26Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-iad-ci-egress",
+        "namespace": "tailscale",
+        "uid": "f0b82f7f-8dc0-477b-94be-88fd3e0c34d3",
+        "resourceVersion": "62745639",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "iad-ci"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "kubectl-proxy-iad-ci.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-iad-ci-egress-54xwl.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:24Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-iad-kalshi-egress",
+        "namespace": "tailscale",
+        "uid": "4197471d-3245-479b-affe-e7c5e478a930",
+        "resourceVersion": "62745641",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "iad-kalshi"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "kubectl-proxy-iad-kalshi.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:29Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:29Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-iad-kalshi-egress-qwwqh.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:29Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-iad-native-ads-egress",
+        "namespace": "tailscale",
+        "uid": "d309fb67-88f6-44b6-8aa6-64168e349e87",
+        "resourceVersion": "62745644",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "iad-native-ads"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "kubectl-proxy-iad-native-ads.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:25Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-iad-native-ads-egress-cdk5f.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:25Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-iad-options-egress",
+        "namespace": "tailscale",
+        "uid": "eadbba58-043b-4965-889b-2514779b28a6",
+        "resourceVersion": "62745642",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "iad-options"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "traefik-iad-options.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:31Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:32Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-iad-options-egress-ncjfb.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:31Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy-ord-devimprint-egress",
+        "namespace": "tailscale",
+        "uid": "326f93c1-40d1-46a4-9bf1-3179708ae3ec",
+        "resourceVersion": "62745640",
+        "creationTimestamp": "2026-08-08T20:12:22Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailscale-ns-rs-manager",
+          "component": "kubectl-proxy-egress",
+          "target-cluster": "ord-devimprint"
+        },
+        "annotations": {
+          "tailscale.com/tailnet-fqdn": "kubectl-proxy-ord-devimprint.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:27Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:27Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-kubectl-proxy-ord-devimprint-egress-52dvg.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-08-08T20:12:27Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-apexalgo-iad-egress-kpj8t",
+        "generateName": "ts-kubectl-proxy-apexalgo-iad-egress-",
+        "namespace": "tailscale",
+        "uid": "b565c2b4-3509-495e-af95-c31d59c01f3f",
+        "resourceVersion": "58543737",
+        "creationTimestamp": "2026-08-08T20:12:25Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-apexalgo-iad-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:25Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "69143851-2c51-4d6e-be27-e2cf522cfa4d"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-iad-ci-egress-54xwl",
+        "generateName": "ts-kubectl-proxy-iad-ci-egress-",
+        "namespace": "tailscale",
+        "uid": "bb1a40cd-a6ee-4949-b2ca-eb3e3da62d51",
+        "resourceVersion": "58543651",
+        "creationTimestamp": "2026-08-08T20:12:23Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-iad-ci-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:23Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "f0b82f7f-8dc0-477b-94be-88fd3e0c34d3"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-iad-kalshi-egress-qwwqh",
+        "generateName": "ts-kubectl-proxy-iad-kalshi-egress-",
+        "namespace": "tailscale",
+        "uid": "72308da0-1626-4c88-b2cb-1dfc1ae2484f",
+        "resourceVersion": "58543865",
+        "creationTimestamp": "2026-08-08T20:12:28Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-iad-kalshi-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "4197471d-3245-479b-affe-e7c5e478a930"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-iad-native-ads-egress-cdk5f",
+        "generateName": "ts-kubectl-proxy-iad-native-ads-egress-",
+        "namespace": "tailscale",
+        "uid": "660aff63-b107-4379-a35e-505a2c766f25",
+        "resourceVersion": "58543713",
+        "creationTimestamp": "2026-08-08T20:12:24Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-iad-native-ads-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "d309fb67-88f6-44b6-8aa6-64168e349e87"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-iad-options-egress-ncjfb",
+        "generateName": "ts-kubectl-proxy-iad-options-egress-",
+        "namespace": "tailscale",
+        "uid": "7ff3ff53-70da-43ba-8ea5-e566a198fb83",
+        "resourceVersion": "58543938",
+        "creationTimestamp": "2026-08-08T20:12:30Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-iad-options-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "eadbba58-043b-4965-889b-2514779b28a6"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-kubectl-proxy-ord-devimprint-egress-52dvg",
+        "generateName": "ts-kubectl-proxy-ord-devimprint-egress-",
+        "namespace": "tailscale",
+        "uid": "d5822637-789d-4bd7-b9bc-581b5f5cf534",
+        "resourceVersion": "58543799",
+        "creationTimestamp": "2026-08-08T20:12:27Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "kubectl-proxy-ord-devimprint-egress",
+          "tailscale.com/parent-resource-ns": "tailscale",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T20:12:27Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "326f93c1-40d1-46a4-9bf1-3179708ae3ec"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-seam-tailscale-p66mw",
+        "generateName": "ts-seam-tailscale-",
+        "namespace": "tailscale",
+        "uid": "8e8307a3-08f4-47b4-ada2-4bf50543971e",
+        "resourceVersion": "69678286",
+        "creationTimestamp": "2026-08-25T20:38:33Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "seam-tailscale",
+          "tailscale.com/parent-resource-ns": "seam",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-25T20:38:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "7f04a46b-1187-43dd-9db7-cfa7b04be11e"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-traefik-ardenone-cluster-egress-8dwr7",
+        "generateName": "ts-traefik-ardenone-cluster-egress-",
+        "namespace": "tailscale",
+        "uid": "5f8df949-b74c-4b6e-825a-a1beed3b4a23",
+        "resourceVersion": "1484763",
+        "creationTimestamp": "2026-04-19T20:05:25Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "traefik-ardenone-cluster-egress",
+          "tailscale.com/parent-resource-ns": "openbao",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-19T20:05:25Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "25923e2e-d817-4736-8d4c-64323bb63c6d"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-traefik-ardenone-manager-egress-2xd87",
+        "generateName": "ts-traefik-ardenone-manager-egress-",
+        "namespace": "tailscale",
+        "uid": "b1b14588-7d3a-4215-8379-2f614ca85a3b",
+        "resourceVersion": "1484740",
+        "creationTimestamp": "2026-04-19T20:05:24Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "traefik-ardenone-manager-egress",
+          "tailscale.com/parent-resource-ns": "openbao",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-19T20:05:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "3fe64fad-e075-4637-a478-8571f25b3141"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-traefik-tailscale-dj69m",
+        "generateName": "ts-traefik-tailscale-",
+        "namespace": "tailscale",
+        "uid": "306a13eb-d0bb-416e-8750-51ac607f0af9",
+        "resourceVersion": "5694",
+        "creationTimestamp": "2026-04-16T03:47:49Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "traefik-tailscale",
+          "tailscale.com/parent-resource-ns": "traefik",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:47:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "d6f36c30-1597-4c93-bd89-40138abf5cdf"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-victoriametrics-query-6xzqf",
+        "generateName": "ts-victoriametrics-query-",
+        "namespace": "tailscale",
+        "uid": "808fb0a9-894c-4465-a01c-17ec4caa6010",
+        "resourceVersion": "65910815",
+        "creationTimestamp": "2026-08-20T07:29:14Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "victoriametrics-query",
+          "tailscale.com/parent-resource-ns": "seam",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-20T07:29:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "46023a0d-d26c-4306-88b0-7f7722ddef51"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "source-controller",
+        "namespace": "tofu-controller",
+        "uid": "fecdb9e6-2afe-4f4a-858c-0440d4f3fd2f",
+        "resourceVersion": "2783312",
+        "creationTimestamp": "2026-04-22T14:39:59Z",
+        "labels": {
+          "app.kubernetes.io/instance": "tofu-controller",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/part-of": "flux",
+          "app.kubernetes.io/version": "2.6.4",
+          "argocd.argoproj.io/instance": "flux-source-controller-rs-manager",
+          "control-plane": "controller",
+          "helm.sh/chart": "flux2-2.16.4"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-22T14:39:59Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:control-plane": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app": "source-controller"
+        },
+        "clusterIP": "10.21.250.39",
+        "clusterIPs": [
+          "10.21.250.39"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ardenone-com-traefik-auth",
+        "namespace": "traefik",
+        "uid": "ab5c0da4-0e7c-4cef-adbe-e92f8369fd08",
+        "resourceVersion": "62745348",
+        "creationTimestamp": "2026-08-08T20:11:42Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "traefik-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":4181,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 4181,
+            "targetPort": 4181
+          }
+        ],
+        "selector": {
+          "app": "ardenone-com-traefik-auth"
+        },
+        "clusterIP": "10.21.107.158",
+        "clusterIPs": [
+          "10.21.107.158"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik",
+        "namespace": "traefik",
+        "uid": "3dbdd274-c469-4ee5-9a4a-df7ef94b0bec",
+        "resourceVersion": "11648417",
+        "creationTimestamp": "2026-04-16T03:26:36Z",
+        "labels": {
+          "app.kubernetes.io/instance": "traefik-traefik",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "traefik",
+          "argocd.argoproj.io/instance": "traefik-rs-manager",
+          "helm.sh/chart": "traefik-34.3.0"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "traefik",
+          "meta.helm.sh/release-namespace": "traefik"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-05-09T19:22:05Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {},
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8086,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "helm",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:26:36Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "web",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": "web"
+          },
+          {
+            "name": "kubectl-tcp",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": "kubectl-tcp"
+          },
+          {
+            "name": "openbao-api",
+            "protocol": "TCP",
+            "port": 8200,
+            "targetPort": "openbao-api"
+          },
+          {
+            "name": "pihole-admin",
+            "protocol": "TCP",
+            "port": 8086,
+            "targetPort": "pihole-admin"
+          },
+          {
+            "name": "vpn",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": "vpn"
+          },
+          {
+            "name": "websecure",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "websecure"
+          },
+          {
+            "name": "dns",
+            "protocol": "UDP",
+            "port": 53,
+            "targetPort": "dns"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "traefik-traefik",
+          "app.kubernetes.io/name": "traefik"
+        },
+        "clusterIP": "10.21.191.104",
+        "clusterIPs": [
+          "10.21.191.104"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik-tailscale",
+        "namespace": "traefik",
+        "uid": "d6f36c30-1597-4c93-bd89-40138abf5cdf",
+        "resourceVersion": "62745347",
+        "creationTimestamp": "2026-04-16T03:47:49Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "traefik-ns-rs-manager"
+        },
+        "annotations": {
+          "tailscale.com/expose": "true",
+          "tailscale.com/hostname": "traefik-rs-manager"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:tailscale.com/expose": {},
+                  "f:tailscale.com/hostname": {}
+                },
+                "f:finalizers": {
+                  "v:\"tailscale.com/finalizer\"": {}
+                },
+                "f:labels": {
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8086,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-16T03:47:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-07-30T17:20:48Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "vpn",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": 8444
+          },
+          {
+            "name": "kubectl-tcp",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          },
+          {
+            "name": "openbao-api",
+            "protocol": "TCP",
+            "port": 8200,
+            "targetPort": 8200
+          },
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 443
+          },
+          {
+            "name": "dns",
+            "protocol": "UDP",
+            "port": 53,
+            "targetPort": 5353
+          },
+          {
+            "name": "pihole-admin",
+            "protocol": "TCP",
+            "port": 8086,
+            "targetPort": 8086
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/name": "traefik"
+        },
+        "clusterIP": "10.21.86.113",
+        "clusterIPs": [
+          "10.21.86.113"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-07-30T17:20:48Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "unifi-agent-proxy",
+        "namespace": "unifi-agent-proxy",
+        "uid": "3b4af5e6-86d8-4b92-b3b2-20f1b28348c1",
+        "resourceVersion": "65248807",
+        "creationTimestamp": "2026-08-19T06:32:46Z",
+        "labels": {
+          "app.kubernetes.io/name": "unifi-agent-proxy",
+          "argocd.argoproj.io/instance": "unifi-agent-proxy-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-19T06:32:46Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/name": "unifi-agent-proxy"
+        },
+        "clusterIP": "10.21.188.251",
+        "clusterIPs": [
+          "10.21.188.251"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "vista",
+        "namespace": "vista",
+        "uid": "67d3af7f-dd7d-4bd5-941a-557d6d16350b",
+        "resourceVersion": "62745437",
+        "creationTimestamp": "2026-08-08T20:12:17Z",
+        "labels": {
+          "app.kubernetes.io/component": "server",
+          "app.kubernetes.io/managed-by": "argocd",
+          "app.kubernetes.io/name": "vista",
+          "argocd.argoproj.io/instance": "vista-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:13Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 3000
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "server",
+          "app.kubernetes.io/name": "vista"
+        },
+        "clusterIP": "10.21.191.23",
+        "clusterIPs": [
+          "10.21.191.23"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "warden",
+        "namespace": "warden",
+        "uid": "020de277-0356-4cc7-95a4-c230c3b08e13",
+        "resourceVersion": "62746884",
+        "creationTimestamp": "2026-07-30T17:39:38Z",
+        "labels": {
+          "app": "warden",
+          "argocd.argoproj.io/instance": "warden-ns-rs-manager"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "warden"
+        },
+        "clusterIP": "10.21.29.127",
+        "clusterIPs": [
+          "10.21.29.127"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    }
+  ]
+}

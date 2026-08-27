@@ -1,0 +1,5637 @@
+{
+  "kind": "ServiceList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "69883473"
+  },
+  "items": [
+    {
+      "metadata": {
+        "name": "eventbus-default-js-svc",
+        "namespace": "argo-events",
+        "uid": "6e32c8db-f3e1-4f15-870e-a422709ecc9c",
+        "resourceVersion": "44052280",
+        "creationTimestamp": "2026-07-11T16:37:04Z",
+        "labels": {
+          "controller": "eventbus-controller",
+          "eventbus-name": "default",
+          "owner-name": "default"
+        },
+        "annotations": {
+          "resource-spec-hash": "4a622a8ef8180064def71ecaba4763fddb0d10e48f8413cd6c5a5e5b153466e7"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "EventBus",
+            "name": "default",
+            "uid": "87360168-7639-4cf2-b38f-cc159892fc1c",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "argo-events",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-07-11T16:37:04Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:resource-spec-hash": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:controller": {},
+                  "f:eventbus-name": {},
+                  "f:owner-name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"87360168-7639-4cf2-b38f-cc159892fc1c\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":4222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":6222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":7777,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:publishNotReadyAddresses": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-client",
+            "protocol": "TCP",
+            "port": 4222,
+            "targetPort": 4222
+          },
+          {
+            "name": "cluster",
+            "protocol": "TCP",
+            "port": 6222,
+            "targetPort": 6222
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 7777,
+            "targetPort": 7777
+          },
+          {
+            "name": "monitor",
+            "protocol": "TCP",
+            "port": 8222,
+            "targetPort": 8222
+          }
+        ],
+        "selector": {
+          "controller": "eventbus-controller",
+          "eventbus-name": "default",
+          "owner-name": "default"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "publishNotReadyAddresses": true,
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "eventbus-default-stan-svc",
+        "namespace": "argo-events",
+        "uid": "accf0de9-b8c8-40be-b30b-3331244276d2",
+        "resourceVersion": "58906204",
+        "creationTimestamp": "2026-08-08T19:30:34Z",
+        "labels": {
+          "controller": "eventbus-controller",
+          "eventbus-name": "default",
+          "owner-name": "default",
+          "stan": "yes"
+        },
+        "annotations": {
+          "resource-spec-hash": "2100308749"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "EventBus",
+            "name": "default",
+            "uid": "87360168-7639-4cf2-b38f-cc159892fc1c",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "argo-events",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T19:30:34Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:resource-spec-hash": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:controller": {},
+                  "f:eventbus-name": {},
+                  "f:owner-name": {},
+                  "f:stan": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"87360168-7639-4cf2-b38f-cc159892fc1c\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":4222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":6222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8222,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-client",
+            "protocol": "TCP",
+            "port": 4222,
+            "targetPort": 4222
+          },
+          {
+            "name": "cluster",
+            "protocol": "TCP",
+            "port": 6222,
+            "targetPort": 6222
+          },
+          {
+            "name": "monitor",
+            "protocol": "TCP",
+            "port": 8222,
+            "targetPort": 8222
+          }
+        ],
+        "selector": {
+          "controller": "eventbus-controller",
+          "eventbus-name": "default",
+          "owner-name": "default"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-webhooks-eventsource-svc",
+        "namespace": "argo-events",
+        "uid": "911113f0-d96f-42a8-bd9a-aa1223750ed9",
+        "resourceVersion": "62754740",
+        "creationTimestamp": "2026-08-15T12:06:42Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "argo-events-ns-iad-ci",
+          "controller": "eventsource-controller",
+          "eventsource-name": "forgejo-webhooks",
+          "owner-name": "forgejo-webhooks"
+        },
+        "annotations": {
+          "resource-spec-hash": "348122456"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "EventSource",
+            "name": "forgejo-webhooks",
+            "uid": "5fc88c26-426b-4635-a6e9-704a54c3c136",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "argo-events",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:06:42Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:resource-spec-hash": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:controller": {},
+                  "f:eventsource-name": {},
+                  "f:owner-name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"5fc88c26-426b-4635-a6e9-704a54c3c136\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":12000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 12000,
+            "targetPort": 12000
+          }
+        ],
+        "selector": {
+          "controller": "eventsource-controller",
+          "eventsource-name": "forgejo-webhooks",
+          "owner-name": "forgejo-webhooks"
+        },
+        "clusterIP": "10.21.185.220",
+        "clusterIPs": [
+          "10.21.185.220"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "github-webhooks-eventsource-svc",
+        "namespace": "argo-events",
+        "uid": "61d2cd4f-4427-4fc0-93a0-16e808db35fb",
+        "resourceVersion": "62754795",
+        "creationTimestamp": "2026-08-15T12:06:45Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "argo-events-ns-iad-ci",
+          "controller": "eventsource-controller",
+          "eventsource-name": "github-webhooks",
+          "owner-name": "github-webhooks"
+        },
+        "annotations": {
+          "resource-spec-hash": "1678284159"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "EventSource",
+            "name": "github-webhooks",
+            "uid": "b2ae0ddb-5ef5-4d8f-93f0-880df848cdd3",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "argo-events",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:06:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:resource-spec-hash": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:controller": {},
+                  "f:eventsource-name": {},
+                  "f:owner-name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b2ae0ddb-5ef5-4d8f-93f0-880df848cdd3\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":12000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 12000,
+            "targetPort": 12000
+          }
+        ],
+        "selector": {
+          "controller": "eventsource-controller",
+          "eventsource-name": "github-webhooks",
+          "owner-name": "github-webhooks"
+        },
+        "clusterIP": "10.21.40.246",
+        "clusterIPs": [
+          "10.21.40.246"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "argo-workflows-iad-ci-server",
+        "namespace": "argo-workflows",
+        "uid": "c462f55e-6f86-4acf-8f87-6f31200564f0",
+        "resourceVersion": "69241010",
+        "creationTimestamp": "2026-08-26T19:46:45Z",
+        "labels": {
+          "app": "server",
+          "app.kubernetes.io/component": "server",
+          "app.kubernetes.io/instance": "argo-workflows-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "argo-workflows-server",
+          "app.kubernetes.io/part-of": "argo-workflows",
+          "app.kubernetes.io/version": "v4.0.3",
+          "argocd.argoproj.io/instance": "argo-workflows-iad-ci",
+          "helm.sh/chart": "argo-workflows-1.0.6"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-26T19:46:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":2746,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 2746,
+            "targetPort": 2746
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "argo-workflows-iad-ci",
+          "app.kubernetes.io/name": "argo-workflows-server"
+        },
+        "clusterIP": "10.21.123.90",
+        "clusterIPs": [
+          "10.21.123.90"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "dex-iad-ci",
+        "namespace": "argo-workflows",
+        "uid": "17cfb92e-95e6-4790-a9c7-ebb2e6769a3d",
+        "resourceVersion": "69377883",
+        "creationTimestamp": "2026-08-27T01:16:01Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "argo-workflows-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"argocd.argoproj.io/instance\":\"argo-workflows-ns-iad-ci\"},\"name\":\"dex-iad-ci\",\"namespace\":\"argo-workflows\"},\"spec\":{\"ports\":[{\"name\":\"http\",\"port\":5556,\"targetPort\":5556}],\"selector\":{\"app\":\"dex-iad-ci\"}}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-27T01:16:01Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5556,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 5556,
+            "targetPort": 5556
+          }
+        ],
+        "selector": {
+          "app": "dex-iad-ci"
+        },
+        "clusterIP": "10.21.111.6",
+        "clusterIPs": [
+          "10.21.111.6"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "armor-test",
+        "namespace": "armor-test",
+        "uid": "452b33d0-0c82-4bdb-ac95-437a2fa70a80",
+        "resourceVersion": "62753074",
+        "creationTimestamp": "2026-08-08T20:12:26Z",
+        "labels": {
+          "app": "armor-test",
+          "argocd.argoproj.io/instance": "armor-test-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"armor-test\",\"argocd.argoproj.io/instance\":\"armor-test-ns-iad-ci\"},\"name\":\"armor-test\",\"namespace\":\"armor-test\"},\"spec\":{\"ports\":[{\"name\":\"s3-api\",\"port\":9000,\"targetPort\":9000}],\"selector\":{\"app\":\"armor-test\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:27Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "s3-api",
+            "protocol": "TCP",
+            "port": 9000,
+            "targetPort": 9000
+          }
+        ],
+        "selector": {
+          "app": "armor-test"
+        },
+        "clusterIP": "10.21.197.104",
+        "clusterIPs": [
+          "10.21.197.104"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "armor",
+        "namespace": "armor",
+        "uid": "10edbdb7-48d6-430f-99f1-b043d8d330c9",
+        "resourceVersion": "62755562",
+        "creationTimestamp": "2026-05-09T16:48:41Z",
+        "labels": {
+          "app": "armor",
+          "argocd.argoproj.io/instance": "armor-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"armor\",\"argocd.argoproj.io/instance\":\"armor-ns-iad-ci\"},\"name\":\"armor\",\"namespace\":\"armor\"},\"spec\":{\"ports\":[{\"name\":\"s3-api\",\"port\":9000,\"protocol\":\"TCP\",\"targetPort\":9000},{\"name\":\"admin-api\",\"port\":9001,\"protocol\":\"TCP\",\"targetPort\":9001}],\"selector\":{\"app\":\"armor\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:18Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "s3-api",
+            "protocol": "TCP",
+            "port": 9000,
+            "targetPort": 9000
+          },
+          {
+            "name": "admin-api",
+            "protocol": "TCP",
+            "port": 9001,
+            "targetPort": 9001
+          }
+        ],
+        "selector": {
+          "app": "armor"
+        },
+        "clusterIP": "10.21.56.95",
+        "clusterIPs": [
+          "10.21.56.95"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "restore-verifier",
+        "namespace": "armor",
+        "uid": "d9f80d02-3ae7-480f-ab97-e30800e7c207",
+        "resourceVersion": "62755565",
+        "creationTimestamp": "2026-08-08T20:11:53Z",
+        "labels": {
+          "app": "restore-verifier",
+          "app.kubernetes.io/name": "restore-verifier",
+          "argocd.argoproj.io/instance": "armor-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"restore-verifier\",\"app.kubernetes.io/name\":\"restore-verifier\",\"argocd.argoproj.io/instance\":\"armor-ns-iad-ci\"},\"name\":\"restore-verifier\",\"namespace\":\"armor\"},\"spec\":{\"ports\":[{\"name\":\"metrics\",\"port\":9002,\"protocol\":\"TCP\",\"targetPort\":9002}],\"selector\":{\"app\":\"restore-verifier\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:18Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9002,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9002,
+            "targetPort": 9002
+          }
+        ],
+        "selector": {
+          "app": "restore-verifier"
+        },
+        "clusterIP": "10.21.110.192",
+        "clusterIPs": [
+          "10.21.110.192"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-api",
+        "namespace": "calico-apiserver",
+        "uid": "ece91575-4496-43de-ac97-9974f00b9200",
+        "resourceVersion": "6038",
+        "creationTimestamp": "2026-04-04T05:07:29Z",
+        "labels": {
+          "k8s-app": "tigera-api"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "APIServer",
+            "name": "default",
+            "uid": "5076575f-ba05-4c52-977e-29a49f19e777",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T05:07:29Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"5076575f-ba05-4c52-977e-29a49f19e777\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "apiserver",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 5443
+          }
+        ],
+        "selector": {
+          "apiserver": "true"
+        },
+        "clusterIP": "10.21.179.224",
+        "clusterIPs": [
+          "10.21.179.224"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-kube-controllers-metrics",
+        "namespace": "calico-system",
+        "uid": "47bf9204-f780-47cf-822d-dbcfe66c9e89",
+        "resourceVersion": "5814",
+        "creationTimestamp": "2026-04-04T05:06:50Z",
+        "labels": {
+          "k8s-app": "calico-kube-controllers"
+        },
+        "annotations": {
+          "prometheus.io/port": "9094",
+          "prometheus.io/scrape": "true"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "Installation",
+            "name": "default",
+            "uid": "73359d90-2cf4-479c-aa45-5327bf21d86f",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T05:06:50Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"73359d90-2cf4-479c-aa45-5327bf21d86f\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":9094,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics-port",
+            "protocol": "TCP",
+            "port": 9094,
+            "targetPort": 9094
+          }
+        ],
+        "selector": {
+          "k8s-app": "calico-kube-controllers"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "calico-typha",
+        "namespace": "calico-system",
+        "uid": "c5ea00ea-c48b-403c-8416-3d3ab83ebd35",
+        "resourceVersion": "5229",
+        "creationTimestamp": "2026-04-04T05:06:15Z",
+        "labels": {
+          "k8s-app": "calico-typha"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "operator.tigera.io/v1",
+            "kind": "Installation",
+            "name": "default",
+            "uid": "73359d90-2cf4-479c-aa45-5327bf21d86f",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T05:06:15Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"73359d90-2cf4-479c-aa45-5327bf21d86f\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5473,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "calico-typha",
+            "protocol": "TCP",
+            "port": 5473,
+            "targetPort": "calico-typha"
+          }
+        ],
+        "selector": {
+          "k8s-app": "calico-typha"
+        },
+        "clusterIP": "10.21.140.118",
+        "clusterIPs": [
+          "10.21.140.118"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-iad-ci",
+        "namespace": "cert-manager",
+        "uid": "bcaf9e18-1100-4314-88c7-e30c4ee68a96",
+        "resourceVersion": "62753412",
+        "creationTimestamp": "2026-04-04T17:04:02Z",
+        "labels": {
+          "app": "cert-manager",
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cert-manager",
+          "app.kubernetes.io/version": "v1.20.0",
+          "argocd.argoproj.io/instance": "cert-manager-iad-ci",
+          "helm.sh/chart": "cert-manager-v1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "tcp-prometheus-servicemonitor",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": "http-metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "controller",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/name": "cert-manager"
+        },
+        "clusterIP": "10.21.210.220",
+        "clusterIPs": [
+          "10.21.210.220"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-iad-ci-cainjector",
+        "namespace": "cert-manager",
+        "uid": "4b8276f6-0684-46bf-b8ba-e3552d0c2de1",
+        "resourceVersion": "62753418",
+        "creationTimestamp": "2026-04-04T17:04:02Z",
+        "labels": {
+          "app": "cainjector",
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cainjector",
+          "app.kubernetes.io/version": "v1.20.0",
+          "argocd.argoproj.io/instance": "cert-manager-iad-ci",
+          "helm.sh/chart": "cert-manager-v1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": 9402
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "cainjector",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/name": "cainjector"
+        },
+        "clusterIP": "10.21.46.83",
+        "clusterIPs": [
+          "10.21.46.83"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cert-manager-iad-ci-webhook",
+        "namespace": "cert-manager",
+        "uid": "dc40bdf2-722d-4c41-b40c-8f3ae328a171",
+        "resourceVersion": "62753411",
+        "creationTimestamp": "2026-04-04T17:04:02Z",
+        "labels": {
+          "app": "webhook",
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "webhook",
+          "app.kubernetes.io/version": "v1.20.0",
+          "argocd.argoproj.io/instance": "cert-manager-iad-ci",
+          "helm.sh/chart": "cert-manager-v1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:04:14Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9402,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "https"
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9402,
+            "targetPort": "http-metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/component": "webhook",
+          "app.kubernetes.io/instance": "cert-manager-iad-ci",
+          "app.kubernetes.io/name": "webhook"
+        },
+        "clusterIP": "10.21.239.45",
+        "clusterIPs": [
+          "10.21.239.45"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "cnpg-webhook-service",
+        "namespace": "cnpg-system",
+        "uid": "72c1600a-63ec-47e4-a053-199aab15ba96",
+        "resourceVersion": "62753770",
+        "creationTimestamp": "2026-05-22T11:20:05Z",
+        "labels": {
+          "app.kubernetes.io/instance": "cnpg-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "cloudnative-pg",
+          "app.kubernetes.io/version": "1.28.1",
+          "argocd.argoproj.io/instance": "cnpg-iad-ci",
+          "helm.sh/chart": "cloudnative-pg-0.27.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:05:04Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "webhook-server",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "webhook-server"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "cnpg-iad-ci",
+          "app.kubernetes.io/name": "cloudnative-pg"
+        },
+        "clusterIP": "10.21.64.20",
+        "clusterIPs": [
+          "10.21.64.20"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "commitgraph-restore-test-r",
+        "namespace": "commitgraph-restore-test-1786280182",
+        "uid": "f373267a-5d2c-4856-ae6e-f401764ac7f1",
+        "resourceVersion": "59318385",
+        "creationTimestamp": "2026-08-09T12:57:03Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "commitgraph-restore-test",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "commitgraph-restore-test"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "commitgraph-restore-test",
+            "uid": "b4b33bfe-d60c-47d2-9fa9-be84ce261610",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:57:03Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b4b33bfe-d60c-47d2-9fa9-be84ce261610\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "commitgraph-restore-test",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.161.100",
+        "clusterIPs": [
+          "10.21.161.100"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "commitgraph-restore-test-ro",
+        "namespace": "commitgraph-restore-test-1786280182",
+        "uid": "f84a572a-5190-49a4-9af6-7bc045d395a1",
+        "resourceVersion": "59318389",
+        "creationTimestamp": "2026-08-09T12:57:03Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "commitgraph-restore-test",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "commitgraph-restore-test"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "commitgraph-restore-test",
+            "uid": "b4b33bfe-d60c-47d2-9fa9-be84ce261610",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:57:03Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b4b33bfe-d60c-47d2-9fa9-be84ce261610\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "commitgraph-restore-test",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.250.170",
+        "clusterIPs": [
+          "10.21.250.170"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "commitgraph-restore-test-rw",
+        "namespace": "commitgraph-restore-test-1786280182",
+        "uid": "03d7147a-d7ad-4c80-9031-2a8681cffead",
+        "resourceVersion": "59318393",
+        "creationTimestamp": "2026-08-09T12:57:03Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "commitgraph-restore-test",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "commitgraph-restore-test"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "commitgraph-restore-test",
+            "uid": "b4b33bfe-d60c-47d2-9fa9-be84ce261610",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:57:03Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b4b33bfe-d60c-47d2-9fa9-be84ce261610\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "commitgraph-restore-test",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.245.7",
+        "clusterIPs": [
+          "10.21.245.7"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubernetes",
+        "namespace": "default",
+        "uid": "ca5c2787-ed7a-4620-affa-7bab41c5cea5",
+        "resourceVersion": "202",
+        "creationTimestamp": "2026-04-04T04:38:13Z",
+        "labels": {
+          "component": "apiserver",
+          "provider": "kubernetes"
+        },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T04:38:13Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:component": {},
+                  "f:provider": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 443
+          }
+        ],
+        "clusterIP": "10.21.0.1",
+        "clusterIPs": [
+          "10.21.0.1"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kubectl-proxy",
+        "namespace": "devpod-observer",
+        "uid": "bc8b38a3-1f18-4f48-9b4e-7947b91a60c2",
+        "resourceVersion": "62753200",
+        "creationTimestamp": "2026-05-13T03:32:35Z",
+        "labels": {
+          "app": "kubectl-proxy",
+          "argocd.argoproj.io/instance": "devpod-observer-ns-iad-ci",
+          "component": "cross-cluster-access",
+          "target-cluster": "iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"kubectl-proxy\",\"argocd.argoproj.io/instance\":\"devpod-observer-ns-iad-ci\",\"component\":\"cross-cluster-access\",\"target-cluster\":\"iad-ci\"},\"name\":\"kubectl-proxy\",\"namespace\":\"devpod-observer\"},\"spec\":{\"ports\":[{\"name\":\"proxy\",\"port\":8001,\"protocol\":\"TCP\",\"targetPort\":8001}],\"selector\":{\"app\":\"kubectl-proxy\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:03:43Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {},
+                  "f:target-cluster": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "proxy",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          }
+        ],
+        "selector": {
+          "app": "kubectl-proxy"
+        },
+        "clusterIP": "10.21.139.85",
+        "clusterIPs": [
+          "10.21.139.85"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-secrets-iad-ci-webhook",
+        "namespace": "external-secrets",
+        "uid": "fbed6c73-9c2e-48e1-9ba8-0b954875cd6c",
+        "resourceVersion": "6334135",
+        "creationTimestamp": "2026-04-04T17:05:26Z",
+        "labels": {
+          "app.kubernetes.io/instance": "external-secrets-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-secrets-webhook",
+          "app.kubernetes.io/version": "v2.2.0",
+          "argocd.argoproj.io/instance": "external-secrets-iad-ci",
+          "external-secrets.io/component": "webhook",
+          "helm.sh/chart": "external-secrets-2.2.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-20T14:49:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:external-secrets.io/component": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "webhook",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "webhook"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "external-secrets-iad-ci",
+          "app.kubernetes.io/name": "external-secrets-webhook"
+        },
+        "clusterIP": "10.21.213.247",
+        "clusterIPs": [
+          "10.21.213.247"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "openbao",
+        "namespace": "external-secrets",
+        "uid": "ea92e383-928d-4d28-a4aa-6eb84077aeaa",
+        "resourceVersion": "62755630",
+        "creationTimestamp": "2026-04-04T17:05:40Z",
+        "labels": {
+          "app": "openbao",
+          "argocd.argoproj.io/instance": "external-secrets-ns-iad-ci",
+          "component": "egress"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"tailscale.com/tailnet-fqdn\":\"traefik-rs-manager.tail1b1987.ts.net\"},\"finalizers\":[\"tailscale.com/finalizer\"],\"labels\":{\"app\":\"openbao\",\"argocd.argoproj.io/instance\":\"external-secrets-ns-iad-ci\",\"component\":\"egress\"},\"name\":\"openbao\",\"namespace\":\"external-secrets\"},\"spec\":{\"externalName\":\"ts-openbao-zcwbs.tailscale.svc.cluster.local\",\"ports\":[{\"name\":\"http\",\"port\":8200,\"protocol\":\"TCP\",\"targetPort\":8200}],\"type\":\"ExternalName\"},\"status\":{\"conditions\":[{\"lastTransitionTime\":\"2026-06-27T08:22:31Z\",\"message\":\"ProxyCreated\",\"reason\":\"ProxyCreated\",\"status\":\"True\",\"type\":\"TailscaleProxyReady\"}],\"loadBalancer\":{}}}\n",
+          "tailscale.com/tailnet-fqdn": "traefik-rs-manager.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-02T23:40:12Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-27T08:22:31Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          },
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {},
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:component": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8200,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8200,
+            "targetPort": 8200
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-openbao-zcwbs.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-06-27T08:22:31Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-gitea-http",
+        "namespace": "forgejo",
+        "uid": "2ae285ea-234c-45e4-bee3-a75e56289750",
+        "resourceVersion": "62755607",
+        "creationTimestamp": "2026-05-10T14:48:48Z",
+        "labels": {
+          "app": "gitea",
+          "app.kubernetes.io/instance": "forgejo",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "gitea",
+          "app.kubernetes.io/version": "10.0.0",
+          "argocd.argoproj.io/instance": "forgejo-iad-ci",
+          "helm.sh/chart": "gitea-10.4.1",
+          "version": "10.0.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:21Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {},
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {},
+                  "f:version": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":3000,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 3000,
+            "targetPort": 3000
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "forgejo",
+          "app.kubernetes.io/name": "gitea"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-gitea-ssh",
+        "namespace": "forgejo",
+        "uid": "000d92c1-0841-4465-af0a-8e10caecf9b1",
+        "resourceVersion": "62755604",
+        "creationTimestamp": "2026-05-10T14:48:48Z",
+        "labels": {
+          "app": "gitea",
+          "app.kubernetes.io/instance": "forgejo",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "gitea",
+          "app.kubernetes.io/version": "10.0.0",
+          "argocd.argoproj.io/instance": "forgejo-iad-ci",
+          "helm.sh/chart": "gitea-10.4.1",
+          "version": "10.0.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:21Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {},
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {},
+                  "f:version": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":22,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "ssh",
+            "protocol": "TCP",
+            "port": 22,
+            "targetPort": 2222
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "forgejo",
+          "app.kubernetes.io/name": "gitea"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-postgres-r",
+        "namespace": "forgejo",
+        "uid": "b05947af-58f1-4ed0-8adf-e728ffeb6ae6",
+        "resourceVersion": "19875555",
+        "creationTimestamp": "2026-05-22T11:20:45Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "forgejo-postgres",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "forgejo-postgres"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "forgejo-postgres",
+            "uid": "1836cd00-149b-49e7-a5ee-b31aeee6c811",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-22T11:20:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1836cd00-149b-49e7-a5ee-b31aeee6c811\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "forgejo-postgres",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.2.30",
+        "clusterIPs": [
+          "10.21.2.30"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-postgres-ro",
+        "namespace": "forgejo",
+        "uid": "9a863cdc-956b-43b7-8acb-1671abceae40",
+        "resourceVersion": "19875562",
+        "creationTimestamp": "2026-05-22T11:20:45Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "forgejo-postgres",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "forgejo-postgres"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "forgejo-postgres",
+            "uid": "1836cd00-149b-49e7-a5ee-b31aeee6c811",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-22T11:20:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1836cd00-149b-49e7-a5ee-b31aeee6c811\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "forgejo-postgres",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.186.98",
+        "clusterIPs": [
+          "10.21.186.98"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "forgejo-postgres-rw",
+        "namespace": "forgejo",
+        "uid": "c0208dd7-6ec5-4b79-b5f3-fa1196cf33bf",
+        "resourceVersion": "19875567",
+        "creationTimestamp": "2026-05-22T11:20:45Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "forgejo-postgres",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "forgejo-postgres"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "forgejo-postgres",
+            "uid": "1836cd00-149b-49e7-a5ee-b31aeee6c811",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-22T11:20:45Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1836cd00-149b-49e7-a5ee-b31aeee6c811\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "forgejo-postgres",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.54.215",
+        "clusterIPs": [
+          "10.21.54.215"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ceph-csi-rbd-provisioner-http-metrics",
+        "namespace": "kube-system",
+        "uid": "16ab13b7-0826-49c8-abb7-17e4557723ce",
+        "resourceVersion": "49520701",
+        "creationTimestamp": "2026-07-23T10:51:35Z",
+        "labels": {
+          "app": "ceph-csi-rbd",
+          "app.kubernetes.io/managed-by": "Helm",
+          "chart": "ceph-csi-rbd-3.15.1",
+          "component": "provisioner",
+          "heritage": "Helm",
+          "release": "ceph-csi-rbd"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "ceph-csi-rbd",
+          "meta.helm.sh/release-namespace": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-07-23T10:51:35Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:chart": {},
+                  "f:component": {},
+                  "f:heritage": {},
+                  "f:release": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http-metrics",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "ceph-csi-rbd",
+          "component": "provisioner",
+          "release": "ceph-csi-rbd"
+        },
+        "clusterIP": "10.21.178.91",
+        "clusterIPs": [
+          "10.21.178.91"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "headlamp",
+        "namespace": "kube-system",
+        "uid": "ac47f236-5d4d-437f-9c89-23ae8bfcfe90",
+        "resourceVersion": "29458458",
+        "creationTimestamp": "2026-06-10T10:08:49Z",
+        "labels": {
+          "app.kubernetes.io/instance": "headlamp",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "headlamp",
+          "app.kubernetes.io/version": "0.42.0",
+          "helm.sh/chart": "headlamp-0.42.0"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "headlamp",
+          "meta.helm.sh/release-namespace": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-10T10:08:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "headlamp",
+          "app.kubernetes.io/name": "headlamp"
+        },
+        "clusterIP": "10.21.116.25",
+        "clusterIPs": [
+          "10.21.116.25"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "kube-dns",
+        "namespace": "kube-system",
+        "uid": "e86b9016-0fb8-426c-822d-6541c787b6ed",
+        "resourceVersion": "299",
+        "creationTimestamp": "2026-04-04T04:38:28Z",
+        "labels": {
+          "k8s-app": "kube-dns",
+          "kamaji.clastix.io/project": "kamaji",
+          "kubernetes.io/cluster-service": "true",
+          "kubernetes.io/name": "CoreDNS"
+        },
+        "annotations": {
+          "prometheus.io/port": "9153",
+          "prometheus.io/scrape": "true"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRoleBinding",
+            "name": "system:coredns",
+            "uid": "013e2664-669e-46cc-bbb7-3a69c2f87e6d",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "kamaji",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-04T04:38:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  "f:k8s-app": {},
+                  "f:kamaji.clastix.io/project": {},
+                  "f:kubernetes.io/cluster-service": {},
+                  "f:kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  "k:{\"uid\":\"013e2664-669e-46cc-bbb7-3a69c2f87e6d\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":53,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9153,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {}
+              }
+            }
+          },
+          {
+            "manager": "kamaji",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T04:38:28Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:prometheus.io/port": {},
+                  "f:prometheus.io/scrape": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:k8s-app": {},
+                  "f:kamaji.clastix.io/project": {},
+                  "f:kubernetes.io/cluster-service": {},
+                  "f:kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"013e2664-669e-46cc-bbb7-3a69c2f87e6d\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":53,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":53,\"protocol\":\"UDP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":9153,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "dns",
+            "protocol": "UDP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "dns-tcp",
+            "protocol": "TCP",
+            "port": 53,
+            "targetPort": 53
+          },
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 9153,
+            "targetPort": 9153
+          }
+        ],
+        "selector": {
+          "k8s-app": "kube-dns"
+        },
+        "clusterIP": "10.21.0.10",
+        "clusterIPs": [
+          "10.21.0.10"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "metrics-server",
+        "namespace": "kube-system",
+        "uid": "e80e7ea8-77eb-4ce1-a9dc-898bdbfa2e79",
+        "resourceVersion": "491",
+        "creationTimestamp": "2026-04-04T04:40:22Z",
+        "labels": {
+          "app.kubernetes.io/instance": "metrics-server",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "metrics-server",
+          "app.kubernetes.io/version": "0.7.0",
+          "helm.sh/chart": "metrics-server-3.12.0"
+        },
+        "annotations": {
+          "meta.helm.sh/release-name": "metrics-server",
+          "meta.helm.sh/release-namespace": "kube-system"
+        },
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-04T04:40:22Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "https"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "metrics-server",
+          "app.kubernetes.io/name": "metrics-server"
+        },
+        "clusterIP": "10.21.39.65",
+        "clusterIPs": [
+          "10.21.39.65"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "vcp-proxy",
+        "namespace": "kube-system",
+        "uid": "f3713656-00b3-4515-bfaf-47fc5a2c5898",
+        "resourceVersion": "1028",
+        "creationTimestamp": "2026-04-04T04:43:54Z",
+        "labels": {
+          "projectsveltos.io/reason": "Resources",
+          "projectsveltos.io/reference-kind": "ConfigMap",
+          "projectsveltos.io/reference-name": "vcp-proxy-cluster-configmap",
+          "projectsveltos.io/reference-namespace": "kube-system"
+        },
+        "annotations": {
+          "projectsveltos.io/hash": "sha256:e4bffc47e04522f86b1ec86a02dddee67501770666bc6c9853d4c39279895834",
+          "projectsveltos.io/owner-tier": "100"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "config.projectsveltos.io/v1beta1",
+            "kind": "ClusterProfile",
+            "name": "proxy-addons",
+            "uid": "6dade94d-b9e3-4871-98cb-28740b854611"
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "application/apply-patch",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-04T04:43:54Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:projectsveltos.io/hash": {},
+                  "f:projectsveltos.io/owner-tier": {}
+                },
+                "f:labels": {
+                  "f:projectsveltos.io/reason": {},
+                  "f:projectsveltos.io/reference-kind": {},
+                  "f:projectsveltos.io/reference-name": {},
+                  "f:projectsveltos.io/reference-namespace": {}
+                },
+                "f:ownerReferences": {
+                  "k:{\"uid\":\"6dade94d-b9e3-4871-98cb-28740b854611\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:clusterIPs": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilies": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  "k:{\"port\":6443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 6443,
+            "targetPort": 6443
+          }
+        ],
+        "selector": {
+          "app": "vcp-proxy"
+        },
+        "clusterIP": "10.21.0.40",
+        "clusterIPs": [
+          "10.21.0.40"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "victorialogs-iad-ci-vector-headless",
+        "namespace": "monitoring",
+        "uid": "deb85cf0-4adc-414a-ba5d-5e21a9052833",
+        "resourceVersion": "62755345",
+        "creationTimestamp": "2026-05-26T18:40:19Z",
+        "labels": {
+          "app.kubernetes.io/component": "Agent",
+          "app.kubernetes.io/instance": "victorialogs-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "vector",
+          "app.kubernetes.io/version": "0.50.0-distroless-libc",
+          "argocd.argoproj.io/instance": "victorialogs-iad-ci",
+          "helm.sh/chart": "vector-0.46.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:43Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {},
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app.kubernetes.io/component": "Agent",
+          "app.kubernetes.io/instance": "victorialogs-iad-ci",
+          "app.kubernetes.io/name": "vector"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "vlogs-server",
+        "namespace": "monitoring",
+        "uid": "baa3d549-269c-47e7-82c9-54eb0b4ebe48",
+        "resourceVersion": "62755349",
+        "creationTimestamp": "2026-05-26T18:40:19Z",
+        "labels": {
+          "app": "server",
+          "app.kubernetes.io/instance": "victorialogs-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "victoria-logs-single",
+          "app.kubernetes.io/version": "v1.36.1-scratch",
+          "argocd.argoproj.io/instance": "victorialogs-iad-ci",
+          "helm.sh/chart": "victoria-logs-single-0.11.17"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:43Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:ports": {
+                  "k:{\"port\":9428,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 9428,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app": "server",
+          "app.kubernetes.io/instance": "victorialogs-iad-ci",
+          "app.kubernetes.io/name": "victoria-logs-single"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-r",
+        "namespace": "queue-db-restore-test-1786277516",
+        "uid": "5bd3dc52-10e8-45cd-bc62-20e0a8a6cd56",
+        "resourceVersion": "59301015",
+        "creationTimestamp": "2026-08-09T12:13:06Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "b1da1fbf-1658-4dfb-bff6-705e134448a2",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:13:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b1da1fbf-1658-4dfb-bff6-705e134448a2\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.164.116",
+        "clusterIPs": [
+          "10.21.164.116"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-ro",
+        "namespace": "queue-db-restore-test-1786277516",
+        "uid": "ca22ea15-0084-40ca-bf28-49347fb0b68b",
+        "resourceVersion": "59301017",
+        "creationTimestamp": "2026-08-09T12:13:06Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "b1da1fbf-1658-4dfb-bff6-705e134448a2",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:13:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b1da1fbf-1658-4dfb-bff6-705e134448a2\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.123.162",
+        "clusterIPs": [
+          "10.21.123.162"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-rw",
+        "namespace": "queue-db-restore-test-1786277516",
+        "uid": "1f8782ff-e6a8-405a-919e-213af592f0ea",
+        "resourceVersion": "59301020",
+        "creationTimestamp": "2026-08-09T12:13:06Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "b1da1fbf-1658-4dfb-bff6-705e134448a2",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-09T12:13:06Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"b1da1fbf-1658-4dfb-bff6-705e134448a2\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.27.160",
+        "clusterIPs": [
+          "10.21.27.160"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-r",
+        "namespace": "queue-db-restore-v2",
+        "uid": "9ee18594-28f3-4300-8cf5-f67dda8988fa",
+        "resourceVersion": "58972939",
+        "creationTimestamp": "2026-08-08T22:10:49Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "5af62ead-6665-4971-97a7-583e515fc2d4",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T22:10:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"5af62ead-6665-4971-97a7-583e515fc2d4\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.23.11",
+        "clusterIPs": [
+          "10.21.23.11"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-ro",
+        "namespace": "queue-db-restore-v2",
+        "uid": "08590f41-9ddc-4e10-ac0e-6918699afa36",
+        "resourceVersion": "58972943",
+        "creationTimestamp": "2026-08-08T22:10:49Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "5af62ead-6665-4971-97a7-583e515fc2d4",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T22:10:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"5af62ead-6665-4971-97a7-583e515fc2d4\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.89.158",
+        "clusterIPs": [
+          "10.21.89.158"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-rw",
+        "namespace": "queue-db-restore-v2",
+        "uid": "9b3bf82d-c179-42a2-8f57-dc412052f716",
+        "resourceVersion": "58972947",
+        "creationTimestamp": "2026-08-08T22:10:49Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "5af62ead-6665-4971-97a7-583e515fc2d4",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T22:10:49Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"5af62ead-6665-4971-97a7-583e515fc2d4\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.89.233",
+        "clusterIPs": [
+          "10.21.89.233"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-r",
+        "namespace": "queue-db-restore",
+        "uid": "ac7b669b-7373-4617-8213-53fe54a8f79a",
+        "resourceVersion": "58966656",
+        "creationTimestamp": "2026-08-08T21:55:39Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "9e2d4c65-aaf4-4a33-b14f-bfd0722eee78",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T21:55:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"9e2d4c65-aaf4-4a33-b14f-bfd0722eee78\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.163.27",
+        "clusterIPs": [
+          "10.21.163.27"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-ro",
+        "namespace": "queue-db-restore",
+        "uid": "f9bd2a27-8d11-4ecb-86de-e3728a48647a",
+        "resourceVersion": "58966660",
+        "creationTimestamp": "2026-08-08T21:55:39Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "9e2d4c65-aaf4-4a33-b14f-bfd0722eee78",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T21:55:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"9e2d4c65-aaf4-4a33-b14f-bfd0722eee78\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.51.30",
+        "clusterIPs": [
+          "10.21.51.30"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-rw",
+        "namespace": "queue-db-restore",
+        "uid": "764db88a-87f0-4b0a-b629-e8b2058cc6b6",
+        "resourceVersion": "58966665",
+        "creationTimestamp": "2026-08-08T21:55:39Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "9e2d4c65-aaf4-4a33-b14f-bfd0722eee78",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-08T21:55:39Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"9e2d4c65-aaf4-4a33-b14f-bfd0722eee78\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.145.217",
+        "clusterIPs": [
+          "10.21.145.217"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-r",
+        "namespace": "queue-db",
+        "uid": "1b625476-f166-499a-a6be-5bdd565aa14b",
+        "resourceVersion": "21557105",
+        "creationTimestamp": "2026-05-26T04:13:07Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "1372e37f-6b6f-45d5-bece-730f7bbfe97d",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-26T04:13:07Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1372e37f-6b6f-45d5-bece-730f7bbfe97d\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/podRole": "instance"
+        },
+        "clusterIP": "10.21.89.92",
+        "clusterIPs": [
+          "10.21.89.92"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-ro",
+        "namespace": "queue-db",
+        "uid": "04b347fb-455c-4dc9-a1ef-cf37a677ac66",
+        "resourceVersion": "21557111",
+        "creationTimestamp": "2026-05-26T04:13:07Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "1372e37f-6b6f-45d5-bece-730f7bbfe97d",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-26T04:13:07Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1372e37f-6b6f-45d5-bece-730f7bbfe97d\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "replica"
+        },
+        "clusterIP": "10.21.235.89",
+        "clusterIPs": [
+          "10.21.235.89"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-db-rw",
+        "namespace": "queue-db",
+        "uid": "73e55c5e-7ba7-4909-83c3-d00d64ace86d",
+        "resourceVersion": "21557116",
+        "creationTimestamp": "2026-05-26T04:13:07Z",
+        "labels": {
+          "app.kubernetes.io/component": "database",
+          "app.kubernetes.io/instance": "queue-db",
+          "app.kubernetes.io/managed-by": "cloudnative-pg",
+          "app.kubernetes.io/name": "postgresql",
+          "app.kubernetes.io/version": "16",
+          "cnpg.io/cluster": "queue-db"
+        },
+        "annotations": {
+          "cnpg.io/operatorVersion": "1.28.1"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "postgresql.cnpg.io/v1",
+            "kind": "Cluster",
+            "name": "queue-db",
+            "uid": "1372e37f-6b6f-45d5-bece-730f7bbfe97d",
+            "controller": true
+          }
+        ],
+        "managedFields": [
+          {
+            "manager": "manager",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-26T04:13:07Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:cnpg.io/operatorVersion": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:cnpg.io/cluster": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"1372e37f-6b6f-45d5-bece-730f7bbfe97d\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5432,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "postgres",
+            "protocol": "TCP",
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "selector": {
+          "cnpg.io/cluster": "queue-db",
+          "cnpg.io/instanceRole": "primary"
+        },
+        "clusterIP": "10.21.230.118",
+        "clusterIPs": [
+          "10.21.230.118"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "sealed-secrets-iad-ci",
+        "namespace": "sealed-secrets",
+        "uid": "6090be9a-695e-4f1c-8709-dde705be7170",
+        "resourceVersion": "6334040",
+        "creationTimestamp": "2026-04-04T17:03:57Z",
+        "labels": {
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "sealed-secrets",
+          "app.kubernetes.io/part-of": "sealed-secrets",
+          "app.kubernetes.io/version": "0.27.1",
+          "argocd.argoproj.io/instance": "sealed-secrets-iad-ci",
+          "helm.sh/chart": "sealed-secrets-2.16.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-20T14:49:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/name": "sealed-secrets"
+        },
+        "clusterIP": "10.21.20.34",
+        "clusterIPs": [
+          "10.21.20.34"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "sealed-secrets-iad-ci-metrics",
+        "namespace": "sealed-secrets",
+        "uid": "836ce327-9a6f-4f34-8898-5ff3629b66c8",
+        "resourceVersion": "6334027",
+        "creationTimestamp": "2026-04-04T17:03:57Z",
+        "labels": {
+          "app.kubernetes.io/component": "metrics",
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "sealed-secrets",
+          "app.kubernetes.io/part-of": "sealed-secrets",
+          "app.kubernetes.io/version": "0.27.1",
+          "argocd.argoproj.io/instance": "sealed-secrets-iad-ci",
+          "helm.sh/chart": "sealed-secrets-2.16.1"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-20T14:49:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/component": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/part-of": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8081,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "metrics",
+            "protocol": "TCP",
+            "port": 8081,
+            "targetPort": "metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/name": "sealed-secrets"
+        },
+        "clusterIP": "10.21.190.138",
+        "clusterIPs": [
+          "10.21.190.138"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "sealed-secrets-iad-ci-sealed-secrets-web",
+        "namespace": "sealed-secrets",
+        "uid": "8cbdb6cb-15b8-4c18-95fa-553316a1cd15",
+        "resourceVersion": "6334039",
+        "creationTimestamp": "2026-04-04T17:03:57Z",
+        "labels": {
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "sealed-secrets-web",
+          "app.kubernetes.io/version": "v3.1.4",
+          "argocd.argoproj.io/instance": "sealed-secrets-iad-ci",
+          "helm.sh/chart": "sealed-secrets-web-3.1.4"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-04-20T14:49:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "sealed-secrets-iad-ci",
+          "app.kubernetes.io/name": "sealed-secrets-web"
+        },
+        "clusterIP": "10.21.9.90",
+        "clusterIPs": [
+          "10.21.9.90"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "pihole-egress",
+        "namespace": "tailnet-external-dns",
+        "uid": "bfbc0fe4-fc39-484f-9e1b-55b95e0a9fb2",
+        "resourceVersion": "62755693",
+        "creationTimestamp": "2026-05-09T19:19:29Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "tailnet-external-dns-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"tailscale.com/tailnet-fqdn\":\"traefik-rs-manager.tail1b1987.ts.net\"},\"finalizers\":[\"tailscale.com/finalizer\"],\"labels\":{\"argocd.argoproj.io/instance\":\"tailnet-external-dns-ns-iad-ci\"},\"name\":\"pihole-egress\",\"namespace\":\"tailnet-external-dns\"},\"spec\":{\"externalName\":\"ts-pihole-egress-vlz9b.tailscale.svc.cluster.local\",\"ports\":[{\"name\":\"pihole-admin\",\"port\":8086,\"protocol\":\"TCP\",\"targetPort\":8086}],\"type\":\"ExternalName\"},\"status\":{\"conditions\":[{\"lastTransitionTime\":\"2026-05-13T08:57:21Z\",\"message\":\"ProxyCreated\",\"reason\":\"ProxyCreated\",\"status\":\"True\",\"type\":\"TailscaleProxyReady\"}],\"loadBalancer\":{}}}\n",
+          "tailscale.com/tailnet-fqdn": "traefik-rs-manager.tail1b1987.ts.net"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-09T19:19:30Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:type": {}
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-13T08:57:21Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          },
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:08:32Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {},
+                  "f:tailscale.com/tailnet-fqdn": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8086,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "pihole-admin",
+            "protocol": "TCP",
+            "port": 8086,
+            "targetPort": 8086
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "ts-pihole-egress-vlz9b.tailscale.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-05-13T08:57:21Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "tailnet-external-dns",
+        "namespace": "tailnet-external-dns",
+        "uid": "9bc465e7-5fde-4eec-867f-fa30eaccd75e",
+        "resourceVersion": "62754543",
+        "creationTimestamp": "2026-05-09T19:19:44Z",
+        "labels": {
+          "app.kubernetes.io/instance": "tailnet-external-dns",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-dns",
+          "app.kubernetes.io/version": "0.20.0",
+          "argocd.argoproj.io/instance": "tailnet-external-dns-iad-ci",
+          "helm.sh/chart": "external-dns-1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:06:26Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":7979,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 7979,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "tailnet-external-dns",
+          "app.kubernetes.io/name": "external-dns"
+        },
+        "clusterIP": "10.21.18.101",
+        "clusterIPs": [
+          "10.21.18.101"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "adb-relay",
+        "namespace": "tailnet",
+        "uid": "9d5369f5-4873-40e2-b9db-be8033aa624a",
+        "resourceVersion": "28980852",
+        "creationTimestamp": "2026-06-09T11:48:47Z",
+        "labels": {
+          "app": "adb-relay"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"adb-relay\"},\"name\":\"adb-relay\",\"namespace\":\"tailnet\"},\"spec\":{\"externalName\":\"adb-relay.adb-relay.svc.cluster.local\",\"ports\":[{\"port\":5037,\"protocol\":\"TCP\",\"targetPort\":5037}],\"type\":\"ExternalName\"}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-06-09T11:48:47Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {}
+                }
+              },
+              "f:spec": {
+                "f:externalName": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":5037,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 5037,
+            "targetPort": 5037
+          }
+        ],
+        "type": "ExternalName",
+        "sessionAffinity": "None",
+        "externalName": "adb-relay.adb-relay.svc.cluster.local"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-openbao-zcwbs",
+        "generateName": "ts-openbao-",
+        "namespace": "tailscale",
+        "uid": "c1ff4949-cf6a-4ecc-9727-d2ddaf2ad396",
+        "resourceVersion": "326117",
+        "creationTimestamp": "2026-04-05T03:21:20Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "openbao",
+          "tailscale.com/parent-resource-ns": "external-secrets",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-05T03:21:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "ea92e383-928d-4d28-a4aa-6eb84077aeaa"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-pihole-egress-vlz9b",
+        "generateName": "ts-pihole-egress-",
+        "namespace": "tailscale",
+        "uid": "87646ac9-8237-449f-b88c-761aa339b7ba",
+        "resourceVersion": "14576621",
+        "creationTimestamp": "2026-05-09T19:19:29Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "pihole-egress",
+          "tailscale.com/parent-resource-ns": "tailnet-external-dns",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-05-09T19:19:29Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "bfbc0fe4-fc39-484f-9e1b-55b95e0a9fb2"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "ts-traefik-tailscale-4jbzk",
+        "generateName": "ts-traefik-tailscale-",
+        "namespace": "tailscale",
+        "uid": "842ff9be-8c2d-46bc-b9f2-aeee40f4c527",
+        "resourceVersion": "916798",
+        "creationTimestamp": "2026-04-06T14:59:33Z",
+        "labels": {
+          "tailscale.com/managed": "true",
+          "tailscale.com/parent-resource": "traefik-tailscale",
+          "tailscale.com/parent-resource-ns": "traefik",
+          "tailscale.com/parent-resource-type": "svc"
+        },
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-06T14:59:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:generateName": {},
+                "f:labels": {
+                  ".": {},
+                  "f:tailscale.com/managed": {},
+                  "f:tailscale.com/parent-resource": {},
+                  "f:tailscale.com/parent-resource-ns": {},
+                  "f:tailscale.com/parent-resource-type": {}
+                }
+              },
+              "f:spec": {
+                "f:clusterIP": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilyPolicy": {},
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "selector": {
+          "app": "6a710dec-bcfc-4b02-a320-2c71fa2466c3"
+        },
+        "clusterIP": "None",
+        "clusterIPs": [
+          "None"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "PreferDualStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik-iad-ci",
+        "namespace": "traefik",
+        "uid": "87680974-06b8-467e-8d88-5bf37edbf3c6",
+        "resourceVersion": "62753861",
+        "creationTimestamp": "2026-04-04T17:03:43Z",
+        "labels": {
+          "app.kubernetes.io/instance": "traefik-iad-ci-traefik",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "traefik",
+          "argocd.argoproj.io/instance": "traefik-iad-ci",
+          "helm.sh/chart": "traefik-39.0.6"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:05:15Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {},
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "kubectl-tcp",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": "kubectl-tcp"
+          },
+          {
+            "name": "vpn",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": "vpn"
+          },
+          {
+            "name": "websecure",
+            "protocol": "TCP",
+            "port": 8443,
+            "targetPort": "websecure"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "traefik-iad-ci-traefik",
+          "app.kubernetes.io/name": "traefik"
+        },
+        "clusterIP": "10.21.161.70",
+        "clusterIPs": [
+          "10.21.161.70"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "traefik-tailscale",
+        "namespace": "traefik",
+        "uid": "6a710dec-bcfc-4b02-a320-2c71fa2466c3",
+        "resourceVersion": "62755228",
+        "creationTimestamp": "2026-04-06T14:59:33Z",
+        "labels": {
+          "argocd.argoproj.io/instance": "traefik-ns-iad-ci"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{\"tailscale.com/expose\":\"true\",\"tailscale.com/hostname\":\"traefik-iad-ci\"},\"finalizers\":[\"tailscale.com/finalizer\"],\"labels\":{\"argocd.argoproj.io/instance\":\"traefik-ns-iad-ci\"},\"name\":\"traefik-tailscale\",\"namespace\":\"traefik\"},\"spec\":{\"ports\":[{\"name\":\"vpn\",\"port\":8444,\"protocol\":\"TCP\",\"targetPort\":8444},{\"name\":\"kubectl-tcp\",\"port\":8001,\"protocol\":\"TCP\",\"targetPort\":8001},{\"name\":\"https\",\"port\":443,\"protocol\":\"TCP\",\"targetPort\":8443}],\"selector\":{\"app.kubernetes.io/name\":\"traefik\"},\"type\":\"ClusterIP\"},\"status\":{\"conditions\":[{\"lastTransitionTime\":\"2026-04-06T18:17:54Z\",\"message\":\"ProxyCreated\",\"reason\":\"ProxyCreated\",\"status\":\"True\",\"type\":\"TailscaleProxyReady\"}],\"loadBalancer\":{}}}\n",
+          "tailscale.com/expose": "true",
+          "tailscale.com/hostname": "traefik-iad-ci"
+        },
+        "finalizers": [
+          "tailscale.com/finalizer"
+        ],
+        "managedFields": [
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-06T14:59:33Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"tailscale.com/finalizer\"": {}
+                }
+              }
+            }
+          },
+          {
+            "manager": "operator",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-06T18:17:54Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:conditions": {
+                  ".": {},
+                  "k:{\"type\":\"TailscaleProxyReady\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "subresource": "status"
+          },
+          {
+            "manager": "argocd-controller",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:07:27Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {},
+                  "f:tailscale.com/expose": {},
+                  "f:tailscale.com/hostname": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:argocd.argoproj.io/instance": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8001,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":8444,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "vpn",
+            "protocol": "TCP",
+            "port": 8444,
+            "targetPort": 8444
+          },
+          {
+            "name": "kubectl-tcp",
+            "protocol": "TCP",
+            "port": 8001,
+            "targetPort": 8001
+          },
+          {
+            "name": "https",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": 8443
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/name": "traefik"
+        },
+        "clusterIP": "10.21.222.24",
+        "clusterIPs": [
+          "10.21.222.24"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {},
+        "conditions": [
+          {
+            "type": "TailscaleProxyReady",
+            "status": "True",
+            "lastTransitionTime": "2026-04-06T18:17:54Z",
+            "reason": "ProxyCreated",
+            "message": "ProxyCreated"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "external-dns-iad-ci",
+        "namespace": "utilities",
+        "uid": "7fb2e709-3654-4328-bec4-d4b61ea1856d",
+        "resourceVersion": "62754763",
+        "creationTimestamp": "2026-04-04T17:38:34Z",
+        "labels": {
+          "app.kubernetes.io/instance": "external-dns-iad-ci",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "external-dns",
+          "app.kubernetes.io/version": "0.20.0",
+          "argocd.argoproj.io/instance": "external-dns-iad-ci",
+          "helm.sh/chart": "external-dns-1.20.0"
+        },
+        "managedFields": [
+          {
+            "manager": "argocd-controller",
+            "operation": "Apply",
+            "apiVersion": "v1",
+            "time": "2026-08-15T12:06:43Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:argocd.argoproj.io/instance": {},
+                  "f:helm.sh/chart": {}
+                }
+              },
+              "f:spec": {
+                "f:ports": {
+                  "k:{\"port\":7979,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "TCP",
+            "port": 7979,
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "external-dns-iad-ci",
+          "app.kubernetes.io/name": "external-dns"
+        },
+        "clusterIP": "10.21.18.35",
+        "clusterIPs": [
+          "10.21.18.35"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    }
+  ]
+}
