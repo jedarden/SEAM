@@ -160,6 +160,7 @@ type Server struct {
 	openBaoReady      bool
 	hotReloadManager  *HotReloadManager // Hot reload manager for fragment changes
 	identityResolver  *IdentityResolver  // Phase 7: Identity resolver for Stage 3 (WhoIs)
+	scopeVersionCache *ScopeVersionCache // Phase 7: Bounded scope version retention map
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -274,6 +275,10 @@ func New(cfg *Config) *Server {
 	s.identityResolver = NewIdentityResolver()
 	log.Printf("Identity resolver initialized for Stage 3 (Phase 7)")
 
+	// Initialize scope version cache for Phase 7 (points 5-6)
+	s.scopeVersionCache = NewScopeVersionCache()
+	log.Printf("Scope version cache initialized for Phase 7 (4 versions per identity, 24h idle TTL, 100 LRU cap)")
+
 	s.setupRoutes()
 
 	// Initialize hot reload manager if enabled
@@ -309,6 +314,7 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/_seam/healthz", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
+	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
 
 	// Setup docs handler - fetches spec internally and serves ReDoc UI
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
@@ -316,19 +322,24 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
 	s.callerMux.HandleFunc("/docs/paths", s.docsPathsHandler)
 
+	// Phase 7 (points 5-6): Control-plane identity and scope endpoints
+	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
+	s.callerMux.HandleFunc("/scopes", s.scopesHandler)
+
 	// Catch-all dispatch handler for upstream proxying (Phase 2.0)
 	// This must be registered last so it doesn't intercept the specific handlers above
 	s.callerMux.HandleFunc("/", s.dispatchHandler)
 
 	// Operator-only routes
+	// Phase 7: Operator-tier endpoints require seam:ops:read scope
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
-	s.operatorMux.HandleFunc("/config/status", s.configStatusHandler)
+	s.operatorMux.HandleFunc("/config/status", s.operatorScopeMiddleware("seam:ops:read", s.configStatusHandler))
 	s.operatorMux.HandleFunc("/_seam/capture/save", s.captureSaveHandler)
 	s.operatorMux.HandleFunc("/_seam/capture/status", s.captureStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
-	s.operatorMux.HandleFunc("/health/credentials", s.credentialsHealthHandler)
-	s.operatorMux.HandleFunc("/health/upstreams", s.healthUpstreamsHandler)
+	s.operatorMux.HandleFunc("/health/credentials", s.operatorScopeMiddleware("seam:ops:read", s.credentialsHealthHandler))
+	s.operatorMux.HandleFunc("/health/upstreams", s.operatorScopeMiddleware("seam:ops:read", s.healthUpstreamsHandler))
 	s.operatorMux.HandleFunc("/", s.operatorNotFoundHandler)
 }
 
@@ -470,6 +481,9 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 // openapiJSONHandler returns the OpenAPI spec as JSON
 //
+// Phase 7: Returns the spec filtered by the caller's identity scopes.
+// Only routes that the caller has at least one required scope for are included.
+//
 // Query parameters:
 //
 //	version - the API version (optional, defaults to _unversioned)
@@ -479,8 +493,18 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the spec JSON with servers populated
-	specJSON, err := s.specLoader.GetRawJSON()
+	// Get identity from context for scope filtering
+	ctx := r.Context()
+	identity := identityFromContext(ctx)
+
+	// Get identity scopes for filtering
+	identityScopes := []string{}
+	if identity != nil && len(identity.Capabilities) > 0 {
+		identityScopes = identity.Capabilities
+	}
+
+	// Get the filtered spec JSON
+	specJSON, err := s.specLoader.GetFilteredJSON(identityScopes)
 	if err != nil {
 		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
 		logRequestError(r, "openapi-document", requestErr)
@@ -496,11 +520,20 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set headers
+	// Set headers including scope version
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+
+	// Add X-SEAM-Scope-Version header for correlation
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	_, _ = w.Write(specJSON)
@@ -508,6 +541,9 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 // docsHandler serves the OpenAPI documentation UI with embedded spec
 // Fetches the merged OpenAPI spec from the spec loader and serves it with Scalar API Reference
+//
+// Phase 7: Returns the spec filtered by the caller's identity scopes.
+// Only routes that the caller has at least one required scope for are included.
 //
 // Query parameters:
 //
@@ -518,8 +554,18 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch the merged OpenAPI spec from internal spec loader
-	specJSON, err := s.specLoader.GetRawJSON()
+	// Get identity from context for scope filtering
+	ctx := r.Context()
+	identity := identityFromContext(ctx)
+
+	// Get identity scopes for filtering
+	identityScopes := []string{}
+	if identity != nil && len(identity.Capabilities) > 0 {
+		identityScopes = identity.Capabilities
+	}
+
+	// Fetch the filtered OpenAPI spec
+	specJSON, err := s.specLoader.GetFilteredJSON(identityScopes)
 	if err != nil {
 		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
 		logRequestError(r, "docs-document", requestErr)
@@ -536,7 +582,7 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[/docs] Successfully fetched and validated merged spec (%d bytes)", len(specJSON))
+	log.Printf("[/docs] Successfully fetched and validated filtered spec (%d bytes)", len(specJSON))
 
 	// Check if no fragments were loaded (fragment mode only) - log warning
 	fragmentStatus := s.specLoader.GetFragmentStatus()
@@ -554,6 +600,15 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 		w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 		w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+
+		// Add X-SEAM-Scope-Version header for correlation
+		if identity != nil {
+			scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+			if scopeVersion != "" {
+				w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
+			}
+		}
+
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(specJSON)
 		return
@@ -565,6 +620,15 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+
+	// Add X-SEAM-Scope-Version header for correlation
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	// Embed the spec JSON in the HTML page
@@ -808,6 +872,61 @@ func (s *Server) docsPathsHandler(w http.ResponseWriter, r *http.Request) {
 			"total_paths":  len(pathStatuses),
 		},
 		"paths": pathStatuses,
+	}
+
+	// Set headers and return response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// whoamiHandler returns the caller's identity information
+//
+// Phase 7: Returns the resolved identity from Tailscale WhoIs, including:
+// - Node name and key
+// - Resolved status
+// - Capabilities (scopes from Tailscale Grant)
+// - Current scope version hash
+//
+// This endpoint is used by the 404 oracle rule to provide callers with
+// information about their identity and scope version when they encounter
+// a filtered route.
+func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
+		return
+	}
+
+	// Get identity from context (resolved by identityResolutionMiddleware)
+	ctx := r.Context()
+	identity := identityFromContext(ctx)
+
+	if identity == nil {
+		// This should never happen if Stage 3 ran, but handle gracefully
+		InternalError("Identity not found in context").Write(w, r)
+		return
+	}
+
+	// Get current scope version for this identity
+	scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity.NodeKey)
+
+	// Build response
+	response := map[string]interface{}{
+		"node_name":      identity.NodeName,
+		"node_key":       identity.NodeKey,
+		"resolved":       identity.Resolved,
+		"capabilities":   identity.Capabilities,
+		"scope_version":  scopeVersion,
+		"tags":           identity.Tags,
+		"metadata": map[string]interface{}{
+			"spec_version":  s.specLoader.GetVersion(),
+			"api_version":  s.specLoader.GetAPIVersion(),
+			"description":  "SEAM caller identity information (Phase 7)",
+		},
 	}
 
 	// Set headers and return response
@@ -1079,6 +1198,10 @@ func (s *Server) Start(ctx context.Context) error {
 	callerHandler = s.authorizationMiddleware(callerHandler)
 	log.Printf("Authorization middleware active on caller-facing port (stage 5, Phase 7 - INERT)")
 
+	// Wrap with scope version middleware (Phase 7 - adds X-SEAM-Scope-Version header)
+	callerHandler = s.scopeVersionMiddleware(callerHandler)
+	log.Printf("Scope version middleware active on caller-facing port (Phase 7 - adds X-SEAM-Scope-Version header)")
+
 	// Wrap with validation middleware (stage 1 - control-plane detection)
 	callerHandler = s.validationMiddleware(callerHandler)
 	log.Printf("Validation middleware active on caller-facing port (stage 1)")
@@ -1102,6 +1225,10 @@ func (s *Server) Start(ctx context.Context) error {
 	// Version validation applies to the operator listener as well. Keep header
 	// injection outermost so rejected operator requests also identify the API
 	// and spec versions that evaluated them.
+
+	// Wrap with identity resolution middleware (stage 3 - WhoIs, Phase 7)
+	operatorHandler = s.identityResolutionMiddleware(operatorHandler)
+	log.Printf("Identity resolution middleware active on operator-only port (stage 3, Phase 7 - INERT)")
 	operatorHandler := s.versionMiddleware(s.operatorMux)
 	operatorHandler = s.versionInjectionMiddleware(operatorHandler)
 	operatorHandler = s.requestIDMiddleware(operatorHandler)
@@ -1871,4 +1998,40 @@ func mergePathParams(base, overlay map[string]string) map[string]string {
 		result[k] = v
 	}
 	return result
+}
+
+// operatorScopeMiddleware wraps an operator endpoint handler with scope checking.
+// Per Phase 7: operator-tier endpoints require seam:ops:read scope.
+// Returns 403 Forbidden with scope name when denied.
+func (s *Server) operatorScopeMiddleware(requiredScope string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		
+		// Get resolved identity from Stage 3
+		identity := identityFromContext(ctx)
+		if identity == nil {
+			// No identity in context - Stage 3 may not have run
+			log.Printf("[Operator-Scope] No identity in context for %s - denying (requires scope: %s)", r.URL.Path, requiredScope)
+			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
+			return
+		}
+		
+		// Check if identity is resolved
+		if !identity.Resolved {
+			log.Printf("[Operator-Scope] Identity not resolved for %s - denying (requires scope: %s)", r.URL.Path, requiredScope)
+			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
+			return
+		}
+		
+		// Check if identity has the required scope
+		if !identity.HasScope(requiredScope) {
+			log.Printf("[Operator-Scope] Identity lacks required scope %s for %s - denying (has: %v)", requiredScope, r.URL.Path, identity.Capabilities)
+			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
+			return
+		}
+		
+		// Scope check passed - proceed to handler
+		log.Printf("[Operator-Scope] Identity has required scope %s for %s - allowing", requiredScope, r.URL.Path)
+		next(w, r)
+	}
 }
