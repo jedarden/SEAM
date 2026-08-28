@@ -100,6 +100,11 @@ type RouteEntry struct {
 	// effective scope.
 	FanoutScope map[string][]string
 
+	// AdapterConfig holds the x-adapter configuration for version migration.
+	// When non-nil, this route adapts requests to a targetVersion and applies
+	// request/response transforms per Phase 8.2.
+	AdapterConfig *AdapterConfig
+
 	// BreakerConfig holds the fragment-root default circuit breaker configuration.
 	// Per-instance overrides are stored in each UpstreamMap entry's BreakerConfig.
 	// The runtime uses the stricter (more likely to open) value when same-origin
