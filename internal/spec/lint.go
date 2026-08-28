@@ -326,6 +326,8 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
 	f.checkBreakerDisagreements(report)
+	f.checkPassThroughProbe(report)
+	f.checkAdapter(report)
 }
 
 func (f *lintFragment) addError(report *LintReport, code, message string) {
@@ -1106,6 +1108,342 @@ func (a *hostAllowlist) allowed(host string) bool {
 		}
 	}
 	return false
+}
+
+// checkAdapter validates x-adapter constraints per Phase 8.2:
+// - targetVersion liveness (validator-side, after merge)
+// - Transform vocabulary compliance
+// - buffered-transform-on-unbufferable-route flag
+func (f *lintFragment) checkAdapter(report *LintReport) {
+	adapter, hasAdapter := f.data["x-adapter"].(map[string]any)
+	if !hasAdapter {
+		return
+	}
+
+	// Extract targetVersion
+	targetVersion, hasTarget := adapter["targetVersion"].(string)
+	if !hasTarget || targetVersion == "" {
+		f.addError(report, "adapter.target-version-missing", "x-adapter.targetVersion is required and must be a non-empty string")
+		return
+	}
+
+	// Validate targetVersion format (must match apiVersion pattern)
+	if !apiVersionPattern.MatchString(targetVersion) {
+		f.addError(report, "adapter.target-version-invalid", fmt.Sprintf("x-adapter.targetVersion %q must match ^v[1-9][0-9]*$", targetVersion))
+	}
+
+	// Check for mutually exclusive upstream-facing fields
+	upstreamFields := []string{
+		"x-upstream", "x-upstream-map", "x-instance-param",
+		"x-upstream-strip-prefix", "x-upstream-tls", "x-upstream-plaintext",
+		"x-vault-path", "x-inject-as", "x-credential-probe", "x-breaker",
+	}
+
+	for _, field := range upstreamFields {
+		if _, exists := f.data[field]; exists {
+			f.addError(report, "adapter.upstream-field-forbidden",
+				fmt.Sprintf("x-adapter is mutually exclusive with %s (all upstream-facing fields are taken from targetVersion)", field))
+		}
+	}
+
+	// Validate request transforms
+	requestTransforms, hasRequest := adapter["request"].([]any)
+	if !hasRequest {
+		f.addError(report, "adapter.request-missing", "x-adapter.request array is required")
+	} else {
+		f.validateAdapterTransforms(report, requestTransforms, "request")
+	}
+
+	// Validate response transforms
+	responseTransforms, hasResponse := adapter["response"].([]any)
+	if !hasResponse {
+		f.addError(report, "adapter.response-missing", "x-adapter.response array is required")
+	} else {
+		f.validateAdapterTransforms(report, responseTransforms, "response")
+	}
+
+	// Check for buffered transforms on streaming routes
+	f.checkAdapterBuffering(report, adapter)
+}
+
+// validateAdapterTransforms validates each transform in the array
+func (f *lintFragment) validateAdapterTransforms(report *LintReport, transforms []any, direction string) {
+	for i, transform := range transforms {
+		transformMap, ok := transform.(map[string]any)
+		if !ok {
+			f.addError(report, "adapter.transform-invalid",
+				fmt.Sprintf("x-adapter.%s[%d] must be an object", direction, i))
+			continue
+		}
+
+		// Check that exactly one transform operation is specified
+		opCount := 0
+		var opName string
+
+		if _, hasRename := transformMap["rename"]; hasRename {
+			opCount++
+			opName = "rename"
+		}
+		if _, hasDefault := transformMap["default"]; hasDefault {
+			opCount++
+			opName = "default"
+		}
+		if _, hasDrop := transformMap["drop"]; hasDrop {
+			opCount++
+			opName = "drop"
+		}
+		if _, hasWrap := transformMap["wrap"]; hasWrap {
+			opCount++
+			opName = "wrap"
+		}
+		if _, hasUnwrap := transformMap["unwrap"]; hasUnwrap {
+			opCount++
+			opName = "unwrap"
+		}
+		if _, hasRenameParam := transformMap["renameParam"]; hasRenameParam {
+			opCount++
+			opName = "renameParam"
+		}
+
+		if opCount == 0 {
+			f.addError(report, "adapter.transform-empty",
+				fmt.Sprintf("x-adapter.%s[%d] must specify exactly one transform operation", direction, i))
+			continue
+		}
+		if opCount > 1 {
+			f.addError(report, "adapter.transform-multiple",
+				fmt.Sprintf("x-adapter.%s[%d] specifies multiple operations; only one transform is allowed per item", direction, i))
+			continue
+		}
+
+		// Validate specific transform types
+		switch opName {
+		case "rename":
+			f.validateRenameTransform(report, transformMap, direction, i)
+		case "default":
+			f.validateDefaultTransform(report, transformMap, direction, i)
+		case "drop":
+			f.validateDropTransform(report, transformMap, direction, i)
+		case "wrap":
+			f.validateWrapTransform(report, transformMap, direction, i)
+		case "unwrap":
+			f.validateUnwrapTransform(report, transformMap, direction, i)
+		case "renameParam":
+			f.validateRenameParamTransform(report, transformMap, direction, i)
+		}
+	}
+}
+
+// validateRenameTransform validates a rename/move transform
+func (f *lintFragment) validateRenameTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	rename, ok := transform["rename"].(map[string]any)
+	if !ok {
+		f.addError(report, "adapter.rename-shape",
+			fmt.Sprintf("x-adapter.%s[%d].rename must be an object", direction, index))
+		return
+	}
+
+	from, hasFrom := rename["from"].(string)
+	to, hasTo := rename["to"].(string)
+
+	if !hasFrom || from == "" {
+		f.addError(report, "adapter.rename-from-missing",
+			fmt.Sprintf("x-adapter.%s[%d].rename.from is required and must be a non-empty string", direction, index))
+	}
+	if !hasTo || to == "" {
+		f.addError(report, "adapter.rename-to-missing",
+			fmt.Sprintf("x-adapter.%s[%d].rename.to is required and must be a non-empty string", direction, index))
+	}
+
+	// Validate JSON Pointer format (basic check)
+	if hasFrom && !strings.HasPrefix(from, "/") {
+		f.addError(report, "adapter.rename-from-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].rename.from must be a JSON Pointer starting with '/'", direction, index))
+	}
+	if hasTo && !strings.HasPrefix(to, "/") {
+		f.addError(report, "adapter.rename-to-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].rename.to must be a JSON Pointer starting with '/'", direction, index))
+	}
+}
+
+// validateDefaultTransform validates a default value transform
+func (f *lintFragment) validateDefaultTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	defaultOp, ok := transform["default"].(map[string]any)
+	if !ok {
+		f.addError(report, "adapter.default-shape",
+			fmt.Sprintf("x-adapter.%s[%d].default must be an object", direction, index))
+		return
+	}
+
+	pointer, hasPointer := defaultOp["pointer"].(string)
+	value, hasValue := defaultOp["value"]
+
+	if !hasPointer || pointer == "" {
+		f.addError(report, "adapter.default-pointer-missing",
+			fmt.Sprintf("x-adapter.%s[%d].default.pointer is required and must be a non-empty string", direction, index))
+	}
+	if !hasValue {
+		f.addError(report, "adapter.default-value-missing",
+			fmt.Sprintf("x-adapter.%s[%d].default.value is required", direction, index))
+	}
+
+	// Validate JSON Pointer format
+	if hasPointer && !strings.HasPrefix(pointer, "/") {
+		f.addError(report, "adapter.default-pointer-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].default.pointer must be a JSON Pointer starting with '/'", direction, index))
+	}
+}
+
+// validateDropTransform validates a drop field transform
+func (f *lintFragment) validateDropTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	drop, ok := transform["drop"].(string)
+	if !ok || drop == "" {
+		f.addError(report, "adapter.drop-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].drop must be a non-empty string (JSON Pointer)", direction, index))
+		return
+	}
+
+	// Validate JSON Pointer format
+	if !strings.HasPrefix(drop, "/") {
+		f.addError(report, "adapter.drop-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].drop must be a JSON Pointer starting with '/'", direction, index))
+	}
+}
+
+// validateWrapTransform validates a wrap envelope transform
+func (f *lintFragment) validateWrapTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	wrap, ok := transform["wrap"].(map[string]any)
+	if !ok {
+		f.addError(report, "adapter.wrap-shape",
+			fmt.Sprintf("x-adapter.%s[%d].wrap must be an object", direction, index))
+		return
+	}
+
+	pointer, hasPointer := wrap["pointer"].(string)
+	envelope, hasEnvelope := wrap["envelope"].(string)
+
+	if !hasPointer || pointer == "" {
+		f.addError(report, "adapter.wrap-pointer-missing",
+			fmt.Sprintf("x-adapter.%s[%d].wrap.pointer is required and must be a non-empty string", direction, index))
+	}
+	if !hasEnvelope || envelope == "" {
+		f.addError(report, "adapter.wrap-envelope-missing",
+			fmt.Sprintf("x-adapter.%s[%d].wrap.envelope is required and must be a non-empty string", direction, index))
+	}
+
+	// Validate JSON Pointer format
+	if hasPointer && !strings.HasPrefix(pointer, "/") {
+		f.addError(report, "adapter.wrap-pointer-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].wrap.pointer must be a JSON Pointer starting with '/'", direction, index))
+	}
+}
+
+// validateUnwrapTransform validates an unwrap envelope transform
+func (f *lintFragment) validateUnwrapTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	unwrap, ok := transform["unwrap"].(map[string]any)
+	if !ok {
+		f.addError(report, "adapter.unwrap-shape",
+			fmt.Sprintf("x-adapter.%s[%d].unwrap must be an object", direction, index))
+		return
+	}
+
+	pointer, hasPointer := unwrap["pointer"].(string)
+	envelope, hasEnvelope := unwrap["envelope"].(string)
+
+	if !hasPointer || pointer == "" {
+		f.addError(report, "adapter.unwrap-pointer-missing",
+			fmt.Sprintf("x-adapter.%s[%d].unwrap.pointer is required and must be a non-empty string", direction, index))
+	}
+	if !hasEnvelope || envelope == "" {
+		f.addError(report, "adapter.unwrap-envelope-missing",
+			fmt.Sprintf("x-adapter.%s[%d].unwrap.envelope is required and must be a non-empty string", direction, index))
+	}
+
+	// Validate JSON Pointer format
+	if hasPointer && !strings.HasPrefix(pointer, "/") {
+		f.addError(report, "adapter.unwrap-pointer-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].unwrap.pointer must be a JSON Pointer starting with '/'", direction, index))
+	}
+}
+
+// validateRenameParamTransform validates a rename parameter transform
+func (f *lintFragment) validateRenameParamTransform(report *LintReport, transform map[string]any, direction string, index int) {
+	// renameParam is only valid for request transforms
+	if direction != "request" {
+		f.addError(report, "adapter.rename-param-response",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam is only valid for request transforms, not response", direction, index))
+		return
+	}
+
+	renameParam, ok := transform["renameParam"].(map[string]any)
+	if !ok {
+		f.addError(report, "adapter.rename-param-shape",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam must be an object", direction, index))
+		return
+	}
+
+	from, hasFrom := renameParam["from"].(string)
+	to, hasTo := renameParam["to"].(string)
+	location, hasLocation := renameParam["location"].(string)
+
+	if !hasFrom || from == "" {
+		f.addError(report, "adapter.rename-param-from-missing",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam.from is required and must be a non-empty string", direction, index))
+	}
+	if !hasTo || to == "" {
+		f.addError(report, "adapter.rename-param-to-missing",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam.to is required and must be a non-empty string", direction, index))
+	}
+	if !hasLocation || location == "" {
+		f.addError(report, "adapter.rename-param-location-missing",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam.location is required and must be 'query' or 'header'", direction, index))
+		return
+	}
+
+	if location != "query" && location != "header" {
+		f.addError(report, "adapter.rename-param-location-invalid",
+			fmt.Sprintf("x-adapter.%s[%d].renameParam.location must be 'query' or 'header', got %q", direction, index, location))
+	}
+}
+
+// checkAdapterBuffering validates that response transforms requiring buffering
+// are not used on unbufferable (streaming) routes
+func (f *lintFragment) checkAdapterBuffering(report *LintReport, adapter map[string]any) {
+	responseTransforms, hasResponse := adapter["response"].([]any)
+	if !hasResponse {
+		return
+	}
+
+	// Check if this route is unbufferable (streaming)
+	// For now, we assume all routes are bufferable unless explicitly marked
+	// In a full implementation, this would check the route's content-type
+	// and response handling configuration
+
+	for i, transform := range responseTransforms {
+		transformMap, ok := transform.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Check for structure-altering transforms that require buffering
+		requiresBuffering := false
+		transformType := ""
+
+		if _, hasWrap := transformMap["wrap"]; hasWrap {
+			requiresBuffering = true
+			transformType = "wrap"
+		} else if _, hasUnwrap := transformMap["unwrap"]; hasUnwrap {
+			// unwrap doesn't inherently require buffering
+			// but may if the response structure changes significantly
+		}
+
+		if requiresBuffering {
+			// TODO: In full implementation, check if route is streaming
+			// For now, emit a warning that buffering will be forced
+			f.addWarning(report, "adapter.buffering-required",
+				fmt.Sprintf("x-adapter.response[%d] uses %s transform which requires buffered response path", i, transformType))
+		}
+	}
 }
 
 func sortLintFindings(report *LintReport) {

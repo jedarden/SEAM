@@ -284,11 +284,128 @@
       "required": ["targetVersion", "request", "response"],
       "properties": {
         "targetVersion": { "$ref": "#/$defs/apiVersion", "$comment": "Names a LIVE served x-api-version this fragment adapts into (validator-side: must exist after merge)." },
-        "request": { "type": "array", "items": { "type": "object" } },
-        "response": { "type": "array", "items": { "type": "object" } }
+        "request": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/adapterTransform" },
+          "$comment": "Ordered request transforms applied at stage 8 before re-validation against targetVersion schema."
+        },
+        "response": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/adapterTransform" },
+          "$comment": "Ordered response transforms applied at stage 2 before scrubbing. Structure-altering transforms force buffered path."
+        }
       },
       "additionalProperties": false,
-      "$comment": "Each list is an ordered sequence of transforms from a CLOSED vocabulary owned by Version Migration Strategy §2 / Phase 8. The transform object shape is intentionally permissive here (items: object) and will be tightened when §2 finalizes the vocabulary; no expressions, no scripting."
+      "$comment": "Closed vocabulary of transforms for version migration (Phase 8.2). No expressions, no code execution."
+    },
+    "adapterTransform": {
+      "oneOf": [
+        { "$ref": "#/$defs/transformRename" },
+        { "$ref": "#/$defs/transformDefault" },
+        { "$ref": "#/$defs/transformDrop" },
+        { "$ref": "#/$defs/transformWrap" },
+        { "$ref": "#/$defs/transformUnwrap" },
+        { "$ref": "#/$defs/transformRenameParam" }
+      ],
+      "$comment": "Closed vocabulary for x-adapter transforms. Each transform is a well-defined operation without arbitrary code execution."
+    },
+    "transformRename": {
+      "type": "object",
+      "required": ["rename"],
+      "properties": {
+        "rename": {
+          "type": "object",
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "type": "string", "$comment": "JSON Pointer to the source field (e.g., '/oldField')" },
+            "to": { "type": "string", "$comment": "JSON Pointer to the destination field (e.g., '/newField')" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Rename or move a field by JSON Pointer. Works on request and response bodies."
+    },
+    "transformDefault": {
+      "type": "object",
+      "required": ["default"],
+      "properties": {
+        "default": {
+          "type": "object",
+          "required": ["pointer", "value"],
+          "properties": {
+            "pointer": { "type": "string", "$comment": "JSON Pointer to the field (e.g., '/metadata/field')" },
+            "value": { "$comment": "Any JSON value to insert if the field is missing" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Set a default value for a missing field. No-op if the field already exists."
+    },
+    "transformDrop": {
+      "type": "object",
+      "required": ["drop"],
+      "properties": {
+        "drop": {
+          "type": "string",
+          "$comment": "JSON Pointer to the field to remove (e.g., '/legacyField')"
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Remove a field from the request or response body."
+    },
+    "transformWrap": {
+      "type": "object",
+      "required": ["wrap"],
+      "properties": {
+        "wrap": {
+          "type": "object",
+          "required": ["pointer", "envelope"],
+          "properties": {
+            "pointer": { "type": "string", "$comment": "JSON Pointer to the location to wrap (e.g., '/data')" },
+            "envelope": { "type": "string", "$comment": "Name of the wrapper field (e.g., 'result')" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Wrap a value in an envelope object. Forces buffered path for responses."
+    },
+    "transformUnwrap": {
+      "type": "object",
+      "required": ["unwrap"],
+      "properties": {
+        "unwrap": {
+          "type": "object",
+          "required": ["pointer", "envelope"],
+          "properties": {
+            "pointer": { "type": "string", "$comment": "JSON Pointer to the wrapped value (e.g., '/data')" },
+            "envelope": { "type": "string", "$comment": "Name of the wrapper field to remove (e.g., 'result')" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Unwrap a value from an envelope object."
+    },
+    "transformRenameParam": {
+      "type": "object",
+      "required": ["renameParam"],
+      "properties": {
+        "renameParam": {
+          "type": "object",
+          "required": ["from", "to", "location"],
+          "properties": {
+            "from": { "type": "string", "$comment": "Current parameter name" },
+            "to": { "type": "string", "$comment": "New parameter name" },
+            "location": { "enum": ["query", "header"], "$comment": "Parameter location" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Rename a query or header parameter. Only applies to requests."
     },
     "pathItem": {
       "type": "object",
