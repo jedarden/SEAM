@@ -65,7 +65,7 @@ func TestCaptureRedactsRouteInjectableNames(t *testing.T) {
 	)
 
 	cm := NewCaptureMiddleware(t.TempDir(), "test-service", "test-incumbent", false)
-	cm.setRouteTable(&RouteTable{routes: []RouteEntry{
+	testRouteTable := &RouteTable{routes: []RouteEntry{
 		{
 			PathTemplate: "/capture",
 			Method:       http.MethodGet,
@@ -78,7 +78,8 @@ func TestCaptureRedactsRouteInjectableNames(t *testing.T) {
 			APIVersion:   "v2",
 			InjectAs:     &InjectAs{Kind: InjectionQuery, Name: queryName},
 		},
-	}})
+	}}
+	cm.setRouteTableHolder(NewThreadSafeTableHolder(testRouteTable))
 	handler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get(headerName); got != headerValue {
 			t.Errorf("handler %s = %q, want %q", headerName, got, headerValue)

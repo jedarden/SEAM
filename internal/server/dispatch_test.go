@@ -97,15 +97,15 @@ func TestDispatchHandler_RouteTableMatch(t *testing.T) {
 		SpecDir:      "./spec",
 	}
 	srv := &Server{
-		config:          cfg,
-		routeTable:      table,
-		proxyMap:        make(map[string]*ReverseProxy),
-		cache:           NewResponseCache(),
-		singleFlight:    NewSingleFlight(),
-		cacheTTLs:       make(map[string]int),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker:    NewQuotaTracker(),
-		costPerCalls:    make(map[string]float64),
+		config:           cfg,
+		routeTableHolder: NewThreadSafeTableHolder(table),
+		proxyMap:         make(map[string]*ReverseProxy),
+		cache:            NewResponseCache(),
+		singleFlight:     NewSingleFlight(),
+		cacheTTLs:        make(map[string]int),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		quotaTracker:     NewQuotaTracker(),
+		costPerCalls:     make(map[string]float64),
 	}
 
 	// Test GET request
@@ -154,9 +154,9 @@ func TestDispatchHandler_NoRoute(t *testing.T) {
 	}
 	srv := &Server{
 		config: cfg,
-		routeTable: &RouteTable{
+		routeTableHolder: NewThreadSafeTableHolder(&RouteTable{
 			routes: make([]RouteEntry, 0),
-		},
+		}),
 		proxyMap:        make(map[string]*ReverseProxy),
 		cache:           NewResponseCache(),
 		singleFlight:    NewSingleFlight(),
@@ -199,7 +199,7 @@ func TestDispatchHandler_NoUpstream(t *testing.T) {
 	}
 	srv := &Server{
 		config: cfg,
-		routeTable: &RouteTable{
+		routeTableHolder: NewThreadSafeTableHolder(&RouteTable{
 			routes: []RouteEntry{
 				{
 					PathTemplate:   "/test",
@@ -208,7 +208,7 @@ func TestDispatchHandler_NoUpstream(t *testing.T) {
 					UpstreamTarget: "", // Empty upstream target
 				},
 			},
-		},
+		}),
 		proxyMap:        make(map[string]*ReverseProxy),
 		cache:           NewResponseCache(),
 		singleFlight:    NewSingleFlight(),
@@ -251,7 +251,7 @@ func TestDispatchHandler_ProxyCreationFailed(t *testing.T) {
 	}
 	srv := &Server{
 		config: cfg,
-		routeTable: &RouteTable{
+		routeTableHolder: NewThreadSafeTableHolder(&RouteTable{
 			routes: []RouteEntry{
 				{
 					PathTemplate:   "/test",
@@ -260,7 +260,7 @@ func TestDispatchHandler_ProxyCreationFailed(t *testing.T) {
 					UpstreamTarget: "http://invalid:999999", // Invalid port
 				},
 			},
-		},
+		}),
 		proxyMap:        make(map[string]*ReverseProxy),
 		cache:           NewResponseCache(),
 		singleFlight:    NewSingleFlight(),
@@ -566,15 +566,15 @@ func TestDispatchHandler_PathParameters(t *testing.T) {
 		SpecDir:      "./spec",
 	}
 	srv := &Server{
-		config:          cfg,
-		routeTable:      table,
-		proxyMap:        make(map[string]*ReverseProxy),
-		cache:           NewResponseCache(),
-		singleFlight:    NewSingleFlight(),
-		cacheTTLs:       make(map[string]int),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
-		quotaTracker:    NewQuotaTracker(),
-		costPerCalls:    make(map[string]float64),
+		config:           cfg,
+		routeTableHolder: NewThreadSafeTableHolder(table),
+		proxyMap:         make(map[string]*ReverseProxy),
+		cache:            NewResponseCache(),
+		singleFlight:     NewSingleFlight(),
+		cacheTTLs:        make(map[string]int),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		quotaTracker:     NewQuotaTracker(),
+		costPerCalls:     make(map[string]float64),
 	}
 
 	// Test with a specific user ID

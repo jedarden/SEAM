@@ -42,6 +42,13 @@ const (
 	// ErrCodeValidationError is retained as a source-compatible alias. The
 	// wire value has always been validation_failed in the validator path.
 	ErrCodeValidationError = ErrCodeValidationFailed
+
+	// Fan-out multi-status errors (Phase 10.2).
+	// These are used within 207 Multi-Status responses, not as top-level error codes.
+	ErrCodeFanoutBreakerRefused ErrorCode = "fanout_breaker_refused"
+	ErrCodeFanoutTimeout        ErrorCode = "fanout_timeout"
+	ErrCodeFanoutTruncated      ErrorCode = "fanout_truncated"
+	ErrCodeFanoutScopeWithheld  ErrorCode = "fanout_scope_withheld"
 )
 
 // HTTPStatusMapping is the canonical mapping from public error codes to HTTP
@@ -69,6 +76,13 @@ var HTTPStatusMapping = map[ErrorCode]int{
 	ErrCodeCaptureFailed:        http.StatusInternalServerError,
 	ErrCodeSpecLoadFailed:       http.StatusInternalServerError,
 	ErrCodeConfigError:          http.StatusInternalServerError,
+
+	// Fan-out errors map to their appropriate HTTP status codes.
+	// These are used within 207 responses, not as top-level codes.
+	ErrCodeFanoutBreakerRefused: http.StatusServiceUnavailable,
+	ErrCodeFanoutTimeout:        http.StatusGatewayTimeout,
+	ErrCodeFanoutTruncated:      http.StatusPartialContent,
+	ErrCodeFanoutScopeWithheld:  http.StatusForbidden,
 }
 
 // GetHTTPStatus returns the HTTP status for code. Unknown codes are treated as

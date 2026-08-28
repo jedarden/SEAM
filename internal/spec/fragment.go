@@ -646,3 +646,97 @@ func (fl *FragmentLoader) GetFragmentStatus() map[string]interface{} {
 		"server_continues":      true, // Server continues even if all fragments are quarantined
 	}
 }
+
+// GetFanoutScope extracts the x-fanout-scope configuration from a fragment.
+// Returns nil if the field is not present.
+func (f *Fragment) GetFanoutScope() map[string][]string {
+	if f.ParsedFragment == nil {
+		return nil
+	}
+
+	// Look for x-fanout-scope at fragment root
+	fanoutScope, exists := f.ParsedFragment["x-fanout-scope"]
+	if !exists {
+		return nil
+	}
+
+	// Parse the scope configuration
+	result, err := parseFanoutScope(fanoutScope)
+	if err != nil {
+		log.Printf("[Fragment] Warning: failed to parse x-fanout-scope in fragment %s: %v", f.SourceFile, err)
+		return nil
+	}
+
+	return result
+}
+
+// parseFanoutScope parses the x-fanout-scope field value.
+// Expected format: map[string][]string where key is instance ID and value is array of scope IDs.
+func parseFanoutScope(raw interface{}) (map[string][]string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+
+	rawMap, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("x-fanout-scope must be an object")
+	}
+
+	result := make(map[string][]string)
+
+	for instanceID, scopesAny := range rawMap {
+		// Parse scopes array
+		scopesArray, ok := scopesAny.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("x-fanout-scope entry for instance %q: value must be an array", instanceID)
+		}
+
+		scopes := make([]string, 0, len(scopesArray))
+		for i, scopeAny := range scopesArray {
+			scope, ok := scopeAny.(string)
+			if !ok {
+				return nil, fmt.Errorf("x-fanout-scope entry for instance %q: scope at index %d must be a string", instanceID, i)
+			}
+			scope = strings.TrimSpace(scope)
+			if scope == "" {
+				return nil, fmt.Errorf("x-fanout-scope entry for instance %q: scope at index %d is empty", instanceID, i)
+			}
+			scopes = append(scopes, scope)
+		}
+
+		if len(scopes) == 0 {
+			return nil, fmt.Errorf("x-fanout-scope entry for instance %q: scope array cannot be empty", instanceID)
+		}
+
+		result[instanceID] = scopes
+	}
+
+	return result, nil
+}
+
+// ValidateFanoutScope validates the x-fanout-scope configuration for a fragment.
+// This is called during fragment validation to ensure the scope constraints are well-formed.
+func ValidateFanoutScope(scopeConfig map[string][]string) error {
+	for instanceID, scopes := range scopeConfig {
+		if instanceID == "" {
+			return fmt.Errorf("x-fanout-scope: instance ID cannot be empty")
+		}
+
+		if len(scopes) == 0 {
+			return fmt.Errorf("x-fanout-scope: instance %q has empty scope array", instanceID)
+		}
+
+		seen := make(map[string]bool)
+		for _, scope := range scopes {
+			if scope == "" {
+				return fmt.Errorf("x-fanout-scope: instance %q has empty scope ID", instanceID)
+			}
+			if seen[scope] {
+				return fmt.Errorf("x-fanout-scope: instance %q has duplicate scope %q", instanceID, scope)
+			}
+			seen[scope] = true
+		}
+	}
+
+	return nil
+}

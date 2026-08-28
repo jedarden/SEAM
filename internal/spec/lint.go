@@ -325,6 +325,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkUnscrubbable(report)
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
+	f.checkBreakerDisagreements(report)
 }
 
 func (f *lintFragment) addError(report *LintReport, code, message string) {
@@ -561,6 +562,50 @@ func (f *lintFragment) checkTransport(report *LintReport) {
 			f.addWarning(report, "transport.plaintext", fmt.Sprintf("x-upstream-map[%q].plaintext: acknowledged requires human review", key))
 		}
 	}
+
+	// SEAM lint map-width warning for Phase 10.2 fan-out envelopes
+	// Calculate envelope size and warn if it would exceed limits
+	instanceCount := len(entries)
+	if instanceCount > 0 {
+		// Max envelope calculation:
+		// maxFanoutEnvelopeBytes = min(maxBufferedResponseBytes × total_instances, 64 MiB)
+		// Default maxBufferedResponseBytes = 1 MiB (1,048,576 bytes)
+		const maxBufferedResponseBytes = 1 * 1024 * 1024 // 1 MiB
+		const hardCap = 64 * 1024 * 1024                 // 64 MiB
+
+		// Calculate the envelope size limit
+		maxPerResponse := int64(maxBufferedResponseBytes) * int64(instanceCount)
+		maxEnvelopeBytes := maxPerResponse
+		if maxEnvelopeBytes > hardCap {
+			maxEnvelopeBytes = hardCap
+		}
+
+		// Estimate per-instance overhead (JSON structure, status codes, etc.)
+		// Rough estimate: ~200 bytes per instance for envelope metadata
+		const perInstanceOverhead = 200
+		estimatedEnvelopeSize := int64(perInstanceOverhead * instanceCount)
+
+		// Warn if the estimated envelope size approaches the limit
+		// Use 80% of the limit as the warning threshold
+		warningThreshold := int64(float64(maxEnvelopeBytes) * 0.8)
+		if estimatedEnvelopeSize > warningThreshold {
+			f.addWarning(report, "fanout.map-width",
+				fmt.Sprintf("x-upstream-map has %d instances; envelope size limit is %d bytes (min(%d × %d, %d MiB)). "+
+					"Consider reducing instance count or increasing maxBufferedResponseBytes to avoid truncation. "+
+					"Estimated envelope overhead: ~%d bytes (exceeds 80%% threshold)",
+					instanceCount, maxEnvelopeBytes,
+					maxBufferedResponseBytes, instanceCount, hardCap/(1024*1024),
+					estimatedEnvelopeSize))
+		}
+
+		// Additional warning if instance count is very high (>100)
+		if instanceCount > 100 {
+			f.addWarning(report, "fanout.map-width",
+				fmt.Sprintf("x-upstream-map has %d instances; large fan-outs (>100) may impact latency and timeout handling. "+
+					"Consider implementing pagination or batch APIs instead of broadcasting to all instances",
+					instanceCount))
+		}
+	}
 }
 
 func (f *lintFragment) checkUnscrubbable(report *LintReport) {
@@ -615,6 +660,145 @@ func (f *lintFragment) checkRouteGuards(report *LintReport) {
 			f.warnLongGuardWindow(report, operation, "x-quota", context+" x-quota.window")
 		}
 	}
+}
+
+// checkBreakerDisagreements validates that same-origin instances in x-upstream-map
+// have identical breaker configuration. Per Phase 11.1, same-origin disagreement
+// is a lint error that fails the PR.
+func (f *lintFragment) checkBreakerDisagreements(report *LintReport) {
+	// Get fragment-root breaker config
+	var fragmentBreakerConfig map[string]any
+	if breaker, ok := f.data["x-breaker"].(map[string]any); ok {
+		fragmentBreakerConfig = breaker
+	}
+
+	// Check x-upstream-map entries
+	upstreamMap, ok := f.data["x-upstream-map"].(map[string]any)
+	if !ok {
+		return // No upstream map, no disagreements possible
+	}
+
+	// Group instances by origin and collect breaker configs
+	type originConfig struct {
+		origin   string
+		instance string
+		config   map[string]any
+		location string
+	}
+
+	originConfigs := make(map[string][]originConfig)
+
+	for instanceKey, entryValue := range upstreamMap {
+		// Skip reserved keys (_all, _default)
+		if instanceKey == "_all" || instanceKey == "_default" {
+			continue
+		}
+
+		entry, ok := entryValue.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Extract URL
+		urlStr, ok := entry["url"].(string)
+		if !ok || urlStr == "" {
+			continue
+		}
+
+		// Parse origin from URL
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			continue // Invalid URL will be caught by other checks
+		}
+
+		if u.Scheme == "" || u.Host == "" {
+			continue
+		}
+
+		// Build origin: scheme://host:port
+		origin := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+
+		// Extract breaker config for this instance
+		var breakerConfig map[string]any
+		if breaker, ok := entry["breaker"].(map[string]any); ok {
+			breakerConfig = breaker
+		} else {
+			// Use fragment-root config if no instance override
+			breakerConfig = fragmentBreakerConfig
+		}
+
+		location := fmt.Sprintf("x-upstream-map[%q].breaker", instanceKey)
+		originConfigs[origin] = append(originConfigs[origin], originConfig{
+			origin:   origin,
+			instance: instanceKey,
+			config:   breakerConfig,
+			location: location,
+		})
+	}
+
+	// Check for disagreements within each origin
+	for origin, configs := range originConfigs {
+		if len(configs) < 2 {
+			continue // No disagreement possible with single instance
+		}
+
+		// Compare all configs against the first one
+		referenceConfig := configs[0].config
+
+		for i := 1; i < len(configs); i++ {
+			currentConfig := configs[i].config
+			currentInstance := configs[i].instance
+
+			if !breakerConfigsEqual(referenceConfig, currentConfig) {
+				f.addError(report, "breaker.same-origin-disagreement",
+					fmt.Sprintf("same-origin %q has conflicting breaker configs between %q and %s: "+
+						"runtime uses the stricter (more likely to open) values, but this disagreement "+
+						"must be resolved before merge. Configure identical x-breaker values for all instances "+
+						"of the same origin, or omit per-instance overrides to use the fragment-root default.",
+						origin, configs[0].instance, currentInstance))
+				return // Only need one error per origin
+			}
+		}
+	}
+}
+
+// breakerConfigsEqual compares two breaker configuration maps for equality.
+// It compares the relevant fields: threshold, openSeconds, maxOpenSeconds, enabled.
+func breakerConfigsEqual(a, b map[string]any) bool {
+	// Both nil is equal
+	if a == nil && b == nil {
+		return true
+	}
+
+	// One nil, one not is not equal
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	// Both non-nil, compare fields
+	return breakerFieldEqual(a, b, "threshold") &&
+		breakerFieldEqual(a, b, "openSeconds") &&
+		breakerFieldEqual(a, b, "maxOpenSeconds") &&
+		breakerFieldEqual(a, b, "enabled")
+}
+
+// breakerFieldEqual checks if two breaker config maps have equal values for a field.
+func breakerFieldEqual(a, b map[string]any, field string) bool {
+	aVal, aHas := a[field]
+	bVal, bHas := b[field]
+
+	// Both missing is equal (uses default)
+	if !aHas && !bHas {
+		return true
+	}
+
+	// One missing, one present is not equal
+	if aHas != bHas {
+		return false
+	}
+
+	// Both present, compare values
+	return fmt.Sprintf("%v", aVal) == fmt.Sprintf("%v", bVal)
 }
 
 func guardUnit(container map[string]any, field string) (string, bool) {

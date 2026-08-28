@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ardenone/seam/internal/buildinfo"
+	"github.com/ardenone/seam/internal/fanout"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/vault"
 )
@@ -123,6 +124,7 @@ type Config struct {
 	VaultBaseDir              string // Base directory for vault path validation (default: "rs-manager/seam/routes")
 	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
 	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
+	HotReloadEnabled          bool   // Phase 3.1: Enable file-watch hot reload of route fragments
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -136,7 +138,7 @@ type Server struct {
 	operatorListener  net.Listener
 	wg                sync.WaitGroup
 	specLoader        *spec.Loader
-	routeTable        *RouteTable              // Route table for request matching (stage 4)
+	routeTableHolder  *ThreadSafeTableHolder   // Thread-safe holder for route table (stage 4)
 	proxyMap          map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
 	proxyMapMu        sync.RWMutex             // Protects proxyMap
 	upstreamClientMap map[string]*http.Client  // Map of TLS identity -> connection-pooled client
@@ -145,6 +147,7 @@ type Server struct {
 	singleFlight      *SingleFlight
 	cacheTTLs         map[string]int // route path -> cache TTL in seconds
 	circuitBreakers   *CircuitBreakerStateRegistry
+	breakerRegistry   *BreakerRegistry // Per-origin circuit breaker manager (Phase 11.1)
 	quotaTracker      *QuotaTracker
 	costPerCalls      map[string]float64 // route -> cost per call
 	metrics           *Metrics
@@ -152,6 +155,18 @@ type Server struct {
 	allowlistEnforcer *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
 	openBaoMu         sync.RWMutex
 	openBaoReady      bool
+	hotReloadManager  *HotReloadManager // Hot reload manager for fragment changes
+}
+
+// Circuit breaker context constants (using contextKey type from proxy.go)
+const (
+	circuitBreakerContextKey contextKey = iota + 1 // Start from 1 to avoid collision with replayableBodyKey
+)
+
+// breakerContext holds circuit breaker state in the request context
+type breakerContext struct {
+	breaker *CircuitBreaker
+	origin  Origin
 }
 
 // New creates a new Server with the given configuration
@@ -214,7 +229,7 @@ func New(cfg *Config) *Server {
 		callerMux:         http.NewServeMux(),
 		operatorMux:       http.NewServeMux(),
 		specLoader:        specLoader,
-		routeTable:        NewRouteTable(specLoader),
+		routeTableHolder:  NewThreadSafeTableHolder(NewRouteTable(specLoader)),
 		proxyMap:          make(map[string]*ReverseProxy),
 		upstreamClientMap: make(map[string]*http.Client),
 		cache:             NewResponseCache(),
@@ -226,8 +241,8 @@ func New(cfg *Config) *Server {
 		allowlistEnforcer: allowlistEnforcer,
 		openBaoReady:      true,
 	}
-	s.metrics = newMetrics(s.cache, s.routeTable, s.circuitBreakers, buildinfo.Read())
-	log.Printf("Route table initialized with %d routes", s.routeTable.RouteCount())
+	s.metrics = newMetrics(s.cache, s.routeTableHolder, s.circuitBreakers, buildinfo.Read())
+	log.Printf("Route table initialized with thread-safe holder")
 
 	// Initialize capture middleware if enabled
 	if cfg.CaptureEnabled {
@@ -236,7 +251,7 @@ func New(cfg *Config) *Server {
 			corpusDir = "corpus"
 		}
 		s.captureMiddleware = NewCaptureMiddleware(corpusDir, "seam", "seam-incumbent", true)
-		s.captureMiddleware.setRouteTable(s.routeTable)
+		s.captureMiddleware.setRouteTableHolder(s.routeTableHolder)
 		// Load existing corpus if present
 		if err := s.captureMiddleware.Load(); err != nil {
 			log.Printf("Warning: failed to load existing corpus: %v", err)
@@ -249,6 +264,16 @@ func New(cfg *Config) *Server {
 	log.Printf("Loaded %d route cache TTL configurations", len(s.cacheTTLs))
 
 	s.setupRoutes()
+
+	// Initialize hot reload manager if enabled
+	if cfg.HotReloadEnabled {
+		s.hotReloadManager = NewHotReloadManager(s)
+		if err := s.hotReloadManager.Enable(); err != nil {
+			log.Printf("Warning: Failed to enable hot reload: %v", err)
+			log.Printf("Warning: Server will continue without hot reload")
+		}
+	}
+
 	return s
 }
 
@@ -355,13 +380,13 @@ func (s *Server) ensureMetrics() *Metrics {
 		if s.cache == nil {
 			s.cache = NewResponseCache()
 		}
-		if s.routeTable == nil {
-			s.routeTable = NewRouteTable(nil)
+		if s.routeTableHolder == nil {
+			s.routeTableHolder = NewThreadSafeTableHolder(NewRouteTable(nil))
 		}
 		if s.circuitBreakers == nil {
 			s.circuitBreakers = NewCircuitBreakerStateRegistry()
 		}
-		s.metrics = newMetrics(s.cache, s.routeTable, s.circuitBreakers, buildinfo.Read())
+		s.metrics = newMetrics(s.cache, s.routeTableHolder, s.circuitBreakers, buildinfo.Read())
 	}
 	return s.metrics
 }
@@ -1149,6 +1174,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
+	// Stop hot reload manager if enabled
+	if s.hotReloadManager != nil {
+		s.hotReloadManager.Disable()
+		log.Printf("Hot reload manager stopped")
+	}
+
 	// Wait for all goroutines to finish
 	s.wg.Wait()
 
@@ -1223,23 +1254,89 @@ func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 // The upstream URL is extracted from the matched route's UpstreamTarget field
 func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	// Stage 4: Match the request against the route table
-	routeMatch, err := s.routeTable.Match(r)
+	routeMatch, err := s.routeTableHolder.Match(r)
 	if err != nil {
 		// No route found - return 404
 		s.handleNotFound(w, r)
 		return
 	}
 
-	// Extract upstream URL from the matched route
-	upstreamURL := routeMatch.Route.UpstreamTarget
+	// Check if this is a fan-out request (_all instance parameter)
+	if routeMatch.Route.IsFanOutRequest(routeMatch.PathParams) {
+		s.handleFanOutRequest(w, r, routeMatch)
+		return
+	}
+
+	// Resolve the instance target if using x-instance-param
+	route := routeMatch.Route
+	if route.InstanceParam != "" && len(route.UpstreamMap) > 0 {
+		instance := routeMatch.PathParams[route.InstanceParam]
+		if instance == "" {
+			s.handleNoUpstream(w, r)
+			return
+		}
+
+		// Resolve to specific instance target
+		if target, ok := route.UpstreamMap[instance]; ok && target.URL != "" {
+			route.UpstreamTarget = target.URL
+			if target.VaultPath != "" {
+				route.VaultPath = target.VaultPath
+			}
+			if target.InjectAs != nil {
+				route.InjectAs = target.InjectAs
+			}
+		} else if target, ok := route.UpstreamMap["_default"]; ok && target.URL != "" {
+			route.UpstreamTarget = target.URL
+			if target.VaultPath != "" {
+				route.VaultPath = target.VaultPath
+			}
+			if target.InjectAs != nil {
+				route.InjectAs = target.InjectAs
+			}
+		} else {
+			s.handleNoUpstream(w, r)
+			return
+		}
+	}
+
+	// Single-instance request path (existing behavior)
+	upstreamURL := route.UpstreamTarget
 	if upstreamURL == "" {
 		// No upstream configured for this route - return 503
 		s.handleNoUpstream(w, r)
 		return
 	}
 
+	// Check circuit breaker before dispatching
+	if s.breakerRegistry != nil {
+		origin, err := ParseOrigin(upstreamURL)
+		if err != nil {
+			log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", upstreamURL, err)
+		} else {
+			// Get or create breaker for this origin
+			config := route.BreakerConfig
+			if config == nil {
+				defaultConfig := DefaultBreakerConfig()
+				config = &defaultConfig
+			}
+			breaker := s.breakerRegistry.GetOrCreate(origin, *config)
+
+			// Check if breaker allows the request
+			if !breaker.Allow() {
+				// Breaker is open, return structured 503
+				log.Printf("[circuit-breaker] Request refused by breaker for origin %s", origin)
+				WriteCircuitBreakerRefused(w, r, breaker.Snapshot())
+				return
+			}
+
+			// Store breaker in request context for post-response tracking
+			ctx := context.WithValue(r.Context(), circuitBreakerContextKey, breakerContext{breaker: breaker, origin: origin})
+			r = r.WithContext(ctx)
+		}
+	}
+
 	// Get or create proxy for this upstream
-	proxy, err := s.getOrCreateProxyWithError(upstreamURL, routeMatch.Route.TLSConfig)
+	proxy, err := s.getOrCreateProxyWithError(upstreamURL, route.TLSConfig)
 	if err != nil {
 		// Proxy creation failed - return 503
 		s.handleProxyCreationFailed(w, r, err)
@@ -1249,6 +1346,122 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	// Stages 6-11: Dispatch to upstream and stream response back
 	// The ReverseProxy handles all stages: building request, dispatching, streaming response
 	proxy.ServeHTTP(w, r)
+}
+
+// handleFanOutRequest handles a _all fan-out request by dispatching to all instances
+// in the upstream map and returning a 207 Multi-Status envelope.
+func (s *Server) handleFanOutRequest(w http.ResponseWriter, r *http.Request, routeMatch *RouteMatch) {
+	// Extract all instance targets from the upstream map
+	instanceTargets := routeMatch.Route.GetAllInstanceTargets()
+	if len(instanceTargets) == 0 {
+		s.handleNoUpstream(w, r)
+		return
+	}
+
+	// Build instance dispatch list
+	dispatches := make([]fanout.InstanceDispatch, 0, len(instanceTargets))
+	for instanceID, target := range instanceTargets {
+		dispatch := fanout.InstanceDispatch{
+			InstanceID: instanceID,
+			Target:     target.URL,
+			VaultPath:  target.VaultPath,
+		}
+
+		// Set InjectAs configuration
+		if target.InjectAs != nil {
+			dispatch.InjectAs = &fanout.InjectAsConfig{
+				Kind: string(target.InjectAs.Kind),
+				Name: target.InjectAs.Name,
+			}
+		}
+
+		// Set TLS configuration from the route (applies to all instances)
+		if routeMatch.Route.TLSConfig != nil {
+			dispatch.TLSConfig = &fanout.TLSConfig{
+				CaBundle:           routeMatch.Route.TLSConfig.CaBundle,
+				ServerName:         routeMatch.Route.TLSConfig.ServerName,
+				InsecureSkipVerify: routeMatch.Route.TLSConfig.InsecureSkipVerify,
+				PlaintextAck:       routeMatch.Route.TLSConfig.PlaintextAck,
+			}
+		}
+
+		dispatches = append(dispatches, dispatch)
+	}
+
+	// Calculate max envelope size
+	maxBufferedResponseBytes := int64(1 * 1024 * 1024) // Default 1 MiB
+	if s.config != nil && s.config.MaxBufferedResponseBytes > 0 {
+		maxBufferedResponseBytes = s.config.MaxBufferedResponseBytes
+	}
+	maxEnvelopeBytes := fanout.MaxFanoutEnvelopeBytes(maxBufferedResponseBytes, len(dispatches))
+
+	// Create fan-out dispatcher configuration
+	dispatchConfig := &fanout.DispatchConfig{
+		MaxEnvelopeBytes: maxEnvelopeBytes,
+		Timeout:          30 * time.Second,
+		ConcurrentLimit:  10,
+	}
+
+	// Create executor that uses existing proxy infrastructure
+	executor := &fanoutExecutor{
+		server:     s,
+		routeMatch: routeMatch,
+		request:    r,
+	}
+
+	// Create circuit breaker check
+	breakerCheck := func(instanceID string, targetURL string) bool {
+		if s.circuitBreakers == nil {
+			return false // No breaker state, allow all
+		}
+		// Check if circuit is open for this target
+		snapshot := s.circuitBreakers.Snapshot()
+		for _, status := range snapshot {
+			if status.Origin == targetURL && status.State == CircuitBreakerOpen {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Create scope check (from x-fanout-scope fragment field)
+	scopeCheck := func(instanceID string) bool {
+		// TODO: Extract scope configuration from route entry
+		// For now, allow all instances (no scope filtering)
+		return true
+	}
+
+	// Create dispatcher and execute
+	dispatcher := fanout.NewDispatcher(dispatchConfig, executor, breakerCheck, scopeCheck)
+	envelope := dispatcher.Dispatch(r.Context(), dispatches)
+
+	// Derive final HTTP status and partial header
+	statusCode, partialHeader := envelope.DeriveStatus()
+
+	// Write the response
+	w.Header().Set("Content-Type", "application/json")
+	if partialHeader != "" {
+		w.Header().Set("X-SEAM-Fanout-Partial", partialHeader)
+	}
+
+	// Handle special case: all breaker-refused = 503 (not 207)
+	if statusCode == http.StatusServiceUnavailable && envelope.Summary.BreakerRefused == envelope.Summary.Dispatched {
+		NewErrorResponse(ErrCodeServiceUnavailable, "All instances refused by circuit breaker").
+			WithDetail("total_instances", envelope.Summary.Total).
+			WithDetail("refused_count", envelope.Summary.BreakerRefused).
+			Write(w, r)
+		return
+	}
+
+	// Write envelope with appropriate status code
+	w.WriteHeader(statusCode)
+	jsonBytes, err := envelope.JSONBytes()
+	if err != nil {
+		log.Printf("[fanout] Failed to encode envelope: %v", err)
+		NewErrorResponse(ErrCodeInternalServer, "Failed to encode fan-out response").Write(w, r)
+		return
+	}
+	_, _ = w.Write(append(jsonBytes, '\n'))
 }
 
 // getOrCreateProxy gets an existing proxy from the proxyMap or creates a new one.
@@ -1380,9 +1593,9 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) metricLabels(r *http.Request) metricRouteLabels {
-	if s.routeTable != nil {
+	if s.routeTableHolder != nil {
 		requestCopy := r.Clone(r.Context())
-		if match, err := s.routeTable.Match(requestCopy); err == nil {
+		if match, err := s.routeTableHolder.Match(requestCopy); err == nil {
 			return metricRouteLabels{
 				Route:   match.Route.PathTemplate,
 				Version: match.Route.APIVersion,
@@ -1434,4 +1647,128 @@ func (w *metricsResponseWriter) Write(body []byte) (int, error) {
 // connection-hijacking capabilities of the underlying writer.
 func (w *metricsResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
+}
+
+// fanoutExecutor implements the fanout.Executor interface using the server's proxy infrastructure.
+type fanoutExecutor struct {
+	server     *Server
+	routeMatch *RouteMatch
+	request    *http.Request
+}
+
+// ExecuteRequest executes a single upstream request for one instance.
+// This implements stages 10-11 of the SEAM pipeline per instance.
+func (fe *fanoutExecutor) ExecuteRequest(ctx context.Context, dispatch *fanout.InstanceDispatch) (int, []byte, error) {
+	// Create a modified route entry for this specific instance
+	instanceRoute := fe.routeMatch.Route
+	instanceRoute.UpstreamTarget = dispatch.Target
+	instanceRoute.VaultPath = dispatch.VaultPath
+
+	// Set instance-specific InjectAs if provided
+	if dispatch.InjectAs != nil {
+		instanceRoute.InjectAs = &InjectAs{
+			Kind: InjectionKind(dispatch.InjectAs.Kind),
+			Name: dispatch.InjectAs.Name,
+		}
+	}
+
+	// Set TLS config if provided
+	if dispatch.TLSConfig != nil {
+		instanceRoute.TLSConfig = &UpstreamTLSConfig{
+			CaBundle:           dispatch.TLSConfig.CaBundle,
+			ServerName:         dispatch.TLSConfig.ServerName,
+			InsecureSkipVerify: dispatch.TLSConfig.InsecureSkipVerify,
+			PlaintextAck:       dispatch.TLSConfig.PlaintextAck,
+		}
+	}
+
+	// Get or create proxy for this instance's upstream
+	proxy, err := fe.server.getOrCreateProxyWithError(dispatch.Target, instanceRoute.TLSConfig)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to create proxy for instance %s: %w", dispatch.InstanceID, err)
+	}
+
+	// Create a response recorder to capture the response
+	recorder := &fanoutResponseRecorder{
+		header: make(http.Header),
+	}
+
+	// Create a copy of the request for this instance
+	instanceReq := fe.cloneRequestForInstance(fe.request, dispatch.InstanceID)
+
+	// Execute the request through the proxy
+	// The proxy will handle stages 10-11 (request building, dispatch, response streaming)
+	proxy.ServeHTTP(recorder, instanceReq)
+
+	// Return the results
+	return recorder.status, recorder.body, recorder.err
+}
+
+// cloneRequestForInstance creates a copy of the request for a specific instance.
+// The instance parameter is added/replaced in the path parameters.
+func (fe *fanoutExecutor) cloneRequestForInstance(req *http.Request, instanceID string) *http.Request {
+	// Clone the request body and headers
+	cloned := req.Clone(req.Context())
+
+	// Update path parameters for this instance
+	// This ensures the instance ID is available to the proxy for logging/metrics
+	cloned = cloned.WithContext(context.WithValue(req.Context(), pathParamsContextKey{},
+		mergePathParams(getPathParams(req.Context()), map[string]string{
+			fe.routeMatch.Route.InstanceParam: instanceID,
+		})))
+
+	return cloned
+}
+
+// fanoutResponseRecorder captures an HTTP response for fan-out envelope building.
+// It is named differently from responseRecorder in capture.go to avoid collision.
+type fanoutResponseRecorder struct {
+	status int
+	body   []byte
+	header http.Header
+	err    error
+}
+
+func (r *fanoutResponseRecorder) Header() http.Header {
+	if r.header == nil {
+		r.header = make(http.Header)
+	}
+	return r.header
+}
+
+func (r *fanoutResponseRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	r.body = append(r.body, b...)
+	return len(b), nil
+}
+
+func (r *fanoutResponseRecorder) WriteHeader(statusCode int) {
+	r.status = statusCode
+}
+
+// Context key types for path parameters and other request context.
+type pathParamsContextKey struct{}
+
+// routeMatchContextKey is declared in request_pipeline.go to avoid duplication
+
+// getPathParams extracts path parameters from the request context.
+func getPathParams(ctx context.Context) map[string]string {
+	if params, ok := ctx.Value(pathParamsContextKey{}).(map[string]string); ok {
+		return params
+	}
+	return nil
+}
+
+// mergePathParams merges two path parameter maps.
+func mergePathParams(base, overlay map[string]string) map[string]string {
+	result := make(map[string]string)
+	for k, v := range base {
+		result[k] = v
+	}
+	for k, v := range overlay {
+		result[k] = v
+	}
+	return result
 }

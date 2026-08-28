@@ -166,7 +166,7 @@ func TestHTTPErrorPathsUseCommonEnvelope(t *testing.T) {
 func newErrorPathDispatchServer(routes []RouteEntry) *Server {
 	return &Server{
 		config:            &Config{},
-		routeTable:        &RouteTable{routes: routes},
+		routeTableHolder:  NewThreadSafeTableHolder(&RouteTable{routes: routes}),
 		proxyMap:          make(map[string]*ReverseProxy),
 		upstreamClientMap: make(map[string]*http.Client),
 		cache:             NewResponseCache(),

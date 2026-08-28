@@ -154,7 +154,7 @@ func newDispatchTLSConfigTestServer(table *RouteTable, upstreamCADir string) *Se
 			MaxBufferedResponseBytes:  DefaultMaxBufferedResponseBytes,
 			UpstreamCADir:             upstreamCADir,
 		},
-		routeTable:        table,
+		routeTableHolder:  NewThreadSafeTableHolder(table),
 		proxyMap:          make(map[string]*ReverseProxy),
 		upstreamClientMap: make(map[string]*http.Client),
 		cache:             NewResponseCache(),

@@ -14,16 +14,16 @@ import (
 
 // HotReloadManager manages hot reload of route tables when fragments change
 type HotReloadManager struct {
-	server          *Server
-	coordinator     *watcher.Coordinator
-	reloadMu        sync.Mutex
+	server           *Server
+	coordinator      *watcher.Coordinator
+	reloadMu         sync.Mutex
 	reloadInProgress bool
-	lastReloadTime  time.Time
+	lastReloadTime   time.Time
 	reloadCount      uint64
-	failCount       uint64
-	enabled         bool
-	ctx             context.Context
-	cancel          context.CancelFunc
+	failCount        uint64
+	enabled          bool
+	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 // NewHotReloadManager creates a new hot reload manager
