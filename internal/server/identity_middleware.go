@@ -21,10 +21,7 @@ import (
 // - Stage 3 without Stage 5: Identity is resolved but never enforced (useless)
 // - Stage 5 without Stage 3: Authorization checks with no identity (denies everyone)
 //
-// Before Phase 7: This middleware records "the reserved anonymous identity"
-// and passes all requests through (ACL serves as security boundary).
-//
-// After Phase 7: This middleware performs real WhoIs resolution and
+// Phase 7 activated: This middleware performs real WhoIs resolution and
 // default-deny for unresolved identities.
 func (s *Server) identityResolutionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,21 +30,11 @@ func (s *Server) identityResolutionMiddleware(next http.Handler) http.Handler {
 
 		if err != nil {
 			// Phase 7: Default-deny for unresolved identities
-			// For now, log but allow (ACL is the security boundary)
 			log.Printf("[Stage-3-Identity] Failed to resolve identity for %s: %v", r.RemoteAddr, err)
 
-			// TODO: Phase 7 activation - return 403 for unresolved identities
-			// NewErrorResponse(ErrCodeForbidden, "Identity resolution failed").Write(w, r)
-			// return
-
-			// Pre-Phase 7: Create anonymous identity
-			identity = &Identity{
-				NodeName:   r.RemoteAddr,
-				Resolved:   false,
-				NodeKey:    "anonymous",
-				Tags:       []string{}, // No tags for anonymous
-				Capabilities: []string{}, // No capabilities
-			}
+			// Phase 7 activated: deny requests with unresolved identity
+			NewErrorResponse(ErrCodeForbidden, "Identity resolution failed").Write(w, r)
+			return
 		}
 
 		// Store resolved identity in request context for later stages

@@ -22,9 +22,7 @@ import (
 // - Stage 3 without Stage 5: Identity is resolved but never enforced (useless)
 // - Stage 5 without Stage 3: Authorization checks with no identity (denies everyone)
 //
-// Before Phase 7: This middleware is INERT - allows all requests through.
-//
-// After Phase 7: This middleware enforces x-required-scope with default-deny.
+// Phase 7 activated: This middleware enforces x-required-scope with default-deny.
 func (s *Server) authorizationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -57,18 +55,13 @@ func (s *Server) authorizationMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Stage 5.4: Check if identity has any of the required scopes
-		// For now, if identity is not resolved, we deny (default-deny)
+		// Phase 7: Default-deny for unresolved identities
 		if !identity.Resolved {
 			log.Printf("[Stage-5-Authorization] Identity not resolved for route %s requiring scopes %v - denying (Phase 7)",
 				routeMatch.Route.PathTemplate, requiredScopes)
 
-			// TODO: Phase 7 activation - uncomment this
-			// NewErrorResponse(ErrCodeForbidden, "Identity resolution failed - cannot authorize scoped route").Write(w, r)
-			// return
-
-			// Pre-Phase 7: Allow anyway (ACL is the security boundary)
-			log.Printf("[Stage-5-Authorization] Pre-Phase 7: allowing despite unresolved identity")
-			next.ServeHTTP(w, r)
+			// Phase 7 activated: deny requests with unresolved identity
+			NewErrorResponse(ErrCodeForbidden, "Identity resolution failed - cannot authorize scoped route").Write(w, r)
 			return
 		}
 
@@ -87,12 +80,9 @@ func (s *Server) authorizationMiddleware(next http.Handler) http.Handler {
 			log.Printf("[Stage-5-Authorization] Identity lacks required scopes %v (has: %v) - denying (Phase 7)",
 				requiredScopes, identity.Capabilities)
 
-			// TODO: Phase 7 activation - uncomment this
-			// NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Route requires one of scopes: %v", requiredScopes)).Write(w, r)
-			// return
-
-			// Pre-Phase 7: Allow anyway (ACL is the security boundary)
-			log.Printf("[Stage-5-Authorization] Pre-Phase 7: allowing despite missing scope")
+			// Phase 7 activated: deny requests with insufficient scope
+			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Route requires one of scopes: %v", requiredScopes)).Write(w, r)
+			return
 		}
 
 		// Proceed to next handler

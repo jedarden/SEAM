@@ -1010,6 +1010,71 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
+
+// scopesHandler returns the caller's current scope information
+//
+// Phase 7: Returns the caller's effective scopes from their Tailscale identity.
+// This endpoint is protected by seam:scopes:read-all scope.
+//
+// Response includes:
+// - resolved: Whether the identity was successfully resolved
+// - capabilities: Array of scope IDs the caller possesses
+// - scope_version: Current scope version hash for this identity
+//
+// Returns 403 Forbidden with scope name if caller lacks seam:scopes:read-all.
+func (s *Server) scopesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
+		return
+	}
+
+	// Get identity from context (resolved by identityResolutionMiddleware)
+	ctx := r.Context()
+	identity := identityFromContext(ctx)
+
+	if identity == nil {
+		// This should never happen if Stage 3 ran, but handle gracefully
+		InternalError("Identity not found in context").Write(w, r)
+		return
+	}
+
+	// Check if identity has the required scope (seam:scopes:read-all)
+	// This is the control-plane branch step 3: builtin scope declarations evaluated
+	if !identity.Resolved || !identity.HasScope("seam:scopes:read-all") {
+		log.Printf("[Scopes-Endpoint] Identity lacks required scope seam:scopes:read-all (has: %v) - denying",
+			identity.Capabilities)
+		NewErrorResponse(ErrCodeForbidden, "Operator endpoint requires scope: seam:scopes:read-all").Write(w, r)
+		return
+	}
+
+	// Get current scope version for this identity
+	scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity.NodeKey)
+
+	// Build response
+	response := map[string]interface{}{
+		"resolved":      identity.Resolved,
+		"capabilities":  identity.Capabilities,
+		"scope_version": scopeVersion,
+		"identity": map[string]interface{}{
+			"node_name": identity.NodeName,
+			"node_key":  identity.NodeKey,
+			"tags":     identity.Tags,
+		},
+		"metadata": map[string]interface{}{
+			"spec_version": s.specLoader.GetVersion(),
+			"api_version":  s.specLoader.GetAPIVersion(),
+			"description":  "SEAM caller scope information (Phase 7)",
+		},
+	}
+
+	// Set headers and return response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
 func rawRouteOperation(pathItem map[string]interface{}, method string) (map[string]interface{}, bool) {
 	operation, ok := pathItem[strings.ToLower(method)].(map[string]interface{})
 	if !ok {
@@ -1736,10 +1801,45 @@ func (s *Server) handleFanOutRequest(w http.ResponseWriter, r *http.Request, rou
 	}
 
 	// Create scope check (from x-fanout-scope fragment field)
+	// Phase 7: Filter instances based on x-fanout-scope requirements
 	scopeCheck := func(instanceID string) bool {
-		// TODO: Extract scope configuration from route entry
-		// For now, allow all instances (no scope filtering)
-		return true
+		// Get the fanout scope configuration from the route
+		fanoutScope := routeMatch.Route.FanoutScope
+		if len(fanoutScope) == 0 {
+			// No x-fanout-scope constraints - allow all instances
+			return true
+		}
+
+		// Get identity from context
+		identity := identityFromContext(r.Context())
+		if identity == nil || !identity.Resolved {
+			// No resolved identity - deny all instances (fail-closed)
+			return false
+		}
+
+		// Check if this instance has scope constraints
+		requiredScopes, exists := fanoutScope[instanceID]
+		if !exists {
+			// No specific constraint for this instance
+			// Check for _default fallback
+			requiredScopes, exists = fanoutScope["_default"]
+			if !exists {
+				// No constraints - allow
+				return true
+			}
+		}
+
+		// Check if identity has any of the required scopes
+		for _, requiredScope := range requiredScopes {
+			if identity.HasScope(requiredScope) {
+				log.Printf("[Fanout-Scope] Instance %s is in scope (has %s)", instanceID, requiredScope)
+				return true
+			}
+		}
+
+		log.Printf("[Fanout-Scope] Instance %s is out of scope (requires one of: %v, has: %v)",
+			instanceID, requiredScopes, identity.Capabilities)
+		return false
 	}
 
 	// Create dispatcher and execute
