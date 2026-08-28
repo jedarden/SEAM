@@ -327,6 +327,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkRouteGuards(report)
 	f.checkBreakerDisagreements(report)
 	f.checkPassThroughProbe(report)
+	f.checkDeprecation(report)
 	f.checkAdapter(report)
 }
 
@@ -1444,6 +1445,207 @@ func (f *lintFragment) checkAdapterBuffering(report *LintReport, adapter map[str
 				fmt.Sprintf("x-adapter.response[%d] uses %s transform which requires buffered response path", i, transformType))
 		}
 	}
+}
+
+// checkDeprecation validates x-seam-deprecated structure
+// Per Phase 8.3: ordered, non-overlapping brownout windows inside [since, sunset]
+func (f *lintFragment) checkDeprecation(report *LintReport) {
+	deprecated, hasDeprecated := f.data["x-seam-deprecated"]
+	if !hasDeprecated {
+		return
+	}
+
+	// A bare true is a lint error - must be an object
+	if _, isBool := deprecated.(bool); isBool {
+		f.addError(report, "deprecation.bare-true", "x-seam-deprecated must be an object with 'since' field; bare true is not allowed")
+		return
+	}
+
+	deprecatedMap, ok := deprecated.(map[string]any)
+	if !ok {
+		// Schema should catch this, but validate anyway
+		f.addError(report, "deprecation.invalid-type", "x-seam-deprecated must be an object")
+		return
+	}
+
+	// Validate required 'since' field (ISO date)
+	since, hasSince := deprecatedMap["since"].(string)
+	if !hasSince || since == "" {
+		f.addError(report, "deprecation.since-missing", "x-seam-deprecated.since is required and must be an ISO date string")
+		return
+	}
+
+	if !isValidISODate(since) {
+		f.addError(report, "deprecation.since-invalid", fmt.Sprintf("x-seam-deprecated.since must be a valid ISO date (YYYY-MM-DD), got %q", since))
+		return
+	}
+
+	// Validate optional 'sunset' field
+	sunset, hasSunset := deprecatedMap["sunset"].(string)
+	if hasSunset && sunset != "" {
+		if !isValidISODate(sunset) {
+			f.addError(report, "deprecation.sunset-invalid", fmt.Sprintf("x-seam-deprecated.sunset must be a valid ISO date (YYYY-MM-DD), got %q", sunset))
+			return
+		}
+
+		// Sunset must be after since
+		if !isDateAfter(sunset, since) {
+			f.addError(report, "deprecation.sunset-before-since", fmt.Sprintf("x-seam-deprecated.sunset %q must be after since %q", sunset, since))
+		}
+	}
+
+	// Validate optional 'brownout' array
+	brownout, hasBrownout := deprecatedMap["brownout"]
+	if !hasBrownout {
+		return
+	}
+
+	brownoutArray, ok := brownout.([]any)
+	if !ok {
+		f.addError(report, "deprecation.brownout-invalid", "x-seam-deprecated.brownout must be an array")
+		return
+	}
+
+	if len(brownoutArray) == 0 {
+		f.addError(report, "deprecation.brownout-empty", "x-seam-deprecated.brownout array must not be empty")
+		return
+	}
+
+	// Brownout requires sunset
+	if !hasSunset || sunset == "" {
+		f.addError(report, "deprecation.brownout-without-sunset", "x-seam-deprecated.brownout requires x-seam-deprecated.sunset to be set")
+		return
+	}
+
+	// Validate each brownout window and check ordering/non-overlap
+	var lastEnd string
+	for i, window := range brownoutArray {
+		windowMap, ok := window.(map[string]any)
+		if !ok {
+			f.addError(report, "deprecation.brownout-window-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d] must be an object", i))
+			continue
+		}
+
+		start, hasStart := windowMap["start"].(string)
+		end, hasEnd := windowMap["end"].(string)
+
+		if !hasStart || start == "" {
+			f.addError(report, "deprecation.brownout-start-missing", fmt.Sprintf("x-seam-deprecated.brownout[%d].start is required and must be an ISO date-time string", i))
+			continue
+		}
+		if !hasEnd || end == "" {
+			f.addError(report, "deprecation.brownout-end-missing", fmt.Sprintf("x-seam-deprecated.brownout[%d].end is required and must be an ISO date-time string", i))
+			continue
+		}
+
+		if !isValidISODateTime(start) {
+			f.addError(report, "deprecation.brownout-start-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d].start must be a valid ISO date-time (RFC 3339), got %q", i, start))
+			continue
+		}
+		if !isValidISODateTime(end) {
+			f.addError(report, "deprecation.brownout-end-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d].end must be a valid ISO date-time (RFC 3339), got %q", i, end))
+			continue
+		}
+
+		// End must be after start
+		if !isDateTimeAfter(end, start) {
+			f.addError(report, "deprecation.brownout-end-before-start", fmt.Sprintf("x-seam-deprecated.brownout[%d].end %q must be after start %q", i, end, start))
+			continue
+		}
+
+		// Window must be within [since, sunset]
+		if !isDateTimeWithinRange(start, since, sunset) {
+			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("x-seam-deprecated.brownout[%d].start %q is outside the deprecation range [%s, %s]", i, start, since, sunset))
+			continue
+		}
+		if !isDateTimeWithinRange(end, since, sunset) {
+			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("x-seam-deprecated.brownout[%d].end %q is outside the deprecation range [%s, %s]", i, end, since, sunset))
+			continue
+		}
+
+		// Check for ordering (no overlapping, sequential windows)
+		if lastEnd != "" && !isDateTimeAfterOrEqual(start, lastEnd) {
+			f.addError(report, "deprecation.brownout-overlapping", fmt.Sprintf("x-seam-deprecated.brownout[%d].start %q must be after or equal to previous window's end %q (windows must be ordered and non-overlapping)", i, start, lastEnd))
+			continue
+		}
+
+		lastEnd = end
+	}
+}
+
+// isValidISODate checks if a string is a valid ISO date (YYYY-MM-DD)
+func isValidISODate(date string) bool {
+	// Basic format check: YYYY-MM-DD
+	if len(date) != 10 {
+		return false
+	}
+	if date[4] != '-' || date[7] != '-' {
+		return false
+	}
+	for i := 0; i < 10; i++ {
+		if i == 4 || i == 7 {
+			continue
+		}
+		if date[i] < '0' || date[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidISODateTime checks if a string is a valid ISO date-time (RFC 3339)
+func isValidISODateTime(datetime string) bool {
+	// RFC 3339 allows both date-time and full date-time with timezone
+	// Basic check: YYYY-MM-DDTHH:MM:SSZ or YYYY-MM-DDTHH:MM:SS+HH:MM
+	if len(datetime) < 20 {
+		return false
+	}
+	// Check date part
+	if !isValidISODate(datetime[:10]) {
+		return false
+	}
+	// Check T separator
+	if datetime[10] != 'T' && datetime[10] != 't' && datetime[10] != ' ' {
+		return false
+	}
+	// Check time part (HH:MM:SS)
+	timePart := datetime[11:]
+	if len(timePart) < 8 {
+		return false
+	}
+	if timePart[2] != ':' || timePart[5] != ':' {
+		return false
+	}
+	// This is a simplified check - a full implementation would use time.Parse
+	return true
+}
+
+// isDateAfter checks if date1 is after date2 (both ISO dates YYYY-MM-DD)
+func isDateAfter(date1, date2 string) bool {
+	return date1 > date2
+}
+
+// isDateTimeAfter checks if datetime1 is after datetime2 (both RFC 3339)
+func isDateTimeAfter(datetime1, datetime2 string) bool {
+	return datetime1 > datetime2
+}
+
+// isDateTimeAfterOrEqual checks if datetime1 is after or equal to datetime2
+func isDateTimeAfterOrEqual(datetime1, datetime2 string) bool {
+	return datetime1 >= datetime2
+}
+
+// isDateTimeWithinRange checks if a datetime is within [sinceDate, sunsetDate]
+// Assumes since and sunset are ISO dates (YYYY-MM-DD) and datetime is RFC 3339
+func isDateTimeWithinRange(datetime, sinceDate, sunsetDate string) bool {
+	// Extract date part from datetime (first 10 characters)
+	if len(datetime) < 10 {
+		return false
+	}
+	dateOnly := datetime[:10]
+
+	// Must be >= since and <= sunset
+	return dateOnly >= sinceDate && dateOnly <= sunsetDate
 }
 
 func sortLintFindings(report *LintReport) {

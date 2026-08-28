@@ -166,6 +166,7 @@ type Server struct {
 	identityResolver  *IdentityResolver  // Phase 7: Identity resolver for Stage 3 (WhoIs)
 	scopeVersionCache *ScopeVersionCache // Phase 7: Bounded scope version retention map
 	tailscaleClient   *tailscale.Client  // Phase 7: Tailscale API client for ephemeral key generation
+	specRingBuffer    *SpecRingBuffer    // Phase 8.4: Ring buffer for spec version history
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -292,6 +293,29 @@ func New(cfg *Config) *Server {
 		log.Printf("Tailscale client initialized for Phase 7 (ephemeral key generation)")
 	}
 
+	// Initialize spec version ring buffer for Phase 8.4
+	s.specRingBuffer = NewSpecRingBuffer(10) // Keep last 10 spec versions
+	log.Printf("Spec version ring buffer initialized for Phase 8.4 (capacity: 10)")
+
+	// Populate ring buffer with the initial spec version
+	if s.specLoader != nil && s.specRingBuffer != nil {
+		specHash := s.specLoader.GetHash()
+		specVersion := s.specLoader.GetVersion()
+
+		// Get the raw spec JSON for storage in the ring buffer
+		specJSON, err := s.specLoader.GetRawJSON()
+		if err != nil {
+			log.Printf("Warning: failed to get spec JSON for ring buffer: %v", err)
+		} else {
+			// Build route snapshots for this version
+			routes := s.buildRouteSnapshots()
+
+			// Add to ring buffer
+			addedVersion := s.specRingBuffer.Add(specHash, specVersion, specJSON, routes)
+			log.Printf("Initial spec version %s added to ring buffer (hash: %s)", addedVersion, specHash)
+		}
+	}
+
 	s.setupRoutes()
 
 	// Initialize hot reload manager if enabled
@@ -339,6 +363,9 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
 	s.callerMux.HandleFunc("/scopes", s.scopesHandler)
 	s.callerMux.HandleFunc("/api/v1/tailscale/ephemeral-key", s.tailscaleEphemeralKeyHandler)
+
+	// Phase 8.4: Version migration endpoints
+	s.callerMux.HandleFunc("/changes", s.changesHandler)
 
 	// Catch-all dispatch handler for upstream proxying (Phase 2.0)
 	// This must be registered last so it doesn't intercept the specific handlers above
@@ -566,12 +593,24 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 // Phase 7: Returns the spec filtered by the caller's identity scopes.
 // Only routes that the caller has at least one required scope for are included.
 //
+// Phase 8.4: Supports ?version=<spec-hash> for archived specs via archiveHandler delegation.
+//
 // Query parameters:
 //
-//	version - the API version (optional, defaults to _unversioned)
+//	version - the API version or spec hash (optional, defaults to current)
 func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		MethodNotAllowed("Only GET method is allowed").Write(w, r)
+		return
+	}
+
+	// Phase 8.4: Check if version parameter is a spec hash (archive request)
+	query := r.URL.Query()
+	requestedVersion := query.Get("version")
+
+	// If version looks like a spec hash (longer than API version), delegate to archive handler
+	if requestedVersion != "" && len(requestedVersion) > 16 {
+		s.archiveHandler(w, r)
 		return
 	}
 
@@ -978,18 +1017,65 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		canonicalVersion = allVersions[len(allVersions)-1]
 	}
 
+	// Phase 8.3: Check for deprecation status from route table
+	isDeprecated := false
+	var deprecationInfo map[string]interface{}
+
+	if s.routeTableHolder != nil {
+		// Create a dummy request for route matching
+		dummyReq, _ := http.NewRequest(method, path, nil)
+		if version != "" && version != version.Default {
+			dummyReq.Header.Set("X-API-Version", version)
+		}
+
+		if match, err := s.routeTableHolder.Match(dummyReq); err == nil {
+			if match.Route.Deprecated != nil {
+				isDeprecated = true
+				deprecationInfo = map[string]interface{}{
+					"since": match.Route.Deprecated.Since,
+				}
+				if match.Route.Deprecated.Sunset != "" {
+					deprecationInfo["sunset"] = match.Route.Deprecated.Sunset
+				}
+				if len(match.Route.Deprecated.Brownouts) > 0 {
+					brownouts := make([]map[string]interface{}, len(match.Route.Deprecated.Brownouts))
+					for i, bw := range match.Route.Deprecated.Brownouts {
+						brownouts[i] = map[string]interface{}{
+							"start": bw.Start,
+							"end":   bw.End,
+						}
+					}
+					deprecationInfo["brownouts"] = brownouts
+				}
+				if match.Route.Deprecated.ReplacementPath != "" {
+					replacement := map[string]interface{}{
+						"path": match.Route.Deprecated.ReplacementPath,
+					}
+					if match.Route.Deprecated.ReplacementVersion != "" {
+						replacement["version"] = match.Route.Deprecated.ReplacementVersion
+					}
+					deprecationInfo["replacement"] = replacement
+				}
+			}
+		}
+	}
+
 	response := map[string]interface{}{
 		"path":                           routeInfo.Path,
 		"version":                        routeInfo.Version,
 		"isDefaultForUnversionedCallers": version.IsDefaultForUnversionedCallers(routeInfo.Version, allVersions),
 		"canonicalVersion":               canonicalVersion,
-		"deprecated":                     false, // Phase 8: x-seam-deprecated handling
+		"deprecated":                     isDeprecated,
 		"versions":                       versionsArray,
 		"metadata": map[string]interface{}{
 			"description":  "Route documentation for SEAM API",
 			"spec_version": s.specLoader.GetVersion(),
 			"api_version":  s.specLoader.GetAPIVersion(),
 		},
+	}
+
+	if deprecationInfo != nil {
+		response["deprecation"] = deprecationInfo
 	}
 
 	if parameters, ok := pathItem["parameters"]; ok {
@@ -2184,6 +2270,8 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			metrics.decrementInFlight(labels, r.Method)
 			metrics.recordHTTPRequest(labels, r.Method, wrapped.statusCode, time.Since(startTime))
+			// Phase 8.4: Record per-route-version metric
+			metrics.recordRouteVersionRequest(labels.Route, labels.SpecVersion)
 		}()
 
 		next.ServeHTTP(wrapped, r)
@@ -2194,13 +2282,22 @@ func (s *Server) metricLabels(r *http.Request) metricRouteLabels {
 	if s.routeTableHolder != nil {
 		requestCopy := r.Clone(r.Context())
 		if match, err := s.routeTableHolder.Match(requestCopy); err == nil {
+			// Phase 8.4: Include spec version from ring buffer
+			specVersion := ""
+			if s.specRingBuffer != nil {
+				if _, currentVersion, _, hasCurrent := s.specRingBuffer.GetCurrentVersion(); hasCurrent {
+					specVersion = currentVersion
+				}
+			}
+
 			return metricRouteLabels{
-				Route:   match.Route.PathTemplate,
-				Version: match.Route.APIVersion,
+				Route:       match.Route.PathTemplate,
+				Version:     match.Route.APIVersion,
+				SpecVersion: specVersion,
 			}
 		}
 	}
-	return metricRouteLabels{Route: unmatchedMetricRoute, Version: "unknown"}
+	return metricRouteLabels{Route: unmatchedMetricRoute, Version: "unknown", SpecVersion: ""}
 }
 
 func metricLabelsFromRequest(r *http.Request) metricRouteLabels {
