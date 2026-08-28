@@ -18,8 +18,9 @@ const unmatchedMetricRoute = "unmatched"
 // middleware run. Route is always the OpenAPI template, never the concrete URL,
 // which keeps label cardinality bounded when paths contain IDs.
 type metricRouteLabels struct {
-	Route   string
-	Version string
+	Route       string
+	Version     string
+	SpecVersion string // Phase 8.4: Spec hash (truncated to 16 chars) for per-route-version metrics
 }
 
 type metricRouteContextKey struct{}
@@ -33,6 +34,8 @@ type Metrics struct {
 	httpRequests *prometheus.CounterVec
 	httpDuration *prometheus.HistogramVec
 	httpInFlight *prometheus.GaugeVec
+
+	routeVersionRequests *prometheus.CounterVec // Phase 8.4: Per-route-version request counter
 
 	cacheHits   *prometheus.CounterVec
 	cacheMisses *prometheus.CounterVec
@@ -97,12 +100,17 @@ func newMetrics(
 			Name: "seam_quota_bypassed_total",
 			Help: "Total quota checks bypassed by response-cache hits.",
 		}, []string{"route"}),
+		routeVersionRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_route_version_requests_total",
+			Help: "Total requests by OpenAPI route template and spec version hash (Phase 8.4: probe-free, origin-tag matched). A probe-inclusive counter means no probed fragment ever retires.",
+		}, []string{"route", "spec_version"}),
 	}
 
 	registry.MustRegister(
 		metrics.httpRequests,
 		metrics.httpDuration,
 		metrics.httpInFlight,
+		metrics.routeVersionRequests, // Phase 8.4
 		metrics.cacheHits,
 		metrics.cacheMisses,
 		metrics.quotaCost,
@@ -167,6 +175,15 @@ func (m *Metrics) recordQuotaExceeded(route string) {
 func (m *Metrics) recordQuotaBypassed(route string) {
 	if m != nil {
 		m.quotaBypassed.WithLabelValues(route).Inc()
+	}
+}
+
+// recordRouteVersionRequest records a per-route-version request (Phase 8.4).
+// This is probe-free by definition: origin-tag matched, so a probe-inclusive
+// counter means no probed fragment ever retires.
+func (m *Metrics) recordRouteVersionRequest(route string, specVersion string) {
+	if m != nil {
+		m.routeVersionRequests.WithLabelValues(route, specVersion).Inc()
 	}
 }
 

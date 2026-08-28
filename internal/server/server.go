@@ -452,6 +452,30 @@ func (s *Server) getTailscaleAPIKeyFromVault() string {
 	return ""
 }
 
+// buildRouteSnapshots builds route snapshots for the current spec version
+// This is used to populate the ring buffer with route metadata for diffing
+func (s *Server) buildRouteSnapshots() []RouteSnapshot {
+	if s.routeTableHolder == nil {
+		return []RouteSnapshot{}
+	}
+
+	routes := s.routeTableHolder.Snapshot()
+	snapshots := make([]RouteSnapshot, 0, len(routes))
+
+	for _, route := range routes {
+		snapshot := RouteSnapshot{
+			Path:            route.PathTemplate,
+			Method:          route.Method,
+			RequiredScopes:  route.RequiredScopes,
+			Deprecated:      route.Deprecated,
+			VisibilityKinds: []string{}, // Could be populated from metadata
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+
+	return snapshots
+}
+
 func (s *Server) operatorNotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	NotFound("Operator endpoint not found").
 		WithDetail("method", r.Method).

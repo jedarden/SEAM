@@ -167,6 +167,25 @@ func (hrm *HotReloadManager) reloadRouteTable() error {
 		return fmt.Errorf("failed to reload fragments: %w", err)
 	}
 
+	// Phase 8.4: Populate ring buffer with the new spec version
+	if hrm.server.specRingBuffer != nil {
+		specHash := hrm.server.specLoader.GetHash()
+		specVersion := hrm.server.specLoader.GetVersion()
+
+		// Get the raw spec JSON for storage in the ring buffer
+		specJSON, err := hrm.server.specLoader.GetRawJSON()
+		if err != nil {
+			log.Printf("[HotReload] Warning: failed to get spec JSON for ring buffer: %v", err)
+		} else {
+			// Build route snapshots for this version
+			routes := hrm.buildRouteSnapshots()
+
+			// Add to ring buffer
+			addedVersion := hrm.server.specRingBuffer.Add(specHash, specVersion, specJSON, routes)
+			log.Printf("[HotReload] Spec version %s added to ring buffer (hash: %s)", addedVersion, specHash)
+		}
+	}
+
 	// Step 2: Build new route table from the re-merged OpenAPI document
 	newRouteTable, err := BuildRouteTable(hrm.server.specLoader.OpenAPIModel())
 	if err != nil {
@@ -216,6 +235,30 @@ func (hrm *HotReloadManager) reloadRouteTable() error {
 	log.Printf("[HotReload] Old route table will be reclaimed after in-flight requests complete")
 
 	return nil
+}
+
+// buildRouteSnapshots builds route snapshots for the current spec version
+// This is used to populate the ring buffer with route metadata for diffing
+func (hrm *HotReloadManager) buildRouteSnapshots() []RouteSnapshot {
+	if hrm.server.routeTableHolder == nil {
+		return []RouteSnapshot{}
+	}
+
+	routes := hrm.server.routeTableHolder.Snapshot()
+	snapshots := make([]RouteSnapshot, 0, len(routes))
+
+	for _, route := range routes {
+		snapshot := RouteSnapshot{
+			Path:            route.PathTemplate,
+			Method:          route.Method,
+			RequiredScopes:  route.RequiredScopes,
+			Deprecated:      route.Deprecated,
+			VisibilityKinds: []string{}, // Could be populated from metadata
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+
+	return snapshots
 }
 
 // Disable stops the hot reload manager
