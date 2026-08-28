@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -160,13 +162,27 @@ func detectGitBase() string {
 		return ""
 	}
 
-	// Try to get the fragments directory from git HEAD
-	// This is a simplified version - a real implementation would use git commands
-	// to extract the fragments directory at HEAD
+	// Use git commands to extract the fragments directory at HEAD
+	// git archive HEAD -- fragments.tar | tar -x -C {tempDir}
+	cmd := exec.Command("git", "archive", "HEAD", "--", "./fragments")
+	cmd.Dir = "."
+	var archive bytes.Buffer
+	cmd.Stdout = &archive
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tempDir)
+		return ""
+	}
 
-	// For now, return empty to indicate we couldn't detect the base
-	_ = tempDir
-	return ""
+	// Extract the archive into the temp directory
+	// Use tar command to extract
+	cmd = exec.Command("tar", "-x", "-C", tempDir)
+	cmd.Stdin = &archive
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tempDir)
+		return ""
+	}
+
+	return filepath.Join(tempDir, "fragments")
 }
 
 // DiffResult represents the result of comparing two specs
