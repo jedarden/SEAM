@@ -50,6 +50,11 @@ const (
 	ErrCodeFanoutTimeout        ErrorCode = "fanout_timeout"
 	ErrCodeFanoutTruncated      ErrorCode = "fanout_truncated"
 	ErrCodeFanoutScopeWithheld  ErrorCode = "fanout_scope_withheld"
+
+	// Credential health sentinel errors (Phase 12).
+	// These errors are returned when credential refresh fails or cannot be retried.
+	ErrCodeCredentialRefreshNotRetried ErrorCode = "credential_refresh_not_retried"
+	ErrCodeSecretStoreUnavailable     ErrorCode = "secret_store_unavailable"
 )
 
 // HTTPStatusMapping is the canonical mapping from public error codes to HTTP
@@ -85,6 +90,10 @@ var HTTPStatusMapping = map[ErrorCode]int{
 	ErrCodeFanoutTimeout:        http.StatusGatewayTimeout,
 	ErrCodeFanoutTruncated:      http.StatusPartialContent,
 	ErrCodeFanoutScopeWithheld:  http.StatusForbidden,
+
+	// Credential health errors map to their appropriate HTTP status codes.
+	ErrCodeCredentialRefreshNotRetried: http.StatusUnauthorized,
+	ErrCodeSecretStoreUnavailable:     http.StatusServiceUnavailable,
 }
 
 // GetHTTPStatus returns the HTTP status for code. Unknown codes are treated as

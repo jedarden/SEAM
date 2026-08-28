@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -46,6 +47,7 @@ const (
 	dispatchStateKey
 	quotaCostKey
 	dryRunKey
+	credentialRetryKey // Phase 12: Track if we've already attempted credential refresh
 )
 
 // contextWithReplayableBody stores a replayable body in the context
@@ -98,6 +100,19 @@ func quotaCostFromContext(ctx context.Context) float64 {
 		return cost
 	}
 	return 0
+}
+
+// contextWithCredentialRetry tracks whether we've attempted credential refresh
+func contextWithCredentialRetry(ctx context.Context, attempted bool) context.Context {
+	return context.WithValue(ctx, credentialRetryKey, attempted)
+}
+
+// credentialRetryFromContext extracts the credential retry state from the context
+func credentialRetryFromContext(ctx context.Context) bool {
+	if attempted, ok := ctx.Value(credentialRetryKey).(bool); ok {
+		return attempted
+	}
+	return false
 }
 
 // contextWithDryRun marks the request as a dry-run (validation only)
@@ -475,6 +490,22 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 
 	log.Printf("[proxy] Upstream %s %s -> %d (%v)", upstreamReq.Method, upstreamReq.URL.Path, upstreamResp.StatusCode, time.Since(startTime))
 
+	// Phase 12.4: Handle 401 responses with credential refresh and retry
+	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
+		// Check if this route uses credential injection
+		match := routeMatchFromRequest(r)
+		if match != nil && match.Route.InjectAs != nil && match.Route.VaultPath != "" {
+			// We have credential injection - attempt refresh and retry
+			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
+				// Either successful retry (returned nil) or fatal error
+				// If retryErr is nil, the response was already sent
+				return retryErr
+			}
+			// Retry was attempted and response was sent, return nil
+			return nil
+		}
+	}
+
 	// Phase 13.2: Record quota cost AT DISPATCH time
 	// The request was successfully sent to upstream, so we charge quota
 	// Even 5xx responses charge quota (the upstream received and processed the request)
@@ -526,6 +557,169 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	if err := p.streamResponse(w, upstreamResp.Body); err != nil {
 		return fmt.Errorf("streaming upstream response: %w", err)
 	}
+	return nil
+}
+
+// handle401CredentialRefresh handles 401 responses with credential refresh and retry logic
+// Phase 12.4: On upstream 401, eagerly invalidate cached secret, refetch from OpenBao,
+// RE-STRIP inbound headers, re-inject fresh value, retry exactly ONCE over Phase 2 tee
+// (body within maxReplayableRequestBytes). Above cap or unreplayable: still invalidate+refetch,
+// do NOT retry, answer with credential-refresh-not-retried envelope.
+func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.ResponseWriter, r *http.Request, upstreamReq *http.Request, upstreamResp *http.Response, match *RouteMatch) error {
+	// Mark that we're attempting credential refresh to prevent infinite loops
+	ctx = contextWithCredentialRetry(ctx, true)
+
+	// Check if we have a replayable body for retry
+	replayable := replayableBodyFromContext(ctx)
+	route := r.URL.Path
+
+	// Resolve the secret resolver
+	resolver := routeSecretResolverFromRequest(r)
+	if resolver == nil {
+		log.Printf("[proxy] 401 retry failed: no credential resolver for route %s", route)
+		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Credential resolver not configured")
+	}
+
+	// Invalidate and refetch the secret
+	log.Printf("[proxy] 401 detected on route %s - invalidating and refetching credential from %s", route, match.Route.VaultPath)
+	freshSecret, refreshErr := resolver(ctx, match.Route)
+	if refreshErr != nil {
+		// Refetch failed - degrade to secret-store-unavailable 503
+		log.Printf("[proxy] 401 credential refresh failed for route %s: %v", route, refreshErr)
+		return p.respondWithError(ctx, w, r, ErrCodeSecretStoreUnavailable, "Credential refresh failed after upstream 401")
+	}
+
+	log.Printf("[proxy] 401 credential refresh succeeded for route %s - secret refetched", route)
+
+	// Check if request is replayable
+	if replayable == nil || !replayable.CanReplay() {
+		// Body is not replayable - still invalidate+refetch (done above), but don't retry
+		// Return credential-refresh-not-retried envelope with scrubbed body
+		log.Printf("[proxy] 401 body not replayable for route %s - returning credential-refresh-not-retried", route)
+
+		// Scrub the upstream 401 response body
+		scrubbedBody, scrubErr := p.scrub401Response(ctx, upstreamResp)
+		if scrubErr != nil {
+			log.Printf("[proxy] Error scrubbing 401 response for route %s: %v", route, scrubErr)
+			scrubbedBody = []byte("[response body redacted]")
+		}
+
+		// Return structured error envelope
+		return p.respondWithCredentialRefreshNotRetried(ctx, w, upstreamResp.StatusCode, scrubbedBody)
+	}
+
+	// Body is replayable - retry exactly ONCE with fresh credential
+	log.Printf("[proxy] 401 body is replayable for route %s - retrying with fresh credential", route)
+
+	// Get buffered bytes for retry
+	bufferedBytes := replayable.GetBufferedBytes()
+
+	// Create a new request with the replayed body
+	// RE-STRIP inbound headers and re-inject fresh value
+	retryReader := io.NopCloser(bytes.NewReader(bufferedBytes))
+	retryURL := upstreamReq.URL.String()
+
+	retryReq, err := http.NewRequestWithContext(ctx, r.Method, retryURL, retryReader)
+	if err != nil {
+		log.Printf("[proxy] 401 retry failed creating request for route %s: %v", route, err)
+		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Failed to create retry request")
+	}
+
+	// Copy metadata from original request, but re-strip headers
+	copyRequestMetadata(r, retryReq)
+
+	// Re-inject the fresh credential
+	if err := InjectSecret(retryReq, match.Route.InjectAs, freshSecret); err != nil {
+		log.Printf("[proxy] 401 retry failed injecting credential for route %s: %v", route, err)
+		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Failed to inject fresh credential")
+	}
+
+	// Re-attach response scrubber context
+	ctx = withResponseScrub(ctx, freshSecret, match.Route.Unscrubbable)
+
+	// Discard the replayable body buffer after successful retry
+	defer replayable.Discard()
+
+	// Make the retry request
+	log.Printf("[proxy] Executing 401 retry for route %s with fresh credential", route)
+	if err := p.dispatchAndServe(ctx, w, r, retryReq); err != nil {
+		log.Printf("[proxy] 401 retry failed for route %s: %v", route, err)
+		return err
+	}
+
+	log.Printf("[proxy] 401 retry succeeded for route %s - transparent success", route)
+	return nil
+}
+
+// scrub401Response scrubs a 401 response body for safe inclusion in error envelopes
+func (p *ReverseProxy) scrub401Response(ctx context.Context, resp *http.Response) ([]byte, error) {
+	if resp == nil || resp.Body == nil {
+		return []byte("[no body]"), nil
+	}
+
+	// Read the response body
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	// Check if we have response scrubber configuration
+	scrubConfig := responseScrubFromContext(ctx)
+	if scrubConfig != nil && len(scrubConfig.secrets) > 0 {
+		// Scrub the body for any secret values
+		scrubber := newSecretScrubber(scrubConfig.secrets)
+		scrubbed := scrubber.redact(body)
+		return scrubbed, nil
+	}
+
+	// No scrubbing configured - return as-is (but truncated if too large)
+	const maxBodySize = 4096
+	if len(body) > maxBodySize {
+		return body[:maxBodySize], nil
+	}
+	return body, nil
+}
+
+// respondWithCredentialRefreshNotRetried sends a structured error response
+// when credential refresh succeeded but the request could not be retried
+func (p *ReverseProxy) respondWithCredentialRefreshNotRetried(ctx context.Context, w http.ResponseWriter, upstreamStatus int, scrubbedBody []byte) error {
+	errorResp := ErrorResponse{
+		Error:   ErrCodeCredentialRefreshNotRetried,
+		Message: "Credential was refreshed after upstream 401, but request could not be retried. Resending your request now will use the refreshed credential.",
+		Details: map[string]interface{}{
+			"upstream_status": upstreamStatus,
+			"upstream_body":   string(scrubbedBody),
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Credential-Refresh", "succeeded")
+	w.WriteHeader(GetHTTPStatus(ErrCodeCredentialRefreshNotRetried))
+
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		log.Printf("[proxy] Error encoding credential-refresh-not-retried response: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// respondWithError sends a structured error response
+func (p *ReverseProxy) respondWithError(ctx context.Context, w http.ResponseWriter, r *http.Request, code ErrorCode, message string) error {
+	errorResp := ErrorResponse{
+		Error:   code,
+		Message: message,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(GetHTTPStatus(code))
+
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		log.Printf("[proxy] Error encoding error response: %v", err)
+		return err
+	}
+
 	return nil
 }
 
