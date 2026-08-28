@@ -1,0 +1,115 @@
+---
+# SEAM Retirement Evaluator Deployment
+# Phase 8.5: Autonomous retirement evaluation with GitHub PR opening
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seam-retirement-evaluator
+  namespace: seam
+  labels:
+    app.kubernetes.io/name: seam-retirement-evaluator
+    app.kubernetes.io/component: evaluator
+    app.kubernetes.io/part-of: seam
+    app.kubernetes.io/managed-by: argocd
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seam-retirement-evaluator
+      app.kubernetes.io/component: evaluator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seam-retirement-evaluator
+        app.kubernetes.io/component: evaluator
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      serviceAccountName: seam-retirement-evaluator
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: evaluator
+        # Semver tag from containers/seam-retirement-evaluator/VERSION
+        image: ronaldraygun/seam-retirement-evaluator:0.1.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: VICTORIAMETRICS_ENDPOINT
+          value: "http://victorialogs-single-ardenone-manager-vector-headless.monitoring.svc.cluster.local:8428"
+        - name: GITHUB_OWNER
+          value: "jedarden"
+        - name: GITHUB_REPO
+          value: "declarative-config"
+        # GitHub token is mounted from OpenBao via secret injection
+        # (NOT from seam/routes/* - evaluator has its own dedicated path)
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: seam-retirement-evaluator-github-token
+              key: token
+              optional: false
+        - name: DECLARATIVE_CONFIG_PATH
+          value: "k8s/rs-manager/seam/routes.d"
+        - name: EVALUATION_INTERVAL_HOURS
+          value: "1"
+        # OpenBao configuration for Kubernetes auth
+        - name: OPENBAO_ADDR
+          value: "http://openbao-rs-manager.openbao.svc.cluster.local:8200"
+        - name: OPENBAO_ROLE
+          value: "seam-retirement-evaluator"
+        # Projected service account token for Kubernetes auth to OpenBao
+        - name: VAULT_ROLE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        # Projected service account token for Kubernetes authentication to OpenBao
+        - name: service-account-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+      volumes:
+      # Projected service account token for Kubernetes authentication to OpenBao
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: openbao
+              expirationSeconds: 3600
+              path: token
