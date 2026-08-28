@@ -124,6 +124,10 @@ type RouteEntry struct {
 	// Per Phase 7: if non-empty, the caller must have at least one of these scopes.
 	// Extracted from x-required-scope extension in OpenAPI operation.
 	RequiredScopes []string
+
+	// Deprecated holds deprecation metadata for this route.
+	// Per Phase 8.3: populated from x-seam-deprecated fragment extension.
+	Deprecated *DeprecationInfo
 }
 
 // RouteTarget is the resolved forwarding and injection metadata for one
@@ -142,6 +146,51 @@ type RouteTarget struct {
 	// this instance. The effective requirement is the union of operation-level
 	// requiredScopes and this instance's RequiredScopes.
 	RequiredScopes []string
+}
+
+// DeprecationInfo holds deprecation metadata for a route.
+// Per Phase 8.3: populated from x-seam-deprecated fragment extension.
+type DeprecationInfo struct {
+	// Since is the ISO date when deprecation was declared (YYYY-MM-DD).
+	Since string
+
+	// Sunset is the optional ISO date when the route will be removed (YYYY-MM-DD).
+	// Empty string means no sunset date is set.
+	Sunset string
+
+	// Brownouts is an array of scheduled brownout windows.
+	// Each window is a period where the route returns 410 Gone.
+	// Windows must be ordered and non-overlapping.
+	Brownouts []BrownoutWindow
+
+	// ReplacementPath is the optional path to the replacement route.
+	// Populated from fragment metadata or inferred from version migration.
+	ReplacementPath string
+
+	// ReplacementVersion is the optional API version of the replacement route.
+	ReplacementVersion string
+}
+
+// BrownoutWindow represents a scheduled brownout period.
+type BrownoutWindow struct {
+	// Start is the RFC 3339 date-time when the brownout begins.
+	Start string
+
+	// End is the RFC 3339 date-time when the brownout ends.
+	End string
+}
+
+// IsActiveAt reports whether the brownout window is active at the given time.
+func (w BrownoutWindow) IsActiveAt(t time.Time) bool {
+	start, err := time.Parse(time.RFC3339, w.Start)
+	if err != nil {
+		return false
+	}
+	end, err := time.Parse(time.RFC3339, w.End)
+	if err != nil {
+		return false
+	}
+	return (t.Equal(start) || t.After(start)) && (t.Before(end) || t.Equal(end))
 }
 
 // RouteMatch represents a matched route with extracted path parameters.
@@ -382,6 +431,12 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
+
+				// Extract deprecation information (Phase 8.3)
+				deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
+				if err != nil {
+					return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+				}
 			entry := RouteEntry{
 				PathTemplate:         path,
 				Method:               methodOp.method,
@@ -393,6 +448,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				Unscrubbable:         unscrubbable,
 				InstanceParam:        instanceParam,
 				UpstreamPathTemplate: upstreamPathTemplate,
+				Deprecated:           deprecated,
 				UpstreamStripPrefix:  upstreamStripPrefix,
 				UpstreamMap:          upstreamMap,
 				FanoutScope:          fanoutScope,
@@ -1434,4 +1490,74 @@ func extractRequiredScopes(operation *v3.Operation, pathItem *v3.PathItem, docum
 	}
 
 	return scopeArray, nil
+}
+
+// extractDeprecation extracts x-seam-deprecated information from an operation.
+// Per Phase 8.3: fragment-root only, not operation-specific.
+func extractDeprecation(operation *v3.Operation, pathItem *v3.PathItem, spec *v3.Document) (*DeprecationInfo, error) {
+	// x-seam-deprecated is fragment-root only, so check pathItem extensions first
+	extensionNode := pathItem.Extensions.Get("x-seam-deprecated")
+	if extensionNode == nil {
+		// Check if operation has OpenAPI deprecated field
+		if operation != nil && operation.Deprecated {
+			// Per-operation deprecated: true honored - return minimal deprecation info
+			return &DeprecationInfo{
+				Since: "unknown", // OpenAPI deprecated has no since date
+			}, nil
+		}
+		return nil, nil
+	}
+
+	// Parse x-seam-deprecated object
+	var deprecatedMap map[string]interface{}
+	if err := extensionNode.Decode(&deprecatedMap); err != nil {
+		return nil, fmt.Errorf("x-seam-deprecated must be an object: %w", err)
+	}
+
+	info := &DeprecationInfo{}
+
+	// Extract since (required)
+	since, ok := deprecatedMap["since"].(string)
+	if !ok || since == "" {
+		return nil, fmt.Errorf("x-seam-deprecated.since is required and must be a string")
+	}
+	info.Since = since
+
+	// Extract sunset (optional)
+	if sunset, ok := deprecatedMap["sunset"].(string); ok && sunset != "" {
+		info.Sunset = sunset
+	}
+
+	// Extract brownout array (optional)
+	if brownoutNode := deprecatedMap["brownout"]; brownoutNode != nil {
+		brownoutArray, ok := brownoutNode.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("x-seam-deprecated.brownout must be an array")
+		}
+
+		info.Brownouts = make([]BrownoutWindow, 0, len(brownoutArray))
+		for i, window := range brownoutArray {
+			windowMap, ok := window.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("x-seam-deprecated.brownout[%d] must be an object", i)
+			}
+
+			start, ok := windowMap["start"].(string)
+			if !ok || start == "" {
+				return nil, fmt.Errorf("x-seam-deprecated.brownout[%d].start is required", i)
+			}
+
+			end, ok := windowMap["end"].(string)
+			if !ok || end == "" {
+				return nil, fmt.Errorf("x-seam-deprecated.brownout[%d].end is required", i)
+			}
+
+			info.Brownouts = append(info.Brownouts, BrownoutWindow{
+				Start: start,
+				End:   end,
+			})
+		}
+	}
+
+	return info, nil
 }
