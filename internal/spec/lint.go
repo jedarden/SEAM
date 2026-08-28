@@ -814,6 +814,14 @@ func quotaUnitMismatchMessages(fragment map[string]any) []string {
 	var messages []string
 	rootCostUnit, rootCostValid := guardUnit(fragment, "x-cost-per-call")
 	rootQuotaUnit, rootQuotaValid := guardUnit(fragment, "x-quota")
+
+	// Phase 13.2: x-quota without x-cost-per-call is an error
+	_, hasCost := fragment["x-cost-per-call"]
+	_, hasQuota := fragment["x-quota"]
+	if hasQuota && !hasCost {
+		messages = append(messages, "fragment-root x-quota is present but x-cost-per-call is missing; quota requires cost-per-call to define the unit and amount to deduct")
+	}
+
 	if rootCostValid && rootQuotaValid && rootCostUnit != rootQuotaUnit {
 		messages = append(messages, fmt.Sprintf("fragment-root x-quota.unit %q must be byte-identical to x-cost-per-call.unit %q", rootQuotaUnit, rootCostUnit))
 	}
@@ -840,6 +848,12 @@ func quotaUnitMismatchMessages(fragment map[string]any) []string {
 			operationQuotaUnit, operationQuotaValid := guardUnit(operation, "x-quota")
 			_, operationCostPresent := operation["x-cost-per-call"]
 			_, operationQuotaPresent := operation["x-quota"]
+
+			// Phase 13.2: operation-level x-quota without x-cost-per-call is an error
+			if operationQuotaPresent && !operationCostPresent && !rootCostValid {
+				messages = append(messages, fmt.Sprintf("operation-level x-quota on %s %s is present but x-cost-per-call is missing at both operation and fragment root; quota requires cost-per-call to define the unit and amount to deduct", strings.ToUpper(method), path))
+			}
+
 			switch {
 			case operationQuotaPresent && operationQuotaValid && operationCostPresent && operationCostValid:
 				messages = appendQuotaUnitMismatch(messages, path, method, operationQuotaUnit, operationCostUnit, "operation-level x-cost-per-call")

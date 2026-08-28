@@ -1,9 +1,13 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // isCacheHit checks if the request context indicates a cache hit
@@ -16,12 +20,26 @@ func isCacheHit(r *http.Request) bool {
 }
 
 // quotaMiddleware enforces quota limits for cost-governed routes
+// Phase 13.2: Quota is checked before dispatch, deducted AT DISPATCH time
 // Cache hits bypass quota checking entirely
+// Sentinel probes (/health/*) bypass quota checking entirely
 func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip quota for reserved paths (health checks, etc.)
+		// Skip quota for reserved paths (health checks, etc.) - Phase 13.2
 		if isReservedPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check for X-SEAM-Dry-Run header - Phase 13.2
+		if r.Header.Get("X-SEAM-Dry-Run") == "1" {
+			log.Printf("[Quota] Dry-run mode for %s - validation only, no quota charge", r.URL.Path)
+			// Set dry-run context for downstream handlers
+			ctx := contextWithDryRun(r.Context())
+			r = r.WithContext(ctx)
+
+			// For dry-run, we don't check quota - just validate and return
+			s.writeDryRunValidationResponse(w, r, r.URL.Path)
 			return
 		}
 
@@ -40,15 +58,18 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		costPerCall := s.getCostPerCall(route)
 		log.Printf("[Quota] Route %s has cost per call: $%.2f", route, costPerCall)
 
-		// If cache hit, use zero cost (bypasses quota deduction)
-		cost := costPerCall
+		// If cache hit, bypass quota entirely - Phase 13.2
 		if cacheHit {
-			cost = 0
-			log.Printf("[Quota] Cache hit for %s - bypassing quota deduction", route)
+			log.Printf("[Quota] Cache hit for %s - bypassing quota check and deduction", route)
+			w.Header().Set("X-Quota-Bypassed", "cache-hit")
+			s.ensureMetrics().recordQuotaBypassed(route)
+			next.ServeHTTP(w, r)
+			return
 		}
 
-		// Check quota (cache hits check without deducting)
-		allowed, remaining, err := s.quotaTracker.CheckAndRecordQuota(r.Context(), route, cost, token, user)
+		// Phase 13.2: Check quota without deducting (deduction happens at dispatch)
+		// Pass cost=0 to check quota without deducting
+		allowed, remaining, err := s.quotaTracker.CheckQuotaOnly(r.Context(), route, costPerCall, token, user)
 		if err != nil {
 			requestErr := WrapRequestError(ErrCodeInternalServer, "Error checking quota", err).
 				WithDetail("route", route)
@@ -58,28 +79,25 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		}
 
 		if !allowed {
-			// Quota exceeded
-			log.Printf("[Quota] Quota exceeded for %s - remaining: %.2f", route, remaining)
-			s.writeQuotaExceededResponse(w, r, route, remaining)
+			// Phase 13.2: Return 402 Payment Required for quota exhaustion
+			log.Printf("[Quota] Quota exceeded for %s - remaining: $%.2f", route, remaining)
+			s.writeQuotaExceededResponse(w, r, route, remaining, costPerCall)
 			return
 		}
-		if cost > 0 {
-			s.ensureMetrics().recordQuotaCost(route, cost)
+
+		// Phase 13.2: Store cost in context for deduction at dispatch time
+		ctx := contextWithQuotaCost(r.Context(), costPerCall)
+		r = r.WithContext(ctx)
+
+		log.Printf("[Quota] Quota check passed for %s - cost will be deducted at dispatch", route)
+
+		// Add X-SEAM-Budget-Remaining header to response (will be set by proxy after dispatch)
+		// For now, set a placeholder - proxy will update with actual remaining after dispatch
+		if costPerCall > 0 {
+			w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemaining(remaining-costPerCall, costPerCall, s.quotaTracker.GetWindowDuration()))
 		}
 
-		// Add quota headers to response
-		if costPerCall > 0 && !cacheHit {
-			w.Header().Set("X-Quota-Cost-Per-Call", formatCost(costPerCall))
-			w.Header().Set("X-Quota-Remaining", formatCost(remaining))
-		}
-
-		// Cache hits get a special header and metric
-		if cacheHit {
-			w.Header().Set("X-Quota-Bypassed", "cache-hit")
-			s.ensureMetrics().recordQuotaBypassed(route)
-		}
-
-		// Proceed to next handler
+		// Proceed to next handler (dispatch will deduct quota)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -100,17 +118,123 @@ func (s *Server) getCostPerCall(route string) float64 {
 	return s.quotaTracker.GetCostPerCall(route)
 }
 
-// writeQuotaExceededResponse writes a 429 Quota Exceeded response
-func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, r *http.Request, route string, remaining float64) {
-	w.Header().Set("Retry-After", "60") // Suggest retry after 1 minute
-	NewErrorResponse(ErrCodeQuotaExceeded, "Request quota exceeded. Please retry later.").
+// writeQuotaExceededResponse writes a 402 Payment Required response for quota exhaustion
+// Phase 13.2: 402 is used for quota refusal, 429 stays with loop breaker
+func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, r *http.Request, route string, remaining float64, costPerCall float64) {
+	// Calculate window reset time
+	windowDuration := s.quotaTracker.GetWindowDuration()
+	resetTime := time.Now().Add(windowDuration)
+
+	// Set Retry-After to seconds until window reset
+	retryAfterSeconds := int(windowDuration.Seconds())
+	if retryAfterSeconds < 1 {
+		retryAfterSeconds = 1
+	}
+	w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfterSeconds))
+
+	// Set X-SEAM-Budget-Remaining header
+	w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemaining(remaining, costPerCall, windowDuration))
+
+	// Write 402 Payment Required response
+	NewErrorResponse(ErrCodeQuotaExceeded, "Payment Required - quota exceeded").
 		WithDetail("route", route).
-		WithDetail("quota", map[string]interface{}{"remaining": formatCost(remaining)}).
-		WithDocsURL("/docs/rate-limiting").
+		WithDetail("quota", map[string]interface{}{
+			"remaining":   formatCost(remaining),
+			"costPerCall": formatCost(costPerCall),
+			"resetsIn":    fmt.Sprintf("%d seconds", retryAfterSeconds),
+			"resetsAt":    resetTime.Format(time.RFC3339),
+		}).
+		WithDocsURL("/docs/quota").
 		Write(w, r)
 
 	// Record quota exceeded metric
 	s.ensureMetrics().recordQuotaExceeded(route)
+}
+
+// writeDryRunValidationResponse writes a validation response for dry-run mode
+// Phase 13.2: X-SEAM-Dry-Run: 1 = validation verdict at stage 7
+func (s *Server) writeDryRunValidationResponse(w http.ResponseWriter, r *http.Request, route string) {
+	// Get route match for validation
+	routeTable := s.getRouteTable()
+	if routeTable == nil {
+		requestErr := WrapRequestError(ErrCodeInternalServer, "Route table not available", nil).
+			WithDetail("route", route)
+		logRequestError(r, "dry-run", requestErr)
+		requestErr.Write(w, r)
+		return
+	}
+
+	// Attempt to match route
+	match := routeTable.Match(r)
+	if match == nil {
+		// Route not found - validation failure
+		NewErrorResponse(ErrCodeRouteNotFound, "Route not found - validation failed").
+			WithDetail("route", route).
+			WithDetail("dryRun", true).
+			Write(w, r)
+		return
+	}
+
+	// Route found - validation success
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Dry-Run", "validated")
+	w.WriteHeader(http.StatusOK)
+
+	validation := map[string]interface{}{
+		"status":   "validated",
+		"route":    route,
+		"method":   r.Method,
+		"upstream": match.Route.UpstreamTarget,
+		"message":  "Request would be accepted - dry-run validation passed",
+	}
+
+	// Add cost info if available
+	costPerCall := s.getCostPerCall(route)
+	if costPerCall > 0 {
+		validation["costPerCall"] = formatCost(costPerCall)
+		validation["quotaEnabled"] = true
+	} else {
+		validation["quotaEnabled"] = false
+	}
+
+	// Add breaker info if configured
+	if match.Route.BreakerConfig != nil {
+		validation["circuitBreaker"] = map[string]interface{}{
+			"enabled":   match.Route.BreakerConfig.Enabled,
+			"threshold": match.Route.BreakerConfig.Threshold,
+		}
+	}
+
+	json.NewEncoder(w).Encode(validation)
+	log.Printf("[Quota] Dry-run validation passed for %s", route)
+}
+
+// formatBudgetRemaining formats the X-SEAM-Budget-Remaining header value
+// Phase 13.2: Format is "amount=X unit=Y window=Z resets=R"
+func formatBudgetRemaining(remaining, costPerCall float64, windowDuration time.Duration) string {
+	resetTime := time.Now().Add(windowDuration)
+	return fmt.Sprintf("amount=%s unit=call window=%s resets=%s",
+		formatCost(remaining),
+		formatDuration(windowDuration),
+		resetTime.Format(time.RFC3339))
+}
+
+// formatDuration formats a duration as a string
+func formatDuration(d time.Duration) string {
+	if d >= time.Hour*24 {
+		days := int(d.Hours() / 24)
+		return fmt.Sprintf("%dd", days)
+	}
+	if d >= time.Hour {
+		hours := int(d.Hours())
+		return fmt.Sprintf("%dh", hours)
+	}
+	if d >= time.Minute {
+		minutes := int(d.Minutes())
+		return fmt.Sprintf("%dm", minutes)
+	}
+	seconds := int(d.Seconds())
+	return fmt.Sprintf("%ds", seconds)
 }
 
 // formatCost formats a cost value as USD string
