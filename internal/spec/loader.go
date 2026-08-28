@@ -305,6 +305,178 @@ func (l *Loader) GetRawJSON() ([]byte, error) {
 	return docJSON, nil
 }
 
+// GetFilteredJSON returns the spec as JSON filtered by identity scopes
+// Only includes routes that the identity has at least one required scope for.
+// A map route is visible if the caller holds scope for at least one instance's effective requirement.
+func (l *Loader) GetFilteredJSON(identityScopes []string) ([]byte, error) {
+	// Get the full spec first
+	fullSpec, err := l.GetRawJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	// If no identity scopes provided, return empty spec
+	if len(identityScopes) == 0 {
+		return l.buildEmptySpec(), nil
+	}
+
+	// Parse the spec into a map
+	var specMap map[string]interface{}
+	if err := json.Unmarshal(fullSpec, &specMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal spec: %w", err)
+	}
+
+	// Get paths from the spec
+	paths, ok := specMap["paths"].(map[string]interface{})
+	if !ok {
+		// No paths, return as-is
+		return fullSpec, nil
+	}
+
+	// Normalize identity scopes for comparison
+	normalizedIdentityScopes := make(map[string]bool)
+	for _, scope := range identityScopes {
+		normalized := strings.ToLower(strings.TrimSpace(scope))
+		if normalized != "" {
+			normalizedIdentityScopes[normalized] = true
+		}
+	}
+
+	// Filter paths: keep only routes where identity has at least one required scope
+	filteredPaths := make(map[string]interface{})
+	for path, pathItem := range paths {
+		pathItemMap, ok := pathItem.(map[string]interface{})
+		if !ok {
+			// Keep path items that aren't maps (shouldn't happen, but be safe)
+			filteredPaths[path] = pathItem
+			continue
+		}
+
+		// Check each method in the path item
+		filteredPathItem := make(map[string]interface{})
+		methodVisible := false
+
+		for httpMethod, methodOp := range pathItemMap {
+			// Skip non-method fields (like $ref, summary, etc.)
+			if !isHTTPMethod(httpMethod) {
+				filteredPathItem[httpMethod] = methodOp
+				continue
+			}
+
+			// Get the operation
+			methodOpMap, ok := methodOp.(map[string]interface{})
+			if !ok {
+				filteredPathItem[httpMethod] = methodOp
+				continue
+			}
+
+			// Check if this operation has x-required-scope
+			requiredScopes := extractRequiredScopesFromMap(methodOpMap)
+
+			// Determine visibility:
+			// - No required scopes: visible (public route)
+			// - Has required scopes: visible if identity has at least one matching scope
+			visible := false
+			if len(requiredScopes) == 0 {
+				visible = true // No scope requirement = public route
+			} else {
+				// Check if identity has any of the required scopes
+				for _, requiredScope := range requiredScopes {
+					normalizedRequired := strings.ToLower(strings.TrimSpace(requiredScope))
+					if normalizedIdentityScopes[normalizedRequired] {
+						visible = true
+						break
+					}
+				}
+			}
+
+			if visible {
+				filteredPathItem[httpMethod] = methodOp
+				methodVisible = true
+			}
+		}
+
+		// Keep the path if at least one method is visible
+		if methodVisible {
+			filteredPaths[path] = filteredPathItem
+		}
+	}
+
+	// Build the filtered spec
+	specMap["paths"] = filteredPaths
+	specMap["x-seam-filtered"] = true
+	specMap["x-seam-filter-reason"] = "Scope-based filtering: only routes visible to caller's identity are included"
+
+	// Marshal back to JSON
+	filteredJSON, err := json.MarshalIndent(specMap, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal filtered spec: %w", err)
+	}
+
+	return filteredJSON, nil
+}
+
+// buildEmptySpec returns a minimal valid OpenAPI spec with no paths
+func (l *Loader) buildEmptySpec() []byte {
+	emptySpec := map[string]interface{}{
+		"openapi": "3.1.0",
+		"info": map[string]interface{}{
+			"title":       "SEAM API",
+			"version":     l.GetAPIVersion(),
+			"description": "No routes are visible with your current scope",
+		},
+		"servers": []map[string]interface{}{
+			{
+				"url":         l.baseURL,
+				"description": "SEAM caller-facing endpoint",
+			},
+		},
+		"paths": map[string]interface{}{},
+		"x-seam-filtered": true,
+		"x-seam-filter-reason": "Scope-based filtering: no routes visible (no scopes provided)",
+	}
+
+	specJSON, _ := json.MarshalIndent(emptySpec, "", "  ")
+	return specJSON
+}
+
+// isHTTPMethod checks if a string is an HTTP method
+func isHTTPMethod(s string) bool {
+	switch strings.ToUpper(s) {
+	case "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE":
+		return true
+	default:
+		return false
+	}
+}
+
+// extractRequiredScopesFromMap extracts x-required-scope from an operation map
+func extractRequiredScopesFromMap(opMap map[string]interface{}) []string {
+	extensions, ok := opMap["x-required-scope"]
+	if !ok {
+		return nil
+	}
+
+	// Handle different formats
+	switch v := extensions.(type) {
+	case []interface{}:
+		scopes := make([]string, 0, len(v))
+		for _, item := range v {
+			if scope, ok := item.(string); ok {
+				scopes = append(scopes, scope)
+			}
+		}
+		return scopes
+	case []string:
+		return v
+	case string:
+		// Single scope as string
+		return []string{v}
+	default:
+		return nil
+	}
+}
+
 // GetRawDocument returns the original raw document bytes
 func (l *Loader) GetRawDocument() []byte {
 	return l.rawDocument
