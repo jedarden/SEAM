@@ -147,9 +147,20 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 		},
 	}
 
+	// Add circuit breaker disagreement enumeration
+	breakerDisagreements := s.enumerateBreakerDisagreements()
+	if len(breakerDisagreements) > 0 {
+		status["breaker_disagreements"] = breakerDisagreements
+	}
+
 	// Add allowlist status section
 	if s.allowlistEnforcer != nil {
 		status["allowlist"] = s.allowlistEnforcer.GetAllowlistStatus()
+	}
+
+	// Add hot reload status section
+	if s.hotReloadManager != nil {
+		status["hot_reload"] = s.hotReloadManager.Status()
 	}
 
 	// Keep the original fragment status keys available for existing operators
@@ -170,8 +181,8 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 // visible to operators without exposing its vault path or credential policy.
 func (s *Server) enumerateScrubbingRoutes() map[string]interface{} {
 	routes := make([]map[string]interface{}, 0)
-	if s.routeTable != nil {
-		for _, route := range s.routeTable.GetRoutes() {
+	if s.routeTableHolder != nil {
+		for _, route := range s.routeTableHolder.Snapshot() {
 			if !route.Unscrubbable {
 				continue
 			}
@@ -218,7 +229,7 @@ func redactConfigURL(raw string) string {
 // enumerateTLSExceptions scans the route table for routes with TLS exceptions
 // (skip-verify or plaintext) and returns a structured report for operator visibility.
 func (s *Server) enumerateTLSExceptions() map[string]interface{} {
-	if s.routeTable == nil {
+	if s.routeTableHolder == nil {
 		return map[string]interface{}{
 			"skip_verify_routes": []interface{}{},
 			"plaintext_routes":   []interface{}{},
@@ -228,7 +239,7 @@ func (s *Server) enumerateTLSExceptions() map[string]interface{} {
 	skipVerifyRoutes := make([]map[string]interface{}, 0)
 	plaintextRoutes := make([]map[string]interface{}, 0)
 
-	routes := s.routeTable.GetRoutes()
+	routes := s.routeTableHolder.Snapshot()
 	for _, route := range routes {
 		if route.TLSConfig == nil {
 			continue
@@ -276,4 +287,122 @@ func detectDevModeCA() string {
 		return customDir
 	}
 	return ""
+}
+
+// enumerateBreakerDisagreements scans all routes for x-breaker configuration
+// disagreements across same-origin instances and returns a structured report.
+// Per Phase 11.1, same-origin disagreements are surfaced at /config/status
+// for operator visibility.
+func (s *Server) enumerateBreakerDisagreements() map[string]interface{} {
+	if s.routeTableHolder == nil {
+		return map[string]interface{}{
+			"has_disagreements": false,
+			"disagreements":     []interface{}{},
+		}
+	}
+
+	type disagreementEntry struct {
+		Path            string
+		Method          string
+		APIVersion      string
+		Origin          string
+		Instances       []string
+		FragmentConfig  map[string]interface{}
+		InstanceConfigs []map[string]interface{}
+	}
+
+	disagreements := make([]disagreementEntry, 0)
+
+	routes := s.routeTableHolder.Snapshot()
+	for _, route := range routes {
+		// Only check routes with upstream maps
+		if len(route.UpstreamMap) == 0 {
+			continue
+		}
+
+		// Detect disagreements for this route
+		routeDisagreements, err := detectBreakerDisagreements(route.UpstreamMap, route.BreakerConfig)
+		if err != nil {
+			// Log error but continue processing other routes
+			continue
+		}
+
+		// If no disagreements for this route, skip
+		if len(routeDisagreements) == 0 {
+			continue
+		}
+
+		// For each origin with disagreements, create an entry
+		for origin, instances := range routeDisagreements {
+			entry := disagreementEntry{
+				Path:       route.PathTemplate,
+				Method:     route.Method,
+				APIVersion: route.APIVersion,
+				Origin:     string(origin),
+				Instances:  instances,
+			}
+
+			// Add fragment-root config
+			if route.BreakerConfig != nil {
+				entry.FragmentConfig = map[string]interface{}{
+					"threshold":      route.BreakerConfig.Threshold,
+					"openSeconds":    route.BreakerConfig.OpenSeconds,
+					"maxOpenSeconds": route.BreakerConfig.MaxOpenSeconds,
+					"enabled":        route.BreakerConfig.Enabled,
+				}
+			}
+
+			// Add per-instance configs
+			entry.InstanceConfigs = make([]map[string]interface{}, 0, len(instances))
+			for _, instanceID := range instances {
+				if target, ok := route.UpstreamMap[instanceID]; ok {
+					config := route.BreakerConfig
+					if target.BreakerConfig != nil {
+						config = target.BreakerConfig
+					}
+
+					if config != nil {
+						entry.InstanceConfigs = append(entry.InstanceConfigs, map[string]interface{}{
+							"instance": instanceID,
+							"config": map[string]interface{}{
+								"threshold":      config.Threshold,
+								"openSeconds":    config.OpenSeconds,
+								"maxOpenSeconds": config.MaxOpenSeconds,
+								"enabled":        config.Enabled,
+							},
+						})
+					}
+				}
+			}
+
+			disagreements = append(disagreements, entry)
+		}
+	}
+
+	// Build the response
+	result := map[string]interface{}{
+		"has_disagreements": len(disagreements) > 0,
+		"disagreements":     []interface{}{},
+	}
+
+	if len(disagreements) > 0 {
+		// Convert to interface slice for JSON serialization
+		disagreementInterfaces := make([]interface{}, len(disagreements))
+		for i, d := range disagreements {
+			disagreementInterfaces[i] = map[string]interface{}{
+				"path":                  d.Path,
+				"method":                d.Method,
+				"api_version":           d.APIVersion,
+				"origin":                d.Origin,
+				"conflicting_instances": d.Instances,
+				"fragment_config":       d.FragmentConfig,
+				"instance_configs":      d.InstanceConfigs,
+				"note":                  "Runtime uses the stricter (more likely to open) breaker config. Resolve this disagreement by ensuring all instances of the same origin have identical x-breaker values, or omit per-instance overrides to use the fragment-root default.",
+			}
+		}
+		result["disagreements"] = disagreementInterfaces
+		result["total_routes_affected"] = len(disagreements)
+	}
+
+	return result
 }

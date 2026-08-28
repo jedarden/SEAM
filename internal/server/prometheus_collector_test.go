@@ -23,10 +23,10 @@ func TestPrometheusCollectorExportsMetricTaxonomy(t *testing.T) {
 	})
 	breakers := NewCircuitBreakerStateRegistry()
 	server := &Server{
-		cache:           cache,
-		routeTable:      table,
-		circuitBreakers: breakers,
-		operatorMux:     http.NewServeMux(),
+		cache:            cache,
+		routeTableHolder: NewThreadSafeTableHolder(table),
+		circuitBreakers:  breakers,
+		operatorMux:      http.NewServeMux(),
 	}
 	server.metrics = newMetrics(cache, table, breakers, buildinfo.Info{
 		Version:   "1.2.3",
@@ -101,9 +101,9 @@ func TestPrometheusCollectorExportsMetricTaxonomy(t *testing.T) {
 
 func TestMetricsEndpointRejectsNonGET(t *testing.T) {
 	server := &Server{
-		cache:           NewResponseCache(),
-		routeTable:      NewRouteTable(nil),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
+		cache:            NewResponseCache(),
+		routeTableHolder: NewThreadSafeTableHolder(NewRouteTable(nil)),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
 	}
 	recorder := httptest.NewRecorder()
 	server.metricsHandler(recorder, httptest.NewRequest(http.MethodPost, "/_seam/metrics", nil))
@@ -114,14 +114,14 @@ func TestMetricsEndpointRejectsNonGET(t *testing.T) {
 
 func TestMetricsRegistriesAreServerScoped(t *testing.T) {
 	first := &Server{
-		cache:           NewResponseCache(),
-		routeTable:      NewRouteTable(nil),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
+		cache:            NewResponseCache(),
+		routeTableHolder: NewThreadSafeTableHolder(NewRouteTable(nil)),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
 	}
 	second := &Server{
-		cache:           NewResponseCache(),
-		routeTable:      NewRouteTable(nil),
-		circuitBreakers: NewCircuitBreakerStateRegistry(),
+		cache:            NewResponseCache(),
+		routeTableHolder: NewThreadSafeTableHolder(NewRouteTable(nil)),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
 	}
 	first.ensureMetrics().recordCacheHit(metricRouteLabels{Route: "/first", Version: "v1"})
 	second.ensureMetrics().recordCacheHit(metricRouteLabels{Route: "/second", Version: "v1"})

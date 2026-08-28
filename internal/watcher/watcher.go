@@ -15,14 +15,14 @@ import (
 // It watches the ..data symlink that Kubernetes ConfigMaps/Secrets use
 // for atomic updates, ensuring we only trigger once per ConfigMap revision.
 type MountWatcher struct {
-	mountPath  string           // Path to watch (e.g., /etc/gateway/routes.d/<svc>)
-	dataLink   string           // Path to the ..data symlink
-	notifyCh   chan struct{}    // Signals when a change is detected
-	stopCh     chan struct{}    // Signals the watcher to stop
-	stopped    bool             // Whether the watcher has been stopped
-	mu         sync.Mutex       // Protects stopped state
-	debounce   time.Duration    // Debounce duration to coalesce rapid changes
-	lastEvent  time.Time        // Time of the last processed event
+	mountPath string        // Path to watch (e.g., /etc/gateway/routes.d/<svc>)
+	dataLink  string        // Path to the ..data symlink
+	notifyCh  chan struct{} // Signals when a change is detected
+	stopCh    chan struct{} // Signals the watcher to stop
+	stopped   bool          // Whether the watcher has been stopped
+	mu        sync.Mutex    // Protects stopped state
+	debounce  time.Duration // Debounce duration to coalesce rapid changes
+	lastEvent time.Time     // Time of the last processed event
 }
 
 // NewMountWatcher creates a new watcher for a single mount point.
@@ -149,14 +149,14 @@ func (mw *MountWatcher) Stop() {
 // when any of them change. It debounces changes across all mounts to avoid
 // excessive reloads when multiple ConfigMaps update simultaneously.
 type Coordinator struct {
-	watchers   map[string]*MountWatcher // mount path -> watcher
-	reloadCh   chan struct{}             // Signals that a reload is needed
-	stopCh     chan struct{}             // Signals the coordinator to stop
-	stopped    bool                      // Whether coordinator has been stopped
-	mu         sync.Mutex                // Protects stopped state
-	debounce   time.Duration             // Global debounce duration
-	ctx        context.Context           // Context for cancellation
-	cancel     context.CancelFunc        // Cancel function
+	watchers map[string]*MountWatcher // mount path -> watcher
+	reloadCh chan struct{}            // Signals that a reload is needed
+	stopCh   chan struct{}            // Signals the coordinator to stop
+	stopped  bool                     // Whether coordinator has been stopped
+	mu       sync.Mutex               // Protects stopped state
+	debounce time.Duration            // Global debounce duration
+	ctx      context.Context          // Context for cancellation
+	cancel   context.CancelFunc       // Cancel function
 }
 
 // NewCoordinator creates a new coordinator for managing multiple mount watchers

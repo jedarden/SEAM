@@ -24,17 +24,17 @@ const DefaultCaptureRetentionLimit = 1000
 
 // CaptureMiddleware handles HTTP request/response capture for corpus collection
 type CaptureMiddleware struct {
-	enabled        bool
-	corpusDir      string
-	service        string
-	incumbent      string
-	mu             sync.Mutex
-	entries        []CorpusEntry
-	nextEntry      int
-	retentionLimit int
-	autoSave       bool
-	saveCount      int
-	routeTable     *RouteTable
+	enabled          bool
+	corpusDir        string
+	service          string
+	incumbent        string
+	mu               sync.Mutex
+	entries          []CorpusEntry
+	nextEntry        int
+	retentionLimit   int
+	autoSave         bool
+	saveCount        int
+	routeTableHolder *ThreadSafeTableHolder
 
 	// Keep serialization and persistence replaceable per middleware so tests
 	// can exercise failures that cannot be represented by CorpusFile itself.
@@ -187,10 +187,10 @@ func (cm *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-// setRouteTable supplies the immutable route metadata used to identify
+// setRouteTableHolder supplies the thread-safe holder for route metadata used to identify
 // caller-controlled values that SEAM would replace with injected credentials.
-func (cm *CaptureMiddleware) setRouteTable(routeTable *RouteTable) {
-	cm.routeTable = routeTable
+func (cm *CaptureMiddleware) setRouteTableHolder(holder *ThreadSafeTableHolder) {
+	cm.routeTableHolder = holder
 }
 
 // appendEntryLocked adds an entry to the bounded in-memory ring and returns
@@ -253,10 +253,50 @@ func (cm *CaptureMiddleware) captureRequest(r *http.Request) CapturedRequest {
 }
 
 func (cm *CaptureMiddleware) injectableNames(r *http.Request) (map[string]bool, map[string]bool) {
-	if cm.routeTable == nil {
+	if cm.routeTableHolder == nil {
 		return nil, nil
 	}
-	return cm.routeTable.injectableNames(r)
+
+	// Get a snapshot of the current route table
+	routes := cm.routeTableHolder.Snapshot()
+	if routes == nil {
+		return nil, nil
+	}
+
+	// Find matching routes and collect injectable names
+	headerNames := make(map[string]bool)
+	queryNames := make(map[string]bool)
+
+	method := strings.ToUpper(r.Method)
+	path := r.URL.EscapedPath()
+	if path == "" {
+		path = r.URL.Path
+	}
+
+	for _, route := range routes {
+		if strings.ToUpper(route.Method) != method {
+			continue
+		}
+
+		// Check if path matches (simple prefix check for efficiency)
+		if !strings.HasPrefix(path, route.PathTemplate) {
+			continue
+		}
+
+		// Collect injectable names from this route
+		for name := range route.injectableHeaderNames() {
+			headerNames[name] = true
+		}
+		for name := range route.injectableQueryNames() {
+			queryNames[name] = true
+		}
+	}
+
+	if len(headerNames) == 0 && len(queryNames) == 0 {
+		return nil, nil
+	}
+
+	return headerNames, queryNames
 }
 
 func redactCapturedHeaders(headers http.Header, injectableNames map[string]bool) {

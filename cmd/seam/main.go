@@ -110,6 +110,7 @@ func serveCommand(args []string) {
 	allowlistFile := fs.String("allowlist-file", "", "Path to the upstream host allowlist (refused in-cluster)")
 	maxReplayableRequestBytes := fs.Int64("max-replayable-request-bytes", 1024*1024, "Phase 2.5: Maximum request body size to buffer for replay in bytes (default 1 MiB)")
 	maxBufferedResponseBytes := fs.Int64("max-buffered-response-bytes", 1024*1024, "Phase 2.6: Maximum decoded response body size to hold for whole-response scrubbing in bytes (default 1 MiB)")
+	hotReloadEnabled := fs.Bool("enable-hot-reload", false, "Phase 3.1: Enable file-watch hot reload of route fragments")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -167,6 +168,12 @@ func serveCommand(args []string) {
 			log.Printf("[config] invalid SEAM_MAX_BUFFERED_RESPONSE_BYTES %q, keeping %d: %v", val, *maxBufferedResponseBytes, err)
 		}
 	}
+	if val := os.Getenv("SEAM_HOT_RELOAD_ENABLED"); val != "" {
+		if val == "true" || val == "1" {
+			*hotReloadEnabled = true
+			log.Printf("[config] SEAM_HOT_RELOAD_ENABLED=%s", val)
+		}
+	}
 
 	// Determine final upstream CA directory
 	finalUpstreamCADir := *upstreamCADir
@@ -217,6 +224,7 @@ func serveCommand(args []string) {
 	}
 	log.Printf("  Max replayable request bytes: %d", *maxReplayableRequestBytes)
 	log.Printf("  Max buffered response bytes: %d", *maxBufferedResponseBytes)
+	log.Printf("  Hot reload enabled: %v", *hotReloadEnabled)
 
 	cfg := &server.Config{
 		CallerPort:                *callerPort,
@@ -232,6 +240,7 @@ func serveCommand(args []string) {
 		AllowlistFile:             finalAllowlistFile,
 		MaxReplayableRequestBytes: *maxReplayableRequestBytes,
 		MaxBufferedResponseBytes:  *maxBufferedResponseBytes,
+		HotReloadEnabled:          *hotReloadEnabled,
 	}
 
 	srv := server.New(cfg)

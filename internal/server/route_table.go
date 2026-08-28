@@ -91,6 +91,23 @@ type RouteEntry struct {
 	// route-table concern; the served OpenAPI document never needs to expose
 	// these forwarding details.
 	UpstreamMap map[string]RouteTarget
+
+	// FanoutScope carries per-instance scope constraints from x-fanout-scope.
+	// The map keys are instance IDs and values are arrays of allowed scope IDs.
+	// This is used to filter instances at dispatch time based on the request's
+	// effective scope.
+	FanoutScope map[string][]string
+
+	// BreakerConfig holds the fragment-root default circuit breaker configuration.
+	// Per-instance overrides are stored in each UpstreamMap entry's BreakerConfig.
+	// The runtime uses the stricter (more likely to open) value when same-origin
+	// instances disagree, and exposes the disagreement at /config/status.
+	BreakerConfig *BreakerConfig
+
+	// BreakerDisagreements tracks origins with conflicting breaker configs
+	// across different instances of the same upstream. This is populated during
+	// route table construction and exposed at /config/status.
+	BreakerDisagreements map[Origin][]string
 }
 
 // RouteTarget is the resolved forwarding and injection metadata for one
@@ -99,6 +116,10 @@ type RouteTarget struct {
 	URL       string
 	VaultPath string
 	InjectAs  *InjectAs
+
+	// BreakerConfig is the per-instance override for circuit breaker configuration.
+	// If nil, the fragment-root BreakerConfig is used.
+	BreakerConfig *BreakerConfig
 }
 
 // RouteMatch represents a matched route with extracted path parameters.
@@ -180,6 +201,38 @@ func (h *ThreadSafeTableHolder) Match(req *http.Request) (*RouteMatch, error) {
 		return nil, fmt.Errorf("route table is not initialized")
 	}
 	return h.current.Match(req)
+}
+
+// Snapshot returns a copy of the current route table's routes for inspection.
+// The returned routes are a snapshot at the time of the call and are not
+// affected by subsequent swaps.
+func (h *ThreadSafeTableHolder) Snapshot() []RouteEntry {
+	if h == nil {
+		return nil
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.current == nil {
+		return nil
+	}
+	return h.current.GetRoutes()
+}
+
+// OpenBaoCacheStats returns the OpenBao cache statistics from the current route table.
+func (h *ThreadSafeTableHolder) OpenBaoCacheStats() vault.CacheStats {
+	if h == nil {
+		return vault.CacheStats{}
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.current == nil {
+		return vault.CacheStats{}
+	}
+	return h.current.OpenBaoCacheStats()
 }
 
 // BuildRouteTable creates a populated RouteTable from an OpenAPI v3 document.
@@ -275,6 +328,25 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			fanoutScope, err := extractFanoutScope(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
+			// Extract fragment-root breaker configuration
+			breakerConfig, err := extractBreakerConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
+			// Detect same-origin disagreements if using upstream map
+			var breakerDisagreements map[Origin][]string
+			if len(upstreamMap) > 0 {
+				breakerDisagreements, err = detectBreakerDisagreements(upstreamMap, breakerConfig)
+				if err != nil {
+					return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+				}
+			}
 
 			entry := RouteEntry{
 				PathTemplate:         path,
@@ -289,6 +361,9 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				UpstreamPathTemplate: upstreamPathTemplate,
 				UpstreamStripPrefix:  upstreamStripPrefix,
 				UpstreamMap:          upstreamMap,
+				FanoutScope:          fanoutScope,
+				BreakerConfig:        breakerConfig,
+				BreakerDisagreements: breakerDisagreements,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
@@ -434,9 +509,10 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		return nil, nil
 	}
 	var raw map[string]struct {
-		URL       string    `yaml:"url" json:"url"`
-		VaultPath string    `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs  *InjectAs `yaml:"injectAs" json:"injectAs"`
+		URL       string                 `yaml:"url" json:"url"`
+		VaultPath string                 `yaml:"vaultPath" json:"vaultPath"`
+		InjectAs  *InjectAs              `yaml:"injectAs" json:"injectAs"`
+		Breaker   map[string]interface{} `yaml:"breaker" json:"breaker"`
 	}
 	if err := node.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("x-upstream-map must be an object: %w", err)
@@ -451,9 +527,184 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 				return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
 			}
 		}
-		result[key] = RouteTarget{URL: strings.TrimSpace(value.URL), VaultPath: value.VaultPath, InjectAs: value.InjectAs}
+
+		// Extract per-instance breaker config if present
+		var breakerConfig *BreakerConfig
+		if len(value.Breaker) > 0 {
+			config, err := parseBreakerConfig(value.Breaker)
+			if err != nil {
+				return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
+			}
+			breakerConfig = &config
+		}
+
+		result[key] = RouteTarget{
+			URL:           strings.TrimSpace(value.URL),
+			VaultPath:     value.VaultPath,
+			InjectAs:      value.InjectAs,
+			BreakerConfig: breakerConfig,
+		}
 	}
 	return result, nil
+}
+
+// extractBreakerConfig extracts the fragment-root x-breaker configuration.
+// Returns nil if x-breaker is not present (uses default).
+func extractBreakerConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*BreakerConfig, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-breaker")
+	if !ok || node == nil {
+		// No breaker config specified, use defaults
+		config := DefaultBreakerConfig()
+		return &config, nil
+	}
+
+	var raw map[string]interface{}
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-breaker must be an object: %w", err)
+	}
+
+	config, err := parseBreakerConfig(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+// parseBreakerConfig parses a raw map into a BreakerConfig.
+func parseBreakerConfig(raw map[string]interface{}) (BreakerConfig, error) {
+	config := DefaultBreakerConfig()
+
+	// Parse threshold if present
+	if val, ok := raw["threshold"]; ok {
+		switch v := val.(type) {
+		case int:
+			config.Threshold = v
+		case float64:
+			config.Threshold = int(v)
+		default:
+			return BreakerConfig{}, fmt.Errorf("threshold must be an integer")
+		}
+	}
+
+	// Parse openSeconds if present
+	if val, ok := raw["openSeconds"]; ok {
+		switch v := val.(type) {
+		case int:
+			config.OpenSeconds = v
+		case float64:
+			config.OpenSeconds = int(v)
+		default:
+			return BreakerConfig{}, fmt.Errorf("openSeconds must be an integer")
+		}
+	}
+
+	// Parse maxOpenSeconds if present
+	if val, ok := raw["maxOpenSeconds"]; ok {
+		switch v := val.(type) {
+		case int:
+			config.MaxOpenSeconds = v
+		case float64:
+			config.MaxOpenSeconds = int(v)
+		default:
+			return BreakerConfig{}, fmt.Errorf("maxOpenSeconds must be an integer")
+		}
+	}
+
+	// Parse enabled if present
+	if val, ok := raw["enabled"]; ok {
+		switch v := val.(type) {
+		case bool:
+			config.Enabled = v
+		default:
+			return BreakerConfig{}, fmt.Errorf("enabled must be a boolean")
+		}
+	}
+
+	// Validate thresholds
+	if config.Threshold < 1 {
+		return BreakerConfig{}, fmt.Errorf("threshold must be >= 1")
+	}
+	if config.OpenSeconds < 1 {
+		return BreakerConfig{}, fmt.Errorf("openSeconds must be >= 1")
+	}
+	if config.MaxOpenSeconds < 1 {
+		return BreakerConfig{}, fmt.Errorf("maxOpenSeconds must be >= 1")
+	}
+	if config.OpenSeconds > config.MaxOpenSeconds {
+		return BreakerConfig{}, fmt.Errorf("openSeconds cannot exceed maxOpenSeconds")
+	}
+
+	return config, nil
+}
+
+// detectBreakerDisagreements checks if different instances targeting the same
+// origin have conflicting breaker configurations. Returns a map of origin to
+// list of instances with conflicting configs.
+func detectBreakerDisagreements(upstreamMap map[string]RouteTarget, fragmentConfig *BreakerConfig) (map[Origin][]string, error) {
+	disagreements := make(map[Origin][]string)
+
+	// Group instances by origin and track their configs
+	originConfigs := make(map[Origin]map[string]BreakerConfig) // origin -> instance -> config
+
+	for instanceID, target := range upstreamMap {
+		// Get the config for this instance (per-instance override or fragment default)
+		config := fragmentConfig
+		if target.BreakerConfig != nil {
+			config = target.BreakerConfig
+		}
+		if config == nil {
+			defaultConfig := DefaultBreakerConfig()
+			config = &defaultConfig
+		}
+
+		origin, err := ParseOrigin(target.URL)
+		if err != nil {
+			return nil, fmt.Errorf("instance %s: parse origin: %w", instanceID, err)
+		}
+
+		if originConfigs[origin] == nil {
+			originConfigs[origin] = make(map[string]BreakerConfig)
+		}
+		originConfigs[origin][instanceID] = *config
+	}
+
+	// Check for disagreements within each origin
+	for origin, instanceConfigs := range originConfigs {
+		if len(instanceConfigs) < 2 {
+			continue // No disagreement if only one instance targets this origin
+		}
+
+		// Find the first config and compare all others against it
+		var firstInstance string
+		var firstConfig BreakerConfig
+		for instance, config := range instanceConfigs {
+			firstInstance = instance
+			firstConfig = config
+			break
+		}
+
+		conflictingInstances := []string{}
+		for instance, config := range instanceConfigs {
+			if instance == firstInstance {
+				continue
+			}
+			if config.Disagreement(firstConfig) {
+				conflictingInstances = append(conflictingInstances, instance)
+			}
+		}
+
+		if len(conflictingInstances) > 0 {
+			// Include all instances involved in the disagreement
+			allInvolved := make([]string, 0, len(instanceConfigs))
+			for instance := range instanceConfigs {
+				allInvolved = append(allInvolved, instance)
+			}
+			disagreements[origin] = allInvolved
+		}
+	}
+
+	return disagreements, nil
 }
 
 func firstExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, name string) (*yaml.Node, bool) {
@@ -716,6 +967,46 @@ func (t *RouteTable) matchingRoutes(req *http.Request) []RouteEntry {
 	return matches
 }
 
+// InjectableNames returns the injectable header and query parameter names for
+// a given request. This is used by the capture middleware to identify which
+// request headers and query parameters contain injected credentials that should
+// be redacted from captured corpus data.
+func (t *RouteTable) InjectableNames(r *http.Request) (map[string]bool, map[string]bool) {
+	if t == nil || r == nil || r.URL == nil {
+		return nil, nil
+	}
+
+	method := strings.ToUpper(r.Method)
+	path := r.URL.EscapedPath()
+	if path == "" {
+		path = r.URL.Path
+	}
+
+	for _, route := range t.routes {
+		if strings.ToUpper(route.Method) != method {
+			continue
+		}
+		if _, ok := matchRoutePath(route.PathTemplate, path); !ok {
+			continue
+		}
+
+		// Found a matching route - extract injectable names
+		headerNames := make(map[string]bool)
+		queryNames := make(map[string]bool)
+
+		for name := range route.injectableHeaderNames() {
+			headerNames[name] = true
+		}
+		for name := range route.injectableQueryNames() {
+			queryNames[name] = true
+		}
+
+		return headerNames, queryNames
+	}
+
+	return nil, nil
+}
+
 func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 	result := make(map[string]struct{})
 	add := func(injectAs *InjectAs) {
@@ -755,6 +1046,13 @@ func (route RouteEntry) effectiveTarget(pathParams map[string]string) RouteEntry
 		return route
 	}
 	instance := pathParams[route.InstanceParam]
+
+	// _all is a special value that triggers fan-out mode
+	// The route entry is returned unchanged - fan-out is handled at dispatch time
+	if instance == "_all" {
+		return route
+	}
+
 	target, ok := route.UpstreamMap[instance]
 	if !ok {
 		target, ok = route.UpstreamMap["_default"]
@@ -897,4 +1195,61 @@ func validateRouteEntry(route RouteEntry, index int) error {
 		return fmt.Errorf("route at index %d: UpstreamTarget cannot be empty", index)
 	}
 	return nil
+}
+
+// IsFanOutRequest checks if the given path parameters indicate a fan-out request.
+func (route RouteEntry) IsFanOutRequest(pathParams map[string]string) bool {
+	if route.InstanceParam == "" || len(route.UpstreamMap) == 0 {
+		return false
+	}
+	instance := pathParams[route.InstanceParam]
+	return instance == "_all"
+}
+
+// ShouldFanOut reports whether this route entry supports fan-out mode.
+// A route can fan out if it has an instance parameter and an upstream map.
+func (route RouteEntry) ShouldFanOut() bool {
+	return route.InstanceParam != "" && len(route.UpstreamMap) > 0
+}
+
+// GetAllInstanceTargets returns all instance targets from the upstream map.
+// This is used when the instance parameter is "_all" to dispatch to all instances.
+func (route RouteEntry) GetAllInstanceTargets() map[string]RouteTarget {
+	if len(route.UpstreamMap) == 0 {
+		return nil
+	}
+	// Return a copy to prevent mutation of the route table
+	result := make(map[string]RouteTarget, len(route.UpstreamMap))
+	for key, target := range route.UpstreamMap {
+		result[key] = target
+	}
+	return result
+}
+
+// GetFanOutInstanceCount returns the number of instances in the upstream map.
+func (route RouteEntry) GetFanOutInstanceCount() int {
+	return len(route.UpstreamMap)
+}
+
+func extractFanoutScope(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (map[string][]string, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-fanout-scope")
+	if !ok || node == nil {
+		return nil, nil
+	}
+	var raw map[string]struct {
+		Scopes []string `yaml:"scopes" json:"scopes"`
+	}
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-fanout-scope must be an object: %w", err)
+	}
+	result := make(map[string][]string, len(raw))
+	for instanceID, scopeEntry := range raw {
+		if len(scopeEntry.Scopes) == 0 {
+			return nil, fmt.Errorf("x-fanout-scope entry %q: scopes array cannot be empty", instanceID)
+		}
+		scopes := make([]string, len(scopeEntry.Scopes))
+		copy(scopes, scopeEntry.Scopes)
+		result[instanceID] = scopes
+	}
+	return result, nil
 }
