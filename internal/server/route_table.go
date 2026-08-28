@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/vault"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -1228,6 +1230,55 @@ func routeVersionRank(version string) int {
 		}
 	}
 	return int(^uint(0) >> 1)
+}
+
+// GetVersionsForPath returns all API versions available for a given path and method.
+// If method is empty, returns versions for all methods at that path.
+// The returned versions are sorted from oldest to newest (by rank).
+func (t *RouteTable) GetVersionsForPath(path string, method string) []string {
+	seen := make(map[string]bool)
+	versions := []string{}
+
+	for _, route := range t.routes {
+		// Check if path matches
+		if !pathTemplatesMatch(route.PathTemplate, path) {
+			continue
+		}
+
+		// Check if method matches (or if we're querying all methods)
+		if method != "" && strings.ToUpper(route.Method) != method {
+			continue
+		}
+
+		// Add version if not already seen
+		if !seen[route.APIVersion] {
+			seen[route.APIVersion] = true
+			versions = append(versions, route.APIVersion)
+		}
+	}
+
+	// Sort versions by rank (oldest first)
+	sortVersionsByRank(versions)
+	return versions
+}
+
+// pathTemplatesMatch checks if a path template matches a concrete path.
+// This is a simplified check - it doesn't do full parameter matching.
+func pathTemplatesMatch(template, path string) bool {
+	// For now, just do exact string matching
+	// TODO: implement proper template matching with parameter extraction
+	return template == path
+}
+
+// sortVersionsByRank sorts version strings by their rank (oldest first).
+// Uses the version package's Rank function for proper numerical ordering,
+// ensuring _unversioned (rank 0) is always first, followed by v1, v2, etc.
+func sortVersionsByRank(versions []string) {
+	sort.Slice(versions, func(i, j int) bool {
+		rankI := version.Rank(versions[i])
+		rankJ := version.Rank(versions[j])
+		return rankI < rankJ
+	})
 }
 
 // Validate checks if the route table entries are valid.
