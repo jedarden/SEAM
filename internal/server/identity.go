@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 )
@@ -50,12 +51,19 @@ func identityFromContext(ctx context.Context) *Identity {
 type IdentityResolver struct {
 	// TODO: Add Tailscale LocalClient for WhoIs calls
 	// For now, this is a placeholder that will be integrated with Tailscale
-	mu sync.RWMutex
+	mu     sync.RWMutex
+	testMode bool // When true, returns resolved test identities for development
 }
 
 // NewIdentityResolver creates a new identity resolver
 func NewIdentityResolver() *IdentityResolver {
-	return &IdentityResolver{}
+	// Check for test mode via environment variable
+	// SEAM_TEST_IDENTITY_MODE=1 enables resolved test identities for development
+	testMode := os.Getenv("SEAM_TEST_IDENTITY_MODE") == "1"
+
+	return &IdentityResolver{
+		testMode: testMode,
+	}
 }
 
 // Resolve resolves an inbound connection to a Tailscale identity
@@ -72,13 +80,26 @@ func (ir *IdentityResolver) Resolve(ctx context.Context, remoteAddr string) (*Id
 	defer ir.mu.RUnlock()
 
 	// TODO: Integrate with Tailscale LocalClient.WhoIs
-	// For now, return an unresolved identity (placeholder)
-	// This will be replaced with actual WhoIs resolution
+	// For now, this is a placeholder that will be replaced with actual WhoIs resolution
 
 	// Placeholder: Check if this is a Tailscale IP (100.x.x.x)
 	ip := net.ParseIP(host)
 	if ip != nil && isTailscaleIP(ip) {
-		// This is a Tailscale connection, but we can't resolve it yet
+		// This is a Tailscale connection
+		if ir.testMode {
+			// Test mode: return resolved identity with test scopes
+			// This allows development to proceed while waiting for LocalClient integration
+			return &Identity{
+				Resolved:     true,
+				NodeName:     "test-worker",
+				NodeKey:      "test-node-key",
+				User:         "test-user@example.com",
+				Tags:         []string{"tag:needle-worker"},
+				Capabilities: []string{"k8s-ro:get", "argocd:read", "config:read", "seam:ops:read", "seam:scopes:read-all"},
+			}, nil
+		}
+
+		// Production mode: return unresolved identity (will be denied by middleware)
 		// Return unresolved identity for now
 		return &Identity{
 			Resolved:     false,
@@ -137,6 +158,7 @@ func ExtractScopeClaims(identity *Identity) []string {
 
 	// For now, return capabilities from the identity
 	// TODO: Parse these from the actual Grant's app field
+	// When LocalClient integration is complete, this will parse WhoIs response
 	return identity.Capabilities
 }
 
