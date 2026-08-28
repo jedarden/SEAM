@@ -795,7 +795,14 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// Specific method requested - check if that method exists
 				_, methodExists := pathItemMap[method]
-				routeVisibleInScope = methodExists
+				if methodExists {
+					routeVisibleInScope = true
+				} else {
+					// Path exists but method doesn't - this is "visible-but-not-invocable"
+					// Return 403 with scope information and Grant snippet
+					s.writeVisibleButNotInvocable(w, r, path, method, identity, pathItemMap)
+					return
+				}
 			}
 		}
 	}
@@ -1521,15 +1528,12 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Resolve the instance target if using x-instance-param
 	route := routeMatch.Route
-	if route.InstanceParam != "" && len(route.UpstreamMap) > 0 {
-		instance := routeMatch.PathParams[route.InstanceParam]
-		if instance == "" {
-			s.handleNoUpstream(w, r)
-			return
-		}
-
-		// Resolve to specific instance target
+		// Resolve to specific instance target and capture for scope checking
+		var selectedInstance string
+		var selectedTarget RouteTarget
 		if target, ok := route.UpstreamMap[instance]; ok && target.URL != "" {
+			selectedInstance = instance
+			selectedTarget = target
 			route.UpstreamTarget = target.URL
 			if target.VaultPath != "" {
 				route.VaultPath = target.VaultPath
@@ -1538,6 +1542,8 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 				route.InjectAs = target.InjectAs
 			}
 		} else if target, ok := route.UpstreamMap["_default"]; ok && target.URL != "" {
+			selectedInstance = "_default"
+			selectedTarget = target
 			route.UpstreamTarget = target.URL
 			if target.VaultPath != "" {
 				route.VaultPath = target.VaultPath
@@ -1549,19 +1555,36 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 			s.handleNoUpstream(w, r)
 			return
 		}
-	}
-
-	// Single-instance request path (existing behavior)
-	upstreamURL := route.UpstreamTarget
-	if upstreamURL == "" {
-		// No upstream configured for this route - return 503
-		s.handleNoUpstream(w, r)
-		return
-	}
-
-	// Check circuit breaker before dispatching
-	if s.breakerRegistry != nil {
-		origin, err := ParseOrigin(upstreamURL)
+		
+		// Phase 7: Check per-instance requiredScope
+		// Effective requirement = union of operation-level and instance-level requiredScopes
+		identity := identityFromContext(r.Context())
+		if identity != nil && identity.Resolved {
+			// Build effective required scopes
+			effectiveRequiredScopes := make([]string, 0, len(route.RequiredScopes) + len(selectedTarget.RequiredScopes))
+			effectiveRequiredScopes = append(effectiveRequiredScopes, route.RequiredScopes...)
+			effectiveRequiredScopes = append(effectiveRequiredScopes, selectedTarget.RequiredScopes...)
+			
+			// Check if identity has any of the required scopes
+			if len(effectiveRequiredScopes) > 0 {
+				hasRequiredScope := false
+				for _, scope := range effectiveRequiredScopes {
+					if identity.HasScope(scope) {
+						hasRequiredScope = true
+						log.Printf("[Per-Instance-Scope] Identity has required scope %s for instance %s", scope, selectedInstance)
+						break
+					}
+				}
+				
+				if !hasRequiredScope {
+					log.Printf("[Per-Instance-Scope] Identity lacks required scopes %v for instance %s (has: %v) - denying",
+						effectiveRequiredScopes, selectedInstance, identity.Capabilities)
+					NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Instance %q requires one of scopes: %v", selectedInstance, effectiveRequiredScopes)).Write(w, r)
+					return
+				}
+			}
+		}
+			if target.InjectAs != nil {
 		if err != nil {
 			log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", upstreamURL, err)
 		} else {
@@ -1882,6 +1905,122 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 			"docs_url": "/docs",
 			"whoami":   "/whoami",
 		},
+	}
+
+	// Add scope version to metadata if available
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			if metadata, ok := response["metadata"].(map[string]interface{}); ok {
+				metadata["x_seam_scope_version"] = scopeVersion
+			}
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// writeVisibleButNotInvocable returns a 403 response when a route path is visible
+// but the requested method is not invocable (right path, wrong method).
+//
+// This implements the scope-naming 403 rule:
+// - Only called for routes within the caller's filtered scope
+// - Returns 403 with missing scope information and Grant snippet to fix it
+//
+// Phase 7: This helps callers understand why they can see a path but not use a specific method.
+func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Request, path, method string, identity *Identity, pathItemMap map[string]interface{}) {
+	// Log the visible-but-not-invocable case
+	log.Printf("[Scope-Filter-403] Route visible but method not invocable: path=%s method=%s identity=%s",
+		path, method, identity.NodeName,
+	)
+
+	// Find which methods are available and their required scopes
+	availableMethods := make([]string, 0)
+	methodScopes := make(map[string][]string)
+
+	for httpMethod, methodOp := range pathItemMap {
+		if !isHTTPMethod(httpMethod) {
+			continue
+		}
+
+		methodOpMap, ok := methodOp.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// Get required scopes for this method
+		requiredScopes := extractRequiredScopesFromMap(methodOpMap)
+
+		// Check if caller has the required scopes
+		hasAccess := len(requiredScopes) == 0 // No scopes required = public access
+		if len(requiredScopes) > 0 && identity != nil && len(identity.Capabilities) > 0 {
+			normalizedIdentityScopes := make(map[string]bool)
+			for _, scope := range identity.Capabilities {
+				normalized := strings.ToLower(strings.TrimSpace(scope))
+				normalizedIdentityScopes[normalized] = true
+			}
+
+			for _, requiredScope := range requiredScopes {
+				normalizedRequired := strings.ToLower(strings.TrimSpace(requiredScope))
+				if normalizedIdentityScopes[normalizedRequired] {
+					hasAccess = true
+					break
+				}
+			}
+		}
+
+		availableMethods = append(availableMethods, httpMethod)
+		if hasAccess {
+			methodScopes[httpMethod] = requiredScopes
+		}
+	}
+
+	// Build 403 response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+
+	// Add X-SEAM-Scope-Version header for correlation
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
+		}
+	}
+
+	w.WriteHeader(http.StatusForbidden)
+
+	// Build error response with Grant snippet
+	response := map[string]interface{}{
+		"error":   "forbidden",
+		"message": fmt.Sprintf("Method %s not allowed for path %s with your current scope", method, path),
+		"details": map[string]interface{}{
+			"path":          path,
+			"requested_method": method,
+			"available_methods": availableMethods,
+			"reason": "visible_but_not_invocable",
+			"documentation": "/docs",
+		},
+		"metadata": map[string]interface{}{
+			"whoami": "/whoami",
+		},
+	}
+
+	// Add Grant snippet if scopes are required
+	if len(methodScopes) > 0 {
+		// Build Grant snippet example
+		grantExample := map[string]interface{}{
+			"grant_example": map[string]interface{}{
+				"description": "Grant the required scope to access this method",
+				"tailscale_grant": map[string]interface{}{
+					"app": map[string]interface{}{
+						"capabilities": methodScopes,
+					},
+				},
+			},
+		}
+		response["grant_snippet"] = grantExample
 	}
 
 	// Add scope version to metadata if available
