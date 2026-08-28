@@ -23,7 +23,7 @@ import (
 
 const (
 	upstreamConnectTimeout  = 5 * time.Second
-	upstreamRequestTimeout  = 30 * time.Second
+	upstreamRequestTimeout  = 60 * time.Second
 	upstreamMaxIdleConns    = 100
 	upstreamIdleConnTimeout = 90 * time.Second
 
