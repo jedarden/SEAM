@@ -742,7 +742,71 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get route information from the spec loader
+	// Phase 7: Check if route is in caller's filtered scope BEFORE checking existence
+	// This implements the 404 oracle rule: a route outside the caller's filtered spec
+	// returns 404 byte-identical to a route that never existed.
+
+	// Get identity from context for scope filtering
+	ctx := r.Context()
+	identity := identityFromContext(ctx)
+
+	// Get identity scopes for filtering
+	identityScopes := []string{}
+	if identity != nil && len(identity.Capabilities) > 0 {
+		identityScopes = identity.Capabilities
+	}
+
+	// Get the filtered spec to check if route is visible to caller
+	filteredSpec, err := s.specLoader.GetFilteredJSON(identityScopes)
+	if err != nil {
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "Failed to load API specification", err)
+		logRequestError(r, "docs-route", requestErr)
+		requestErr.Write(w, r)
+		return
+	}
+
+	// Parse filtered spec to check route visibility
+	var filteredDocument map[string]interface{}
+	if err := json.Unmarshal(filteredSpec, &filteredDocument); err != nil {
+		requestErr := WrapRequestError(ErrCodeSpecLoadFailed, "API specification is not valid JSON", err)
+		logRequestError(r, "docs-route", requestErr)
+		requestErr.Write(w, r)
+		return
+	}
+
+	// Check if path exists in filtered spec
+	filteredPaths, ok := filteredDocument["paths"].(map[string]interface{})
+	if !ok {
+		// No paths in filtered spec - route not visible
+		s.writeScopeFilteredNotFound(w, r, path, method, identity)
+		return
+	}
+
+	pathItemInFiltered, pathExistsInFiltered := filteredPaths[path]
+
+	// Check if route is visible in filtered spec
+	routeVisibleInScope := false
+	if pathExistsInFiltered {
+		pathItemMap, ok := pathItemInFiltered.(map[string]interface{})
+		if ok {
+			if method == "" {
+				// No specific method requested - path is visible if any method exists
+				routeVisibleInScope = true
+			} else {
+				// Specific method requested - check if that method exists
+				_, methodExists := pathItemMap[method]
+				routeVisibleInScope = methodExists
+			}
+		}
+	}
+
+	// If route is not visible in filtered scope, return 404 byte-identical to non-existent route
+	if !routeVisibleInScope {
+		s.writeScopeFilteredNotFound(w, r, path, method, identity)
+		return
+	}
+
+	// Route is visible in scope - proceed to get route information from full spec
 	routeInfo, err := s.specLoader.GetRoute(path, method, version)
 	if err != nil {
 		requestErr := WrapRequestError(ErrCodeRouteNotFound, "Requested route documentation was not found", err).
@@ -1769,6 +1833,68 @@ func (s *Server) getOrCreateProxyWithError(upstreamURL string, tlsConfigs ...*Up
 // handleNotFound returns a 404 response when no route matches
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 	RouteNotFound(r.Method, r.URL.Path).Write(w, r)
+}
+
+// writeScopeFilteredNotFound returns a 404 response byte-identical to a genuinely non-existent route.
+// This implements the 404 oracle rule: when a route is outside the caller's filtered spec,
+// it returns 404 byte-identical to a route that never existed.
+//
+// The 404 response includes:
+// - Standard 404 status code and headers (identical to non-existent route)
+// - Error body naming /whoami and X-SEAM-Scope-Version for caller correlation
+// - Server-side logging of the resolved route
+//
+// Phase 7: This is called before checking route existence for scope-filtered endpoints.
+func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Request, path, method string, identity *Identity) {
+	// Log the resolved route server-side (as specified in task)
+	log.Printf("[Scope-Filter-404] Route not in caller's filtered scope: path=%s method=%s identity=%s scope_version=%s",
+		path,
+		method,
+		identity.NodeName,
+		s.scopeVersionCache.GetCurrentScopeVersion(identity),
+	)
+
+	// Get the standard RouteNotFound error (byte-identical to non-existent route)
+	notFoundErr := RouteNotFound(method, path)
+
+	// Set headers identical to non-existent route
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+
+	// Add X-SEAM-Scope-Version header for correlation
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
+		}
+	}
+
+	w.WriteHeader(http.StatusNotFound)
+
+	// Write the error response
+	response := map[string]interface{}{
+		"error":    notFoundErr.ErrorCode,
+		"message":  notFoundErr.Message,
+		"details":  notFoundErr.Details,
+		"metadata": map[string]interface{}{
+			"docs_url": "/docs",
+			"whoami":   "/whoami",
+		},
+	}
+
+	// Add scope version to metadata if available
+	if identity != nil {
+		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
+		if scopeVersion != "" {
+			if metadata, ok := response["metadata"].(map[string]interface{}); ok {
+				metadata["x_seam_scope_version"] = scopeVersion
+			}
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // handleNoUpstream returns a 503 response when no upstream is configured
