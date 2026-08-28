@@ -112,6 +112,11 @@ type RouteEntry struct {
 	// LoopGuardConfig holds the loop guard configuration for this route.
 	// Per Phase 13.1: protects against repeated identical failing requests.
 	LoopGuardConfig *LoopGuardConfig
+
+	// RequiredScopes holds the scope requirements for this route.
+	// Per Phase 7: if non-empty, the caller must have at least one of these scopes.
+	// Extracted from x-required-scope extension in OpenAPI operation.
+	RequiredScopes []string
 }
 
 // RouteTarget is the resolved forwarding and injection metadata for one
@@ -124,6 +129,12 @@ type RouteTarget struct {
 	// BreakerConfig is the per-instance override for circuit breaker configuration.
 	// If nil, the fragment-root BreakerConfig is used.
 	BreakerConfig *BreakerConfig
+
+	// RequiredScopes holds the scope requirements for this specific instance.
+	// Per Phase 7: callers must have at least one of these scopes to access
+	// this instance. The effective requirement is the union of operation-level
+	// requiredScopes and this instance's RequiredScopes.
+	RequiredScopes []string
 }
 
 // RouteMatch represents a matched route with extracted path parameters.
@@ -358,6 +369,12 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
+			// Extract required scopes (Phase 7)
+			requiredScopes, err := extractRequiredScopes(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
 			entry := RouteEntry{
 				PathTemplate:         path,
 				Method:               methodOp.method,
@@ -375,6 +392,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				BreakerConfig:        breakerConfig,
 				BreakerDisagreements: breakerDisagreements,
 				LoopGuardConfig:      loopGuardConfig,
+				RequiredScopes:       requiredScopes,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
@@ -520,10 +538,11 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		return nil, nil
 	}
 	var raw map[string]struct {
-		URL       string                 `yaml:"url" json:"url"`
-		VaultPath string                 `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs  *InjectAs              `yaml:"injectAs" json:"injectAs"`
-		Breaker   map[string]interface{} `yaml:"breaker" json:"breaker"`
+		URL           string                 `yaml:"url" json:"url"`
+		VaultPath     string                 `yaml:"vaultPath" json:"vaultPath"`
+		InjectAs      *InjectAs              `yaml:"injectAs" json:"injectAs"`
+		Breaker       map[string]interface{} `yaml:"breaker" json:"breaker"`
+		RequiredScope []string               `yaml:"requiredScope" json:"requiredScope"`
 	}
 	if err := node.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("x-upstream-map must be an object: %w", err)
@@ -554,6 +573,7 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 			VaultPath:     value.VaultPath,
 			InjectAs:      value.InjectAs,
 			BreakerConfig: breakerConfig,
+			RequiredScopes: value.RequiredScope,
 		}
 	}
 	return result, nil
@@ -1323,4 +1343,39 @@ func extractFanoutScope(operation *v3.Operation, pathItem *v3.PathItem, document
 		result[instanceID] = scopes
 	}
 	return result, nil
+}
+
+// extractRequiredScopes extracts the x-required-scope extension from operation.
+// Returns nil if no scopes are required (public route).
+// Per Phase 7: routes can require specific scopes for access.
+func extractRequiredScopes(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) ([]string, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-required-scope")
+	if !ok || node == nil {
+		return nil, nil
+	}
+
+	// Check if it's a single string
+	var singleScope string
+	if err := node.Decode(&singleScope); err == nil && singleScope != "" {
+		return []string{singleScope}, nil
+	}
+
+	// Check if it's an array of strings
+	var scopeArray []string
+	if err := node.Decode(&scopeArray); err != nil {
+		return nil, fmt.Errorf("x-required-scope must be a string or array of strings: %w", err)
+	}
+
+	if len(scopeArray) == 0 {
+		return nil, fmt.Errorf("x-required-scope array cannot be empty")
+	}
+
+	// Validate all scopes are non-empty
+	for i, scope := range scopeArray {
+		if strings.TrimSpace(scope) == "" {
+			return nil, fmt.Errorf("x-required-scope array element %d is empty", i)
+		}
+	}
+
+	return scopeArray, nil
 }
