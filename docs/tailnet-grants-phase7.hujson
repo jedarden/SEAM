@@ -1,0 +1,227 @@
+{
+  // SEAM Phase 7: Tailnet Grant entries with scope claims for Stage 3/5 identity resolution
+  //
+  // This file contains Grant entries that carry scope claims in the `app` capability field.
+  // These grants enable SEAM's Stage 3 (WhoIs identity resolution) and Stage 5 (authorization
+  // via x-required-scope) to function together.
+  //
+  // GRANT ARCHITECTURE:
+  // - Tailscale Grants supersede raw ACL `acls` blocks and provide fine-grained control
+  // - The `app` field carries opaque, application-defined JSON that SEAM reads and enforces
+  // - Scope claims follow the format: service:action (e.g., "k8s-ro:get", "argocd:read")
+  //
+  // CRITICAL: These Grants must be deployed TOGETHER with Phase 7 activation.
+  // - Stages 3 and 5 activate together: deny without check refuses everyone;
+  //   check without identity evaluates nobody
+  //
+  // INTEGRATION:
+  // 1. Merge these entries into your tailnet's policy.hujson file
+  // 2. Ensure SEAM is running with Phase 7 enabled (identity resolution + authorization middleware)
+  // 3. Worker nodes must have their corresponding tags (tag:needle-worker, etc.)
+  //
+  // For more on Tailscale Grants and app capabilities:
+  // - https://tailscale.com/docs/features/access-control/grants
+  // - https://tailscale.com/docs/features/access-control/grants/grants-app-capabilities
+
+  "grants": [
+    // NEEDLE worker grant - baseline cluster read access
+    {
+      "src": ["tag:needle-worker"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Baseline scopes for all NEEDLE workers
+            // These scopes allow read access to cluster state and basic operations
+            "scopes": [
+              "k8s-ro:get",           // Read-only Kubernetes API access
+              "argocd:read",          // Read-only ArgoCD access
+              "config:read"            // Read-only config status access
+            ]
+          }
+        ]
+      }
+    },
+
+    // NEEDLE worker grant - extended capabilities (for specific workers)
+    {
+      "src": ["tag:needle-worker"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Extended scopes for privileged workers (e.g., deployment agents)
+            "scopes": [
+              "k8s-rw:patch",        // Read-write Kubernetes access (patch/update)
+              "k8s-rw:create",       // Create resources in Kubernetes
+              "argocd:write",        // Write access to ArgoCD
+              "vault:read",          // Read access to OpenBao secrets
+              "admin:execute"        // Execute admin operations
+            ],
+            "comment": "Extended capabilities for deployment and operations workers"
+          }
+        ]
+      }
+    },
+
+    // Dev pod grant - development access
+    {
+      "src": ["tag:devpod"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Scopes for development pods
+            // More permissive for development workflows
+            "scopes": [
+              "k8s-ro:get",
+              "k8s-rw:patch",
+              "argocd:read",
+              "argocd:write",
+              "config:read",
+              "config:write"
+            ],
+            "comment": "Development access - elevated permissions for dev workflows"
+          }
+        ]
+      }
+    },
+
+    // Admin grant - full administrative access
+    {
+      "src": ["autogroup:admin"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Full administrative access
+            // Admin devices get all scopes
+            "scopes": [
+              "k8s-ro:get",
+              "k8s-rw:patch",
+              "k8s-rw:create",
+              "k8s-rw:delete",
+              "argocd:read",
+              "argocd:write",
+              "argocd:admin",
+              "vault:read",
+              "vault:write",
+              "config:read",
+              "config:write",
+              "config:admin",
+              "admin:execute",
+              "admin:all"
+            ],
+            "comment": "Full administrative access - all scopes granted"
+          }
+        ]
+      }
+    },
+
+    // Operator-only port grant (8081) - administrative access
+    {
+      "src": ["autogroup:admin"],
+      "dst": ["tag:seam:8081"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Full access to operator-only surface
+            "scopes": [
+              "admin:all",
+              "operator:all"
+            ],
+            "comment": "Full operator port access - administrative surface"
+          }
+        ]
+      }
+    },
+
+    // Service-specific grants - for specific microservices
+    {
+      "src": ["tag:service-kalshi-tape"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Scopes specific to Kalshi tape service
+            "scopes": [
+              "k8s-ro:get",
+              "vault:read"
+            ],
+            "comment": "Kalshi tape service - limited to read cluster and read secrets"
+          }
+        ]
+      }
+    },
+
+    {
+      "src": ["tag:service-news-trader"],
+      "dst": ["tag:seam:8080"],
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            // Scopes specific to news trader service
+            "scopes": [
+              "k8s-ro:get",
+              "argocd:read",
+              "vault:read"
+            ],
+            "comment": "News trader service - read cluster, ArgoCD, and secrets"
+          }
+        ]
+      }
+    }
+  ],
+
+  // Grant tests - validate that scope claims are correctly evaluated
+  "tests": [
+    {
+      "name": "NEEDLE worker has baseline scopes",
+      "src": "tag:needle-worker",
+      "dst": "tag:seam:8080",
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            "expect_scopes": ["k8s-ro:get", "argocd:read", "config:read"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dev pod has elevated scopes",
+      "src": "tag:devpod",
+      "dst": "tag:seam:8080",
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            "expect_scopes": ["k8s-ro:get", "k8s-rw:patch", "argocd:write", "config:write"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Admin has all scopes",
+      "src": "autogroup:admin",
+      "dst": "tag:seam:8080",
+      "app": {
+        "tailscale.com/cap/seam-scopes": [
+          {
+            "expect_all": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "NEEDLE worker denied operator port",
+      "src": "tag:needle-worker",
+      "dst": "tag:seam:8081",
+      "accept": false
+    },
+    {
+      "name": "Admin has operator port access",
+      "src": "autogroup:admin",
+      "dst": "tag:seam:8081",
+      "accept": true
+    }
+  ]
+}
