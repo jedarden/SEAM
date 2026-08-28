@@ -108,6 +108,10 @@ type RouteEntry struct {
 	// across different instances of the same upstream. This is populated during
 	// route table construction and exposed at /config/status.
 	BreakerDisagreements map[Origin][]string
+
+	// LoopGuardConfig holds the loop guard configuration for this route.
+	// Per Phase 13.1: protects against repeated identical failing requests.
+	LoopGuardConfig *LoopGuardConfig
 }
 
 // RouteTarget is the resolved forwarding and injection metadata for one
@@ -348,6 +352,12 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				}
 			}
 
+			// Extract fragment-root loop guard configuration
+			loopGuardConfig, err := extractLoopGuardConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+
 			entry := RouteEntry{
 				PathTemplate:         path,
 				Method:               methodOp.method,
@@ -364,6 +374,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				FanoutScope:          fanoutScope,
 				BreakerConfig:        breakerConfig,
 				BreakerDisagreements: breakerDisagreements,
+				LoopGuardConfig:      loopGuardConfig,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
@@ -633,6 +644,66 @@ func parseBreakerConfig(raw map[string]interface{}) (BreakerConfig, error) {
 	}
 	if config.OpenSeconds > config.MaxOpenSeconds {
 		return BreakerConfig{}, fmt.Errorf("openSeconds cannot exceed maxOpenSeconds")
+	}
+
+	return config, nil
+}
+
+// extractLoopGuardConfig extracts the fragment-root x-loop-guard configuration.
+// Returns nil if x-loop-guard is not present (uses default).
+func extractLoopGuardConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*LoopGuardConfig, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-loop-guard")
+	if !ok || node == nil {
+		// No loop guard config specified, return nil (disabled by default)
+		return nil, nil
+	}
+
+	var raw map[string]interface{}
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-loop-guard must be an object: %w", err)
+	}
+
+	config, err := parseLoopGuardConfig(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+// parseLoopGuardConfig parses a raw map into a LoopGuardConfig.
+func parseLoopGuardConfig(raw map[string]interface{}) (LoopGuardConfig, error) {
+	config := LoopGuardConfig{}
+
+	// Parse maxRepeats (required)
+	if val, ok := raw["maxRepeats"]; ok {
+		switch v := val.(type) {
+		case int:
+			config.MaxRepeats = v
+		case float64:
+			config.MaxRepeats = int(v)
+		default:
+			return LoopGuardConfig{}, fmt.Errorf("maxRepeats must be an integer")
+		}
+	} else {
+		return LoopGuardConfig{}, fmt.Errorf("maxRepeats is required")
+	}
+
+	// Parse window (required)
+	if val, ok := raw["window"]; ok {
+		switch v := val.(type) {
+		case string:
+			config.Window = v
+		default:
+			return LoopGuardConfig{}, fmt.Errorf("window must be a string")
+		}
+	} else {
+		return LoopGuardConfig{}, fmt.Errorf("window is required")
+	}
+
+	// Validate the configuration
+	if err := config.Validate(); err != nil {
+		return LoopGuardConfig{}, err
 	}
 
 	return config, nil

@@ -151,6 +151,7 @@ type Server struct {
 	breakerRegistry   *BreakerRegistry // Per-origin circuit breaker manager (Phase 11.1)
 	last2xxTracker    *Last2xxTracker  // Per-path and per-upstream last-2xx tracking (Phase 11.2)
 	quotaTracker      *QuotaTracker
+	loopGuardRegistry *LoopGuardRegistry // Per-route loop guard manager (Phase 13.1)
 	costPerCalls      map[string]float64 // route -> cost per call
 	metrics           *Metrics
 	mu                sync.RWMutex
@@ -241,6 +242,7 @@ func New(cfg *Config) *Server {
 		breakerRegistry:   NewBreakerRegistry(NewCircuitBreakerStateRegistry()),
 		last2xxTracker:    NewLast2xxTracker(),
 		quotaTracker:      NewQuotaTracker(),
+		loopGuardRegistry: NewLoopGuardRegistry(),
 		costPerCalls:      make(map[string]float64),
 		allowlistEnforcer: allowlistEnforcer,
 		openBaoReady:      true,
@@ -1615,6 +1617,9 @@ func (s *Server) getOrCreateProxyWithError(upstreamURL string, tlsConfigs ...*Up
 	if err != nil {
 		return nil, fmt.Errorf("create proxy: %w", err)
 	}
+
+	// Phase 13.2: Wire up quota tracker for dispatch-time accounting
+	proxy.QuotaTracker = s.quotaTracker
 
 	s.proxyMap[proxyKey] = proxy
 	log.Printf("[dispatch] Created new proxy for upstream %s (TLS identity %s)", upstreamURL, clientKey)
