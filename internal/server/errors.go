@@ -14,18 +14,19 @@ type ErrorCode string
 // Error codes taxonomy.
 const (
 	// Client errors (4xx).
-	ErrCodeBadRequest        ErrorCode = "bad_request"
-	ErrCodeUnauthorized      ErrorCode = "unauthorized"
-	ErrCodeForbidden         ErrorCode = "forbidden"
-	ErrCodeNotFound          ErrorCode = "not_found"
-	ErrCodeMethodNotAllowed  ErrorCode = "method_not_allowed"
-	ErrCodeInvalidVersion    ErrorCode = "invalid_version_parameter"
-	ErrCodeMissingParameter  ErrorCode = "missing_required_parameter"
-	ErrCodeInvalidPayload    ErrorCode = "invalid_payload"
-	ErrCodeRouteNotFound     ErrorCode = "route_not_found"
-	ErrCodeValidationFailed  ErrorCode = "validation_failed"
-	ErrCodeQuotaExceeded     ErrorCode = "quota_exceeded"
-	ErrCodeRateLimitExceeded ErrorCode = "rate_limit_exceeded"
+	ErrCodeBadRequest          ErrorCode = "bad_request"
+	ErrCodeUnauthorized        ErrorCode = "unauthorized"
+	ErrCodeForbidden           ErrorCode = "forbidden"
+	ErrCodeNotFound            ErrorCode = "not_found"
+	ErrCodeMethodNotAllowed    ErrorCode = "method_not_allowed"
+	ErrCodeInvalidVersion      ErrorCode = "invalid_version_parameter"
+	ErrCodeMissingParameter    ErrorCode = "missing_required_parameter"
+	ErrCodeInvalidPayload      ErrorCode = "invalid_payload"
+	ErrCodeRouteNotFound       ErrorCode = "route_not_found"
+	ErrCodeValidationFailed    ErrorCode = "validation_failed"
+	ErrCodeQuotaExceeded       ErrorCode = "quota_exceeded"
+	ErrCodeRateLimitExceeded   ErrorCode = "rate_limit_exceeded"
+	ErrCodeLoopGuardExceeded   ErrorCode = "loop_guard_exceeded"
 
 	// Dependency and server errors (5xx).
 	ErrCodeInternalServer       ErrorCode = "internal_server_error"
@@ -66,6 +67,7 @@ var HTTPStatusMapping = map[ErrorCode]int{
 	ErrCodeValidationFailed:     http.StatusBadRequest,
 	ErrCodeQuotaExceeded:        http.StatusTooManyRequests,
 	ErrCodeRateLimitExceeded:    http.StatusTooManyRequests,
+	ErrCodeLoopGuardExceeded:    http.StatusTooManyRequests,
 	ErrCodeInternalServer:       http.StatusInternalServerError,
 	ErrCodeBadGateway:           http.StatusBadGateway,
 	ErrCodeServiceUnavailable:   http.StatusServiceUnavailable,
@@ -254,6 +256,28 @@ func (e *ErrorResponse) WithRequestID(requestID string) *ErrorResponse {
 func (e *ErrorResponse) WithValidationErrors(errors []ValidationFieldError) *ErrorResponse {
 	e.ValidationErrors = errors
 	return e
+}
+
+// NewLoopGuardErrorResponse creates a 429 response for loop guard intervention.
+// Per Phase 13.1: plain-language body naming N repeats + re-read /docs/route pointer
+// + Retry-After = seconds to window close + pre-Phase-7 statement that guard is route-wide.
+func NewLoopGuardErrorResponse(repeatCount int, retryAfter int, routeID string) *RequestError {
+	message := fmt.Sprintf("Loop guard intervention: This request has been repeated %d times with failures. The loop guard is protecting this route-wide (pre-Phase-7 per-request scoping). Please re-read /docs/route for guidance on idempotent request patterns.", repeatCount)
+
+	return &RequestError{
+		Code:    ErrCodeLoopGuardExceeded,
+		Message: message,
+		Details: map[string]interface{}{
+			"repeat_count":   repeatCount,
+			"max_repeats":    repeatCount, // This indicates we hit the limit
+			"route_id":       routeID,
+			"guard_scope":    "route-wide",
+			"phase_note":     "Phase 7 per-request scoping not yet implemented",
+			"retry_after":    retryAfter,
+			"retry_after_unit": "seconds",
+		},
+		DocsURL: "/docs/route",
+	}
 }
 
 // Write sends a structured JSON error. It normalizes unknown codes and
