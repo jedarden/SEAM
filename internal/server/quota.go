@@ -99,6 +99,7 @@ func (qt *QuotaTracker) scopeKey(scope, route string) string {
 // CheckAndRecordQuota checks if a request is within quota and records the cost
 // Returns (allowed, remainingCost, error)
 // For cache hits, pass cost=0 to skip quota deduction
+// DEPRECATED: Use CheckQuotaOnly + RecordQuotaCost for dispatch-time accounting (Phase 13.2)
 func (qt *QuotaTracker) CheckAndRecordQuota(ctx context.Context, route string, cost float64, token, user string) (bool, float64, error) {
 	qt.mu.Lock()
 	defer qt.mu.Unlock()
@@ -135,6 +136,114 @@ func (qt *QuotaTracker) CheckAndRecordQuota(ctx context.Context, route string, c
 	log.Printf("[QuotaTracker] Cost recorded: globalAccum=$%.2f, routeAccum=$%.2f", qt.globalCostAccum, qt.requestCosts[route])
 
 	return true, remaining - routeCost, nil
+}
+
+// CheckQuotaOnly checks if a request is within quota without recording the cost
+// Phase 13.2: Used by quota middleware to check quota before dispatch
+// Returns (allowed, remainingCost, error)
+func (qt *QuotaTracker) CheckQuotaOnly(ctx context.Context, route string, costPerCall float64, token, user string) (bool, float64, error) {
+	qt.mu.Lock()
+	defer qt.mu.Unlock()
+
+	log.Printf("[QuotaTracker] CheckQuotaOnly: route=%s, costPerCall=$%.2f, token_present=%t, user=%s", route, costPerCall, token != "", user)
+
+	// Check if window has expired and reset if needed
+	now := time.Now()
+	if now.Sub(qt.windowStart) >= qt.windowDuration {
+		qt.resetWindow(now)
+	}
+
+	// Check all applicable quotas without deducting
+	allowed, remaining := qt.checkQuotas(route, costPerCall, token, user)
+	if !allowed {
+		log.Printf("[QuotaTracker] Quota check failed: remaining=$%.2f", remaining)
+		return false, remaining, nil
+	}
+
+	log.Printf("[QuotaTracker] Quota check passed: remaining=$%.2f", remaining)
+	return true, remaining, nil
+}
+
+// RecordQuotaCost records the cost after dispatch
+// Phase 13.2: Called by proxy after upstream request is sent
+func (qt *QuotaTracker) RecordQuotaCost(route string, cost float64, token, user string) error {
+	qt.mu.Lock()
+	defer qt.mu.Unlock()
+
+	log.Printf("[QuotaTracker] RecordQuotaCost: route=%s, cost=$%.2f, token_present=%t, user=%s", route, cost, token != "", user)
+
+	// Check if window has expired and reset if needed
+	now := time.Now()
+	if now.Sub(qt.windowStart) >= qt.windowDuration {
+		qt.resetWindow(now)
+	}
+
+	// Record the cost
+	qt.recordCost(route, cost, token, user)
+	log.Printf("[QuotaTracker] Cost recorded: globalAccum=$%.2f, routeAccum=$%.2f", qt.globalCostAccum, qt.requestCosts[route])
+
+	return nil
+}
+
+// GetWindowDuration returns the quota window duration
+// Phase 13.2: Used to calculate Retry-After and window reset times
+func (qt *QuotaTracker) GetWindowDuration() time.Duration {
+	qt.mu.RLock()
+	defer qt.mu.RUnlock()
+	return qt.windowDuration
+}
+
+// GetRemaining returns the remaining quota for a given route, token, and user
+// Phase 13.2: Used to populate X-SEAM-Budget-Remaining header
+func (qt *QuotaTracker) GetRemaining(route, token, user string) float64 {
+	qt.mu.RLock()
+	defer qt.mu.RUnlock()
+
+	minRemaining := float64(-1)
+
+	// Check global quota
+	if state, exists := qt.quotas["global"]; exists {
+		remaining := state.limit - qt.globalCostAccum
+		if minRemaining == -1 || remaining < minRemaining {
+			minRemaining = remaining
+		}
+	}
+
+	// Check per-route quota
+	if state, exists := qt.quotas["route:"+route]; exists {
+		accumulated := qt.requestCosts[route]
+		remaining := state.limit - accumulated
+		if minRemaining == -1 || remaining < minRemaining {
+			minRemaining = remaining
+		}
+	}
+
+	// Check per-token quota
+	if token != "" {
+		if state, exists := qt.quotas["per-token:"+token]; exists {
+			accumulated := qt.tokensCosts[token]
+			remaining := state.limit - accumulated
+			if minRemaining == -1 || remaining < minRemaining {
+				minRemaining = remaining
+			}
+		}
+	}
+
+	// Check per-user quota
+	if user != "" {
+		if state, exists := qt.quotas["per-user:"+user]; exists {
+			accumulated := qt.usersCosts[user]
+			remaining := state.limit - accumulated
+			if minRemaining == -1 || remaining < minRemaining {
+				minRemaining = remaining
+			}
+		}
+	}
+
+	if minRemaining < 0 {
+		return 0
+	}
+	return minRemaining
 }
 
 // checkQuotaOnly checks quota without deducting (for cache hits)

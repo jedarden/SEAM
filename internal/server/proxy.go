@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -42,6 +43,9 @@ type contextKey int
 
 const (
 	replayableBodyKey contextKey = iota
+	dispatchStateKey
+	quotaCostKey
+	dryRunKey
 )
 
 // contextWithReplayableBody stores a replayable body in the context
@@ -59,6 +63,54 @@ func replayableBodyFromContext(ctx context.Context) *replayableBody {
 		return rb
 	}
 	return nil
+}
+
+// DispatchState tracks whether a request was dispatched to upstream
+// Phase 13.2: Quota accounting happens at dispatch time, not before
+type DispatchState struct {
+	Dispatched bool      // True if request was sent to upstream
+	StatusCode int       // HTTP status code from upstream (0 if not dispatched)
+	Cost       float64   // Cost to deduct (per dispatch instance)
+	Timestamp  time.Time // When dispatch occurred
+}
+
+// contextWithDispatchState stores dispatch state in the context
+func contextWithDispatchState(ctx context.Context, state *DispatchState) context.Context {
+	return context.WithValue(ctx, dispatchStateKey, state)
+}
+
+// dispatchStateFromContext extracts the dispatch state from the context
+func dispatchStateFromContext(ctx context.Context) *DispatchState {
+	if state, ok := ctx.Value(dispatchStateKey).(*DispatchState); ok {
+		return state
+	}
+	return nil
+}
+
+// contextWithQuotaCost stores the quota cost in the context for later deduction
+func contextWithQuotaCost(ctx context.Context, cost float64) context.Context {
+	return context.WithValue(ctx, quotaCostKey, cost)
+}
+
+// quotaCostFromContext extracts the quota cost from the context
+func quotaCostFromContext(ctx context.Context) float64 {
+	if cost, ok := ctx.Value(quotaCostKey).(float64); ok {
+		return cost
+	}
+	return 0
+}
+
+// contextWithDryRun marks the request as a dry-run (validation only)
+func contextWithDryRun(ctx context.Context) context.Context {
+	return context.WithValue(ctx, dryRunKey, true)
+}
+
+// isDryRun checks if the request is a dry-run
+func isDryRun(ctx context.Context) bool {
+	if dryRun, ok := ctx.Value(dryRunKey).(bool); ok {
+		return dryRun
+	}
+	return false
 }
 
 // isProtocolUpgrade detects if the request is a protocol upgrade (WebSocket, HTTP/2, etc.)
@@ -219,6 +271,10 @@ type ReverseProxy struct {
 	// whole-body scrubbing. Larger and unknown-length bodies use incremental
 	// scrubbing instead. Default: 1 MiB.
 	MaxBufferedResponseBytes int64
+
+	// QuotaTracker is the quota tracker for dispatch-time cost deduction
+	// Phase 13.2: Quota is deducted at dispatch time, not before
+	QuotaTracker *QuotaTracker
 }
 
 // NewReverseProxy creates a reverse proxy for upstreamURL.
@@ -380,14 +436,19 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 }
 
 // dispatchAndServe sends the request to the upstream and streams its response
+// Phase 13.2: Quota is deducted AT DISPATCH time (after upstream request is sent)
 // without buffering the body in memory.
-func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWriter, _ *http.Request, upstreamReq *http.Request) error {
+func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWriter, r *http.Request, upstreamReq *http.Request) error {
 	if upstreamReq == nil {
 		return fmt.Errorf("upstream request is nil")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
+	// Phase 13.2: Extract quota cost from context for dispatch-time deduction
+	quotaCost := quotaCostFromContext(ctx)
+	route := r.URL.Path
 
 	timeout := p.RequestTimeout
 	if timeout <= 0 {
@@ -404,12 +465,43 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	upstreamResp, err := client.Do(upstreamReq)
 	if err != nil {
 		cancel()
+		// Phase 13.2: Transport errors (connection refused, timeout, etc.) do NOT charge quota
+		// The request was never successfully sent to the upstream
+		log.Printf("[proxy] Upstream request failed for %s - not charging quota (transport error): %v", route, err)
 		return fmt.Errorf("upstream request failed: %w", err)
 	}
 	upstreamResp.Body = &cancelOnClose{ReadCloser: upstreamResp.Body, cancel: cancel}
 	defer func() { _ = upstreamResp.Body.Close() }()
 
 	log.Printf("[proxy] Upstream %s %s -> %d (%v)", upstreamReq.Method, upstreamReq.URL.Path, upstreamResp.StatusCode, time.Since(startTime))
+
+	// Phase 13.2: Record quota cost AT DISPATCH time
+	// The request was successfully sent to upstream, so we charge quota
+	// Even 5xx responses charge quota (the upstream received and processed the request)
+	if quotaCost > 0 && p.QuotaTracker != nil {
+		// Extract token and user for quota tracking
+		token := r.Header.Get("X-Auth-Token")
+		user := r.Header.Get("X-User-ID")
+
+		// Record the quota cost
+		log.Printf("[proxy] Recording quota cost at dispatch: route=%s, cost=$%.2f, status=%d", route, quotaCost, upstreamResp.StatusCode)
+		if err := p.QuotaTracker.RecordQuotaCost(route, quotaCost, token, user); err != nil {
+			log.Printf("[proxy] ERROR recording quota cost: %v", err)
+		}
+	}
+
+	// Update X-SEAM-Budget-Remaining header with actual remaining after deduction
+	if quotaCost > 0 && p.QuotaTracker != nil {
+		token := r.Header.Get("X-Auth-Token")
+		user := r.Header.Get("X-User-ID")
+
+		// Get remaining quota after deduction
+		remaining := p.QuotaTracker.GetRemaining(route, token, user)
+		windowDuration := p.QuotaTracker.GetWindowDuration()
+
+		// Update the header with actual remaining
+		w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemaining(remaining, quotaCost, windowDuration))
+	}
 
 	if scrubConfig := responseScrubFromContext(upstreamReq.Context()); scrubConfig != nil && len(scrubConfig.secrets) > 0 {
 		scrubber := newSecretScrubber(scrubConfig.secrets)
@@ -862,4 +954,38 @@ func (p *ReverseProxy) GetUpstreamURL() string {
 		return p.UpstreamURL.String()
 	}
 	return ""
+}
+
+// formatBudgetRemaining formats the X-SEAM-Budget-Remaining header value
+// Phase 13.2: Format is "amount=X unit=Y window=Z resets=R"
+func formatBudgetRemaining(remaining, costPerCall float64, windowDuration time.Duration) string {
+	resetTime := time.Now().Add(windowDuration)
+	return fmt.Sprintf("amount=%s unit=call window=%s resets=%s",
+		formatCost(remaining),
+		formatDuration(windowDuration),
+		resetTime.Format(time.RFC3339))
+}
+
+// formatDuration formats a duration as a string
+func formatDuration(d time.Duration) string {
+	if d >= time.Hour*24 {
+		days := int(d.Hours() / 24)
+		return fmt.Sprintf("%dd", days)
+	}
+	if d >= time.Hour {
+		hours := int(d.Hours())
+		return fmt.Sprintf("%dh", hours)
+	}
+	if d >= time.Minute {
+		minutes := int(d.Minutes())
+		return fmt.Sprintf("%dm", minutes)
+	}
+	seconds := int(d.Seconds())
+	return fmt.Sprintf("%ds", seconds)
+}
+
+// formatCost formats a cost value as USD string
+func formatCost(cost float64) string {
+	return "$" + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", cost), "0"), ".")
+}
 }
