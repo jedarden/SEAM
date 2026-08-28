@@ -159,6 +159,7 @@ type Server struct {
 	openBaoMu         sync.RWMutex
 	openBaoReady      bool
 	hotReloadManager  *HotReloadManager // Hot reload manager for fragment changes
+	identityResolver  *IdentityResolver  // Phase 7: Identity resolver for Stage 3 (WhoIs)
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -268,6 +269,10 @@ func New(cfg *Config) *Server {
 	// Load cache TTL configuration from fragments
 	s.cacheTTLs = s.specLoader.GetCacheTTLs()
 	log.Printf("Loaded %d route cache TTL configurations", len(s.cacheTTLs))
+
+	// Initialize identity resolver for Stage 3 (Phase 7)
+	s.identityResolver = NewIdentityResolver()
+	log.Printf("Identity resolver initialized for Stage 3 (Phase 7)")
 
 	s.setupRoutes()
 
@@ -1065,6 +1070,14 @@ func (s *Server) Start(ctx context.Context) error {
 	// Wrap with header-stripping middleware (stage 2 - strips X-SEAM-* headers)
 	callerHandler = s.headerStrippingMiddleware(callerHandler)
 	log.Printf("Header-stripping middleware active on caller-facing port (stage 2)")
+
+	// Wrap with identity resolution middleware (stage 3 - WhoIs, Phase 7)
+	callerHandler = s.identityResolutionMiddleware(callerHandler)
+	log.Printf("Identity resolution middleware active on caller-facing port (stage 3, Phase 7 - INERT)")
+
+	// Wrap with authorization middleware (stage 5 - x-required-scope, Phase 7)
+	callerHandler = s.authorizationMiddleware(callerHandler)
+	log.Printf("Authorization middleware active on caller-facing port (stage 5, Phase 7 - INERT)")
 
 	// Wrap with validation middleware (stage 1 - control-plane detection)
 	callerHandler = s.validationMiddleware(callerHandler)
