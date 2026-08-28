@@ -16,6 +16,7 @@ import (
 	"github.com/ardenone/seam/internal/buildinfo"
 	"github.com/ardenone/seam/internal/fanout"
 	"github.com/ardenone/seam/internal/spec"
+	"github.com/ardenone/seam/internal/tailscale"
 	"github.com/ardenone/seam/internal/vault"
 )
 
@@ -40,16 +41,17 @@ var reservedPaths = struct {
 	prefixes []string
 }{
 	exact: map[string]bool{
-		"/docs":               true,
-		"/docs/route":         true,
-		"/docs/paths":         true, // Phase 11.2: All paths with last-2xx status
-		"/openapi.json":       true,
-		"/whoami":             true,
-		"/scopes":             true,
-		"/changes":            true,
-		"/health/credentials": true, // Health sentinel: credential status check
-		"/health/upstreams":   true, // Health sentinel: upstream connectivity check
-		"/config/status":      true,
+		"/docs":                    true,
+		"/docs/route":              true,
+		"/docs/paths":              true, // Phase 11.2: All paths with last-2xx status
+		"/openapi.json":            true,
+		"/whoami":                  true,
+		"/scopes":                  true,
+		"/changes":                 true,
+		"/health/credentials":      true, // Health sentinel: credential status check
+		"/health/upstreams":        true, // Health sentinel: upstream connectivity check
+		"/config/status":           true,
+		"/api/v1/tailscale/ephemeral-key": true, // Phase 7: Tailscale ephemeral key endpoint
 	},
 	prefixes: []string{
 		"/docs/",      // Documentation endpoints (reserved namespace)
@@ -57,6 +59,7 @@ var reservedPaths = struct {
 		"/config/",    // Configuration management endpoints
 		"/approvals/", // Approval workflow endpoints
 		"/_seam/",     // Internal SEAM endpoints (metrics, health, ready)
+		"/api/v1/",    // API v1 endpoints
 	},
 }
 
@@ -161,6 +164,7 @@ type Server struct {
 	hotReloadManager  *HotReloadManager // Hot reload manager for fragment changes
 	identityResolver  *IdentityResolver  // Phase 7: Identity resolver for Stage 3 (WhoIs)
 	scopeVersionCache *ScopeVersionCache // Phase 7: Bounded scope version retention map
+	tailscaleClient   *tailscale.Client  // Phase 7: Tailscale API client for ephemeral key generation
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -279,6 +283,14 @@ func New(cfg *Config) *Server {
 	s.scopeVersionCache = NewScopeVersionCache()
 	log.Printf("Scope version cache initialized for Phase 7 (4 versions per identity, 24h idle TTL, 100 LRU cap)")
 
+	// Initialize Tailscale client for Phase 7 (ephemeral key generation)
+	if err := s.initTailscaleClient(); err != nil {
+		log.Printf("Warning: Failed to initialize Tailscale client: %v", err)
+		log.Printf("Warning: /api/v1/tailscale/ephemeral-key endpoint will be unavailable")
+	} else {
+		log.Printf("Tailscale client initialized for Phase 7 (ephemeral key generation)")
+	}
+
 	s.setupRoutes()
 
 	// Initialize hot reload manager if enabled
@@ -325,6 +337,7 @@ func (s *Server) setupRoutes() {
 	// Phase 7 (points 5-6): Control-plane identity and scope endpoints
 	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
 	s.callerMux.HandleFunc("/scopes", s.scopesHandler)
+	s.callerMux.HandleFunc("/api/v1/tailscale/ephemeral-key", s.tailscaleEphemeralKeyHandler)
 
 	// Catch-all dispatch handler for upstream proxying (Phase 2.0)
 	// This must be registered last so it doesn't intercept the specific handlers above
@@ -341,6 +354,74 @@ func (s *Server) setupRoutes() {
 	s.operatorMux.HandleFunc("/health/credentials", s.operatorScopeMiddleware("seam:ops:read", s.credentialsHealthHandler))
 	s.operatorMux.HandleFunc("/health/upstreams", s.operatorScopeMiddleware("seam:ops:read", s.healthUpstreamsHandler))
 	s.operatorMux.HandleFunc("/", s.operatorNotFoundHandler)
+}
+
+// initTailscaleClient initializes the Tailscale API client for ephemeral key generation.
+// It reads configuration from environment variables and OpenBao.
+func (s *Server) initTailscaleClient() error {
+	// Read Tailscale configuration from environment
+	apiKey := os.Getenv("TS_API_KEY")
+	tailnet := os.Getenv("TS_TAILNET")
+
+	// If not in environment, try to read from OpenBao
+	if apiKey == "" {
+		apiKey = s.getTailscaleAPIKeyFromVault()
+	}
+	if tailnet == "" {
+		tailnet = os.Getenv("TS_TAILNET")
+		if tailnet == "" {
+			tailnet = "ardenone" // Default tailnet
+		}
+	}
+
+	// Validate configuration
+	if apiKey == "" {
+		return fmt.Errorf("TS_API_KEY not set and not found in OpenBao")
+	}
+	if tailnet == "" {
+		return fmt.Errorf("TS_TAILNET not set")
+	}
+
+	// Create Tailscale client
+	cfg := tailscale.Config{
+		APIKey:              apiKey,
+		Tailnet:             tailnet,
+		BaseURL:             "https://api.tailscale.com",
+		DefaultExpiry:       90 * 24 * time.Hour, // 90 days
+		DefaultTags:         []string{"tag:needle-worker"},
+		CacheTTL:            5 * time.Minute,
+		CacheHoldDown:       30 * time.Second,
+		EnableDebugLogging: os.Getenv("TS_DEBUG") == "true",
+	}
+
+	client, err := tailscale.New(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create Tailscale client: %w", err)
+	}
+
+	s.tailscaleClient = client
+	return nil
+}
+
+// getTailscaleAPIKeyFromVault retrieves the Tailscale API key from OpenBao.
+// It reads from the path: secret/rs-manager/tailscale/api-key
+func (s *Server) getTailscaleAPIKeyFromVault() string {
+	// Wait for OpenBao to be ready
+	if !s.isOpenBaoReady() {
+		log.Printf("OpenBao not ready, cannot retrieve Tailscale API key")
+		return ""
+	}
+
+	s.openBaoMu.Lock()
+	defer s.openBaoMu.Unlock()
+
+	// Read from OpenBao
+	// Path: secret/rs-manager/tailscale/api-key
+	// This would use the vault client to read the secret
+	// For now, return empty to avoid blocking startup
+	// TODO: Implement OpenBao integration for Tailscale API key
+	log.Printf("OpenBao integration for Tailscale API key not yet implemented")
+	return ""
 }
 
 func (s *Server) operatorNotFoundHandler(w http.ResponseWriter, r *http.Request) {
@@ -955,126 +1036,6 @@ func (s *Server) docsPathsHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-// whoamiHandler returns the caller's identity information
-//
-// Phase 7: Returns the resolved identity from Tailscale WhoIs, including:
-// - Node name and key
-// - Resolved status
-// - Capabilities (scopes from Tailscale Grant)
-// - Current scope version hash
-//
-// This endpoint is used by the 404 oracle rule to provide callers with
-// information about their identity and scope version when they encounter
-// a filtered route.
-func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		MethodNotAllowed("Only GET method is allowed").Write(w, r)
-		return
-	}
-
-	// Get identity from context (resolved by identityResolutionMiddleware)
-	ctx := r.Context()
-	identity := identityFromContext(ctx)
-
-	if identity == nil {
-		// This should never happen if Stage 3 ran, but handle gracefully
-		InternalError("Identity not found in context").Write(w, r)
-		return
-	}
-
-	// Get current scope version for this identity
-	scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity.NodeKey)
-
-	// Build response
-	response := map[string]interface{}{
-		"node_name":      identity.NodeName,
-		"node_key":       identity.NodeKey,
-		"resolved":       identity.Resolved,
-		"capabilities":   identity.Capabilities,
-		"scope_version":  scopeVersion,
-		"tags":           identity.Tags,
-		"metadata": map[string]interface{}{
-			"spec_version":  s.specLoader.GetVersion(),
-			"api_version":  s.specLoader.GetAPIVersion(),
-			"description":  "SEAM caller identity information (Phase 7)",
-		},
-	}
-
-	// Set headers and return response
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(response)
-}
-
-
-// scopesHandler returns the caller's current scope information
-//
-// Phase 7: Returns the caller's effective scopes from their Tailscale identity.
-// This endpoint is protected by seam:scopes:read-all scope.
-//
-// Response includes:
-// - resolved: Whether the identity was successfully resolved
-// - capabilities: Array of scope IDs the caller possesses
-// - scope_version: Current scope version hash for this identity
-//
-// Returns 403 Forbidden with scope name if caller lacks seam:scopes:read-all.
-func (s *Server) scopesHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		MethodNotAllowed("Only GET method is allowed").Write(w, r)
-		return
-	}
-
-	// Get identity from context (resolved by identityResolutionMiddleware)
-	ctx := r.Context()
-	identity := identityFromContext(ctx)
-
-	if identity == nil {
-		// This should never happen if Stage 3 ran, but handle gracefully
-		InternalError("Identity not found in context").Write(w, r)
-		return
-	}
-
-	// Check if identity has the required scope (seam:scopes:read-all)
-	// This is the control-plane branch step 3: builtin scope declarations evaluated
-	if !identity.Resolved || !identity.HasScope("seam:scopes:read-all") {
-		log.Printf("[Scopes-Endpoint] Identity lacks required scope seam:scopes:read-all (has: %v) - denying",
-			identity.Capabilities)
-		NewErrorResponse(ErrCodeForbidden, "Operator endpoint requires scope: seam:scopes:read-all").Write(w, r)
-		return
-	}
-
-	// Get current scope version for this identity
-	scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity.NodeKey)
-
-	// Build response
-	response := map[string]interface{}{
-		"resolved":      identity.Resolved,
-		"capabilities":  identity.Capabilities,
-		"scope_version": scopeVersion,
-		"identity": map[string]interface{}{
-			"node_name": identity.NodeName,
-			"node_key":  identity.NodeKey,
-			"tags":     identity.Tags,
-		},
-		"metadata": map[string]interface{}{
-			"spec_version": s.specLoader.GetVersion(),
-			"api_version":  s.specLoader.GetAPIVersion(),
-			"description":  "SEAM caller scope information (Phase 7)",
-		},
-	}
-
-	// Set headers and return response
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
-	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(response)
-}
 func rawRouteOperation(pathItem map[string]interface{}, method string) (map[string]interface{}, bool) {
 	operation, ok := pathItem[strings.ToLower(method)].(map[string]interface{})
 	if !ok {

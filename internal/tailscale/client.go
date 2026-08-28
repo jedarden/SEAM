@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"strings"
 	"time"
 )
 
@@ -264,7 +263,8 @@ func (c *Client) ListKeys(ctx context.Context) ([]Key, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp.StatusCode, body)
+		_, err := c.handleErrorResponse(resp.StatusCode, body)
+		return nil, err
 	}
 
 	var listResp ListKeysResponse
@@ -299,7 +299,9 @@ func (c *Client) DeleteKey(ctx context.Context, keyID string) error {
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		_, err := c.handleErrorResponse(resp.StatusCode, body)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

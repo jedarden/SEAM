@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/ardenone/seam/internal/tailscale"
 )
 
 // BuiltinControlPlaneScopes is the compiled-in set of control-plane scopes.
@@ -24,6 +27,7 @@ var BuiltinControlPlaneScopes = []string{
 	"seam:cache:write",
 	"seam:openapi:read",
 	"seam:docs:read",
+	"seam:tailscale:key-create", // Phase 7: Tailscale ephemeral key creation
 }
 
 // whoamiHandler returns the resolved caller identity, tags, effective scopes,
@@ -294,4 +298,112 @@ func effectiveScopesFromIdentity(identity *Identity) []string {
 	// Sort for canonical representation
 	sort.Strings(scopes)
 	return scopes
+}
+
+// tailscaleEphemeralKeyHandler creates a Tailscale ephemeral key for a NEEDLE worker.
+//
+// POST /api/v1/tailscale/ephemeral-key
+//
+// This endpoint allows NEEDLE workers to obtain ephemeral Tailscale auth keys.
+// The request must include a worker_id in the JSON body.
+//
+// Phase 7 Integration:
+// - This endpoint is a reserved path (bypasses route-table lookup)
+// - Requires seam:tailscale:key-create scope
+// - Uses the Tailscale API client to create keys with caching
+//
+// Request JSON:
+//   {
+//     "worker_id": "needle-worker-name"
+//   }
+//
+// Response JSON:
+//   {
+//     "key": "tskey-...",
+//     "id": "key-id",
+//     "expires": "2026-11-26T12:34:56Z",
+//     "description": "NEEDLE worker: needle-worker-name"
+//   }
+func (s *Server) tailscaleEphemeralKeyHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		MethodNotAllowed("Only POST method is allowed").Write(w, r)
+		return
+	}
+
+	// Get caller's identity and effective scopes
+	identity := identityFromContext(r.Context())
+	effectiveScopes := []string{}
+	if identity != nil {
+		effectiveScopes = identity.Capabilities
+	}
+
+	// Check seam:tailscale:key-create scope
+	if !hasScope(effectiveScopes, "seam:tailscale:key-create") {
+		NewErrorResponse(ErrCodeForbidden, "The seam:tailscale:key-create scope is required to create ephemeral keys").
+			WithDetail("required_scope", "seam:tailscale:key-create").
+			Write(w, r)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		WorkerID string `json:"worker_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		NewErrorResponse(ErrCodeBadRequest, "Invalid request body").
+			WithDetail("error", err.Error()).
+			Write(w, r)
+		return
+	}
+
+	// Validate worker_id
+	if req.WorkerID == "" {
+		NewErrorResponse(ErrCodeBadRequest, "worker_id is required").
+			WithDetail("field", "worker_id").
+			Write(w, r)
+		return
+	}
+
+	// Check if Tailscale client is initialized
+	if s.tailscaleClient == nil {
+		NewErrorResponse(ErrCodeServiceUnavailable, "Tailscale client not initialized").
+			WithDetail("reason", "Tailscale API client is not configured").
+			Write(w, r)
+		return
+	}
+
+	// Create ephemeral key
+	key, err := s.tailscaleClient.CreateEphemeralKey(r.Context(), req.WorkerID)
+	if err != nil {
+		// Handle specific error types
+		if err == tailscale.ErrCacheHoldDown {
+			NewErrorResponse(ErrCodeServiceUnavailable, "Tailscale API is in hold-down period after previous failure").
+				WithDetail("retry_after", "30s").
+				Write(w, r)
+			return
+		}
+		if err == tailscale.ErrNoAPIKey || err == tailscale.ErrNoTailnet {
+			NewErrorResponse(ErrCodeInternalServer, "Tailscale client misconfigured").
+				WithDetail("error", err.Error()).
+				Write(w, r)
+			return
+		}
+		NewErrorResponse(ErrCodeInternalServer, "Failed to create ephemeral key").
+			WithDetail("error", err.Error()).
+			Write(w, r)
+		return
+	}
+
+	// Build response
+	response := map[string]interface{}{
+		"key":         key.Key,
+		"id":          key.ID,
+		"expires":     key.Expires.Format(time.RFC3339),
+		"description": key.Description,
+	}
+
+	// Set headers and return response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
 }

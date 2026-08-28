@@ -988,4 +988,3 @@ func formatDuration(d time.Duration) string {
 func formatCost(cost float64) string {
 	return "$" + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", cost), "0"), ".")
 }
-}
