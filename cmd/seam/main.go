@@ -264,16 +264,6 @@ func serveCommand(args []string) {
 	log.Println("Server stopped")
 }
 
-func diffCommand(args []string) {
-	fmt.Println("diff command: not yet implemented")
-	os.Exit(1)
-}
-
-func importCommand(args []string) {
-	fmt.Println("import command: not yet implemented")
-	os.Exit(1)
-}
-
 // detectInClusterEnvironment checks if SEAM is running in a Kubernetes cluster.
 // It uses the standard Kubernetes Downward API environment variables.
 func detectInClusterEnvironment() bool {
