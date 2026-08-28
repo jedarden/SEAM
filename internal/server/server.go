@@ -130,6 +130,11 @@ type Config struct {
 	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
 	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
 	HotReloadEnabled          bool   // Phase 3.1: Enable file-watch hot reload of route fragments
+
+	// Phase 14: Cloudflare Access JWT validation configuration
+	CloudflareAccessEnabled  bool   // Enable Cloudflare Access JWT validation (default: false)
+	CloudflareTeamDomain     string // Cloudflare team domain (e.g., "ardenone")
+	CloudflareAudience       string // Expected JWT audience (Access Application ID)
 }
 
 // Server represents the SEAM gateway server with two listeners
@@ -167,6 +172,7 @@ type Server struct {
 	scopeVersionCache *ScopeVersionCache // Phase 7: Bounded scope version retention map
 	tailscaleClient   *tailscale.Client  // Phase 7: Tailscale API client for ephemeral key generation
 	specRingBuffer    *SpecRingBuffer    // Phase 8.4: Ring buffer for spec version history
+	cloudflareJWTValidator *CloudflareJWTValidator // Phase 14: Cloudflare Access JWT validator
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -313,6 +319,22 @@ func New(cfg *Config) *Server {
 			// Add to ring buffer
 			addedVersion := s.specRingBuffer.Add(specHash, specVersion, specJSON, routes)
 			log.Printf("Initial spec version %s added to ring buffer (hash: %s)", addedVersion, specHash)
+		}
+	}
+
+	// Initialize Cloudflare JWT validator for Phase 14
+	if cfg.CloudflareAccessEnabled {
+		if cfg.CloudflareTeamDomain == "" {
+			log.Printf("Warning: Cloudflare Access enabled but CloudflareTeamDomain not set - JWT validation disabled")
+		} else if cfg.CloudflareAudience == "" {
+			log.Printf("Warning: Cloudflare Access enabled but CloudflareAudience not set - JWT validation disabled")
+		} else {
+			s.cloudflareJWTValidator = NewCloudflareJWTValidator(
+				cfg.CloudflareTeamDomain,
+				cfg.CloudflareAudience,
+				true, // enabled
+			)
+			log.Printf("Cloudflare JWT validator initialized for Phase 14 (team domain: %s)", cfg.CloudflareTeamDomain)
 		}
 	}
 
@@ -1466,6 +1488,12 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.captureMiddleware != nil {
 		callerHandler = s.captureMiddleware.Wrap(callerHandler)
 		log.Printf("Capture middleware active on caller-facing port")
+	}
+
+	// Wrap with Cloudflare JWT middleware (OUTERMOST - Phase 14: JWT validation before all other processing)
+	if s.cloudflareJWTValidator != nil {
+		callerHandler = s.cloudflareJWTMiddleware(callerHandler)
+		log.Printf("Cloudflare JWT validation middleware active on caller-facing port (Phase 14 - OUTERMOST)")
 	}
 
 	// Wrap with version injection middleware (outermost - adds version headers to all responses)

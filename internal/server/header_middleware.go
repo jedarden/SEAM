@@ -10,11 +10,21 @@ import (
 // All other X-SEAM-* headers are stripped in stage 2 to prevent clients
 // from injecting fake control-plane headers.
 //
+// Phase 14 Rule 3: X-SEAM-Scopes and equivalents are DELETED at stage 2, not ignored.
+// This includes: X-SEAM-Scopes, X-Seam-Scopes, X-SEAM-Scope, X-Seam-Scope, etc.
+//
 // NOTE: Go's http package canonicalizes header names (e.g., "X-SEAM-*" -> "X-Seam-*"),
 // so these keys use the canonical form.
 var allowedSEAMHeaders = map[string]bool{
 	"X-Seam-Spec-Version": true,
 	"X-Seam-Api-Version":  true,
+}
+
+// Phase 14 Rule 3: Headers that MUST be deleted (scope assertion headers)
+// These headers are explicitly deleted to prevent clients from asserting their own scopes.
+var deletedScopeHeaders = map[string]bool{
+	"X-Seam-Scopes": true,
+	"X-Seam-Scope":  true,
 }
 
 // versionInjectionMiddleware adds version headers to all HTTP responses.
@@ -122,6 +132,9 @@ func (vw *versionWriter) injectHeaders() {
 // This middleware strips all X-SEAM-* headers from incoming requests EXCEPT
 // the allowed exceptions (X-SEAM-Spec-Version and X-SEAM-API-Version).
 //
+// Phase 14 Rule 3: X-SEAM-Scopes and equivalents are DELETED at stage 2.
+// These headers are explicitly removed to prevent clients from asserting their own scopes.
+//
 // Purpose: Prevent clients from injecting fake X-SEAM-* headers that could
 // interfere with control-plane operation or impersonate internal responses.
 //
@@ -135,9 +148,20 @@ func (vw *versionWriter) injectHeaders() {
 //   - Stage 4: Route table lookup / proxy (not yet implemented)
 func (s *Server) headerStrippingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Strip all X-SEAM-* headers except the two allowed exceptions
-		// NOTE: Header names are canonicalized by Go (e.g., "X-SEAM-*" -> "X-Seam-*")
 		stripped := false
+		scopeHeadersStripped := false
+
+		// Phase 14 Rule 3: Explicitly delete scope assertion headers
+		for headerName := range deletedScopeHeaders {
+			if r.Header.Get(headerName) != "" {
+				r.Header.Del(headerName)
+				stripped = true
+				scopeHeadersStripped = true
+			}
+		}
+
+		// Strip all other X-SEAM-* headers except the allowed exceptions
+		// NOTE: Header names are canonicalized by Go (e.g., "X-SEAM-*" -> "X-Seam-*")
 		for headerName := range r.Header {
 			if strings.HasPrefix(strings.ToLower(headerName), "x-seam-") &&
 				!allowedSEAMHeaders[headerName] && !strings.EqualFold(headerName, "X-SEAM-Dry-Run") {
@@ -149,7 +173,12 @@ func (s *Server) headerStrippingMiddleware(next http.Handler) http.Handler {
 		if stripped {
 			// Log that we stripped headers (for debugging/security monitoring)
 			// In production, this might go to a security event log
-			log.Printf("[Header-Strip] Stripped forbidden X-SEAM-* headers from request to %s", r.URL.Path)
+			if scopeHeadersStripped {
+				// Special log for scope header deletion (Phase 14 rule 3)
+				log.Printf("[Header-Strip-Phase14] Deleted X-SEAM-Scopes headers from request to %s (Rule 3: DELETE, not ignore)", r.URL.Path)
+			} else {
+				log.Printf("[Header-Strip] Stripped forbidden X-SEAM-* headers from request to %s", r.URL.Path)
+			}
 		}
 
 		// Proceed to next handler
