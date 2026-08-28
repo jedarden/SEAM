@@ -17,6 +17,7 @@ import (
 	"github.com/ardenone/seam/internal/fanout"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/tailscale"
+	"github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/vault"
 )
 
@@ -808,6 +809,17 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	method := strings.ToUpper(strings.TrimSpace(query.Get("method")))
 	version := query.Get("version")
 
+	// Validate version parameter (400 for wrong-alphabet values)
+	// Phase 8: /docs/route accepts x-api-version values (v[1-9][0-9]* or _unversioned)
+	if err := validateVersionParameter(version); err != nil {
+		InvalidParameterValue("version", version).
+			WithDetail("expected_format", "API version matching grammar ^v[1-9][0-9]*$ or _unversioned").
+			WithDetail("provided_value", version).
+			WithDocsURL("/docs").
+			Write(w, r)
+		return
+	}
+
 	// Set default version
 	if version == "" {
 		version = unversionedAPIVersion
@@ -936,10 +948,43 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Phase 8: Gather version information for this route
+	allVersions := []string{}
+	if s.routeTableHolder != nil {
+		allVersions = s.routeTableHolder.Get().GetVersionsForPath(path, method)
+	}
+	if len(allVersions) == 0 {
+		// Fallback to just the requested version if route table query fails
+		allVersions = []string{version}
+	}
+
+	// Build versions array with per-entry docsUrl
+	versionsArray := []map[string]interface{}{}
+	for _, ver := range allVersions {
+		docsURL := fmt.Sprintf("/docs/route?path=%s&version=%s", url.QueryEscape(path), ver)
+		if method != "" {
+			docsURL += "&method=" + method
+		}
+		versionsArray = append(versionsArray, map[string]interface{}{
+			"version":                        ver,
+			"docsUrl":                        docsURL,
+			"isDefaultForUnversionedCallers": version.IsDefaultForUnversionedCallers(ver, allVersions),
+		})
+	}
+
+	// canonicalVersion is the newest still-served version (highest rank)
+	canonicalVersion := version.Default
+	if len(allVersions) > 0 {
+		canonicalVersion = allVersions[len(allVersions)-1]
+	}
+
 	response := map[string]interface{}{
 		"path":                           routeInfo.Path,
 		"version":                        routeInfo.Version,
-		"isDefaultForUnversionedCallers": true,
+		"isDefaultForUnversionedCallers": version.IsDefaultForUnversionedCallers(routeInfo.Version, allVersions),
+		"canonicalVersion":               canonicalVersion,
+		"deprecated":                     false, // Phase 8: x-seam-deprecated handling
+		"versions":                       versionsArray,
 		"metadata": map[string]interface{}{
 			"description":  "Route documentation for SEAM API",
 			"spec_version": s.specLoader.GetVersion(),
