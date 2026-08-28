@@ -762,6 +762,7 @@ func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err e
 type responseWriterTracker struct {
 	http.ResponseWriter
 	wroteHeader bool
+	statusCode   int // Tracks the HTTP status code written
 }
 
 func (w *responseWriterTracker) WriteHeader(statusCode int) {
@@ -769,6 +770,7 @@ func (w *responseWriterTracker) WriteHeader(statusCode int) {
 		return
 	}
 	w.wroteHeader = true
+	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
@@ -777,6 +779,11 @@ func (w *responseWriterTracker) Write(body []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 	return w.ResponseWriter.Write(body)
+}
+
+// StatusCode returns the status code that was written, or 0 if no header has been written.
+func (w *responseWriterTracker) StatusCode() int {
+	return w.statusCode
 }
 
 func (w *responseWriterTracker) ResponseStarted() bool {

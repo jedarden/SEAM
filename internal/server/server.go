@@ -42,6 +42,7 @@ var reservedPaths = struct {
 	exact: map[string]bool{
 		"/docs":               true,
 		"/docs/route":         true,
+		"/docs/paths":         true, // Phase 11.2: All paths with last-2xx status
 		"/openapi.json":       true,
 		"/whoami":             true,
 		"/scopes":             true,
@@ -148,6 +149,7 @@ type Server struct {
 	cacheTTLs         map[string]int // route path -> cache TTL in seconds
 	circuitBreakers   *CircuitBreakerStateRegistry
 	breakerRegistry   *BreakerRegistry // Per-origin circuit breaker manager (Phase 11.1)
+	last2xxTracker    *Last2xxTracker  // Per-path and per-upstream last-2xx tracking (Phase 11.2)
 	quotaTracker      *QuotaTracker
 	costPerCalls      map[string]float64 // route -> cost per call
 	metrics           *Metrics
@@ -236,6 +238,8 @@ func New(cfg *Config) *Server {
 		singleFlight:      NewSingleFlight(),
 		cacheTTLs:         make(map[string]int),
 		circuitBreakers:   NewCircuitBreakerStateRegistry(),
+		breakerRegistry:   NewBreakerRegistry(NewCircuitBreakerStateRegistry()),
+		last2xxTracker:    NewLast2xxTracker(),
 		quotaTracker:      NewQuotaTracker(),
 		costPerCalls:      make(map[string]float64),
 		allowlistEnforcer: allowlistEnforcer,
@@ -303,6 +307,7 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
 
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
+	s.callerMux.HandleFunc("/docs/paths", s.docsPathsHandler)
 
 	// Catch-all dispatch handler for upstream proxying (Phase 2.0)
 	// This must be registered last so it doesn't intercept the specific handlers above
@@ -316,6 +321,7 @@ func (s *Server) setupRoutes() {
 	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
 	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
 	s.operatorMux.HandleFunc("/health/credentials", s.credentialsHealthHandler)
+	s.operatorMux.HandleFunc("/health/upstreams", s.healthUpstreamsHandler)
 	s.operatorMux.HandleFunc("/", s.operatorNotFoundHandler)
 }
 
@@ -758,11 +764,51 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	response["annotations"] = routeAnnotations(pathItem, exampleOperation)
 	response["example"] = buildWorkedExample(path, exampleMethod, pathItem, exampleOperation, document)
 
+	// Phase 11.2: Add last-2xx status for the path
+	// This tracking is in-memory and restart-scoped (lost on process restart)
+	last2xxStatus := s.last2xxTracker.GetPathStatus(path)
+	response["last_2xx"] = last2xxStatus
+
 	// Set headers and return response
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// docsPathsHandler returns all paths with their last-2xx status.
+// Query parameters: none
+//
+// Phase 11.2: Returns a list of all tracked paths with their three-state last-2xx tracking.
+// This tracking is in-memory and restart-scoped (lost on process restart).
+func (s *Server) docsPathsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		MethodNotAllowed("Only GET method is allowed").Write(w, r)
+		return
+	}
+
+	// Get all path-level statuses
+	pathStatuses := s.last2xxTracker.GetAllPathStatuses()
+
+	// Build response
+	response := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"description":  "All paths with last-2xx status (Phase 11.2)",
+			"spec_version": s.specLoader.GetVersion(),
+			"api_version":  s.specLoader.GetAPIVersion(),
+			"total_paths":  len(pathStatuses),
+		},
+		"paths": pathStatuses,
+	}
+
+	// Set headers and return response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-SEAM-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-Spec-Version", s.specLoader.GetHash())
+	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
 }
@@ -1343,9 +1389,45 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Phase 11.2: Record attempt before dispatch (per-path and per-upstream)
+	// This tracking is in-memory and restart-scoped (lost on process restart)
+	pathTemplate := route.PathTemplate
+	origin := upstreamURL // Full upstream URL as origin identifier
+	s.last2xxTracker.RecordAttempt(pathTemplate, origin)
+
+	// Wrap response writer to track status for last-2xx recording
+	trackedWriter := &responseWriterTracker{ResponseWriter: w}
+
 	// Stages 6-11: Dispatch to upstream and stream response back
 	// The ReverseProxy handles all stages: building request, dispatching, streaming response
-	proxy.ServeHTTP(w, r)
+	proxy.ServeHTTP(trackedWriter, r)
+
+	// Phase 11.2: Record success or error based on response status
+	// This tracking is in-memory and restart-scoped (lost on process restart)
+	statusCode := trackedWriter.StatusCode()
+	if statusCode >= 200 && statusCode < 300 {
+		// Success: record with source (empty for passive requests, populated by probes in Phase 12)
+		s.last2xxTracker.RecordSuccess(pathTemplate, origin, "")
+	} else {
+		// Error: record the error message
+		// Get last error from circuit breaker if available
+		var errMsg string
+		if ctxVal := r.Context().Value(circuitBreakerContextKey); ctxVal != nil {
+			if bc, ok := ctxVal.(breakerContext); ok {
+				breakerSnapshot := bc.breaker.Snapshot()
+				errMsg = breakerSnapshot.LastError
+			}
+		}
+		// Fallback error message if no breaker error available
+		if errMsg == "" {
+			if statusCode > 0 {
+				errMsg = fmt.Sprintf("HTTP %d", statusCode)
+			} else {
+				errMsg = "request failed"
+			}
+		}
+		s.last2xxTracker.RecordError(pathTemplate, origin, errMsg)
+	}
 }
 
 // handleFanOutRequest handles a _all fan-out request by dispatching to all instances
