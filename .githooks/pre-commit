@@ -1,18 +1,31 @@
-#!/bin/sh
-# Blocks commits that introduce gofmt-unclean Go files.
-# Checks only staged files, so pre-existing unrelated issues elsewhere
-# in the tree never block an unrelated commit.
+#!/usr/bin/env bash
+# Pre-commit hook: Definition of Done (fast lane)
+#
+# This hook runs the fast lane definition-of-done checks before allowing a commit.
+# It counts bypasses so we know when quality gates are being skipped.
+#
+# To bypass this hook (NOT RECOMMENDED), use:
+#   git commit --no-verify -m "..."
+# This will be recorded in .beads/bypasses.jsonl
 
-files=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
-[ -z "$files" ] && exit 0
+set -euo pipefail
 
-bad=$(printf '%s\n' "$files" | xargs -r gofmt -l 2>/dev/null || true)
-if [ -n "$bad" ]; then
-    echo "pre-commit: gofmt found formatting issues in staged file(s):" >&2
-    echo "$bad" | sed 's/^/  /' >&2
-    echo "" >&2
-    echo "Fix with: gofmt -w $bad" >&2
-    exit 1
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "=== Running Definition of Done (fast lane) ==="
+
+# Run the fast lane checks with bypass counting
+if ! scripts/definition-of-done.sh --fast --count-bypass; then
+  echo ""
+  echo "❌ Pre-commit check failed"
+  echo ""
+  echo "Your changes do not meet the Definition of Done."
+  echo "Please fix the issues above before committing."
+  echo ""
+  echo "To bypass (not recommended), use: git commit --no-verify"
+  echo "This will be recorded in .beads/bypasses.jsonl"
+  exit 1
 fi
 
-exit 0
+echo "✓ Pre-commit checks passed"

@@ -1,0 +1,188 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: seam-ci
+  namespace: argo-workflows
+  labels:
+    app: seam
+    component: ci
+spec:
+  activeDeadlineSeconds: 7200
+  entrypoint: pipeline
+  serviceAccountName: argo-workflow
+  synchronization:
+    mutexes:
+    - name: seam-ci-mutex
+  templates:
+  - name: pipeline
+    steps:
+    - - name: verify
+        template: ci
+    - - name: resolve-release
+        template: resolve-release
+    - - arguments:
+        parameters:
+        - name: version
+          value: '{{steps.resolve-release.outputs.parameters.version}}'
+        name: image-build
+        template: image-build
+        when: '{{steps.resolve-release.outputs.parameters.should-release}} == true'
+    - - arguments:
+        parameters:
+        - name: version
+          value: '{{steps.resolve-release.outputs.parameters.version}}'
+        - name: commit
+          value: '{{steps.resolve-release.outputs.parameters.commit}}'
+        - name: digest
+          value: '{{steps.image-build.outputs.parameters.digest}}'
+        name: github-release
+        template: github-release
+        when: '{{steps.resolve-release.outputs.parameters.should-release}} == true'
+
+  - name: ci
+    activeDeadlineSeconds: 1800
+    container:
+      image: golang:1.26
+      command: [bash, -c]
+      args:
+        - |
+          set -exo pipefail
+          apt-get update -qq && apt-get install -y --no-install-recommends git ca-certificates python3
+          rm -rf /var/lib/apt/lists/*
+
+          # Clone from trusted hardcoded source (ignore webhook payload),
+          # matching the other CI templates' security posture.
+          git clone --branch main "https://github.com/jedarden/SEAM.git" /workspace
+          cd /workspace
+          echo "Commit: $(git rev-parse HEAD)"
+          go version
+
+          echo "=== Running Definition of Done (all lanes) ==="
+          ./scripts/definition-of-done.sh --all
+
+          echo "✅ Verify passed"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+  - name: resolve-release
+    activeDeadlineSeconds: 60
+    script:
+      image: alpine/git:v2.49.1
+      command: [sh]
+      source: |
+        #!/bin/sh
+        set -e
+        cd /tmp
+        git clone --depth 1 --branch main "https://github.com/jedarden/SEAM.git" repo
+        cd repo
+        VERSION=$(cat cmd/seam/VERSION)
+        COMMIT=$(git rev-parse HEAD)
+        echo "Version: $VERSION"
+        echo "Commit: $COMMIT"
+
+        # Check if this is a new version (not already released)
+        if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q "v$VERSION"; then
+          echo "Version $VERSION already tagged"
+          echo "should-release=false" >> $EO_OUTPUTS
+        else
+          echo "Version $VERSION is new - will release"
+          echo "should-release=true" >> $EO_OUTPUTS
+        fi
+
+        echo "version=$VERSION" >> $EO_OUTPUTS
+        echo "commit=$COMMIT" >> $EO_OUTPUTS
+    env:
+      - name: GIT_CONFIG_COUNT
+        value: "1"
+      - name: GIT_CONFIG_KEY_0
+        value: credential.helper
+      - name: GIT_CONFIG_VALUE_0
+        value: '!f() { test "$1" = get && echo "username=x-token" && echo "password=$GH_TOKEN"; }; f'
+      - name: GH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-webhook-secret
+            key: token
+
+  - name: image-build
+    activeDeadlineSeconds: 1800
+    inputs:
+      parameters:
+      - name: version
+    container:
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args:
+      - --dockerfile=Dockerfile
+      - --context=dir:///workspace
+      - --destination=ronaldraygun/seam:{{inputs.parameters.version}}
+      - --cache-repo=ronaldraygun/cache
+      - --cache=true
+      - --use-new-run
+      volumeMounts:
+      - name: docker-config
+        mountPath: /kaniko/.docker
+      - name: workspace
+        mountPath: /workspace
+    volumes:
+      - name: docker-config
+        secret:
+          secretName: docker-hub-registry
+          items:
+          - key: .dockerconfigjson
+            path: config.json
+      - name: workspace
+        emptyDir: {}
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+  - name: github-release
+    activeDeadlineSeconds: 300
+    inputs:
+      parameters:
+      - name: version
+      - name: commit
+      - name: digest
+    script:
+      image: alpine/git:v2.49.1
+      command: [sh]
+      source: |
+        #!/bin/sh
+        set -e
+        echo "Creating GitHub release for v{{inputs.parameters.version}}"
+        echo "Commit: {{inputs.parameters.commit}}"
+        echo "Digest: {{inputs.parameters.digest}}"
+
+        # Tag the commit
+        git clone --depth 1 --branch main "https://github.com/jedarden/SEAM.git" /tmp/repo
+        cd /tmp/repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Create and push tag
+        git tag -a "v{{inputs.parameters.version}}" -m "Release v{{inputs.parameters.version}}"
+        git push origin "v{{inputs.parameters.version}}"
+
+        echo "✅ Release v{{inputs.parameters.version}} created"
+    env:
+      - name: GIT_CONFIG_COUNT
+        value: "1"
+      - name: GIT_CONFIG_KEY_0
+        value: credential.helper
+      - name: GIT_CONFIG_VALUE_0
+        value: '!f() { test "$1" = get && echo "username=x-token" && echo "password=$GH_TOKEN"; }; f'
+      - name: GH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-webhook-secret
+            key: token
