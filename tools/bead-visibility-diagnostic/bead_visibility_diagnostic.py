@@ -246,7 +246,7 @@ If this issue persists, manual intervention may be required.
         try:
             self.logger.info(f"Creating diagnostic bead: {title}")
             result = subprocess.run(
-                ["/home/coding/.local/bin/bead", "create", "--title", title, "--priority", "3", "--issue-type", "task"],
+                ["/home/coding/.local/bin/bead", "create", "--title", title, "--priority", "3", "--issue-type", "task", "--label", "starvation-alert", "--label", "visibility-bug"],
                 cwd=self.workspace,
                 capture_output=True,
                 text=True,
