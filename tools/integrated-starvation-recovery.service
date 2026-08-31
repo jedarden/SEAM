@@ -1,0 +1,27 @@
+[Unit]
+Description=Integrated Starvation Recovery and Auto-Closure Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=coding
+Group=users
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/home/coding/.local/bin/integrated-starvation-recovery --interval 5m --verbose
+Restart=always
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/coding /tmp
+
+# Environment
+Environment=WORKSPACE=/home/coding/SEAM
+
+[Install]
+WantedBy=default.target
