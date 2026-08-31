@@ -1,0 +1,17 @@
+[Unit]
+Description=SEAM Starvation Alert Re-evaluator
+After=network.target
+
+[Service]
+Type=simple
+User=coding
+Group=users
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/usr/local/bin/starvation-alert-revaluator --interval 7m --log-file /var/log/seam/alert-resolutions.jsonl
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
