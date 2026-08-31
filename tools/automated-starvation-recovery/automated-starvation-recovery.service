@@ -1,0 +1,28 @@
+[Unit]
+Description=Automated Starvation Recovery and Monitoring Service
+Documentation=file:///home/coding/SEAM/tools/automated-starvation-recovery/README.md
+After=network.target
+ConditionPathExists=/home/coding/SEAM/.beads/beads.db
+
+[Service]
+Type=exec
+User=coding
+Group=users
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/home/coding/SEAM/tools/automated-starvation-recovery/automated_recovery.py --interval 5
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
