@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/ardenone/seam/internal/buildinfo"
 	"github.com/ardenone/seam/internal/fanout"
+	"github.com/ardenone/seam/internal/pluckfallback"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/tailscale"
 	"github.com/ardenone/seam/internal/version"
@@ -57,6 +59,9 @@ var reservedPaths = struct {
 		"/api/v1/exclusions/reports": true, // Phase 13: All exclusion reports endpoint
 		"/api/v1/exclusions/analyze": true, // Phase 13: On-demand exclusion analysis endpoint
 		"/api/v1/exclusions/summary": true, // Phase 13: Exclusion activity summary endpoint
+		"/api/v1/exclusions/alerts": true, // Phase 13: All alerts endpoint
+		"/api/v1/exclusions/alerts/active": true, // Phase 13: Active alerts endpoint
+		"/api/v1/exclusions/alerts/resolve": true, // Phase 13: Resolve alert endpoint
 	},
 	prefixes: []string{
 		"/docs/",      // Documentation endpoints (reserved namespace)
@@ -177,6 +182,7 @@ type Server struct {
 	tailscaleClient   *tailscale.Client  // Phase 7: Tailscale API client for ephemeral key generation
 	specRingBuffer    *SpecRingBuffer    // Phase 8.4: Ring buffer for spec version history
 	cloudflareJWTValidator *CloudflareJWTValidator // Phase 14: Cloudflare Access JWT validator
+	exclusionTracker  *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -342,6 +348,17 @@ func New(cfg *Config) *Server {
 		}
 	}
 
+	// Initialize exclusion tracker for Phase 13
+	exclusionLogPath := filepath.Join(cfg.SpecDir, ".beads", "diagnostics", "exclusions.jsonl")
+	tracker, err := pluckfallback.NewExclusionTracker(exclusionLogPath, true, cfg.SpecDir, 30*time.Minute)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize exclusion tracker: %v (exclusion endpoints will be limited)", err)
+		s.exclusionTracker = nil
+	} else {
+		s.exclusionTracker = tracker
+		log.Printf("Exclusion tracker initialized for Phase 13 (bead visibility analysis)")
+	}
+
 	s.setupRoutes()
 
 	// Initialize hot reload manager if enabled
@@ -395,6 +412,9 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/api/v1/exclusions/reports", s.exclusionAllReportsHandler)
 	s.callerMux.HandleFunc("/api/v1/exclusions/analyze", s.exclusionAnalyzeHandler)
 	s.callerMux.HandleFunc("/api/v1/exclusions/summary", s.exclusionSummaryHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/alerts", s.exclusionAlertsHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/alerts/active", s.exclusionActiveAlertsHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/alerts/resolve", s.exclusionResolveAlertHandler)
 	log.Printf("Registered bead exclusion tracking endpoints")
 
 	// Phase 8.4: Version migration endpoints

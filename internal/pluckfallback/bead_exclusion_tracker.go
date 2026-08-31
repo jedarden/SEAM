@@ -64,6 +64,47 @@ type ExclusionSummary struct {
 	MostCommonCount     int                       `json:"most_common_count"`
 }
 
+// RollingWindow maintains a time-bounded window of exclusion statistics.
+type RollingWindow struct {
+	mu               sync.RWMutex
+	window           time.Duration // How far back to keep data
+	dataPoints       []WindowDataPoint
+	maxDataPoints    int // Maximum data points to keep (prevents unbounded growth)
+}
+
+// WindowDataPoint represents a single exclusion observation in the rolling window.
+type WindowDataPoint struct {
+	Timestamp     time.Time       `json:"timestamp"`
+	Workspace     string          `json:"workspace"`
+	Reason        ExclusionReason `json:"reason"`
+	BeadID        string          `json:"bead_id"`
+	Count         int             `json:"count"` // Number of beads with this reason
+}
+
+// SystemicIssueAlert represents a detected systemic issue.
+type SystemicIssueAlert struct {
+	ID            string        `json:"id"`
+	Timestamp     time.Time     `json:"timestamp"`
+	Workspace     string        `json:"workspace"`
+	AlertType     string        `json:"alert_type"`
+	Reason        ExclusionReason `json:"reason"`
+	Severity      string        `json:"severity"`
+	Description   string        `json:"description"`
+	Metrics       SystemicIssueMetrics `json:"metrics"`
+	Resolved      bool          `json:"resolved"`
+	ResolvedAt    *time.Time    `json:"resolved_at,omitempty"`
+}
+
+// SystemicIssueMetrics captures the metrics that triggered the alert.
+type SystemicIssueMetrics struct {
+	TotalOpen         int            `json:"total_open"`
+	TotalExcluded     int            `json:"total_excluded"`
+	ExclusionRate     float64        `json:"exclusion_rate"`
+	ReasonCount       int            `json:"reason_count"`
+	ReasonPercentage  float64        `json:"reason_percentage"`
+	Threshold         float64        `json:"threshold"`
+}
+
 // ExclusionTracker tracks why beads are excluded from the ready frontier.
 type ExclusionTracker struct {
 	mu                   sync.RWMutex
@@ -73,6 +114,9 @@ type ExclusionTracker struct {
 	verbose              bool
 	workspaceRoot        string
 	staleWorkerThreshold time.Duration
+	rollingWindow        *RollingWindow
+	alerts               []SystemicIssueAlert
+	alertThreshold       float64 // Percentage threshold for systemic issues (e.g., 0.8 = 80%)
 }
 
 // NewExclusionTracker creates a new exclusion tracker.
@@ -83,6 +127,13 @@ func NewExclusionTracker(logPath string, verbose bool, workspaceRoot string, sta
 		verbose:              verbose,
 		workspaceRoot:        workspaceRoot,
 		staleWorkerThreshold: staleThreshold,
+		rollingWindow: &RollingWindow{
+			window:        24 * time.Hour, // Keep 24 hours of data
+			maxDataPoints: 10000,           // Prevent unbounded growth
+			dataPoints:    make([]WindowDataPoint, 0),
+		},
+		alerts:         make([]SystemicIssueAlert, 0),
+		alertThreshold: 0.8, // 80% threshold for systemic issues
 	}
 
 	if logPath != "" {
@@ -182,6 +233,20 @@ func (et *ExclusionTracker) TrackExclusions(ctx context.Context, workspacePath s
 	et.mu.Lock()
 	et.reportsByWorkspace[workspacePath] = report
 	et.mu.Unlock()
+
+	// Add to rolling window
+	for _, exclusion := range report.ExcludedBeads {
+		et.AddToRollingWindow(workspacePath, exclusion.Reason, exclusion.BeadID, 1)
+	}
+
+	// Detect systemic issues
+	alert := et.DetectSystemicIssue(report)
+	if alert != nil {
+		et.RecordAlert(alert)
+		if et.verbose {
+			log.Printf("[ExclusionTracker] SYSTEMIC ISSUE DETECTED: %s", alert.Description)
+		}
+	}
 
 	// Log the report
 	if et.logFile != nil {
@@ -500,6 +565,216 @@ func (et *ExclusionTracker) Close() error {
 		return et.logFile.Close()
 	}
 	return nil
+}
+
+// AddToRollingWindow adds an exclusion observation to the rolling window.
+func (et *ExclusionTracker) AddToRollingWindow(workspace string, reason ExclusionReason, beadID string, count int) {
+	et.rollingWindow.mu.Lock()
+	defer et.rollingWindow.mu.Unlock()
+
+	now := time.Now()
+
+	// Add new data point
+	point := WindowDataPoint{
+		Timestamp: now,
+		Workspace: workspace,
+		Reason:    reason,
+		BeadID:    beadID,
+		Count:     count,
+	}
+	et.rollingWindow.dataPoints = append(et.rollingWindow.dataPoints, point)
+
+	// Trim old data points outside the window
+	cutoff := now.Add(-et.rollingWindow.window)
+	trimmed := et.rollingWindow.dataPoints[:0]
+	for _, dp := range et.rollingWindow.dataPoints {
+		if dp.Timestamp.After(cutoff) {
+			trimmed = append(trimmed, dp)
+		}
+	}
+	et.rollingWindow.dataPoints = trimmed
+
+	// Enforce maximum data points limit
+	if len(et.rollingWindow.dataPoints) > et.rollingWindow.maxDataPoints {
+		// Keep the most recent data points
+		et.rollingWindow.dataPoints = et.rollingWindow.dataPoints[len(et.rollingWindow.dataPoints)-et.rollingWindow.maxDataPoints:]
+	}
+}
+
+// GetRollingWindowStats returns aggregated statistics from the rolling window.
+func (et *ExclusionTracker) GetRollingWindowStats() map[string]interface{} {
+	et.rollingWindow.mu.RLock()
+	defer et.rollingWindow.mu.RUnlock()
+
+	stats := map[string]interface{}{
+		"window_duration":    et.rollingWindow.window.String(),
+		"data_points_count":  len(et.rollingWindow.dataPoints),
+		"oldest_timestamp":   nil,
+		"newest_timestamp":   nil,
+		"by_workspace":       make(map[string]int),
+		"by_reason":          make(map[string]int),
+	}
+
+	if len(et.rollingWindow.dataPoints) == 0 {
+		return stats
+	}
+
+	// Find oldest and newest timestamps
+	oldest := et.rollingWindow.dataPoints[0].Timestamp
+	newest := et.rollingWindow.dataPoints[0].Timestamp
+	for _, dp := range et.rollingWindow.dataPoints {
+		if dp.Timestamp.Before(oldest) {
+			oldest = dp.Timestamp
+		}
+		if dp.Timestamp.After(newest) {
+			newest = dp.Timestamp
+		}
+	}
+	stats["oldest_timestamp"] = oldest
+	stats["newest_timestamp"] = newest
+
+	// Aggregate by workspace and reason
+	byWorkspace := make(map[string]int)
+	byReason := make(map[string]int)
+	for _, dp := range et.rollingWindow.dataPoints {
+		byWorkspace[dp.Workspace] += dp.Count
+		byReason[string(dp.Reason)] += dp.Count
+	}
+	stats["by_workspace"] = byWorkspace
+	stats["by_reason"] = byReason
+
+	return stats
+}
+
+// DetectSystemicIssue checks if the exclusion report indicates a systemic issue.
+func (et *ExclusionTracker) DetectSystemicIssue(report *ExclusionReport) *SystemicIssueAlert {
+	if report == nil || report.OpenCount == 0 {
+		return nil
+	}
+
+	exclusionRate := float64(report.Summary.TotalExcluded) / float64(report.OpenCount)
+
+	// Check if overall exclusion rate exceeds threshold
+	if exclusionRate < et.alertThreshold {
+		return nil
+	}
+
+	// Check if the most common reason dominates
+	mostCommonRate := float64(report.Summary.MostCommonCount) / float64(report.Summary.TotalExcluded)
+	if mostCommonRate < et.alertThreshold {
+		return nil
+	}
+
+	// Generate alert
+	alert := &SystemicIssueAlert{
+		ID:          fmt.Sprintf("sysalert-%s-%d", filepath.Base(report.WorkspacePath), time.Now().Unix()),
+		Timestamp:   time.Now(),
+		Workspace:   report.WorkspacePath,
+		AlertType:   "high_exclusion_rate",
+		Reason:      report.Summary.MostCommonReason,
+		Severity:    et.calculateSeverity(exclusionRate, mostCommonRate),
+		Description: fmt.Sprintf("%s: %.1f%% of open beads excluded, %.1f%% of exclusions are due to %s",
+			filepath.Base(report.WorkspacePath),
+			exclusionRate*100,
+			mostCommonRate*100,
+			report.Summary.MostCommonReason),
+		Metrics: SystemicIssueMetrics{
+			TotalOpen:         report.OpenCount,
+			TotalExcluded:     report.Summary.TotalExcluded,
+			ExclusionRate:     exclusionRate,
+			ReasonCount:       report.Summary.MostCommonCount,
+			ReasonPercentage:  mostCommonRate,
+			Threshold:         et.alertThreshold,
+		},
+		Resolved: false,
+	}
+
+	return alert
+}
+
+// calculateSeverity determines the severity level based on rates.
+func (et *ExclusionTracker) calculateSeverity(exclusionRate, mostCommonRate float64) string {
+	if exclusionRate >= 0.95 || mostCommonRate >= 0.95 {
+		return "critical"
+	} else if exclusionRate >= 0.9 || mostCommonRate >= 0.9 {
+		return "high"
+	} else if exclusionRate >= 0.8 || mostCommonRate >= 0.8 {
+		return "medium"
+	}
+	return "low"
+}
+
+// RecordAlert records a systemic issue alert.
+func (et *ExclusionTracker) RecordAlert(alert *SystemicIssueAlert) {
+	et.mu.Lock()
+	defer et.mu.Unlock()
+
+	// Check if this is a duplicate of an existing unresolved alert
+	for _, existing := range et.alerts {
+		if !existing.Resolved &&
+			existing.Workspace == alert.Workspace &&
+			existing.Reason == alert.Reason &&
+			existing.AlertType == alert.AlertType {
+			// Update the existing alert with new metrics
+			existing.Metrics = alert.Metrics
+			existing.Timestamp = alert.Timestamp
+			existing.Description = alert.Description
+			existing.Severity = alert.Severity
+			if et.verbose {
+				log.Printf("[ExclusionTracker] Updated existing alert: %s", existing.ID)
+			}
+			return
+		}
+	}
+
+	// Add new alert
+	et.alerts = append(et.alerts, *alert)
+	if et.verbose {
+		log.Printf("[ExclusionTracker] New alert recorded: %s - %s", alert.ID, alert.Description)
+	}
+}
+
+// GetActiveAlerts returns all unresolved alerts.
+func (et *ExclusionTracker) GetActiveAlerts() []SystemicIssueAlert {
+	et.mu.RLock()
+	defer et.mu.RUnlock()
+
+	active := make([]SystemicIssueAlert, 0)
+	for _, alert := range et.alerts {
+		if !alert.Resolved {
+			active = append(active, alert)
+		}
+	}
+	return active
+}
+
+// GetAllAlerts returns all alerts (resolved and unresolved).
+func (et *ExclusionTracker) GetAllAlerts() []SystemicIssueAlert {
+	et.mu.RLock()
+	defer et.mu.RUnlock()
+
+	alerts := make([]SystemicIssueAlert, len(et.alerts))
+	copy(alerts, et.alerts)
+	return alerts
+}
+
+// ResolveAlert marks an alert as resolved.
+func (et *ExclusionTracker) ResolveAlert(alertID string) error {
+	et.mu.Lock()
+	defer et.mu.Unlock()
+
+	for i, alert := range et.alerts {
+		if alert.ID == alertID && !alert.Resolved {
+			now := time.Now()
+			et.alerts[i].Resolved = true
+			et.alerts[i].ResolvedAt = &now
+			if et.verbose {
+				log.Printf("[ExclusionTracker] Alert resolved: %s", alertID)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("alert not found or already resolved: %s", alertID)
 }
 
 // WorkerHeartbeat represents a worker's heartbeat record.
