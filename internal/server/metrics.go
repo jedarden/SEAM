@@ -59,6 +59,11 @@ type Metrics struct {
 	repairEscalations      *prometheus.CounterVec
 	repairDuration         *prometheus.HistogramVec
 	repairQueueByRootCause *prometheus.GaugeVec
+
+	// Starvation diagnostic daemon metrics
+	diagnosticRuns       *prometheus.CounterVec
+	diagnosticDurations  *prometheus.HistogramVec
+	diagnosticRepairable *prometheus.GaugeVec
 }
 
 type responseCacheStatsProvider interface {
@@ -163,17 +168,21 @@ func newMetrics(
 				}, []string{"workspace", "root_cause", "result"}),
 				repairQueueByRootCause: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 					Name: "seam_repair_queue_by_root_cause",
-			metrics.repairQueueSize,
-			metrics.repairAttempts,
-			metrics.repairSuccesses,
-			metrics.repairEscalations,
-			metrics.repairDuration,
-			metrics.repairQueueByRootCause,
-
 					Help: "Current number of queued items by root cause category.",
 				}, []string{"root_cause"}),
-
-
+				diagnosticRuns: prometheus.NewCounterVec(prometheus.CounterOpts{
+					Name: "seam_diagnostic_runs_total",
+					Help: "Total diagnostic runs by workspace and root cause.",
+				}, []string{"workspace", "root_cause"}),
+				diagnosticDurations: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+					Name:    "seam_diagnostic_duration_seconds",
+					Help:    "Diagnostic operation duration by workspace.",
+					Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30},
+				}, []string{"workspace"}),
+				diagnosticRepairable: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+					Name: "seam_diagnostic_repairable",
+					Help: "Whether diagnostic result was auto-repairable by workspace.",
+				}, []string{"workspace"}),
 	}
 
 	registry.MustRegister(
@@ -192,6 +201,15 @@ func newMetrics(
 		metrics.recoveryStageUsed,
 		metrics.recoveryDuration,
 		metrics.checkpointRebuilds,
+		metrics.repairQueueSize,
+		metrics.repairAttempts,
+		metrics.repairSuccesses,
+		metrics.repairEscalations,
+		metrics.repairDuration,
+		metrics.repairQueueByRootCause,
+		metrics.diagnosticRuns,
+		metrics.diagnosticDurations,
+		metrics.diagnosticRepairable,
 		newStateMetricsCollector(cache, openBao, upstreams, build),
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
@@ -507,4 +525,25 @@ func (m *Metrics) UpdateRepairQueueByRootCause(rootCause string, count float64) 
 		return
 	}
 	m.repairQueueByRootCause.WithLabelValues(rootCause).Set(count)
+}
+
+// Diagnostic metric recording methods
+
+func (m *Metrics) RecordDiagnosticRun(workspace, rootCause string, repairable bool) {
+	if m == nil {
+		return
+	}
+	m.diagnosticRuns.WithLabelValues(workspace, rootCause).Inc()
+	repairableValue := 0.0
+	if repairable {
+		repairableValue = 1.0
+	}
+	m.diagnosticRepairable.WithLabelValues(workspace).Set(repairableValue)
+}
+
+func (m *Metrics) RecordDiagnosticDuration(workspace string, duration float64) {
+	if m == nil {
+		return
+	}
+	m.diagnosticDurations.WithLabelValues(workspace).Observe(duration)
 }
