@@ -51,6 +51,14 @@ type Metrics struct {
 	recoveryStageUsed   *prometheus.CounterVec
 	recoveryDuration    *prometheus.HistogramVec
 	checkpointRebuilds  *prometheus.CounterVec
+
+	// Repair queue and daemon metrics
+	repairQueueSize        *prometheus.GaugeVec
+	repairAttempts         *prometheus.CounterVec
+	repairSuccesses        *prometheus.CounterVec
+	repairEscalations      *prometheus.CounterVec
+	repairDuration         *prometheus.HistogramVec
+	repairQueueByRootCause *prometheus.GaugeVec
 }
 
 type responseCacheStatsProvider interface {
@@ -132,6 +140,39 @@ func newMetrics(
 				Name: "seam_starvation_checkpoint_rebuilds_total",
 				Help: "Total checkpoint database rebuilds by workspace and result.",
 			}, []string{"workspace", "result"}),
+				repairQueueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+					Name: "seam_repair_queue_size",
+					Help: "Current number of items in the repair queue by workspace.",
+				}, []string{"workspace"}),
+				repairAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
+					Name: "seam_repair_attempts_total",
+					Help: "Total repair attempts by workspace and root cause.",
+				}, []string{"workspace", "root_cause"}),
+				repairSuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
+					Name: "seam_repair_successes_total",
+					Help: "Total successful repairs by workspace and root cause.",
+				}, []string{"workspace", "root_cause"}),
+				repairEscalations: prometheus.NewCounterVec(prometheus.CounterOpts{
+					Name: "seam_repair_escalations_total",
+					Help: "Total repairs escalated to human review by workspace and root cause.",
+				}, []string{"workspace", "root_cause"}),
+				repairDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+					Name:    "seam_repair_duration_seconds",
+					Help:    "Repair operation duration by workspace, root cause, and result.",
+					Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+				}, []string{"workspace", "root_cause", "result"}),
+				repairQueueByRootCause: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+					Name: "seam_repair_queue_by_root_cause",
+			metrics.repairQueueSize,
+			metrics.repairAttempts,
+			metrics.repairSuccesses,
+			metrics.repairEscalations,
+			metrics.repairDuration,
+			metrics.repairQueueByRootCause,
+
+					Help: "Current number of queued items by root cause category.",
+				}, []string{"root_cause"}),
+
 
 	}
 
@@ -426,4 +467,44 @@ func (m *Metrics) recordCheckpointRebuild(workspace string, result string) {
 		return
 	}
 	m.checkpointRebuilds.WithLabelValues(workspace, result).Inc()
+}
+
+// Repair metric recording methods
+
+func (m *Metrics) RecordRepairResult(workspace, rootCause string, success bool) {
+	if m == nil {
+		return
+	}
+	if success {
+		m.repairSuccesses.WithLabelValues(workspace, rootCause).Inc()
+	}
+	m.repairAttempts.WithLabelValues(workspace, rootCause).Inc()
+}
+
+func (m *Metrics) RecordRepairEscalation(workspace, rootCause string) {
+	if m == nil {
+		return
+	}
+	m.repairEscalations.WithLabelValues(workspace, rootCause).Inc()
+}
+
+func (m *Metrics) RecordRepairDuration(workspace, rootCause, result string, duration float64) {
+	if m == nil {
+		return
+	}
+	m.repairDuration.WithLabelValues(workspace, rootCause, result).Observe(duration)
+}
+
+func (m *Metrics) UpdateRepairQueueSize(workspace string, size float64) {
+	if m == nil {
+		return
+	}
+	m.repairQueueSize.WithLabelValues(workspace).Set(size)
+}
+
+func (m *Metrics) UpdateRepairQueueByRootCause(rootCause string, count float64) {
+	if m == nil {
+		return
+	}
+	m.repairQueueByRootCause.WithLabelValues(rootCause).Set(count)
 }
