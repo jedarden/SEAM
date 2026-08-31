@@ -1,0 +1,30 @@
+[Unit]
+Description=Bead Visibility Diagnostic and Repair Daemon
+Documentation=https://github.com/jedarden/SEAM
+After=network.target
+ConditionPathExists=/home/coding/SEAM/.beads/beads.db
+
+[Service]
+Type=simple
+User=coding
+Group=coding
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/home/coding/SEAM/tools/bead_visibility_diagnostic.py --interval 5 --log-dir /home/coding/SEAM/.beads/diagnostics
+Restart=on-failure
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/home/coding/SEAM/.beads /tmp
+PrivateTmp=yes
+NoNewPrivileges=true
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=default.target
