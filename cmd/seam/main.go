@@ -26,6 +26,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "  import           Import fragments into SEAM")
 		fmt.Fprintln(os.Stderr, "  bead-health-daemon  Run bead health monitoring and repair daemon")
 		fmt.Fprintln(os.Stderr, "  database-recovery-daemon  Run database corruption detection and recovery daemon")
+		fmt.Fprintln(os.Stderr, "  exclusion-recovery-daemon  Run exclusion-reason-specific auto-recovery daemon")
 		os.Exit(1)
 	}
 
@@ -47,9 +48,11 @@ func main() {
 		beadHealthDaemonCommand(args)
 	case "database-recovery-daemon":
 		databaseRecoveryDaemonCommand(args)
+	case "exclusion-recovery-daemon":
+		exclusionRecoveryDaemonCommand(args)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import, bead-health-daemon, database-recovery-daemon")
+		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import, bead-health-daemon, database-recovery-daemon, exclusion-recovery-daemon")
 		os.Exit(1)
 	}
 }
@@ -441,4 +444,87 @@ func databaseRecoveryDaemonCommand(args []string) {
 	}
 
 	log.Println("[DatabaseRecovery] Daemon stopped")
+}
+
+	// exclusionRecoveryDaemonCommand runs the exclusion-reason-specific auto-recovery daemon.
+	func exclusionRecoveryDaemonCommand(args []string) {
+		fs := flag.NewFlagSet("exclusion-recovery-daemon", flag.ExitOnError)
+
+		workspaceRoot := fs.String("workspace-root", "/home/coding", "Root directory containing all workspaces")
+		checkInterval := fs.Duration("check-interval", 10*time.Minute, "How often to check for exclusions requiring recovery")
+		statePath := fs.String("state-path", "", "Path to daemon state JSON file")
+		recoveryLogPath := fs.String("recovery-log-path", "", "Path to recovery log file")
+		staleWorkerThreshold := fs.Duration("stale-worker-threshold", 30*time.Minute, "How long a worker can be inactive before its assignee is cleared")
+		leaseName := fs.String("lease-name", "seam-exclusion-recovery", "Kubernetes Lease resource name")
+		leaseNamespace := fs.String("lease-namespace", "seam", "Kubernetes Lease namespace")
+
+		if err := fs.Parse(args); err != nil {
+			os.Exit(1)
+		}
+
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+		log.Printf("Starting SEAM exclusion recovery daemon:")
+		log.Printf("  Workspace root: %s", *workspaceRoot)
+		log.Printf("  Check interval: %v", *checkInterval)
+		log.Printf("  State path: %s", *statePath)
+		log.Printf("  Recovery log: %s", *recoveryLogPath)
+		log.Printf("  Stale worker threshold: %v", *staleWorkerThreshold)
+		log.Printf("  Lease: %s/%s", *leaseNamespace, *leaseName)
+
+		// Create lease leader for distributed coordination
+		leaseLeader, err := server.NewLeaseLeader(server.LeaseConfig{
+			LeaseName: *leaseName,
+			LeaseNamespace: *leaseNamespace,
+			OnLeadershipLost: func() {
+				log.Println("[ExclusionRecovery] Leadership lost, shutting down")
+				os.Exit(0)
+			},
+		})
+		if err != nil {
+			log.Fatalf("Failed to create lease leader: %v", err)
+		}
+
+		// Create exclusion recovery daemon
+		daemon, err := server.NewExclusionRecoveryDaemon(server.ExclusionRecoveryConfig{
+			WorkspaceRoot:        *workspaceRoot,
+			LeaseLeader:          leaseLeader,
+			CheckInterval:        *checkInterval,
+			StatePath:            *statePath,
+			RecoveryLogPath:      *recoveryLogPath,
+			StaleWorkerThreshold: *staleWorkerThreshold,
+			OnRecovery: func(result *server.ExclusionRecovery) {
+				if result.Success {
+					log.Printf("[ExclusionRecovery] Recovery: %s in %s - %s (action: %s)",
+						result.BeadID, result.Workspace, result.ActionTaken, result.RecoveryAction)
+				} else {
+					log.Printf("[ExclusionRecovery] Recovery failed: %s in %s - %s",
+						result.BeadID, result.Workspace, result.Error)
+				}
+			},
+		})
+		if err != nil {
+			log.Fatalf("Failed to create exclusion recovery daemon: %v", err)
+		}
+
+		// Setup graceful shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+		go func() {
+			<-sigCh
+			log.Println("[ExclusionRecovery] Received shutdown signal")
+			daemon.Stop()
+			cancel()
+		}()
+
+		// Start the daemon
+		if err := daemon.Start(ctx); err != nil {
+			log.Fatalf("Daemon failed: %v", err)
+		}
+
+		log.Println("[ExclusionRecovery] Daemon stopped")
+	}
 }
