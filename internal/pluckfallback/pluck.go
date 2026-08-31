@@ -185,9 +185,10 @@ func (s *CheckpointQueryStrategy) Execute(ctx context.Context, workspace string)
 
 // PluckFallback coordinates multiple query strategies with fallback logic.
 type PluckFallback struct {
-	strategies   []QueryStrategy
-	verbose      bool
-	diagnosticLog *os.File
+	strategies        []QueryStrategy
+	verbose           bool
+	diagnosticLog     *os.File
+	exclusionTracker  *ExclusionTracker
 }
 
 // NewPluckFallback creates a new PluckFallback with default strategies.
@@ -209,6 +210,20 @@ func NewPluckFallback(verbose bool, diagnosticLogPath string) (*PluckFallback, e
 			return nil, fmt.Errorf("open diagnostic log: %w", err)
 		}
 		pf.diagnosticLog = f
+	}
+
+	// Initialize exclusion tracker with a separate log file
+	exclusionLogPath := strings.Replace(diagnosticLogPath, ".log", "-exclusions.jsonl", 1)
+	if diagnosticLogPath == "" {
+		exclusionLogPath = ""
+	}
+
+	tracker, err := NewExclusionTracker(exclusionLogPath, verbose)
+	if err != nil {
+		log.Printf("[PluckFallback] Failed to create exclusion tracker: %v (continuing without it)", err)
+	} else {
+		pf.exclusionTracker = tracker
+		log.Printf("[PluckFallback] Exclusion tracker initialized")
 	}
 
 	return pf, nil
@@ -261,6 +276,21 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 			StrategyName: strategy.Name(),
 			SuccessCount: 1,
 			LastUsed:     time.Now(),
+		}
+
+		// If primary query returned 0 candidates, run exclusion analysis
+		if i == 0 && len(results) == 0 && pf.exclusionTracker != nil {
+			if pf.verbose {
+				log.Printf("[%s] Primary query returned 0 candidates - running exclusion analysis", workspace)
+			}
+			exclusionReport, err := pf.exclusionTracker.TrackExclusions(ctx, workspace)
+			if err != nil {
+				log.Printf("[%s] Exclusion analysis failed: %v", workspace, err)
+			} else {
+				if pf.verbose && exclusionReport.Summary.TotalExcluded > 0 {
+					log.Printf("[%s] Exclusion analysis complete: %d beads excluded", workspace, exclusionReport.Summary.TotalExcluded)
+				}
+			}
 		}
 
 		return results, metrics, discrepancies, nil

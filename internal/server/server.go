@@ -53,6 +53,10 @@ var reservedPaths = struct {
 		"/health/upstreams":        true, // Health sentinel: upstream connectivity check
 		"/config/status":           true,
 		"/api/v1/tailscale/ephemeral-key": true, // Phase 7: Tailscale ephemeral key endpoint
+		"/api/v1/exclusions/report": true, // Phase 13: Bead exclusion report endpoint
+		"/api/v1/exclusions/reports": true, // Phase 13: All exclusion reports endpoint
+		"/api/v1/exclusions/analyze": true, // Phase 13: On-demand exclusion analysis endpoint
+		"/api/v1/exclusions/summary": true, // Phase 13: Exclusion activity summary endpoint
 	},
 	prefixes: []string{
 		"/docs/",      // Documentation endpoints (reserved namespace)
@@ -385,6 +389,13 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
 	s.callerMux.HandleFunc("/scopes", s.scopesHandler)
 	s.callerMux.HandleFunc("/api/v1/tailscale/ephemeral-key", s.tailscaleEphemeralKeyHandler)
+
+	// Phase 13: Bead exclusion tracking and debugging endpoints
+	s.callerMux.HandleFunc("/api/v1/exclusions/report", s.exclusionReportHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/reports", s.exclusionAllReportsHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/analyze", s.exclusionAnalyzeHandler)
+	s.callerMux.HandleFunc("/api/v1/exclusions/summary", s.exclusionSummaryHandler)
+	log.Printf("Registered bead exclusion tracking endpoints")
 
 	// Phase 8.4: Version migration endpoints
 	s.callerMux.HandleFunc("/changes", s.changesHandler)
