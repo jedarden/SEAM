@@ -7,7 +7,7 @@ Type=simple
 User=coding
 Group=users
 WorkingDirectory=/home/coding/SEAM
-ExecStart=/run/current-system/sw/bin/bash /home/coding/SEAM/tools/integrated_starvation_recovery.sh --interval 5m --verbose
+ExecStart=/run/current-system/sw/bin/bash /home/coding/SEAM/tools/integrated_starvation_recovery.sh --interval 5 --verbose
 Restart=always
 RestartSec=60
 StandardOutput=journal
@@ -19,7 +19,7 @@ PrivateTmp=true
 
 # Environment
 Environment=WORKSPACE=/home/coding/SEAM
-Environment=PATH=/home/coding/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/run/current-system/sw/bin:/home/coding/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=LD_LIBRARY_PATH=/usr/local/lib:/usr/lib
 
 [Install]

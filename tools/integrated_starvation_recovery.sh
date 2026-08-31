@@ -130,32 +130,48 @@ log "Log directory: $LOG_DIR"
 # Function to count beads by status
 count_beads() {
     local status="$1"
-    local count=0
+    local json_output
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        count=$((count + 1))
-    done < <(bead list --status "$status" --json 2>/dev/null)
+    json_output=$(bead list --status "$status" --json 2>/dev/null)
 
-    echo "$count"
+    # Handle empty array case
+    if [[ "$json_output" == "[]" ]]; then
+        echo 0
+        return 0
+    fi
+
+    # Count JSON array elements
+    echo "$json_output" | jq '. | length'
 }
 
 # Function to count ready beads
 count_ready_beads() {
-    local count=0
+    local json_output
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        count=$((count + 1))
-    done < <(bead list --ready --json 2>/dev/null)
+    json_output=$(bead list --ready --json 2>/dev/null)
 
-    echo "$count"
+    # Handle empty array case
+    if [[ "$json_output" == "[]" ]]; then
+        echo 0
+        return 0
+    fi
+
+    # Count JSON array elements
+    echo "$json_output" | jq '. | length'
 }
 
 # Function to find starvation alert beads
 find_starvation_alert_beads() {
     local alerts=()
+    local json_output
+    json_output=$(bead list --status open --json 2>/dev/null)
 
+    # Handle empty array case
+    if [[ "$json_output" == "[]" ]]; then
+        return 0
+    fi
+
+    # Process JSON array
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
 
@@ -163,9 +179,9 @@ find_starvation_alert_beads() {
         if echo "$line" | jq -e '.labels[] | select(. == "starvation-alert" or startswith("alert:starvation"))' >/dev/null 2>&1; then
             local id
             id=$(echo "$line" | jq -r '.id')
-            alerts+=("$id")
+            [[ -n "$id" ]] && alerts+=("$id")
         fi
-    done < <(bead list --status open --json 2>/dev/null)
+    done < <(echo "$json_output" | jq -r '.[] | @json')
 
     printf '%s\n' "${alerts[@]}"
 }
@@ -174,16 +190,32 @@ find_starvation_alert_beads() {
 close_bead() {
     local bead_id="$1"
     local reason="$2"
+    local output
 
     if [[ "$DRY_RUN" == "true" ]]; then
         log_warning "[DRY-RUN] Would close bead $bead_id: $reason"
         return 0
     fi
 
-    if bead close "$bead_id" --reason "$reason" 2>&1 | tee -a "$LOG_FILE"; then
+    # Check if bead is already closed
+    local current_status
+    current_status=$(bead show "$bead_id" 2>/dev/null | grep "^Status:" | cut -d' ' -f2)
+    if [[ "$current_status" == "Closed" ]]; then
+        log "Bead $bead_id already closed - skipping"
+        return 0
+    fi
+
+    if output=$(bead close "$bead_id" --reason "$reason" 2>&1); then
+        echo "$output" | tee -a "$LOG_FILE"
         log_success "Closed starvation alert bead: $bead_id"
         return 0
     else
+        echo "$output" | tee -a "$LOG_FILE"
+        # Check if it's an "already closed" error
+        if grep -q "already closed" <<< "$output"; then
+            log "Bead $bead_id already closed - treating as success"
+            return 0
+        fi
         log_error "Failed to close bead: $bead_id"
         return 1
     fi
