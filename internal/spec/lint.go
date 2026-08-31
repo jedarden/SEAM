@@ -326,7 +326,6 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
 	f.checkBreakerDisagreements(report)
-	f.checkPassThroughProbe(report)
 	f.checkDeprecation(report)
 	f.checkAdapter(report)
 }
@@ -1277,7 +1276,7 @@ func (f *lintFragment) validateDefaultTransform(report *LintReport, transform ma
 	}
 
 	pointer, hasPointer := defaultOp["pointer"].(string)
-	value, hasValue := defaultOp["value"]
+	_, hasValue := defaultOp["value"]
 
 	if !hasPointer || pointer == "" {
 		f.addError(report, "adapter.default-pointer-missing",
