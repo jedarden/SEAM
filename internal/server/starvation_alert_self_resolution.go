@@ -33,6 +33,7 @@ type StarvationAlertSelfResolution struct {
 	maxConsecutiveChecks int // Number of checks before escalation (3)
 	checkHistory        map[string]*CheckHistory // bead ID -> check history
 	onResolution        func(resolution *AlertResolution)
+	rootCauseAnalyzer   *RootCauseAnalyzer // New: root cause analysis
 }
 
 // CheckHistory tracks consecutive checks for a starvation alert.
@@ -61,6 +62,8 @@ type AlertResolution struct {
 	StrategyUsed      string    `json:"strategy_used,omitempty"`
 	ConsecutiveChecks int       `json:"consecutive_checks"`
 	Error             string    `json:"error,omitempty"`
+	RootCause         string    `json:"root_cause,omitempty"` // New: root cause
+	AutoRecovered     bool      `json:"auto_recovered"`       // New: auto-recovery flag
 }
 
 // SelfResolutionConfig holds configuration for the self-resolution daemon.
@@ -129,6 +132,9 @@ func NewStarvationAlertSelfResolution(cfg SelfResolutionConfig) (*StarvationAler
 		daemon.pluckFallback = pf
 		log.Printf("[AlertSelfResolution] PluckFallback enabled with diagnostic log: %s", cfg.PluckFallbackDiagnosticLog)
 	}
+
+	// Initialize root cause analyzer
+	daemon.rootCauseAnalyzer = NewRootCauseAnalyzer()
 
 	return daemon, nil
 }
@@ -342,9 +348,9 @@ func (d *StarvationAlertSelfResolution) checkAndResolveAlert(ctx context.Context
 	log.Printf("[AlertSelfResolution] Alert %s in %s: check #%d, ready=%d, strategy=%s",
 		beadID, workspaceName, history.CheckCount, readyCount, strategyUsed)
 
-	// If candidates found, resolve the alert
+	// If candidates found, analyze root cause and resolve the alert
 	if readyCount > 0 {
-		return d.resolveAlert(ctx, workspacePath, beadID, readyCount, strategyUsed, history)
+		return d.resolveAlertWithRootCauseAnalysis(ctx, workspacePath, beadID, readyCount, strategyUsed, history)
 	}
 
 	// No candidates - check if we should escalate
@@ -416,36 +422,51 @@ func (d *StarvationAlertSelfResolution) countReadyBeadsDirect(ctx context.Contex
 	return count, nil
 }
 
-// resolveAlert closes an alert bead with detailed recovery information.
-func (d *StarvationAlertSelfResolution) resolveAlert(ctx context.Context, workspacePath, beadID string, readyCount int, strategy string, history *CheckHistory) *AlertResolution {
+// resolveAlertWithRootCauseAnalysis closes an alert bead with detailed recovery information and root cause analysis.
+func (d *StarvationAlertSelfResolution) resolveAlertWithRootCauseAnalysis(ctx context.Context, workspacePath, beadID string, readyCount int, strategy string, history *CheckHistory) *AlertResolution {
 	workspaceName := filepath.Base(workspacePath)
 	now := time.Now()
 
-	reason := fmt.Sprintf("Condition resolved - automated verification found %d candidates via %s strategy",
-		readyCount, strategy)
+	// Run root cause analysis
+	rootCause, autoRecovered, analysisDetails := d.rootCauseAnalyzer.Analyze(ctx, workspacePath, strategy, readyCount, history)
 
-	// Add note documenting the recovery
+	// Tag the bead with root cause label
+	tagLabel := fmt.Sprintf("starvation:%s", rootCause)
+	tagCmd := exec.CommandContext(ctx, "bead", "label", "add", beadID, tagLabel)
+	tagCmd.Dir = workspacePath
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		log.Printf("[AlertSelfResolution] Failed to add root cause label to %s: %v (output: %s)", beadID, err, string(output))
+		// Continue anyway - tagging is optional
+	} else {
+		log.Printf("[AlertSelfResolution] ✓ Tagged %s with root cause: %s", beadID, tagLabel)
+	}
+
+	// Build the close reason and note
+	reason := fmt.Sprintf("Root cause identified and resolved: %s", rootCause)
 	note := fmt.Sprintf("Automated recovery at %s\n\n"+
-		"Recovery Details:\n"+
+		"**Root Cause Analysis:**\n"+
+		"%s\n\n"+
+		"**Recovery Details:**\n"+
 		"- Candidates found: %d\n"+
 		"- Strategy used: %s\n"+
 		"- Consecutive checks: %d\n"+
-		"- Time to resolution: %.1f minutes\n",
-		now.Format(time.RFC3339), readyCount, strategy, history.CheckCount, now.Sub(history.FirstCheck).Minutes())
+		"- Time to resolution: %.1f minutes\n"+
+		"- Auto-recovered: %v\n",
+		now.Format(time.RFC3339), analysisDetails, readyCount, strategy, history.CheckCount, now.Sub(history.FirstCheck).Minutes(), autoRecovered)
 
 	// Add note to bead
-	cmd := exec.CommandContext(ctx, "bead", "update", beadID, "--notes", note)
-	cmd.Dir = workspacePath
-	if output, err := cmd.CombinedOutput(); err != nil {
+	updateCmd := exec.CommandContext(ctx, "bead", "update", beadID, "--notes", note)
+	updateCmd.Dir = workspacePath
+	if output, err := updateCmd.CombinedOutput(); err != nil {
 		log.Printf("[AlertSelfResolution] Failed to add note to %s: %v (output: %s)", beadID, err, string(output))
 		// Continue anyway - note is optional
 	}
 
 	// Close the bead
-	cmd = exec.CommandContext(ctx, "bead", "close", beadID, "--reason", reason)
-	cmd.Dir = workspacePath
+	closeCmd := exec.CommandContext(ctx, "bead", "close", beadID, "--reason", reason)
+	closeCmd.Dir = workspacePath
 
-	output, err := cmd.CombinedOutput()
+	output, err := closeCmd.CombinedOutput()
 	if err != nil {
 		log.Printf("[AlertSelfResolution] Failed to close alert %s in %s: %v", beadID, workspaceName, err)
 		return &AlertResolution{
@@ -460,8 +481,8 @@ func (d *StarvationAlertSelfResolution) resolveAlert(ctx context.Context, worksp
 	// Mark as resolved in history
 	history.Resolved = true
 
-	log.Printf("[AlertSelfResolution] ✓ Resolved alert %s in %s (ready=%d, strategy=%s, checks=%d)",
-		beadID, workspaceName, readyCount, strategy, history.CheckCount)
+	log.Printf("[AlertSelfResolution] ✓ Resolved alert %s in %s (root cause=%s, auto-recovered=%v, ready=%d, strategy=%s, checks=%d)",
+		beadID, workspaceName, rootCause, autoRecovered, readyCount, strategy, history.CheckCount)
 
 	return &AlertResolution{
 		AlertID:           beadID,
@@ -472,6 +493,8 @@ func (d *StarvationAlertSelfResolution) resolveAlert(ctx context.Context, worksp
 		ReadyCount:        readyCount,
 		StrategyUsed:      strategy,
 		ConsecutiveChecks: history.CheckCount,
+		RootCause:         rootCause,
+		AutoRecovered:     autoRecovered,
 	}
 }
 
