@@ -124,7 +124,9 @@ func (s *Server) exclusionAnalyzeHandler(w http.ResponseWriter, r *http.Request)
 
 	// Create a temporary exclusion tracker for this analysis
 	logPath := filepath.Join(req.WorkspacePath, ".beads", "diagnostics", "on-demand-exclusions.jsonl")
-	tracker, err := pluckfallback.NewExclusionTracker(logPath, true)
+	// Use parent of workspace path as root (for heartbeats.jsonl access)
+	workspaceRoot := filepath.Dir(req.WorkspacePath)
+	tracker, err := pluckfallback.NewExclusionTracker(logPath, true, workspaceRoot, 30*time.Minute)
 	if err != nil {
 		response := exclusionAnalysisResponse{
 			Success: false,

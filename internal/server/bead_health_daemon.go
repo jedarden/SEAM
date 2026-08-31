@@ -18,18 +18,20 @@ import (
 // It detects common starvation patterns like 'assigned but open' beads and
 // automatically repairs them to prevent worker starvation.
 type BeadHealthDaemon struct {
-	mu                sync.RWMutex
-	leaseLeader       *LeaseLeader
-	workspaceRoot     string
-	stopCh            chan struct{}
-	stopped           bool
-	checkInterval     time.Duration
-	statePath         string
-	diagnosticLogPath string
-	repairThreshold   int
-	repairCount       int
-	lastCheckTime     time.Time
-	onRepair          func(repair *BeadRepair)
+	mu                   sync.RWMutex
+	leaseLeader          *LeaseLeader
+	workspaceRoot        string
+	stopCh               chan struct{}
+	stopped              bool
+	checkInterval        time.Duration
+	statePath            string
+	diagnosticLogPath    string
+	assigneeClearLogPath string
+	repairThreshold      int
+	repairCount          int
+	lastCheckTime        time.Time
+	onRepair             func(repair *BeadRepair)
+	staleWorkerThreshold time.Duration
 }
 
 // BeadHealthState tracks the daemon's persistent state.
@@ -50,14 +52,17 @@ type BeadRepairSummary struct {
 
 // BeadRepair records the outcome of a bead health repair operation.
 type BeadRepair struct {
-	BeadID        string    `json:"bead_id"`
-	Workspace     string    `json:"workspace"`
-	Timestamp     time.Time `json:"timestamp"`
-	RepairType    string    `json:"repair_type"`
-	Success       bool      `json:"success"`
-	Error         string    `json:"error,omitempty"`
-	Diagnosis     string    `json:"diagnosis,omitempty"`
-	ActionTaken   string    `json:"action_taken,omitempty"`
+	BeadID         string    `json:"bead_id"`
+	Workspace      string    `json:"workspace"`
+	Timestamp      time.Time `json:"timestamp"`
+	RepairType     string    `json:"repair_type"`
+	Success        bool      `json:"success"`
+	Error          string    `json:"error,omitempty"`
+	Diagnosis      string    `json:"diagnosis,omitempty"`
+	ActionTaken    string    `json:"action_taken,omitempty"`
+	PreviousAssignee string  `json:"previous_assignee,omitempty"`
+	WorkerInactive bool      `json:"worker_inactive,omitempty"`
+	InactiveDuration string   `json:"inactive_duration,omitempty"`
 }
 
 // BeadDiagnostics holds diagnostic information about a bead.
@@ -89,11 +94,17 @@ type BeadHealthConfig struct {
 	// DiagnosticLogPath is where to write structured logs (default: .beads/diagnostics/bead-health.log)
 	DiagnosticLogPath string
 
+	// AssigneeClearLogPath is where to log assignee clear operations (default: .beads/diagnostics/assignee-clears.log)
+	AssigneeClearLogPath string
+
 	// RepairThreshold is the number of repairs before generating a summary report (default: 10)
 	RepairThreshold int
 
 	// OnRepair is called when a bead repair is performed
 	OnRepair func(repair *BeadRepair)
+
+	// StaleWorkerThreshold is how long a worker can be inactive before its assignee is cleared (default: 30 minutes)
+	StaleWorkerThreshold time.Duration
 }
 
 // NewBeadHealthDaemon creates a new bead health daemon.
@@ -110,13 +121,24 @@ func NewBeadHealthDaemon(cfg BeadHealthConfig) (*BeadHealthDaemon, error) {
 	if cfg.DiagnosticLogPath == "" {
 		cfg.DiagnosticLogPath = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "bead-health.log")
 	}
+	if cfg.AssigneeClearLogPath == "" {
+		cfg.AssigneeClearLogPath = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "assignee-clears.log")
+	}
 	if cfg.RepairThreshold == 0 {
 		cfg.RepairThreshold = 10
+	}
+	if cfg.StaleWorkerThreshold == 0 {
+		cfg.StaleWorkerThreshold = 30 * time.Minute
 	}
 
 	// Ensure diagnostic log directory exists
 	if err := os.MkdirAll(filepath.Dir(cfg.DiagnosticLogPath), 0755); err != nil {
 		return nil, fmt.Errorf("create diagnostic log directory: %w", err)
+	}
+
+	// Ensure assignee clear log directory exists
+	if err := os.MkdirAll(filepath.Dir(cfg.AssigneeClearLogPath), 0755); err != nil {
+		return nil, fmt.Errorf("create assignee clear log directory: %w", err)
 	}
 
 	// Load existing state if it exists
@@ -134,16 +156,18 @@ func NewBeadHealthDaemon(cfg BeadHealthConfig) (*BeadHealthDaemon, error) {
 	}
 
 	daemon := &BeadHealthDaemon{
-		leaseLeader:       cfg.LeaseLeader,
-		workspaceRoot:     cfg.WorkspaceRoot,
-		checkInterval:     cfg.CheckInterval,
-		statePath:         cfg.StatePath,
-		diagnosticLogPath: cfg.DiagnosticLogPath,
-		repairThreshold:   cfg.RepairThreshold,
-		stopCh:           make(chan struct{}),
-		repairCount:      state.TotalRepairs,
-		lastCheckTime:    state.LastCheckTime,
-		onRepair:         cfg.OnRepair,
+		leaseLeader:          cfg.LeaseLeader,
+		workspaceRoot:        cfg.WorkspaceRoot,
+		checkInterval:        cfg.CheckInterval,
+		statePath:            cfg.StatePath,
+		diagnosticLogPath:    cfg.DiagnosticLogPath,
+		assigneeClearLogPath: cfg.AssigneeClearLogPath,
+		repairThreshold:      cfg.RepairThreshold,
+		staleWorkerThreshold: cfg.StaleWorkerThreshold,
+		stopCh:               make(chan struct{}),
+		repairCount:          state.TotalRepairs,
+		lastCheckTime:        state.LastCheckTime,
+		onRepair:             cfg.OnRepair,
 	}
 
 	return daemon, nil
@@ -428,20 +452,49 @@ func (d *BeadHealthDaemon) checkCircularDependencies(ctx context.Context, worksp
 	return false
 }
 
-// repairAssignedOpen repairs an assigned-but-open bead.
+// repairAssignedOpen repairs an assigned-but-open bead with safety checks.
 func (d *BeadHealthDaemon) repairAssignedOpen(ctx context.Context, workspacePath, beadID string, diagnostics *BeadDiagnostics) *BeadRepair {
 	workspaceName := filepath.Base(workspacePath)
 	now := time.Now()
 
 	repair := &BeadRepair{
-		BeadID:    beadID,
-		Workspace: workspaceName,
-		Timestamp: now,
-		RepairType: "clear-assignee",
-		Diagnosis: fmt.Sprintf("Bead %s is assigned to %s but has status 'open'", beadID, diagnostics.Assignee),
+		BeadID:          beadID,
+		Workspace:       workspaceName,
+		Timestamp:       now,
+		RepairType:      "clear-assignee",
+		PreviousAssignee: diagnostics.Assignee,
+		Diagnosis:       fmt.Sprintf("Bead %s is assigned to %s but has status 'open'", beadID, diagnostics.Assignee),
 	}
 
-	log.Printf("[BeadHealth] Repairing assigned-but-open bead: %s (assignee: %s)", beadID, diagnostics.Assignee)
+	log.Printf("[BeadHealth] Checking assigned-but-open bead: %s (assignee: %s)", beadID, diagnostics.Assignee)
+
+	// Safety check 1: Verify worker is inactive before clearing
+	isStale, inactiveDuration, err := d.isWorkerStale(diagnostics.Assignee)
+	if err != nil {
+		// No heartbeat found or error reading heartbeats - be conservative
+		repair.Success = false
+		repair.Error = fmt.Sprintf("cannot verify worker activity: %v", err)
+		log.Printf("[BeadHealth] Skipping bead %s - cannot verify worker %s activity: %v", beadID, diagnostics.Assignee, err)
+		d.logAssigneeClear(repair)
+		return repair
+	}
+
+	repair.WorkerInactive = isStale
+	repair.InactiveDuration = inactiveDuration.String()
+
+	if !isStale {
+		// Worker is still active - don't clear the assignee
+		repair.Success = false
+		repair.Error = fmt.Sprintf("worker %s is still active (last heartbeat %s ago, threshold: %s)",
+			diagnostics.Assignee, inactiveDuration, d.staleWorkerThreshold)
+		log.Printf("[BeadHealth] Skipping bead %s - worker %s is still active (last heartbeat %s ago)",
+			beadID, diagnostics.Assignee, inactiveDuration)
+		d.logAssigneeClear(repair)
+		return repair
+	}
+
+	log.Printf("[BeadHealth] ✓ Worker %s is stale (inactive for %s), clearing assignee from bead %s",
+		diagnostics.Assignee, inactiveDuration, beadID)
 
 	// Clear the assignee
 	cmd := exec.CommandContext(ctx, "bead", "update", beadID, "--clear-assignee")
@@ -454,12 +507,14 @@ func (d *BeadHealthDaemon) repairAssignedOpen(ctx context.Context, workspacePath
 		log.Printf("[BeadHealth] Failed to repair bead %s: %v", beadID, err)
 	} else {
 		repair.Success = true
-		repair.ActionTaken = fmt.Sprintf("Cleared assignee: %s", diagnostics.Assignee)
-		log.Printf("[BeadHealth] ✓ Repaired bead %s (cleared assignee: %s)", beadID, diagnostics.Assignee)
+		repair.ActionTaken = fmt.Sprintf("Cleared stale assignee: %s (inactive for %s)", diagnostics.Assignee, inactiveDuration)
+		log.Printf("[BeadHealth] ✓ Repaired bead %s (cleared stale assignee: %s, inactive for %s)",
+			beadID, diagnostics.Assignee, inactiveDuration)
 	}
 
-	// Log to diagnostic file
+	// Log to both diagnostic files
 	d.logRepair(repair)
+	d.logAssigneeClear(repair)
 
 	return repair
 }
@@ -658,4 +713,91 @@ func (d *BeadHealthDaemon) GetRepairCount() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.repairCount
+}
+
+// WorkerHeartbeat represents a worker's heartbeat record.
+type WorkerHeartbeat struct {
+	Worker     string    `json:"worker"`
+	State      string    `json:"state"`
+	Timestamp  time.Time `json:"ts"`
+	LastStrand string    `json:"last_strand"`
+}
+
+// getLastHeartbeat retrieves the last heartbeat for a worker.
+func (d *BeadHealthDaemon) getLastHeartbeat(worker string) (*WorkerHeartbeat, error) {
+	heartbeatPath := filepath.Join(d.workspaceRoot, ".beads", "heartbeats.jsonl")
+
+	f, err := os.Open(heartbeatPath)
+	if err != nil {
+		return nil, fmt.Errorf("open heartbeats file: %w", err)
+	}
+	defer f.Close()
+
+	var lastHeartbeat *WorkerHeartbeat
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		var hb WorkerHeartbeat
+		if err := json.Unmarshal([]byte(line), &hb); err != nil {
+			continue
+		}
+		if hb.Worker == worker {
+			lastHeartbeat = &hb
+		}
+	}
+
+	if lastHeartbeat == nil {
+		return nil, fmt.Errorf("no heartbeat found for worker %s", worker)
+	}
+
+	return lastHeartbeat, nil
+}
+
+// isWorkerStale checks if a worker's last heartbeat exceeds the staleness threshold.
+func (d *BeadHealthDaemon) isWorkerStale(worker string) (bool, time.Duration, error) {
+	lastHB, err := d.getLastHeartbeat(worker)
+	if err != nil {
+		return false, 0, err
+	}
+
+	now := time.Now()
+	inactiveDuration := now.Sub(lastHB.Timestamp)
+
+	return inactiveDuration > d.staleWorkerThreshold, inactiveDuration, nil
+}
+
+// logAssigneeClear writes an assignee clear operation to the dedicated log.
+func (d *BeadHealthDaemon) logAssigneeClear(repair *BeadRepair) {
+	logPath := d.assigneeClearLogPath
+
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("[BeadHealth] Failed to open assignee clear log: %v", err)
+		return
+	}
+	defer f.Close()
+
+	logEntry := map[string]interface{}{
+		"timestamp":          repair.Timestamp.Format(time.RFC3339),
+		"workspace":          repair.Workspace,
+		"bead_id":            repair.BeadID,
+		"repair_type":        repair.RepairType,
+		"success":            repair.Success,
+		"previous_assignee":  repair.PreviousAssignee,
+		"worker_inactive":    repair.WorkerInactive,
+		"inactive_duration":  repair.InactiveDuration,
+		"action_taken":       repair.ActionTaken,
+		"error":              repair.Error,
+	}
+
+	jsonEntry, err := json.Marshal(logEntry)
+	if err != nil {
+		log.Printf("[BeadHealth] Failed to marshal assignee clear log entry: %v", err)
+		return
+	}
+
+	if _, err := f.Write(append(jsonEntry, '\n')); err != nil {
+		log.Printf("[BeadHealth] Failed to write assignee clear log: %v", err)
+	}
 }
