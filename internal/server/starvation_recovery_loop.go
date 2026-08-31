@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ardenone/seam/internal/pluckfallback"
 )
 
 // StarvationRecoveryLoop runs the automated starvation diagnostic and recovery loop.
@@ -27,6 +29,8 @@ type StarvationRecoveryLoop struct {
 	recoveryAttempts    map[string]int // bead ID -> attempt count
 	maxAttemptsPerBead  int
 	onRecoveryComplete func(beadID string, success bool, details string)
+	pluckFallback       *pluckfallback.PluckFallback // PluckFallback for resilient bead querying
+	diagnosticLogPath   string                        // Path to diagnostic log for pluck discrepancies
 }
 
 // RecoveryConfig holds the configuration for the starvation recovery loop.
@@ -48,6 +52,12 @@ type RecoveryConfig struct {
 
 	// OnRecoveryComplete is called when a recovery attempt completes
 	OnRecoveryComplete func(beadID string, success bool, details string)
+
+	// EnablePluckFallback enables the use of PluckFallback for resilient bead querying
+	EnablePluckFallback bool
+
+	// PluckFallbackDiagnosticLog is the path to the diagnostic log for pluck discrepancies
+	PluckFallbackDiagnosticLog string
 }
 
 // NewStarvationRecoveryLoop creates a new starvation recovery loop.
@@ -70,7 +80,7 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		return nil, fmt.Errorf("validate script not found: %w", err)
 	}
 
-	return &StarvationRecoveryLoop{
+	loop := &StarvationRecoveryLoop{
 		leaseLeader:        cfg.LeaseLeader,
 		workspaceRoot:      cfg.WorkspaceRoot,
 		validateScript:     cfg.ValidateScript,
@@ -79,7 +89,23 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		recoveryAttempts:   make(map[string]int),
 		stopCh:            make(chan struct{}),
 		onRecoveryComplete: cfg.OnRecoveryComplete,
-	}, nil
+		diagnosticLogPath:  cfg.PluckFallbackDiagnosticLog,
+	}
+
+	// Initialize PluckFallback if enabled
+	if cfg.EnablePluckFallback {
+		if cfg.PluckFallbackDiagnosticLog == "" {
+			cfg.PluckFallbackDiagnosticLog = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "pluck-fallback.log")
+		}
+		pf, err := pluckfallback.NewPluckFallback(true, cfg.PluckFallbackDiagnosticLog)
+		if err != nil {
+			return nil, fmt.Errorf("initialize pluck fallback: %w", err)
+		}
+		loop.pluckFallback = pf
+		log.Printf("[RecoveryLoop] PluckFallback enabled with diagnostic log: %s", cfg.PluckFallbackDiagnosticLog)
+	}
+
+	return loop, nil
 }
 
 // Start begins the starvation recovery loop.
@@ -289,7 +315,38 @@ func (l *StarvationRecoveryLoop) countInvisibleBeads(ctx context.Context, worksp
 }
 
 // countReadyBeads counts beads that are actually ready for workers to claim.
+// Uses PluckFallback if enabled, otherwise falls back to direct bead list --ready query.
 func (l *StarvationRecoveryLoop) countReadyBeads(ctx context.Context, workspacePath string) (int, error) {
+	// Use PluckFallback if enabled
+	if l.pluckFallback != nil {
+		candidates, strategy, discrepancies, err := l.pluckFallback.Pluck(ctx, workspacePath)
+		if err != nil {
+			log.Printf("[RecoveryLoop] PluckFallback failed for %s: %v", workspacePath, err)
+			// Fall back to direct query as last resort
+			return l.countReadyBeadsDirect(ctx, workspacePath)
+		}
+
+		// Log any discrepancies detected
+		for _, d := range discrepancies {
+			log.Printf("[RecoveryLoop] %s", d)
+		}
+
+		// If fallback was triggered, log it
+		if strategy != "primary" && len(candidates) > 0 {
+			log.Printf("[RecoveryLoop] PluckFallback used %s strategy and recovered %d beads in %s",
+				strategy, len(candidates), workspacePath)
+		}
+
+		return len(candidates), nil
+	}
+
+	// Fall back to direct query if PluckFallback is not enabled
+	return l.countReadyBeadsDirect(ctx, workspacePath)
+}
+
+// countReadyBeadsDirect counts beads using the direct `bead list --ready` query.
+// This is the fallback method when PluckFallback is not enabled.
+func (l *StarvationRecoveryLoop) countReadyBeadsDirect(ctx context.Context, workspacePath string) (int, error) {
 	cmd := exec.CommandContext(ctx, "bead", "list", "--ready", "--json")
 	cmd.Dir = workspacePath
 
@@ -407,6 +464,13 @@ func (l *StarvationRecoveryLoop) Stop() {
 
 	l.stopped = true
 	close(l.stopCh)
+
+	// Close PluckFallback if enabled
+	if l.pluckFallback != nil {
+		if err := l.pluckFallback.Close(); err != nil {
+			log.Printf("[RecoveryLoop] Failed to close PluckFallback: %v", err)
+		}
+	}
 
 	// Release lease leadership if configured
 	if l.leaseLeader != nil {
