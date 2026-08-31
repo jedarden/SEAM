@@ -94,6 +94,36 @@ func (s *DirectDBQueryStrategy) Execute(ctx context.Context, workspace string) (
 	return parseSQLiteOutput(output, s.Name()), nil
 }
 
+// OpenUnassignedQueryStrategy uses `bead list --status open --json` and filters for beads without assignee.
+type OpenUnassignedQueryStrategy struct{}
+
+func (s *OpenUnassignedQueryStrategy) Name() string {
+	return "open_unassigned"
+}
+
+func (s *OpenUnassignedQueryStrategy) Execute(ctx context.Context, workspace string) ([]PluckResult, error) {
+	cmd := exec.CommandContext(ctx, "bead", "list", "--status", "open", "--json")
+	cmd.Dir = workspace
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("bead list --status open: %w", err)
+	}
+
+	// Parse JSON and filter for unassigned beads
+	allResults := parseBeadListJSON(output, s.Name())
+
+	// Filter to only include beads without assignee
+	var unassignedResults []PluckResult
+	for _, result := range allResults {
+		if result.Assignee == "" || result.Assignee == "null" {
+			unassignedResults = append(unassignedResults, result)
+		}
+	}
+
+	return unassignedResults, nil
+}
+
 // CheckpointQueryStrategy reads from the checkpoint JSON file.
 type CheckpointQueryStrategy struct{}
 
@@ -137,7 +167,7 @@ func (s *CheckpointQueryStrategy) Execute(ctx context.Context, workspace string)
 		result := PluckResult{
 			ID:          issue.ID,
 			Title:       issue.Title,
-			Status:       statusToString(issue.Status),
+			Status:      statusToString(issue.Status),
 			Priority:    issue.Priority,
 			Labels:      issue.Labels,
 			QuerySource: s.Name(),
@@ -164,10 +194,11 @@ type PluckFallback struct {
 func NewPluckFallback(verbose bool, diagnosticLogPath string) (*PluckFallback, error) {
 	pf := &PluckFallback{
 		strategies: []QueryStrategy{
-			&PrimaryQueryStrategy{},
-			&OpenStatusQueryStrategy{},
-			&DirectDBQueryStrategy{},
-			&CheckpointQueryStrategy{},
+			&PrimaryQueryStrategy{},           // 1. Standard ready query
+			&OpenUnassignedQueryStrategy{},     // 2. Fallback to open beads without assignee
+			&OpenStatusQueryStrategy{},         // 3. Fallback to all open beads
+			&DirectDBQueryStrategy{},           // 4. Direct database query
+			&CheckpointQueryStrategy{},         // 5. Read from checkpoint
 		},
 		verbose: verbose,
 	}
@@ -183,9 +214,16 @@ func NewPluckFallback(verbose bool, diagnosticLogPath string) (*PluckFallback, e
 	return pf, nil
 }
 
+// StrategyMetrics tracks which strategies succeed.
+type StrategyMetrics struct {
+	StrategyName  string
+	SuccessCount  int
+	LastUsed      time.Time
+}
+
 // Pluck attempts to find bead candidates using fallback strategies.
-// Returns candidates found, which strategy succeeded, and any visibility discrepancies.
-func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckResult, string, []string, error) {
+// Returns candidates found, which strategy succeeded, metrics, and any visibility discrepancies.
+func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckResult, *StrategyMetrics, []string, error) {
 	var discrepancies []string
 	var lastError error
 
@@ -220,11 +258,96 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 			}
 		}
 
-		return results, strategy.Name(), discrepancies, nil
+		// Track metrics
+		metrics := &StrategyMetrics{
+			StrategyName: strategy.Name(),
+			SuccessCount: 1,
+			LastUsed:     time.Now(),
+		}
+
+		return results, metrics, discrepancies, nil
 	}
 
-	// All strategies failed
-	return nil, "", discrepancies, lastError
+	// All strategies failed - attempt automatic database rebuild
+	if pf.verbose {
+		log.Printf("[%s] All query strategies failed, attempting database rebuild from checkpoint", workspace)
+	}
+
+	rebuildErr := pf.rebuildDatabaseFromCheckpoint(ctx, workspace)
+	if rebuildErr != nil {
+		if pf.verbose {
+			log.Printf("[%s] Database rebuild failed: %v", workspace, rebuildErr)
+		}
+		discrepancies = append(discrepancies, fmt.Sprintf("[%s] All strategies failed and database rebuild failed: %v",
+			time.Now().Format(time.RFC3339), rebuildErr))
+
+		if pf.diagnosticLog != nil {
+			fmt.Fprintf(pf.diagnosticLog, "[%s] Database rebuild failed: %v\n",
+				time.Now().Format(time.RFC3339), rebuildErr)
+			pf.diagnosticLog.Sync()
+		}
+
+		return nil, nil, discrepancies, fmt.Errorf("all strategies failed and database rebuild failed: %w", rebuildErr)
+	}
+
+	// Database rebuild succeeded - retry pluck with primary strategy
+	if pf.verbose {
+		log.Printf("[%s] Database rebuild succeeded, retrying pluck", workspace)
+	}
+
+	if pf.diagnosticLog != nil {
+		fmt.Fprintf(pf.diagnosticLog, "[%s] Database rebuild from checkpoint succeeded, retrying pluck\n",
+			time.Now().Format(time.RFC3339))
+		pf.diagnosticLog.Sync()
+	}
+
+	// Retry with all strategies after rebuild
+	for i, strategy := range pf.strategies {
+		results, err := strategy.Execute(ctx, workspace)
+		if err != nil {
+			if pf.verbose {
+				log.Printf("[%s] Post-rebuild Strategy %d (%s) failed: %v", workspace, i, strategy.Name(), err)
+			}
+			continue
+		}
+
+		if pf.verbose {
+			log.Printf("[%s] Post-rebuild Strategy %d (%s) returned %d candidates", workspace, i, strategy.Name(), len(results))
+		}
+
+		// Track metrics for rebuild-recovered strategy
+		metrics := &StrategyMetrics{
+			StrategyName: strategy.Name() + "_rebuild",
+			SuccessCount: 1,
+			LastUsed:     time.Now(),
+		}
+
+		recoveryDetail := fmt.Sprintf("[%s] Database recovery successful: %s strategy returned %d candidates after rebuild",
+			time.Now().Format(time.RFC3339), strategy.Name(), len(results))
+		discrepancies = append(discrepancies, recoveryDetail)
+
+		if pf.diagnosticLog != nil {
+			fmt.Fprintf(pf.diagnosticLog, "%s\n", recoveryDetail)
+			for _, r := range results {
+				fmt.Fprintf(pf.diagnosticLog, "  - Recovered bead: %s (%s)\n", r.ID, r.Title)
+			}
+			pf.diagnosticLog.Sync()
+		}
+
+		return results, metrics, discrepancies, nil
+	}
+
+	// Even after rebuild, no strategies succeeded
+	rebuildFailure := fmt.Sprintf("[%s] Database rebuild succeeded but all strategies still returned no candidates",
+		time.Now().Format(time.RFC3339))
+	discrepancies = append(discrepancies, rebuildFailure)
+
+	if pf.diagnosticLog != nil {
+		fmt.Fprintf(pf.diagnosticLog, "%s\n", rebuildFailure)
+		pf.diagnosticLog.Sync()
+	}
+
+	return nil, nil, discrepancies, fmt.Errorf("database rebuild succeeded but no candidates found")
 }
 
 // Close closes the diagnostic log if open.
@@ -232,6 +355,63 @@ func (pf *PluckFallback) Close() error {
 	if pf.diagnosticLog != nil {
 		return pf.diagnosticLog.Close()
 	}
+	return nil
+}
+
+// rebuildDatabaseFromCheckpoint rebuilds the bead database from checkpoint.
+// Runs: bead sync import-only --input .beads/checkpoint/forensic.jsonl --restore-into-empty --actor system-recovery
+func (pf *PluckFallback) rebuildDatabaseFromCheckpoint(ctx context.Context, workspace string) error {
+	checkpointPath := filepath.Join(workspace, ".beads", "checkpoint", "forensic.jsonl")
+	if _, err := os.Stat(checkpointPath); err != nil {
+		return fmt.Errorf("checkpoint not found: %s", checkpointPath)
+	}
+
+	// Step 1: Backup existing database (if it exists)
+	dbPath := filepath.Join(workspace, ".beads", "beads.db")
+	backupPath := dbPath + ".backup"
+	if _, err := os.Stat(dbPath); err == nil {
+		if err := os.Rename(dbPath, backupPath); err != nil {
+			return fmt.Errorf("backup database: %w", err)
+		}
+		if pf.verbose {
+			log.Printf("[%s] Backed up database to %s", workspace, backupPath)
+		}
+	}
+
+	// Step 2: Reinitialize the database
+	cmd := exec.CommandContext(ctx, "bead", "init")
+	cmd.Dir = workspace
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			os.Rename(backupPath, dbPath)
+		}
+		return fmt.Errorf("bead init failed: %w: %s", err, string(output))
+	}
+
+	// Step 3: Import from checkpoint
+	cmd = exec.CommandContext(ctx, "bead", "sync", "import-only",
+		"--input", checkpointPath,
+		"--restore-into-empty",
+		"--actor", "system-recovery")
+	cmd.Dir = workspace
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			os.Rename(backupPath, dbPath)
+		}
+		return fmt.Errorf("bead sync import-only failed: %w: %s", err, string(output))
+	}
+
+	if pf.verbose {
+		log.Printf("[%s] Database rebuilt from checkpoint successfully", workspace)
+	}
+
+	// Step 4: Remove backup on success
+	if _, err := os.Stat(backupPath); err == nil {
+		os.Remove(backupPath)
+	}
+
 	return nil
 }
 
