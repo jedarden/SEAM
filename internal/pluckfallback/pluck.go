@@ -225,7 +225,6 @@ type StrategyMetrics struct {
 // Returns candidates found, which strategy succeeded, metrics, and any visibility discrepancies.
 func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckResult, *StrategyMetrics, []string, error) {
 	var discrepancies []string
-	var lastError error
 
 	for i, strategy := range pf.strategies {
 		results, err := strategy.Execute(ctx, workspace)
@@ -233,7 +232,6 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 			if pf.verbose {
 				log.Printf("[%s] Strategy %d (%s) failed: %v", workspace, i, strategy.Name(), err)
 			}
-			lastError = err
 			continue
 		}
 
