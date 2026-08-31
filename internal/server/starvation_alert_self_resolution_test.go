@@ -318,3 +318,251 @@ func TestCountReadyBeadsDirect(t *testing.T) {
 		t.Errorf("Expected non-negative count, got %d", count)
 	}
 }
+
+func TestRootCauseAnalyzerInitialization(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := SelfResolutionConfig{
+		WorkspaceRoot:       tempDir,
+		EnablePluckFallback: false,
+	}
+
+	daemon, err := NewStarvationAlertSelfResolution(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create daemon: %v", err)
+	}
+	defer daemon.Stop()
+
+	if daemon.rootCauseAnalyzer == nil {
+		t.Error("Root cause analyzer should be initialized")
+	}
+}
+
+func TestResolveAlertWithRootCauseAnalysis_PrimaryStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create a mock workspace with bead database
+	workspacePath := filepath.Join(tempDir, "test-ws")
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads"), 0755); err != nil {
+		t.Fatalf("Failed to create workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads", "checkpoint"), 0755); err != nil {
+		t.Fatalf("Failed to create checkpoint dir: %v", err)
+	}
+
+	// Create a minimal database and checkpoint
+	dbPath := filepath.Join(workspacePath, ".beads", "beads.db")
+	checkpointPath := filepath.Join(workspacePath, ".beads", "checkpoint", "current.json")
+	if err := os.WriteFile(dbPath, []byte("test db"), 0644); err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	if err := os.WriteFile(checkpointPath, []byte(`{"issues":[]}`), 0644); err != nil {
+		t.Fatalf("Failed to create checkpoint: %v", err)
+	}
+
+	cfg := SelfResolutionConfig{
+		WorkspaceRoot:       tempDir,
+		EnablePluckFallback: false,
+	}
+
+	daemon, err := NewStarvationAlertSelfResolution(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create daemon: %v", err)
+	}
+	defer daemon.Stop()
+
+	// Create a check history entry
+	beadID := "test-abc123"
+	now := time.Now()
+	history := &CheckHistory{
+		AlertID:    beadID,
+		Workspace:  filepath.Base(workspacePath),
+		FirstCheck: now.Add(-5 * time.Minute),
+		CheckCount: 1,
+	}
+
+	ctx := context.Background()
+
+	// Test resolveAlertWithRootCauseAnalysis with primary strategy
+	resolution := daemon.resolveAlertWithRootCauseAnalysis(
+		ctx,
+		workspacePath,
+		beadID,
+		3, // readyCount
+		"primary", // strategy
+		history,
+	)
+
+	if resolution == nil {
+		t.Fatal("Expected non-nil resolution")
+	}
+
+	// Verify resolution contains root cause information
+	if resolution.RootCause == "" {
+		t.Error("Expected non-empty root cause")
+	}
+
+	if resolution.RootCause != "transient-starvation" {
+		t.Errorf("Expected root cause 'transient-starvation', got '%s'", resolution.RootCause)
+	}
+
+	if !resolution.AutoRecovered {
+		t.Error("Expected auto-recovered=true for primary strategy")
+	}
+
+	t.Logf("Primary strategy resolution: rootCause=%s, autoRecovered=%v",
+		resolution.RootCause, resolution.AutoRecovered)
+}
+
+func TestResolveAlertWithRootCauseAnalysis_CheckpointStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create a mock workspace with bead database
+	workspacePath := filepath.Join(tempDir, "test-ws")
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads"), 0755); err != nil {
+		t.Fatalf("Failed to create workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads", "checkpoint"), 0755); err != nil {
+		t.Fatalf("Failed to create checkpoint dir: %v", err)
+	}
+
+	// Create a minimal database and checkpoint
+	dbPath := filepath.Join(workspacePath, ".beads", "beads.db")
+	checkpointPath := filepath.Join(workspacePath, ".beads", "checkpoint", "current.json")
+	if err := os.WriteFile(dbPath, []byte("test db"), 0644); err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	if err := os.WriteFile(checkpointPath, []byte(`{"issues":[]}`), 0644); err != nil {
+		t.Fatalf("Failed to create checkpoint: %v", err)
+	}
+
+	cfg := SelfResolutionConfig{
+		WorkspaceRoot:       tempDir,
+		EnablePluckFallback: false,
+	}
+
+	daemon, err := NewStarvationAlertSelfResolution(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create daemon: %v", err)
+	}
+	defer daemon.Stop()
+
+	// Create a check history entry
+	beadID := "test-def456"
+	now := time.Now()
+	history := &CheckHistory{
+		AlertID:    beadID,
+		Workspace:  filepath.Base(workspacePath),
+		FirstCheck: now.Add(-5 * time.Minute),
+		CheckCount: 1,
+	}
+
+	ctx := context.Background()
+
+	// Test resolveAlertWithRootCauseAnalysis with checkpoint strategy
+	resolution := daemon.resolveAlertWithRootCauseAnalysis(
+		ctx,
+		workspacePath,
+		beadID,
+		2, // readyCount
+		"checkpoint", // strategy
+		history,
+	)
+
+	if resolution == nil {
+		t.Fatal("Expected non-nil resolution")
+	}
+
+	// Verify resolution contains root cause information
+	if resolution.RootCause == "" {
+		t.Error("Expected non-empty root cause")
+	}
+
+	// Checkpoint strategy should result in database-corruption
+	if resolution.RootCause != "database-corruption" {
+		t.Errorf("Expected root cause 'database-corruption', got '%s'", resolution.RootCause)
+	}
+
+	if !resolution.AutoRecovered {
+		t.Error("Expected auto-recovered=true for checkpoint strategy")
+	}
+
+	t.Logf("Checkpoint strategy resolution: rootCause=%s, autoRecovered=%v",
+		resolution.RootCause, resolution.AutoRecovered)
+}
+
+func TestResolveAlertWithRootCauseAnalysis_DirectDBStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create a mock workspace with bead database
+	workspacePath := filepath.Join(tempDir, "test-ws")
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads"), 0755); err != nil {
+		t.Fatalf("Failed to create workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspacePath, ".beads", "checkpoint"), 0755); err != nil {
+		t.Fatalf("Failed to create checkpoint dir: %v", err)
+	}
+
+	// Create a minimal database and checkpoint
+	dbPath := filepath.Join(workspacePath, ".beads", "beads.db")
+	checkpointPath := filepath.Join(workspacePath, ".beads", "checkpoint", "current.json")
+	if err := os.WriteFile(dbPath, []byte("test db"), 0644); err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	if err := os.WriteFile(checkpointPath, []byte(`{"issues":[]}`), 0644); err != nil {
+		t.Fatalf("Failed to create checkpoint: %v", err)
+	}
+
+	cfg := SelfResolutionConfig{
+		WorkspaceRoot:       tempDir,
+		EnablePluckFallback: false,
+	}
+
+	daemon, err := NewStarvationAlertSelfResolution(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create daemon: %v", err)
+	}
+	defer daemon.Stop()
+
+	// Create a check history entry
+	beadID := "test-ghi789"
+	now := time.Now()
+	history := &CheckHistory{
+		AlertID:    beadID,
+		Workspace:  filepath.Base(workspacePath),
+		FirstCheck: now.Add(-5 * time.Minute),
+		CheckCount: 1,
+	}
+
+	ctx := context.Background()
+
+	// Test resolveAlertWithRootCauseAnalysis with direct_db strategy
+	resolution := daemon.resolveAlertWithRootCauseAnalysis(
+		ctx,
+		workspacePath,
+		beadID,
+		4, // readyCount
+		"direct_db", // strategy
+		history,
+	)
+
+	if resolution == nil {
+		t.Fatal("Expected non-nil resolution")
+	}
+
+	// Verify resolution contains root cause information
+	if resolution.RootCause == "" {
+		t.Error("Expected non-empty root cause")
+	}
+
+	// direct_db strategy should result in cli-failure
+	if resolution.RootCause != "cli-failure" {
+		t.Errorf("Expected root cause 'cli-failure', got '%s'", resolution.RootCause)
+	}
+
+	if !resolution.AutoRecovered {
+		t.Error("Expected auto-recovered=true for direct_db strategy")
+	}
+
+	t.Logf("Direct DB strategy resolution: rootCause=%s, autoRecovered=%v",
+		resolution.RootCause, resolution.AutoRecovered)
+}
