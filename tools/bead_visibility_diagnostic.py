@@ -72,11 +72,17 @@ class BeadVisibilityChecker:
                 timeout=30
             )
             if result.returncode == 0:
-                beads = json.loads(result.stdout)
-                if isinstance(beads, list):
-                    return [b["id"] for b in beads]
-                elif isinstance(beads, dict) and "id" in beads:
-                    return [beads["id"]]
+                # Handle NDJSON output (one JSON object per line)
+                bead_ids = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        try:
+                            bead = json.loads(line)
+                            if isinstance(bead, dict) and "id" in bead:
+                                bead_ids.append(bead["id"])
+                        except json.JSONDecodeError:
+                            continue
+                return bead_ids
         except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError) as e:
             self.logger.warning(f"CLI open query failed: {e}")
         return []
@@ -92,11 +98,17 @@ class BeadVisibilityChecker:
                 timeout=30
             )
             if result.returncode == 0:
-                beads = json.loads(result.stdout)
-                if isinstance(beads, list):
-                    return [b["id"] for b in beads]
-                elif isinstance(beads, dict) and "id" in beads:
-                    return [beads["id"]]
+                # Handle NDJSON output (one JSON object per line)
+                bead_ids = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        try:
+                            bead = json.loads(line)
+                            if isinstance(bead, dict) and "id" in bead:
+                                bead_ids.append(bead["id"])
+                        except json.JSONDecodeError:
+                            continue
+                return bead_ids
         except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError) as e:
             self.logger.warning(f"CLI ready query failed: {e}")
         return []
