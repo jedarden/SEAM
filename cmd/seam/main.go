@@ -25,6 +25,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "  diff             Show differences between fragment versions")
 		fmt.Fprintln(os.Stderr, "  import           Import fragments into SEAM")
 		fmt.Fprintln(os.Stderr, "  bead-health-daemon  Run bead health monitoring and repair daemon")
+		fmt.Fprintln(os.Stderr, "  database-recovery-daemon  Run database corruption detection and recovery daemon")
 		os.Exit(1)
 	}
 
@@ -44,9 +45,11 @@ func main() {
 		importCommand(args)
 	case "bead-health-daemon":
 		beadHealthDaemonCommand(args)
+	case "database-recovery-daemon":
+		databaseRecoveryDaemonCommand(args)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import, bead-health-daemon")
+		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import, bead-health-daemon, database-recovery-daemon")
 		os.Exit(1)
 	}
 }
@@ -359,4 +362,83 @@ func beadHealthDaemonCommand(args []string) {
 	}
 
 	log.Println("[BeadHealth] Daemon stopped")
+}
+
+// databaseRecoveryDaemonCommand runs the database corruption detection and recovery daemon.
+func databaseRecoveryDaemonCommand(args []string) {
+	fs := flag.NewFlagSet("database-recovery-daemon", flag.ExitOnError)
+
+	workspaceRoot := fs.String("workspace-root", "/home/coding", "Root directory containing all workspaces")
+	checkInterval := fs.Duration("check-interval", 5*time.Minute, "How often to check for database corruption")
+	statePath := fs.String("state-path", "", "Path to daemon state JSON file")
+	diagnosticLogPath := fs.String("diagnostic-log-path", "", "Path to diagnostic log file")
+	leaseName := fs.String("lease-name", "seam-database-recovery", "Kubernetes Lease resource name")
+	leaseNamespace := fs.String("lease-namespace", "seam", "Kubernetes Lease namespace")
+
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("Starting SEAM database corruption recovery daemon:")
+	log.Printf("  Workspace root: %s", *workspaceRoot)
+	log.Printf("  Check interval: %v", *checkInterval)
+	log.Printf("  State path: %s", *statePath)
+	log.Printf("  Diagnostic log: %s", *diagnosticLogPath)
+	log.Printf("  Lease: %s/%s", *leaseNamespace, *leaseName)
+
+	// Create lease leader for distributed coordination
+	leaseLeader, err := server.NewLeaseLeader(server.LeaseConfig{
+		LeaseName: *leaseName,
+		LeaseNamespace: *leaseNamespace,
+		OnLeadershipLost: func() {
+			log.Println("[DatabaseRecovery] Leadership lost, shutting down")
+			os.Exit(0)
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to create lease leader: %v", err)
+	}
+
+	// Create database corruption recovery daemon
+	daemon, err := server.NewDatabaseCorruptionRecoveryDaemon(server.DatabaseCorruptionConfig{
+		WorkspaceRoot:     *workspaceRoot,
+		LeaseLeader:       leaseLeader,
+		CheckInterval:     *checkInterval,
+		StatePath:         *statePath,
+		DiagnosticLogPath: *diagnosticLogPath,
+		OnRecovery: func(result *server.DatabaseRecoveryResult) {
+			if result.Success {
+				log.Printf("[DatabaseRecovery] Recovery: %s - method=%s, cli=%d, db=%d, alerts_closed=%d",
+					result.Workspace, result.RecoveryMethod, result.CliOpenCount,
+					result.DbOpenCount, len(result.AlertsClosed))
+			} else {
+				log.Printf("[DatabaseRecovery] Recovery failed: %s - %s", result.Workspace, result.Error)
+			}
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to create database recovery daemon: %v", err)
+	}
+
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh
+		log.Println("[DatabaseRecovery] Received shutdown signal")
+		daemon.Stop()
+		cancel()
+	}()
+
+	// Start the daemon
+	if err := daemon.Start(ctx); err != nil {
+		log.Fatalf("Daemon failed: %v", err)
+	}
+
+	log.Println("[DatabaseRecovery] Daemon stopped")
 }
