@@ -1,0 +1,24 @@
+[Unit]
+Description=Starvation Recovery Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=coding
+Group=users
+WorkingDirectory=/home/coding
+ExecStart=/usr/local/bin/starvation-recovery --interval 5m --verbose
+Restart=always
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/coding
+
+[Install]
+WantedBy=multi-user.target
