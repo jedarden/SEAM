@@ -90,12 +90,21 @@ func (s *Server) exclusionAllReportsHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// For now, return an empty list - we'll need to wire this up to the actual tracker
-	// when we integrate it with the server structure
+	// Get all reports from the tracker
 	response := exclusionListResponse{
 		Timestamp:    time.Now(),
 		TotalReports: 0,
 		Reports:      []exclusionReportData{},
+	}
+
+	if s.exclusionTracker != nil {
+		allReports := s.exclusionTracker.GetAllReports()
+		response.TotalReports = len(allReports)
+
+		for workspace, report := range allReports {
+			reportData := convertExclusionReport(report)
+			response.Reports = append(response.Reports, *reportData)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -180,19 +189,165 @@ func (s *Server) exclusionSummaryHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// For now, return a basic summary
-	// This could be expanded to aggregate across all workspaces
 	summary := map[string]interface{}{
 		"timestamp":             time.Now(),
 		"workspaces_analyzed":   0,
-		"total_exclusions":     0,
-		"starvation_events":    0,
-		"most_common_reason":    nil,
-		"message":              "Exclusion tracking integration pending - reports available via on-demand analysis",
+		"total_exclusions":       0,
+		"starvation_events":     0,
+		"most_common_reason":     nil,
+		"active_alerts":         0,
+		"rolling_window_stats":  nil,
+		"message":              "Exclusion tracking active",
+	}
+
+	if s.exclusionTracker != nil {
+		// Get rolling window statistics
+		rollingStats := s.exclusionTracker.GetRollingWindowStats()
+		summary["rolling_window_stats"] = rollingStats
+
+		// Get all reports
+		allReports := s.exclusionTracker.GetAllReports()
+		summary["workspaces_analyzed"] = len(allReports)
+
+		// Calculate totals
+		totalExclusions := 0
+		starvationEvents := 0
+		mostCommonReason := ""
+		mostCommonCount := 0
+		reasonCounts := make(map[string]int)
+
+		for _, report := range allReports {
+			totalExclusions += report.Summary.TotalExcluded
+			if report.ReadyCount == 0 && report.OpenCount > 0 {
+				starvationEvents++
+			}
+
+			// Aggregate reason counts
+			for reason, count := range report.Summary.ByReason {
+				reasonCounts[string(reason)] += count
+			}
+		}
+
+		summary["total_exclusions"] = totalExclusions
+		summary["starvation_events"] = starvationEvents
+
+		// Find most common reason overall
+		for reason, count := range reasonCounts {
+			if count > mostCommonCount {
+				mostCommonReason = reason
+				mostCommonCount = count
+			}
+		}
+		summary["most_common_reason"] = mostCommonReason
+
+		// Get active alerts
+		activeAlerts := s.exclusionTracker.GetActiveAlerts()
+		summary["active_alerts"] = len(activeAlerts)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
+}
+
+// exclusionAlertsHandler returns all alerts (active and resolved).
+// Handler: GET /api/v1/exclusions/alerts
+func (s *Server) exclusionAlertsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.exclusionTracker == nil {
+		http.Error(w, "Exclusion tracker not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	alerts := s.exclusionTracker.GetAllAlerts()
+
+	response := map[string]interface{}{
+		"timestamp":    time.Now(),
+		"total_alerts": len(alerts),
+		"alerts":       alerts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// exclusionActiveAlertsHandler returns only active (unresolved) alerts.
+// Handler: GET /api/v1/exclusions/alerts/active
+func (s *Server) exclusionActiveAlertsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.exclusionTracker == nil {
+		http.Error(w, "Exclusion tracker not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	alerts := s.exclusionTracker.GetActiveAlerts()
+
+	response := map[string]interface{}{
+		"timestamp":      time.Now(),
+		"active_alerts": len(alerts),
+		"alerts":         alerts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// exclusionResolveAlertHandler marks an alert as resolved.
+// Handler: POST /api/v1/exclusions/alerts/resolve
+// Request body: {"alert_id": "sysalert-..."}
+func (s *Server) exclusionResolveAlertHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.exclusionTracker == nil {
+		http.Error(w, "Exclusion tracker not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req struct {
+		AlertID string `json:"alert_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if req.AlertID == "" {
+		http.Error(w, "Missing alert_id in request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.exclusionTracker.ResolveAlert(req.AlertID); err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success":  true,
+		"alert_id": req.AlertID,
+		"message":  "Alert resolved successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+	log.Printf("[exclusionResolveAlertHandler] Alert resolved: %s", req.AlertID)
 }
 
 // convertExclusionReport converts a pluckfallback.ExclusionReport to the HTTP response format.
