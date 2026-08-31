@@ -319,7 +319,7 @@ func (l *StarvationRecoveryLoop) countInvisibleBeads(ctx context.Context, worksp
 func (l *StarvationRecoveryLoop) countReadyBeads(ctx context.Context, workspacePath string) (int, error) {
 	// Use PluckFallback if enabled
 	if l.pluckFallback != nil {
-		candidates, strategy, discrepancies, err := l.pluckFallback.Pluck(ctx, workspacePath)
+		candidates, metrics, discrepancies, err := l.pluckFallback.Pluck(ctx, workspacePath)
 		if err != nil {
 			log.Printf("[RecoveryLoop] PluckFallback failed for %s: %v", workspacePath, err)
 			// Fall back to direct query as last resort
@@ -331,10 +331,16 @@ func (l *StarvationRecoveryLoop) countReadyBeads(ctx context.Context, workspaceP
 			log.Printf("[RecoveryLoop] %s", d)
 		}
 
+		// Log metrics if available
+		if metrics != nil {
+			log.Printf("[RecoveryLoop] PluckFallback strategy: %s (last used: %s)",
+				metrics.StrategyName, metrics.LastUsed.Format(time.RFC3339))
+		}
+
 		// If fallback was triggered, log it
-		if strategy != "primary" && len(candidates) > 0 {
+		if metrics != nil && metrics.StrategyName != "primary" && len(candidates) > 0 {
 			log.Printf("[RecoveryLoop] PluckFallback used %s strategy and recovered %d beads in %s",
-				strategy, len(candidates), workspacePath)
+				metrics.StrategyName, len(candidates), workspacePath)
 		}
 
 		return len(candidates), nil
