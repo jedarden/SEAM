@@ -98,7 +98,12 @@ func main() {
 		return
 	}
 
-	// Loop mode
+	// Loop mode - run immediate check first, then periodic
+	log.Println("[Revaluator] Running immediate check on startup for contradictory alerts...")
+	immediateResolutions := revaluator.runAllWorkspaces(context.Background())
+	revaluator.reportResolutions(immediateResolutions)
+	log.Println("[Revaluator] Immediate check complete, starting periodic loop")
+
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
 
