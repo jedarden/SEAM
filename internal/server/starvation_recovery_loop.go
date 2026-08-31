@@ -33,6 +33,8 @@ type StarvationRecoveryLoop struct {
 	pluckFallback       *pluckfallback.PluckFallback // PluckFallback for resilient bead querying
 	diagnosticLogPath   string                        // Path to diagnostic log for pluck discrepancies
 	metrics             *Metrics                       // Prometheus metrics publisher
+	repairQueue         *RepairQueue                  // Repair queue for auto-repairable issues
+	rootCauseAnalyzer   *RootCauseAnalyzer            // Root cause analysis for queuing decisions
 }
 
 // RecoveryConfig holds the configuration for the starvation recovery loop.
@@ -63,6 +65,12 @@ type RecoveryConfig struct {
 
 	// Metrics is the Prometheus metrics publisher for recovery metrics
 	Metrics *Metrics
+
+	// EnableRepairQueue enables auto-repairable issue queuing (default: true)
+	EnableRepairQueue bool
+
+	// RepairQueuePath is the path to the repair queue file (default: .beads/diagnostics/repair-queue.jsonl)
+	RepairQueuePath string
 }
 
 // NewStarvationRecoveryLoop creates a new starvation recovery loop.
@@ -96,6 +104,7 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		onRecoveryComplete: cfg.OnRecoveryComplete,
 		diagnosticLogPath:  cfg.PluckFallbackDiagnosticLog,
 		metrics:           cfg.Metrics,
+		rootCauseAnalyzer: NewRootCauseAnalyzer(),
 	}
 
 	// Initialize PluckFallback if enabled
@@ -111,7 +120,61 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		log.Printf("[RecoveryLoop] PluckFallback enabled with diagnostic log: %s", cfg.PluckFallbackDiagnosticLog)
 	}
 
+	// Initialize repair queue if enabled (default: true)
+	if cfg.EnableRepairQueue || cfg.EnableRepairQueue == false { // Default to true if not explicitly set
+		if cfg.RepairQueuePath == "" {
+			cfg.RepairQueuePath = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "repair-queue.jsonl")
+		}
+
+		repairQueue, err := NewRepairQueue(RepairQueueConfig{
+			QueuePath:          cfg.RepairQueuePath,
+			MaxQueueSize:       1000,
+			MaxAttemptsPerItem: cfg.MaxAttemptsPerBead,
+			OnItemAdded: func(item *RepairItem) {
+				log.Printf("[RecoveryLoop] Repair item queued: %s (root_cause=%s)", item.ID, item.RootCause)
+				if loop.metrics != nil {
+					loop.metrics.UpdateRepairQueueSize(item.Workspace, float64(getQueueSize(loop.repairQueue)))
+					loop.metrics.UpdateRepairQueueByRootCause(item.RootCause, float64(getQueueCountByCause(loop.repairQueue, item.RootCause)))
+				}
+			},
+			OnItemProcessed: func(item *RepairItem, result *RepairResult) {
+				if loop.metrics != nil {
+					loop.metrics.UpdateRepairQueueSize(item.Workspace, float64(getQueueSize(loop.repairQueue)))
+				}
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("initialize repair queue: %w", err)
+		}
+		loop.repairQueue = repairQueue
+		log.Printf("[RecoveryLoop] Repair queue enabled: %s", cfg.RepairQueuePath)
+	}
+
 	return loop, nil
+}
+
+// getQueueSize returns the current queue size (helper function).
+func getQueueSize(q *RepairQueue) int {
+	if q == nil {
+		return 0
+	}
+	stats, err := q.Stats(context.Background())
+	if err != nil {
+		return 0
+	}
+	return stats.TotalItems
+}
+
+// getQueueCountByCause returns the count for a specific root cause (helper function).
+func getQueueCountByCause(q *RepairQueue, cause string) int {
+	if q == nil {
+		return 0
+	}
+	stats, err := q.Stats(context.Background())
+	if err != nil {
+		return 0
+	}
+	return stats.ByRootCause[cause]
 }
 
 // Start begins the starvation recovery loop.
@@ -830,4 +893,61 @@ func (l *StarvationRecoveryLoop) IsRunning() bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return !l.stopped && (l.leaseLeader == nil || l.leaseLeader.IsLeader())
+}
+
+// queueForAutoRepair analyzes the starvation issue and queues it for auto-repair if appropriate.
+// This is called when automated recovery fails to resolve the starvation condition.
+func (l *StarvationRecoveryLoop) queueForAutoRepair(ctx context.Context, workspacePath string, readyCount int) {
+	workspaceName := filepath.Base(workspacePath)
+
+	log.Printf("[RecoveryLoop] Analyzing starvation in %s for auto-repair queuing", workspaceName)
+
+	// Run root cause analysis
+	rootCause, autoRecovered, analysisDetails := l.rootCauseAnalyzer.Analyze(ctx, workspacePath, "recovery-loop-failed", readyCount, nil)
+
+	// Check if this issue is auto-repairable
+	// Auto-repairable issues: index-corrupt, database-corrupt, checkpoint-out-of-sync, filter-mismatch, stale-assignment
+	// Non-repairable issues: business-logic-required, external-dependency-failed
+	repairableCauses := map[string]bool{
+		"index-corrupt":          true,
+		"database-corrupt":       true,
+		"checkpoint-out-of-sync": true,
+		"filter-mismatch":        true,
+		"stale-assignment":       true,
+	}
+
+	isRepairable := repairableCauses[rootCause]
+
+	if !isRepairable {
+		log.Printf("[RecoveryLoop] Root cause %s in %s is not auto-repairable, skipping queue", rootCause, workspaceName)
+		// Non-repairable issues will be handled by existing escalation logic
+		return
+	}
+
+	log.Printf("[RecoveryLoop] Root cause %s in %s is auto-repairable, queuing for repair daemon", rootCause, workspaceName)
+
+	// Create repair item
+	item := &RepairItem{
+		Workspace:   workspacePath,
+		AlertID:     fmt.Sprintf("starvation-%s-%d", workspaceName, time.Now().Unix()),
+		RootCause:   rootCause,
+		Priority:    2, // P2 - medium priority
+		MaxAttempts: 3,
+		QueuedBy:    "starvation-recovery-loop",
+	}
+
+	// Enqueue the item
+	enqueued, existingItem, err := l.repairQueue.Enqueue(ctx, item)
+	if err != nil {
+		log.Printf("[RecoveryLoop] Failed to enqueue repair item for %s: %v", workspaceName, err)
+		return
+	}
+
+	if !enqueued && existingItem != nil {
+		log.Printf("[RecoveryLoop] Repair item already exists for %s (item_id=%s, root_cause=%s)",
+			workspaceName, existingItem.ID, existingItem.RootCause)
+	} else if enqueued {
+		log.Printf("[RecoveryLoop] ✓ Queued repair item %s for %s (root_cause=%s)",
+			item.ID, workspaceName, rootCause)
+	}
 }
