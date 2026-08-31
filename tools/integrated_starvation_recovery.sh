@@ -140,8 +140,8 @@ count_beads() {
         return 0
     fi
 
-    # Count JSON array elements
-    echo "$json_output" | jq '. | length'
+    # Count JSON array elements (use -s to handle JSONL format)
+    echo "$json_output" | jq -s '. | length'
 }
 
 # Function to count ready beads
@@ -156,8 +156,8 @@ count_ready_beads() {
         return 0
     fi
 
-    # Count JSON array elements
-    echo "$json_output" | jq '. | length'
+    # Count JSON array elements (use -s to handle JSONL format)
+    echo "$json_output" | jq -s '. | length'
 }
 
 # Function to find starvation alert beads
@@ -171,19 +171,26 @@ find_starvation_alert_beads() {
         return 0
     fi
 
-    # Process JSON array
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
+    # Use jq to filter beads with starvation alert labels directly
+    # This handles both JSONL and JSON array formats
+    local ids
+    ids=$(echo "$json_output" | jq -r '
+        . as $raw |
+        if type == "array" then $raw else [$raw] end |
+        .[] |
+        select(.labels != null and (.labels[] | contains("starvation-alert"))) |
+        .id
+    ' 2>/dev/null)
 
-        # Check if bead has starvation alert label
-        if echo "$line" | jq -e '.labels[] | select(. == "starvation-alert" or startswith("alert:starvation"))' >/dev/null 2>&1; then
-            local id
-            id=$(echo "$line" | jq -r '.id')
-            [[ -n "$id" ]] && alerts+=("$id")
-        fi
-    done < <(echo "$json_output" | jq -r '.[] | @json')
+    # Add non-empty IDs to the array
+    while IFS= read -r id; do
+        [[ -n "$id" ]] && alerts+=("$id")
+    done <<< "$ids"
 
-    printf '%s\n' "${alerts[@]}"
+    # Only print if we have alerts
+    if [[ ${#alerts[@]} -gt 0 ]]; then
+        printf '%s\n' "${alerts[@]}"
+    fi
 }
 
 # Function to close a bead
