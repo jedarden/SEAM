@@ -183,7 +183,10 @@ func (r *RecoveryTool) runRecovery(ctx context.Context, workspacePath string) *R
 	log.Printf("[%s] State: open=%d, invisible=%d, ready=%d", workspaceName, openBeads, invisible, ready)
 
 	// Check if starvation condition exists
-	hasStarvation := (ready == 0) && (openBeads > 0 || invisible > 0)
+	// CRITICAL: openBeads > 0 is mandatory - never create starvation alert when open beads is 0
+	// The "invisible > 0" alone is insufficient; must have at least one open bead
+	// This prevents false-positive alerts claiming "open beads exist" when count is 0
+	hasStarvation := (ready == 0) && (openBeads > 0)
 	if !hasStarvation {
 		log.Printf("[%s] No starvation detected (ready beads available)", workspaceName)
 		result.Success = true

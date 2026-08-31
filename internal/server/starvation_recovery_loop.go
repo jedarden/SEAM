@@ -246,8 +246,9 @@ func (l *StarvationRecoveryLoop) checkWorkspace(ctx context.Context, workspacePa
 
 // detectStarvation checks if a workspace is in starvation state.
 // Starvation = no ready beads available but open/invisible beads exist.
+// IMPORTANT: Self-verifies open bead count against direct database query before declaring starvation.
 func (l *StarvationRecoveryLoop) detectStarvation(ctx context.Context, workspacePath string) (hasStarvation bool, openBeadsCount int, invisibleCount int, err error) {
-	// Count open beads
+	// Count open beads via CLI
 	openCount, err := l.countBeadsByStatus(ctx, workspacePath, "open")
 	if err != nil {
 		return false, 0, 0, fmt.Errorf("count open beads: %w", err)
@@ -265,10 +266,40 @@ func (l *StarvationRecoveryLoop) detectStarvation(ctx context.Context, workspace
 		return false, openCount, invisible, fmt.Errorf("count ready beads: %w", err)
 	}
 
-	// Starvation condition: no ready beads but open/invisible beads exist
-	hasStarvation = (readyCount == 0) && (openCount > 0 || invisible > 0)
+	// Self-verification: Compare CLI-based open count against direct database query
+	// This prevents false-positive starvation alerts when the CLI returns stale/incorrect data
+	dbOpenCount, err := l.verifyOpenBeadCountDirectDB(ctx, workspacePath)
+	if err != nil {
+		// If direct DB query fails, log warning but continue with CLI count
+		log.Printf("[RecoveryLoop] WARNING: Direct DB verification failed for %s: %v (using CLI count)", filepath.Base(workspacePath), err)
+		dbOpenCount = openCount // fallback to CLI count
+	}
 
-	return hasStarvation, openCount, invisible, nil
+	// Detection anomaly check: If CLI claims open beads exist but DB shows none, suppress alert
+	if openCount > 0 && dbOpenCount == 0 {
+		log.Printf("[RecoveryLoop] DETECTION ANOMALY in %s: CLI reports %d open beads but direct DB query shows 0. Suppressing starvation alert to prevent false positive.",
+			filepath.Base(workspacePath), openCount)
+		// Log to diagnostic file if available
+		if l.diagnosticLogPath != "" {
+			l.logDetectionAnomaly(ctx, workspacePath, openCount, dbOpenCount, readyCount, invisible)
+		}
+		// Suppress the alert - return no starvation despite CLI claim
+		return false, openCount, invisible, nil
+	}
+
+	// Log verification result if counts differ (but don't suppress unless DB shows zero)
+	if openCount != dbOpenCount {
+		log.Printf("[RecoveryLoop] VERIFICATION DISCREPANCY in %s: CLI=%d open beads, DB=%d open beads. Proceeding with DB count as authoritative.",
+			filepath.Base(workspacePath), openCount, dbOpenCount)
+	}
+
+	// Starvation condition: no ready beads but open/invisible beads exist
+	// CRITICAL: dbOpenCount > 0 is mandatory - never create starvation alert when open beads is 0
+	// The "invisible > 0" alone is insufficient; must have at least one open bead
+	// This prevents false-positive alerts claiming "open beads exist" when count is 0
+	hasStarvation = (readyCount == 0) && (dbOpenCount > 0)
+
+	return hasStarvation, dbOpenCount, invisible, nil
 }
 
 // countBeadsByStatus counts beads with a given status.
@@ -365,6 +396,65 @@ func (l *StarvationRecoveryLoop) countReadyBeadsDirect(ctx context.Context, work
 	// Parse JSON output and count beads
 	count := strings.Count(string(output), `"id":`)
 	return count, nil
+}
+
+// verifyOpenBeadCountDirectDB performs self-verification by querying the database directly.
+// Returns the count of open beads from the authoritative database source.
+// This prevents false-positive starvation alerts based on stale CLI output.
+func (l *StarvationRecoveryLoop) verifyOpenBeadCountDirectDB(ctx context.Context, workspacePath string) (int, error) {
+	dbPath := filepath.Join(workspacePath, ".beads", "beads.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return 0, fmt.Errorf("database not found: %s", dbPath)
+	}
+
+	// Direct database query: SELECT COUNT(*) FROM issues WHERE status = 'open'
+	// Status enum: 0=open, 1=in_progress, 2=deferred, 3=closed
+	query := `SELECT COUNT(*) FROM issues WHERE status = 0`
+	cmd := exec.CommandContext(ctx, "sqlite3", dbPath, query)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("sqlite3 query failed: %w", err)
+	}
+
+	// Parse the count from output (sqlite3 returns just the number)
+	countStr := strings.TrimSpace(string(output))
+	if countStr == "" {
+		return 0, nil
+	}
+
+	var count int
+	if _, err := fmt.Sscanf(countStr, "%d", &count); err != nil {
+		return 0, fmt.Errorf("parse count from sqlite output: %w", err)
+	}
+
+	return count, nil
+}
+
+// logDetectionAnomaly logs a detection anomaly to the diagnostic log.
+// Called when CLI reports open beads but direct DB query shows none.
+func (l *StarvationRecoveryLoop) logDetectionAnomaly(ctx context.Context, workspacePath string, cliCount, dbCount, readyCount, invisibleCount int) {
+	timestamp := time.Now().Format(time.RFC3339)
+	anomalyLog := fmt.Sprintf(
+		"[%s] DETECTION_ANOMALY workspace=%s cli_open=%d db_open=%d ready=%d invisible=%d message=CLI reported open beads but direct DB query showed zero. Starvation alert suppressed to prevent false positive.",
+		timestamp, filepath.Base(workspacePath), cliCount, dbCount, readyCount, invisibleCount,
+	)
+
+	// Append to diagnostic log file
+	if l.diagnosticLogPath != "" {
+		f, err := os.OpenFile(l.diagnosticLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Printf("[RecoveryLoop] Failed to open diagnostic log: %v", err)
+			return
+		}
+		defer f.Close()
+
+		if _, err := f.WriteString(anomalyLog + "\n"); err != nil {
+			log.Printf("[RecoveryLoop] Failed to write to diagnostic log: %v", err)
+		}
+	}
+
+	// Always log to stderr as well
+	log.Printf("[RecoveryLoop] %s", anomalyLog)
 }
 
 // runAutomatedRecovery executes the automated recovery steps.
