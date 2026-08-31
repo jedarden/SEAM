@@ -192,7 +192,7 @@ type PluckFallback struct {
 }
 
 // NewPluckFallback creates a new PluckFallback with default strategies.
-func NewPluckFallback(verbose bool, diagnosticLogPath string) (*PluckFallback, error) {
+func NewPluckFallback(verbose bool, diagnosticLogPath string, workspaceRoot string) (*PluckFallback, error) {
 	pf := &PluckFallback{
 		strategies: []QueryStrategy{
 			&PrimaryQueryStrategy{},           // 1. Standard ready query
@@ -218,7 +218,7 @@ func NewPluckFallback(verbose bool, diagnosticLogPath string) (*PluckFallback, e
 		exclusionLogPath = ""
 	}
 
-	tracker, err := NewExclusionTracker(exclusionLogPath, verbose)
+	tracker, err := NewExclusionTracker(exclusionLogPath, verbose, workspaceRoot, 30*time.Minute)
 	if err != nil {
 		log.Printf("[PluckFallback] Failed to create exclusion tracker: %v (continuing without it)", err)
 	} else {

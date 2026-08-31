@@ -125,7 +125,7 @@ func NewStarvationAlertSelfResolution(cfg SelfResolutionConfig) (*StarvationAler
 		if cfg.PluckFallbackDiagnosticLog == "" {
 			cfg.PluckFallbackDiagnosticLog = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "starvation-alert-resolution.log")
 		}
-		pf, err := pluckfallback.NewPluckFallback(true, cfg.PluckFallbackDiagnosticLog)
+		pf, err := pluckfallback.NewPluckFallback(true, cfg.PluckFallbackDiagnosticLog, cfg.WorkspaceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("initialize pluck fallback: %w", err)
 		}

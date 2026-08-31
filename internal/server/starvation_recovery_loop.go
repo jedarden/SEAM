@@ -112,7 +112,7 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		if cfg.PluckFallbackDiagnosticLog == "" {
 			cfg.PluckFallbackDiagnosticLog = filepath.Join(cfg.WorkspaceRoot, ".beads", "diagnostics", "pluck-fallback.log")
 		}
-		pf, err := pluckfallback.NewPluckFallback(true, cfg.PluckFallbackDiagnosticLog)
+		pf, err := pluckfallback.NewPluckFallback(true, cfg.PluckFallbackDiagnosticLog, cfg.WorkspaceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("initialize pluck fallback: %w", err)
 		}

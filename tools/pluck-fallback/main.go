@@ -25,7 +25,7 @@ func main() {
 		log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	}
 
-	pf, err := pluckfallback.NewPluckFallback(*verbose, *diagnosticLog)
+	pf, err := pluckfallback.NewPluckFallback(*verbose, *diagnosticLog, *workspace)
 	if err != nil {
 		log.Fatalf("Failed to create pluck fallback: %v", err)
 	}
