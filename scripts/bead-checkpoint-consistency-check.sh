@@ -12,24 +12,29 @@ set -euo pipefail
 # 4. Verify restoration succeeded before proceeding
 #
 # Usage:
-#   ./scripts/bead-checkpoint-consistency-check.sh [--dry-run] [--verbose] [--force-repair]
+#   ./scripts/bead-checkpoint-consistency-check.sh [--dry-run] [--verbose] [--force-repair] [--no-auto-close]
 #
 # Options:
 #   --dry-run      Print what would be done without executing
 #   --verbose      Show detailed output
 #   --force-repair Force recovery even if counts match (useful for corruption detection)
+#   --no-auto-close Don't auto-close starvation alert beads after recovery
 #
 # Exit codes:
 #   0  Verification passed, database is consistent
 #   1  Verification or recovery failed
 #   2  bead CLI not found or workspace not initialized
 #   3  Recovery required but incomplete
+#   4  Auto-close starvation alerts failed (non-critical)
 #
 
 DRY_RUN=false
 VERBOSE=false
 FORCE_REPAIR=false
+AUTO_CLOSE_STARVATION_ALERTS=true
 SCRIPT_NAME="$(basename "$0")"
+WORKSPACE_DIR="$(pwd)"
+RECOVERY_LOG="$WORKSPACE_DIR/.beads/doctor-recovery.log"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -46,9 +51,13 @@ while [[ $# -gt 0 ]]; do
       FORCE_REPAIR=true
       shift
       ;;
+    --no-auto-close)
+      AUTO_CLOSE_STARVATION_ALERTS=false
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--dry-run] [--verbose] [--force-repair]"
+      echo "Usage: $0 [--dry-run] [--verbose] [--force-repair] [--no-auto-close]"
       exit 2
       ;;
   esac
@@ -56,7 +65,10 @@ done
 
 # Function to log messages
 log() {
-  echo "[$(date -Iseconds)] $1"
+  local msg="[$(date -Iseconds)] $1"
+  echo "$msg"
+  # Also log to .beads/doctor-recovery.log for audit trail
+  echo "$msg" >> .beads/doctor-recovery.log
 }
 
 # Function to log verbose messages
@@ -75,6 +87,54 @@ run_cmd() {
     log_verbose "Executing: $*"
     "$@"
   fi
+}
+
+# Function to auto-close starvation alert beads when consistency is restored
+auto_close_starvation_alerts() {
+  log ""
+  log "Checking for starvation alert beads to auto-close..."
+
+  # Find all open starvation alert beads (excluding unravel/alternative beads)
+  STARVATION_BEADS=$(bead list --status open --json | jq -r '.[] | select(.title | test("(?i)starvation.*alert.*beads invisible")) | select(.title | test("(?i)unravel|alternative") | not) | .id' 2>/dev/null || true)
+
+  if [ -z "$STARVATION_BEADS" ]; then
+    log_verbose "No starvation alert beads found to close"
+    return 0
+  fi
+
+  local closed_count=0
+  local failed_count=0
+
+  while IFS= read -r bead_id; do
+    if [ -z "$bead_id" ]; then
+      continue
+    fi
+
+    log "  Auto-closing starvation alert bead: $bead_id"
+
+    if [ "$DRY_RUN" = true ]; then
+      log "    [DRY-RUN] Would close: $bead_id"
+      ((closed_count++)) || true
+    else
+      # Close the bead with reason
+      if bead close "$bead_id" --reason "Consistency restored by automated health check - database and checkpoint are now in sync" 2>/dev/null; then
+        log "    ✓ Closed successfully"
+        ((closed_count++)) || true
+      else
+        log "    ⚠️  Failed to close (may already be closed or permissions issue)"
+        ((failed_count++)) || true
+      fi
+    fi
+  done <<< "$STARVATION_BEADS"
+
+  log "  Auto-closure summary: $closed_count closed, $failed_count failed"
+
+  if [ $failed_count -gt 0 ]; then
+    log "⚠️  WARNING: Some starvation alert beads failed to close"
+    return 4
+  fi
+
+  return 0
 }
 
 log "=== Bead Checkpoint Consistency Health Check ==="
@@ -288,6 +348,17 @@ if [ "$RECOVERY_NEEDED" = true ]; then
         log "Status: RECOVERY_SUCCESSFUL"
         log "Action: Database rebuilt from checkpoint"
         log "Restored beads: $RESTORED_COUNT"
+
+        # Auto-close starvation alert beads after successful recovery
+        if [ "$AUTO_CLOSE_STARVATION_ALERTS" = true ]; then
+          auto_close_starvation_alerts
+          AUTOCLOSE_EXIT=$?
+          if [ $AUTOCLOSE_EXIT -ne 0 ]; then
+            log "⚠️  Recovery succeeded but auto-close encountered issues"
+            exit 4
+          fi
+        fi
+
         exit 0
       else
         log "⚠️  WARNING: Restoration count mismatch"
@@ -298,6 +369,17 @@ if [ "$RECOVERY_NEEDED" = true ]; then
       fi
     else
       log "✓ Database restored (checkpoint count unavailable for verification)"
+
+      # Auto-close starvation alert beads after successful recovery
+      if [ "$AUTO_CLOSE_STARVATION_ALERTS" = true ]; then
+        auto_close_starvation_alerts
+        AUTOCLOSE_EXIT=$?
+        if [ $AUTOCLOSE_EXIT -ne 0 ]; then
+          log "⚠️  Recovery succeeded but auto-close encountered issues"
+          exit 4
+        fi
+      fi
+
       exit 0
     fi
   else
@@ -314,5 +396,12 @@ else
   log "Status: CONSISTENT"
   log "Database beads: $DB_Bead_COUNT"
   log "Checkpoint beads: $CHECKPOINT_Bead_COUNT"
+
+  # Auto-close starvation alert beads if consistency is restored
+  if [ "$AUTO_CLOSE_STARVATION_ALERTS" = true ]; then
+    auto_close_starvation_alerts
+  fi
+
   exit 0
 fi
+
