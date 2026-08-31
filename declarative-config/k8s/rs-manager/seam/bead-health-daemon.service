@@ -1,0 +1,42 @@
+[Unit]
+Description=SEAM Bead Health Diagnostic and Repair Daemon
+Documentation=https://git.ardenone.com/jedarden/SEAM
+After=network.target
+Requires=seam.service
+
+[Service]
+Type=simple
+User=seam
+Group=seam
+WorkingDirectory=/opt/seam
+
+# Run the bead health daemon
+ExecStart=/opt/seam/seam bead-health-daemon \
+    --workspace-root=/home/coding \
+    --check-interval=10m \
+    --state-path=/var/lib/seam/bead-health-state.json \
+    --diagnostic-log-path=/var/log/seam/bead-health.log \
+    --repair-threshold=10
+
+# Restart on failure
+Restart=on-failure
+RestartSec=30s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/seam /var/log/seam /home/coding
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bead-health-daemon
+
+[Install]
+WantedBy=multi-user.target

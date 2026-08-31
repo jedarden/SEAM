@@ -19,11 +19,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Usage: seam <command> [<args>]")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Available commands:")
-		fmt.Fprintln(os.Stderr, "  serve        Start the SEAM gateway server")
-		fmt.Fprintln(os.Stderr, "  healthcheck  Probe the caller-facing liveness endpoint")
-		fmt.Fprintln(os.Stderr, "  lint         Validate SEAM route fragments")
-		fmt.Fprintln(os.Stderr, "  diff         Show differences between fragment versions")
-		fmt.Fprintln(os.Stderr, "  import       Import fragments into SEAM")
+		fmt.Fprintln(os.Stderr, "  serve            Start the SEAM gateway server")
+		fmt.Fprintln(os.Stderr, "  healthcheck      Probe the caller-facing liveness endpoint")
+		fmt.Fprintln(os.Stderr, "  lint             Validate SEAM route fragments")
+		fmt.Fprintln(os.Stderr, "  diff             Show differences between fragment versions")
+		fmt.Fprintln(os.Stderr, "  import           Import fragments into SEAM")
+		fmt.Fprintln(os.Stderr, "  bead-health-daemon  Run bead health monitoring and repair daemon")
 		os.Exit(1)
 	}
 
@@ -41,9 +42,11 @@ func main() {
 		diffCommand(args)
 	case "import":
 		importCommand(args)
+	case "bead-health-daemon":
+		beadHealthDaemonCommand(args)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import")
+		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import, bead-health-daemon")
 		os.Exit(1)
 	}
 }
@@ -276,4 +279,84 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 		return server.DefaultUpstreamAllowlistFile
 	}
 	return requested
+}
+
+// beadHealthDaemonCommand runs the bead health monitoring and repair daemon.
+func beadHealthDaemonCommand(args []string) {
+	fs := flag.NewFlagSet("bead-health-daemon", flag.ExitOnError)
+
+	workspaceRoot := fs.String("workspace-root", "/home/coding", "Root directory containing all workspaces")
+	checkInterval := fs.Duration("check-interval", 10*time.Minute, "How often to check bead health")
+	statePath := fs.String("state-path", "", "Path to daemon state JSON file")
+	diagnosticLogPath := fs.String("diagnostic-log-path", "", "Path to diagnostic log file")
+	repairThreshold := fs.Int("repair-threshold", 10, "Number of repairs before generating summary report")
+	leaseName := fs.String("lease-name", "seam-bead-health", "Kubernetes Lease resource name")
+	leaseNamespace := fs.String("lease-namespace", "seam", "Kubernetes Lease namespace")
+
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("Starting SEAM bead health daemon:")
+	log.Printf("  Workspace root: %s", *workspaceRoot)
+	log.Printf("  Check interval: %v", *checkInterval)
+	log.Printf("  State path: %s", *statePath)
+	log.Printf("  Diagnostic log: %s", *diagnosticLogPath)
+	log.Printf("  Repair threshold: %d", *repairThreshold)
+	log.Printf("  Lease: %s/%s", *leaseNamespace, *leaseName)
+
+	// Create lease leader for distributed coordination
+	leaseLeader, err := server.NewLeaseLeader(server.LeaseConfig{
+		LeaseName:      *leaseName,
+		LeaseNamespace: *leaseNamespace,
+		OnLeadershipLost: func() {
+			log.Println("[BeadHealth] Leadership lost, shutting down")
+			os.Exit(0)
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to create lease leader: %v", err)
+	}
+
+	// Create bead health daemon
+	daemon, err := server.NewBeadHealthDaemon(server.BeadHealthConfig{
+		WorkspaceRoot:       *workspaceRoot,
+		LeaseLeader:         leaseLeader,
+		CheckInterval:       *checkInterval,
+		StatePath:           *statePath,
+		DiagnosticLogPath:   *diagnosticLogPath,
+		RepairThreshold:     *repairThreshold,
+		OnRepair: func(repair *server.BeadRepair) {
+			if repair.Success {
+				log.Printf("[BeadHealth] Repair: %s in %s - %s", repair.BeadID, repair.Workspace, repair.ActionTaken)
+			} else {
+				log.Printf("[BeadHealth] Repair failed: %s in %s - %s", repair.BeadID, repair.Workspace, repair.Error)
+			}
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to create bead health daemon: %v", err)
+	}
+
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh
+		log.Println("[BeadHealth] Received shutdown signal")
+		daemon.Stop()
+		cancel()
+	}()
+
+	// Start the daemon
+	if err := daemon.Start(ctx); err != nil {
+		log.Fatalf("Daemon failed: %v", err)
+	}
+
+	log.Println("[BeadHealth] Daemon stopped")
 }
