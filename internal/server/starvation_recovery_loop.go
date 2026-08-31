@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -31,6 +32,7 @@ type StarvationRecoveryLoop struct {
 	onRecoveryComplete func(beadID string, success bool, details string)
 	pluckFallback       *pluckfallback.PluckFallback // PluckFallback for resilient bead querying
 	diagnosticLogPath   string                        // Path to diagnostic log for pluck discrepancies
+	metrics             *Metrics                       // Prometheus metrics publisher
 }
 
 // RecoveryConfig holds the configuration for the starvation recovery loop.
@@ -58,6 +60,9 @@ type RecoveryConfig struct {
 
 	// PluckFallbackDiagnosticLog is the path to the diagnostic log for pluck discrepancies
 	PluckFallbackDiagnosticLog string
+
+	// Metrics is the Prometheus metrics publisher for recovery metrics
+	Metrics *Metrics
 }
 
 // NewStarvationRecoveryLoop creates a new starvation recovery loop.
@@ -90,6 +95,7 @@ func NewStarvationRecoveryLoop(cfg RecoveryConfig) (*StarvationRecoveryLoop, err
 		stopCh:            make(chan struct{}),
 		onRecoveryComplete: cfg.OnRecoveryComplete,
 		diagnosticLogPath:  cfg.PluckFallbackDiagnosticLog,
+		metrics:           cfg.Metrics,
 	}
 
 	// Initialize PluckFallback if enabled
@@ -457,41 +463,159 @@ func (l *StarvationRecoveryLoop) logDetectionAnomaly(ctx context.Context, worksp
 	log.Printf("[RecoveryLoop] %s", anomalyLog)
 }
 
-// runAutomatedRecovery executes the automated recovery steps.
+// runAutomatedRecovery executes the automated recovery steps using a two-stage diagnostic approach.
+// Stage 1: Read-only diagnostics to capture current state
+// Stage 2: Conditional repair only if issues are identified
+// Stage 3: Pluck verification after each step
+// Stage 4: Checkpoint rebuild as final fallback
 // Returns (success, details) where success indicates if recovery was complete.
 func (l *StarvationRecoveryLoop) runAutomatedRecovery(ctx context.Context, workspacePath string) (bool, string) {
+	workspaceName := filepath.Base(workspacePath)
 	var steps []string
 	var errors []string
+	var diagnostics []string
 
-	// Step 1: Run bead doctor --repair to fix database corruption
-	steps = append(steps, "Running bead doctor --repair")
-	if err := l.runBeadDoctor(ctx, workspacePath); err != nil {
-		errors = append(errors, fmt.Sprintf("bead doctor failed: %v", err))
+	// Record recovery attempt and start timer
+	startTime := time.Now()
+	if l.metrics != nil {
+		l.metrics.recordRecoveryAttempt(workspaceName)
+		l.metrics.recordRecoveryStageUsed("diagnostics")
 	}
 
-	// Step 2: Run validate_cross_repo_preconditions.sh to mark beads with unmet dependencies
+	log.Printf("[RecoveryLoop] Starting two-stage recovery for %s", workspaceName)
+
+	// Stage 1: Run bead doctor in read-only mode to capture diagnostics
+	steps = append(steps, "Running bead doctor (read-only diagnostics)")
+	diagnosticOutput, dbHealthy, diagnosticErr := l.runBeadDoctorDiagnostics(ctx, workspacePath)
+	if diagnosticErr != nil {
+		errors = append(errors, fmt.Sprintf("diagnostic failed: %v", diagnosticErr))
+		diagnostics = append(diagnostics, fmt.Sprintf("Diagnostic error: %v", diagnosticErr))
+	} else {
+		diagnostics = append(diagnostics, fmt.Sprintf("Database healthy: %v", dbHealthy))
+		log.Printf("[RecoveryLoop] Diagnostic output for %s:\n%s", workspaceName, diagnosticOutput)
+	}
+
+	// Check if starvation is resolved by diagnostics alone
+	readyCount, _ := l.countReadyBeads(ctx, workspacePath)
+	if readyCount > 0 {
+		log.Printf("[RecoveryLoop] ✓ Starvation resolved in %s after diagnostics (ready=%d)", workspaceName, readyCount)
+		duration := time.Since(startTime).Seconds()
+		if l.metrics != nil {
+			l.metrics.recordRecoverySuccess(workspaceName, "diagnostics")
+			l.metrics.recordRecoveryDuration(workspaceName, "success", duration)
+		}
+		return true, fmt.Sprintf("Recovery succeeded after diagnostics. Ready beads: %d. Details: %s",
+			readyCount, strings.Join(diagnostics, "; "))
+	}
+
+	// Stage 2: If database is unhealthy, run repair
+	if !dbHealthy {
+		if l.metrics != nil {
+			l.metrics.recordRecoveryStageUsed("repair")
+		}
+
+		steps = append(steps, "Running bead doctor --repair (database issues detected)")
+		repairErr := l.runBeadDoctorRepair(ctx, workspacePath)
+		if repairErr != nil {
+			errors = append(errors, fmt.Sprintf("repair failed: %v", repairErr))
+		} else {
+			log.Printf("[RecoveryLoop] ✓ Repair completed in %s", workspaceName)
+		}
+
+		// Verify recovery after repair
+		readyCount, _ = l.countReadyBeads(ctx, workspacePath)
+		if readyCount > 0 {
+			log.Printf("[RecoveryLoop] ✓ Starvation resolved in %s after repair (ready=%d)", workspaceName, readyCount)
+			duration := time.Since(startTime).Seconds()
+			if l.metrics != nil {
+				l.metrics.recordRecoverySuccess(workspaceName, "repair")
+				l.metrics.recordRecoveryDuration(workspaceName, "success", duration)
+			}
+			return true, fmt.Sprintf("Recovery succeeded after repair. Ready beads: %d. Repairs: %s",
+				readyCount, strings.Join(steps, ", "))
+		}
+	}
+
+	// Stage 3: Run validate_cross_repo_preconditions.sh to mark beads with unmet dependencies
+	if l.metrics != nil {
+		l.metrics.recordRecoveryStageUsed("precondition_validation")
+	}
+
 	steps = append(steps, "Validating cross-repo preconditions")
 	if err := l.runValidatePreconditions(ctx, workspacePath); err != nil {
 		errors = append(errors, fmt.Sprintf("precondition validation failed: %v", err))
 	}
 
-	// Step 3: Check if NEEDLE workers are alive
+	// Verify recovery after precondition validation
+	readyCount, _ = l.countReadyBeads(ctx, workspacePath)
+	if readyCount > 0 {
+		log.Printf("[RecoveryLoop] ✓ Starvation resolved in %s after precondition validation (ready=%d)", workspaceName, readyCount)
+		duration := time.Since(startTime).Seconds()
+		if l.metrics != nil {
+			l.metrics.recordRecoverySuccess(workspaceName, "precondition_validation")
+			l.metrics.recordRecoveryDuration(workspaceName, "success", duration)
+		}
+		return true, fmt.Sprintf("Recovery succeeded after precondition validation. Ready beads: %d", readyCount)
+	}
+
+	// Stage 4: Check if NEEDLE workers are alive
 	steps = append(steps, "Checking worker status")
 	workersAlive, err := l.checkWorkersAlive(ctx)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("worker check failed: %v", err))
 	}
-
-	// Step 4: Re-evaluate ready frontier
-	steps = append(steps, "Re-evaluating ready frontier")
-	readyCount, err := l.countReadyBeads(ctx, workspacePath)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("failed to re-evaluate ready frontier: %v", err))
+	if !workersAlive {
+		diagnostics = append(diagnostics, "WARNING: No NEEDLE workers detected")
 	}
 
-	// Build details message
-	details := fmt.Sprintf("Steps executed: %s. Ready beads after recovery: %d.",
-		strings.Join(steps, ", "), readyCount)
+	// Stage 5: Final pluck verification
+	steps = append(steps, "Final pluck verification")
+	readyCount, err = l.countReadyBeads(ctx, workspacePath)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("final verification failed: %v", err))
+	}
+
+	// Stage 6: If starvation still persists, attempt checkpoint sync rebuild
+	if readyCount == 0 {
+		if l.metrics != nil {
+			l.metrics.recordRecoveryStageUsed("checkpoint_rebuild")
+		}
+
+		log.Printf("[RecoveryLoop] Starvation persists in %s after all recovery steps, attempting checkpoint rebuild", workspaceName)
+		steps = append(steps, "Attempting checkpoint sync rebuild")
+
+		rebuildErr := l.runCheckpointRebuild(ctx, workspacePath)
+		result := "success"
+		if rebuildErr != nil {
+			errors = append(errors, fmt.Sprintf("checkpoint rebuild failed: %v", rebuildErr))
+			diagnostics = append(diagnostics, "Checkpoint rebuild unsuccessful")
+			result = "failure"
+		} else {
+			log.Printf("[RecoveryLoop] ✓ Checkpoint rebuild completed in %s", workspaceName)
+			diagnostics = append(diagnostics, "Checkpoint rebuild successful")
+
+			// Final verification after checkpoint rebuild
+			readyCount, _ = l.countReadyBeads(ctx, workspacePath)
+			if readyCount > 0 {
+				log.Printf("[RecoveryLoop] ✓ Starvation resolved in %s after checkpoint rebuild (ready=%d)", workspaceName, readyCount)
+				duration := time.Since(startTime).Seconds()
+				if l.metrics != nil {
+					l.metrics.recordRecoverySuccess(workspaceName, "checkpoint_rebuild")
+					l.metrics.recordRecoveryDuration(workspaceName, "success", duration)
+					l.metrics.recordCheckpointRebuild(workspaceName, "success")
+				}
+				return true, fmt.Sprintf("Recovery succeeded after checkpoint rebuild. Ready beads: %d", readyCount)
+			}
+		}
+
+		if l.metrics != nil {
+			l.metrics.recordCheckpointRebuild(workspaceName, result)
+		}
+	}
+
+	// Build final details message
+	details := fmt.Sprintf("Recovery stages executed: %s. Diagnostics: %s. Ready beads after recovery: %d.",
+		strings.Join(steps, ", "), strings.Join(diagnostics, "; "), readyCount)
 
 	if len(errors) > 0 {
 		details += fmt.Sprintf(" Errors: %s", strings.Join(errors, "; "))
@@ -500,11 +624,57 @@ func (l *StarvationRecoveryLoop) runAutomatedRecovery(ctx context.Context, works
 	// Recovery is successful if work became available
 	success := readyCount > 0
 
+	// Record final metrics
+	duration := time.Since(startTime).Seconds()
+	result := "success"
+	if !success {
+		result = "failure"
+	}
+	if l.metrics != nil {
+		l.metrics.recordRecoveryDuration(workspaceName, result, duration)
+	}
+
 	return success, details
 }
 
-// runBeadDoctor executes `bead doctor --repair` in the workspace.
-func (l *StarvationRecoveryLoop) runBeadDoctor(ctx context.Context, workspacePath string) error {
+// runBeadDoctorDiagnostics executes `bead doctor` in read-only mode to capture diagnostics.
+// Returns (output, healthy, error) where healthy indicates if no issues were found.
+func (l *StarvationRecoveryLoop) runBeadDoctorDiagnostics(ctx context.Context, workspacePath string) (string, bool, error) {
+	cmd := exec.CommandContext(ctx, "bead", "doctor", "--json")
+	cmd.Dir = workspacePath
+
+	output, err := cmd.Output()
+	if err != nil {
+		return string(output), false, fmt.Errorf("%w: %s", err, string(output))
+	}
+
+	// Parse JSON output to determine if database is healthy
+	// bead doctor --json returns a JSON object with "issues": [] if healthy
+	var diagnostics struct {
+		Healthy bool     `json:"healthy"`
+		Issues  []string `json:"issues"`
+	}
+
+	if err := json.Unmarshal(output, &diagnostics); err != nil {
+		// If we can't parse JSON, assume unhealthy based on output content
+		outputStr := string(output)
+		healthy := !strings.Contains(strings.ToLower(outputStr), "error") &&
+		            !strings.Contains(strings.ToLower(outputStr), "corruption") &&
+		            !strings.Contains(strings.ToLower(outputStr), "missing")
+		return outputStr, healthy, nil
+	}
+
+	// Database is healthy if no issues reported
+	healthy := diagnostics.Healthy || len(diagnostics.Issues) == 0
+
+	log.Printf("[RecoveryLoop] bead doctor diagnostics completed in %s (healthy=%v, issues=%d)",
+		filepath.Base(workspacePath), healthy, len(diagnostics.Issues))
+
+	return string(output), healthy, nil
+}
+
+// runBeadDoctorRepair executes `bead doctor --repair` to fix identified issues.
+func (l *StarvationRecoveryLoop) runBeadDoctorRepair(ctx context.Context, workspacePath string) error {
 	cmd := exec.CommandContext(ctx, "bead", "doctor", "--repair")
 	cmd.Dir = workspacePath
 
@@ -513,7 +683,81 @@ func (l *StarvationRecoveryLoop) runBeadDoctor(ctx context.Context, workspacePat
 		return fmt.Errorf("%w: %s", err, string(output))
 	}
 
-	log.Printf("[RecoveryLoop] bead doctor --repair completed in %s", workspacePath)
+	log.Printf("[RecoveryLoop] bead doctor --repair completed in %s", filepath.Base(workspacePath))
+	return nil
+}
+
+// runCheckpointRebuild executes checkpoint sync rebuild when starvation persists.
+// Runs: bead sync flush-only followed by database rebuild from checkpoint if needed.
+func (l *StarvationRecoveryLoop) runCheckpointRebuild(ctx context.Context, workspacePath string) error {
+	workspaceName := filepath.Base(workspacePath)
+
+	// Step 1: Flush checkpoint to ensure it's up-to-date
+	log.Printf("[RecoveryLoop] Flushing checkpoint in %s", workspaceName)
+	flushCmd := exec.CommandContext(ctx, "bead", "sync", "flush-only")
+	flushCmd.Dir = workspacePath
+
+	if output, err := flushCmd.CombinedOutput(); err != nil {
+		log.Printf("[RecoveryLoop] Checkpoint flush failed in %s: %v (output: %s)", workspaceName, err, string(output))
+		// Continue anyway - flush may fail if database is locked, but we can still try rebuild
+	} else {
+		log.Printf("[RecoveryLoop] ✓ Checkpoint flushed successfully in %s", workspaceName)
+	}
+
+	// Step 2: Use PluckFallback to rebuild database if available
+	if l.pluckFallback != nil {
+		log.Printf("[RecoveryLoop] Using PluckFallback for database rebuild in %s", workspaceName)
+		rebuildErr := l.pluckFallback.rebuildDatabaseFromCheckpoint(ctx, workspacePath)
+		if rebuildErr != nil {
+			return fmt.Errorf("PluckFallback rebuild failed: %w", rebuildErr)
+		}
+		log.Printf("[RecoveryLoop] ✓ Database rebuilt successfully in %s", workspaceName)
+		return nil
+	}
+
+	// Step 3: Fallback to manual rebuild if PluckFallback not available
+	// Backup existing database
+	dbPath := filepath.Join(workspacePath, ".beads", "beads.db")
+	backupPath := dbPath + ".backup"
+	if _, err := os.Stat(dbPath); err == nil {
+		if err := os.Rename(dbPath, backupPath); err != nil {
+			return fmt.Errorf("backup database: %w", err)
+		}
+		log.Printf("[RecoveryLoop] Backed up database to %s", backupPath)
+	}
+
+	// Reinitialize database
+	initCmd := exec.CommandContext(ctx, "bead", "init")
+	initCmd.Dir = workspacePath
+	if output, err := initCmd.CombinedOutput(); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			os.Rename(backupPath, dbPath)
+		}
+		return fmt.Errorf("bead init failed: %w: %s", err, string(output))
+	}
+
+	// Import from checkpoint
+	checkpointPath := filepath.Join(workspacePath, ".beads", "checkpoint", "forensic.jsonl")
+	importCmd := exec.CommandContext(ctx, "bead", "sync", "import-only",
+		"--input", checkpointPath,
+		"--restore-into-empty",
+		"--actor", "system-recovery")
+	importCmd.Dir = workspacePath
+	if output, err := importCmd.CombinedOutput(); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			os.Rename(backupPath, dbPath)
+		}
+		return fmt.Errorf("bead sync import-only failed: %w: %s", err, string(output))
+	}
+
+	// Remove backup on success
+	if _, err := os.Stat(backupPath); err == nil {
+		os.Remove(backupPath)
+	}
+
+	log.Printf("[RecoveryLoop] ✓ Checkpoint rebuild completed in %s", workspaceName)
 	return nil
 }
 

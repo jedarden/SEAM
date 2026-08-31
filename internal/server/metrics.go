@@ -44,6 +44,13 @@ type Metrics struct {
 	quotaRemaining *prometheus.GaugeVec
 	quotaExceeded  *prometheus.CounterVec
 	quotaBypassed  *prometheus.CounterVec
+
+	// Starvation recovery metrics
+	recoveryAttempts    *prometheus.CounterVec
+	recoverySuccesses   *prometheus.CounterVec
+	recoveryStageUsed   *prometheus.CounterVec
+	recoveryDuration    *prometheus.HistogramVec
+	checkpointRebuilds  *prometheus.CounterVec
 }
 
 type responseCacheStatsProvider interface {
@@ -104,6 +111,28 @@ func newMetrics(
 			Name: "seam_route_version_requests_total",
 			Help: "Total requests by OpenAPI route template and spec version hash (Phase 8.4: probe-free, origin-tag matched). A probe-inclusive counter means no probed fragment ever retires.",
 		}, []string{"route", "spec_version"}),
+			recoveryAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Name: "seam_starvation_recovery_attempts_total",
+				Help: "Total starvation recovery attempts by workspace.",
+			}, []string{"workspace"}),
+			recoverySuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Name: "seam_starvation_recovery_successes_total",
+				Help: "Total successful starvation recoveries by workspace and recovery stage.",
+			}, []string{"workspace", "stage"}),
+			recoveryStageUsed: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Name: "seam_starvation_recovery_stage_used_total",
+				Help: "Total usage count of each recovery stage.",
+			}, []string{"stage"}),
+			recoveryDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+				Name:    "seam_starvation_recovery_duration_seconds",
+				Help:    "Starvation recovery operation duration by workspace and result.",
+				Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+			}, []string{"workspace", "result"}),
+			checkpointRebuilds: prometheus.NewCounterVec(prometheus.CounterOpts{
+				Name: "seam_starvation_checkpoint_rebuilds_total",
+				Help: "Total checkpoint database rebuilds by workspace and result.",
+			}, []string{"workspace", "result"}),
+
 	}
 
 	registry.MustRegister(
@@ -117,6 +146,11 @@ func newMetrics(
 		metrics.quotaRemaining,
 		metrics.quotaExceeded,
 		metrics.quotaBypassed,
+		metrics.recoveryAttempts,
+		metrics.recoverySuccesses,
+		metrics.recoveryStageUsed,
+		metrics.recoveryDuration,
+		metrics.checkpointRebuilds,
 		newStateMetricsCollector(cache, openBao, upstreams, build),
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
@@ -355,4 +389,41 @@ func (c *stateMetricsCollector) Collect(metrics chan<- prometheus.Metric) {
 			upstream.Origin,
 		)
 	}
+}
+
+// Recovery metric recording methods
+
+func (m *Metrics) recordRecoveryAttempt(workspace string) {
+	if m == nil {
+		return
+	}
+	m.recoveryAttempts.WithLabelValues(workspace).Inc()
+}
+
+func (m *Metrics) recordRecoverySuccess(workspace, stage string) {
+	if m == nil {
+		return
+	}
+	m.recoverySuccesses.WithLabelValues(workspace, stage).Inc()
+}
+
+func (m *Metrics) recordRecoveryStageUsed(stage string) {
+	if m == nil {
+		return
+	}
+	m.recoveryStageUsed.WithLabelValues(stage).Inc()
+}
+
+func (m *Metrics) recordRecoveryDuration(workspace string, result string, duration float64) {
+	if m == nil {
+		return
+	}
+	m.recoveryDuration.WithLabelValues(workspace, result).Observe(duration)
+}
+
+func (m *Metrics) recordCheckpointRebuild(workspace string, result string) {
+	if m == nil {
+		return
+	}
+	m.checkpointRebuilds.WithLabelValues(workspace, result).Inc()
 }
