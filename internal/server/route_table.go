@@ -1499,7 +1499,7 @@ func extractDeprecation(operation *v3.Operation, pathItem *v3.PathItem, spec *v3
 	extensionNode := pathItem.Extensions.Get("x-seam-deprecated")
 	if extensionNode == nil {
 		// Check if operation has OpenAPI deprecated field
-		if operation != nil && operation.Deprecated {
+		if operation != nil && operation.Deprecated != nil && *operation.Deprecated {
 			// Per-operation deprecated: true honored - return minimal deprecation info
 			return &DeprecationInfo{
 				Since: "unknown", // OpenAPI deprecated has no since date
