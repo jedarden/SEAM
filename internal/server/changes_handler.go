@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/ardenone/seam/internal/spec"
 )
@@ -84,7 +83,7 @@ func (s *Server) changesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the since spec from ring buffer
-	sinceSpec, sinceKnown, firstSeen := s.specRingBuffer.Get(since)
+	sinceSpec, sinceKnown, _ := s.specRingBuffer.Get(since)
 
 	// Build response
 	response := map[string]interface{}{
@@ -492,8 +491,8 @@ func (s *Server) compareParameters(sinceOp, currentOp map[string]interface{}) []
 func (s *Server) compareResponses(sinceOp, currentOp map[string]interface{}) []FieldDiffEntry {
 	diffs := []FieldDiffEntry{}
 
-	sinceResp, sinceHas := sinceOp["responses"]
-	currentResp, currentHas := currentOp["responses"]
+	_, sinceHas := sinceOp["responses"]
+	_, currentHas := currentOp["responses"]
 
 	if !sinceHas && !currentHas {
 		return diffs
