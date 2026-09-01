@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -154,19 +153,9 @@ func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, r *http.Reque
 // writeDryRunValidationResponse writes a validation response for dry-run mode
 // Phase 13.2: X-SEAM-Dry-Run: 1 = validation verdict at stage 7
 func (s *Server) writeDryRunValidationResponse(w http.ResponseWriter, r *http.Request, route string) {
-	// Get route match for validation
-	routeTable := s.getRouteTable()
-	if routeTable == nil {
-		requestErr := WrapRequestError(ErrCodeInternalServer, "Route table not available", nil).
-			WithDetail("route", route)
-		logRequestError(r, "dry-run", requestErr)
-		requestErr.Write(w, r)
-		return
-	}
-
 	// Attempt to match route
-	match := routeTable.Match(r)
-	if match == nil {
+	match, err := s.routeTableHolder.Match(r)
+	if err != nil {
 		// Route not found - validation failure
 		NewErrorResponse(ErrCodeRouteNotFound, "Route not found - validation failed").
 			WithDetail("route", route).
