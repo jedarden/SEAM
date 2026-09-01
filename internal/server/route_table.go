@@ -316,6 +316,25 @@ func (h *ThreadSafeTableHolder) OpenBaoCacheStats() vault.CacheStats {
 	return h.current.OpenBaoCacheStats()
 }
 
+// GetVersionsForPath returns all API versions available for a given path and method.
+// If method is empty, returns versions for all methods at that path.
+// The returned versions are sorted from oldest to newest (by rank).
+// Returns empty slice if the holder is nil or the table is not initialized.
+func (h *ThreadSafeTableHolder) GetVersionsForPath(path string, method string) []string {
+	if h == nil {
+		return []string{}
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.current == nil {
+		return []string{}
+	}
+
+	return h.current.GetVersionsForPath(path, method)
+}
+
 // BuildRouteTable creates a populated RouteTable from an OpenAPI v3 document.
 // The route table contains the five HTTP methods SEAM currently proxies. A
 // missing operation-level x-api-version extension is represented as v1.

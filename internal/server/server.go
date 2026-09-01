@@ -1072,7 +1072,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(allVersions) == 0 {
 		// Fallback to just the requested version if route table query fails
-		allVersions = []string{version}
+		allVersions = []string{requestedVersion}
 	}
 
 	// Build versions array with per-entry docsUrl
