@@ -405,7 +405,7 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
-			upstreamMap, err := extractUpstreamMap(methodOp.operation, pathItem, spec)
+			upstreamMap, err := extractUpstreamMapWithProbeIntervals(methodOp.operation, pathItem, spec)
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
@@ -453,24 +453,25 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 					return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 				}
 			entry := RouteEntry{
-				PathTemplate:         path,
-				Method:               methodOp.method,
-				APIVersion:           apiVersion,
-				UpstreamTarget:       upstreamTarget,
-				TLSConfig:            tlsConfig,
-				VaultPath:            vaultPath,
-				InjectAs:             injectAs,
-				Unscrubbable:         unscrubbable,
-				InstanceParam:        instanceParam,
-				UpstreamPathTemplate: upstreamPathTemplate,
-				Deprecated:           deprecated,
-				UpstreamStripPrefix:  upstreamStripPrefix,
-				UpstreamMap:          upstreamMap,
-				FanoutScope:          fanoutScope,
-				BreakerConfig:        breakerConfig,
-				BreakerDisagreements: breakerDisagreements,
-				LoopGuardConfig:      loopGuardConfig,
-				RequiredScopes:       requiredScopes,
+				PathTemplate:          path,
+				Method:                methodOp.method,
+				APIVersion:            apiVersion,
+				UpstreamTarget:        upstreamTarget,
+				TLSConfig:             tlsConfig,
+				VaultPath:             vaultPath,
+				InjectAs:              injectAs,
+				Unscrubbable:          unscrubbable,
+				InstanceParam:         instanceParam,
+				UpstreamPathTemplate:  upstreamPathTemplate,
+				Deprecated:            deprecated,
+				UpstreamStripPrefix:   upstreamStripPrefix,
+				UpstreamMap:           upstreamMap,
+				FanoutScope:           fanoutScope,
+				BreakerConfig:         breakerConfig,
+				BreakerDisagreements:  breakerDisagreements,
+				LoopGuardConfig:       loopGuardConfig,
+				RequiredScopes:        requiredScopes,
+				CredentialProbeConfig: credentialProbeConfig,
 			}
 
 			if err := addBuiltRoute(table, seen, entry); err != nil {
