@@ -419,6 +419,14 @@ func InvalidVersion(version, expected string) *ErrorResponse {
 		WithDocsURL("/docs")
 }
 
+// InvalidParameterValue creates an invalid-parameter-value response.
+func InvalidParameterValue(paramName, value string) *ErrorResponse {
+	return NewErrorResponse(ErrCodeInvalidVersion,
+		fmt.Sprintf("Invalid value for parameter '%s'", paramName)).
+		WithDetail("parameter", paramName).
+		WithDetail("provided_value", value)
+}
+
 // MissingParameter creates a missing-required-parameter response.
 func MissingParameter(paramName string) *ErrorResponse {
 	return NewErrorResponse(ErrCodeMissingParameter,
