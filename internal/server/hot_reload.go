@@ -252,7 +252,7 @@ func (hrm *HotReloadManager) buildRouteSnapshots() []RouteSnapshot {
 			Path:            route.PathTemplate,
 			Method:          route.Method,
 			RequiredScopes:  route.RequiredScopes,
-			Deprecated:      route.Deprecated,
+			Deprecated:      route.Deprecated != nil, // Convert *DeprecationInfo to bool
 			VisibilityKinds: []string{}, // Could be populated from metadata
 		}
 		snapshots = append(snapshots, snapshot)
