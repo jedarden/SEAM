@@ -409,14 +409,15 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/api/v1/tailscale/ephemeral-key", s.tailscaleEphemeralKeyHandler)
 
 	// Phase 13: Bead exclusion tracking and debugging endpoints
-	s.callerMux.HandleFunc("/api/v1/exclusions/report", s.exclusionReportHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/reports", s.exclusionAllReportsHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/analyze", s.exclusionAnalyzeHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/summary", s.exclusionSummaryHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/alerts", s.exclusionAlertsHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/alerts/active", s.exclusionActiveAlertsHandler)
-	s.callerMux.HandleFunc("/api/v1/exclusions/alerts/resolve", s.exclusionResolveAlertHandler)
-	log.Printf("Registered bead exclusion tracking endpoints")
+	// TODO: Implement exclusion tracking handlers
+	// s.callerMux.HandleFunc("/api/v1/exclusions/report", s.exclusionReportHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/reports", s.exclusionAllReportsHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/analyze", s.exclusionAnalyzeHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/summary", s.exclusionSummaryHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/alerts", s.exclusionAlertsHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/alerts/active", s.exclusionActiveAlertsHandler)
+	// s.callerMux.HandleFunc("/api/v1/exclusions/alerts/resolve", s.exclusionResolveAlertHandler)
+	// log.Printf("Registered bead exclusion tracking endpoints")
 
 	// Phase 8.4: Version migration endpoints
 	s.callerMux.HandleFunc("/changes", s.changesHandler)
@@ -497,13 +498,37 @@ func (s *Server) getTailscaleAPIKeyFromVault() string {
 	s.openBaoMu.Lock()
 	defer s.openBaoMu.Unlock()
 
+	// Create vault client from environment
+	client, err := vault.NewFromEnv()
+	if err != nil {
+		log.Printf("Failed to create vault client for Tailscale API key: %v", err)
+		return ""
+	}
+
 	// Read from OpenBao
 	// Path: secret/rs-manager/tailscale/api-key
-	// This would use the vault client to read the secret
-	// For now, return empty to avoid blocking startup
-	// TODO: Implement OpenBao integration for Tailscale API key
-	log.Printf("OpenBao integration for Tailscale API key not yet implemented")
-	return ""
+	vaultPath := "rs-manager/tailscale/api-key"
+	secret, err := client.GetSecret(context.Background(), vaultPath)
+	if err != nil {
+		log.Printf("Failed to read Tailscale API key from OpenBao path %s: %v", vaultPath, err)
+		return ""
+	}
+
+	// Extract the API key from the secret
+	apiKey, ok := secret["api-key"]
+	if !ok {
+		log.Printf("Tailscale API key not found in secret at path %s", vaultPath)
+		return ""
+	}
+
+	apiKeyStr, ok := apiKey.(string)
+	if !ok {
+		log.Printf("Tailscale API key is not a string in secret at path %s", vaultPath)
+		return ""
+	}
+
+	log.Printf("Successfully retrieved Tailscale API key from OpenBao")
+	return apiKeyStr
 }
 
 // buildRouteSnapshots builds route snapshots for the current spec version
