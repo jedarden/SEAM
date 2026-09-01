@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -927,7 +928,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate version parameter (400 for wrong-alphabet values)
 	// Phase 8: /docs/route accepts x-api-version values (v[1-9][0-9]* or _unversioned)
-	if err := validateVersionParameter(requestedVersion); err != nil {
+	if err := apiversion.Validate(requestedVersion); err != nil {
 		InvalidParameterValue("version", requestedVersion).
 			WithDetail("expected_format", "API version matching grammar ^v[1-9][0-9]*$ or _unversioned").
 			WithDetail("provided_value", requestedVersion).
@@ -1067,7 +1068,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Phase 8: Gather version information for this route
 	allVersions := []string{}
 	if s.routeTableHolder != nil {
-		allVersions = s.routeTableHolder.Get().GetVersionsForPath(path, method)
+		allVersions = s.routeTableHolder.GetVersionsForPath(path, method)
 	}
 	if len(allVersions) == 0 {
 		// Fallback to just the requested version if route table query fails
@@ -1084,12 +1085,12 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 		versionsArray = append(versionsArray, map[string]interface{}{
 			"version":                        ver,
 			"docsUrl":                        docsURL,
-			"isDefaultForUnversionedCallers": version.IsDefaultForUnversionedCallers(ver, allVersions),
+			"isDefaultForUnversionedCallers": apiversion.IsDefaultForUnversionedCallers(ver, allVersions),
 		})
 	}
 
 	// canonicalVersion is the newest still-served version (highest rank)
-	canonicalVersion := version.Default
+	canonicalVersion := apiversion.Default
 	if len(allVersions) > 0 {
 		canonicalVersion = allVersions[len(allVersions)-1]
 	}
@@ -1101,8 +1102,8 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if s.routeTableHolder != nil {
 		// Create a dummy request for route matching
 		dummyReq, _ := http.NewRequest(method, path, nil)
-		if version != "" && version != version.Default {
-			dummyReq.Header.Set("X-API-Version", version)
+		if requestedVersion != "" && requestedVersion != apiversion.Default {
+			dummyReq.Header.Set("X-API-Version", requestedVersion)
 		}
 
 		if match, err := s.routeTableHolder.Match(dummyReq); err == nil {
@@ -1140,7 +1141,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"path":                           routeInfo.Path,
 		"version":                        routeInfo.Version,
-		"isDefaultForUnversionedCallers": version.IsDefaultForUnversionedCallers(routeInfo.Version, allVersions),
+		"isDefaultForUnversionedCallers": apiversion.IsDefaultForUnversionedCallers(routeInfo.Version, allVersions),
 		"canonicalVersion":               canonicalVersion,
 		"deprecated":                     isDeprecated,
 		"versions":                       versionsArray,
@@ -1538,9 +1539,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// and spec versions that evaluated them.
 
 	// Wrap with identity resolution middleware (stage 3 - WhoIs, Phase 7)
+	operatorHandler := s.versionMiddleware(s.operatorMux)
 	operatorHandler = s.identityResolutionMiddleware(operatorHandler)
 	log.Printf("Identity resolution middleware active on operator-only port (stage 3, Phase 7 - INERT)")
-	operatorHandler := s.versionMiddleware(s.operatorMux)
 	operatorHandler = s.versionInjectionMiddleware(operatorHandler)
 	operatorHandler = s.requestIDMiddleware(operatorHandler)
 	log.Printf("Version validation, injection, and request ID middleware active on operator-only port")
@@ -1829,34 +1830,36 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-			if target.InjectAs != nil {
-		if err != nil {
-			log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", upstreamURL, err)
-		} else {
-			// Get or create breaker for this origin
-			config := route.BreakerConfig
-			if config == nil {
-				defaultConfig := DefaultBreakerConfig()
-				config = &defaultConfig
-			}
-			breaker := s.breakerRegistry.GetOrCreate(origin, *config)
+		// Phase 11.1: Circuit breaker check (if enabled)
+		if route.UpstreamTarget != "" {
+			origin, err := ParseOrigin(route.UpstreamTarget)
+			if err != nil {
+				log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", route.UpstreamTarget, err)
+			} else {
+				// Get or create breaker for this origin
+				config := route.BreakerConfig
+				if config == nil {
+					defaultConfig := DefaultBreakerConfig()
+					config = &defaultConfig
+				}
+				breaker := s.breakerRegistry.GetOrCreate(origin, *config)
 
-			// Check if breaker allows the request
-			if !breaker.Allow() {
-				// Breaker is open, return structured 503
-				log.Printf("[circuit-breaker] Request refused by breaker for origin %s", origin)
-				WriteCircuitBreakerRefused(w, r, breaker.Snapshot())
-				return
-			}
+				// Check if breaker allows the request
+				if !breaker.Allow() {
+					// Breaker is open, return structured 503
+					log.Printf("[circuit-breaker] Request refused by breaker for origin %s", origin)
+					WriteCircuitBreakerRefused(w, r, breaker.Snapshot())
+					return
+				}
 
-			// Store breaker in request context for post-response tracking
-			ctx := context.WithValue(r.Context(), circuitBreakerContextKey, breakerContext{breaker: breaker, origin: origin})
-			r = r.WithContext(ctx)
+				// Store breaker in request context for post-response tracking
+				ctx := context.WithValue(r.Context(), circuitBreakerContextKey, breakerContext{breaker: breaker, origin: origin})
+				r = r.WithContext(ctx)
+			}
 		}
-	}
 
 	// Get or create proxy for this upstream
-	proxy, err := s.getOrCreateProxyWithError(upstreamURL, route.TLSConfig)
+	proxy, err := s.getOrCreateProxyWithError(route.UpstreamTarget, route.TLSConfig)
 	if err != nil {
 		// Proxy creation failed - return 503
 		s.handleProxyCreationFailed(w, r, err)
@@ -1866,7 +1869,7 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	// Phase 11.2: Record attempt before dispatch (per-path and per-upstream)
 	// This tracking is in-memory and restart-scoped (lost on process restart)
 	pathTemplate := route.PathTemplate
-	origin := upstreamURL // Full upstream URL as origin identifier
+	origin := route.UpstreamTarget // Full upstream URL as origin identifier
 	s.last2xxTracker.RecordAttempt(pathTemplate, origin)
 
 	// Wrap response writer to track status for last-2xx recording
@@ -2178,7 +2181,7 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 
 	// Write the error response
 	response := map[string]interface{}{
-		"error":    notFoundErr.ErrorCode,
+		"error":    notFoundErr.Error,
 		"message":  notFoundErr.Message,
 		"details":  notFoundErr.Details,
 		"metadata": map[string]interface{}{
