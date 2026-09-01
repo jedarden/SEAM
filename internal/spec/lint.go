@@ -1499,8 +1499,17 @@ func (f *lintFragment) checkDeprecation(report *LintReport) {
 		return
 	}
 
-	brownoutArray, ok := brownout.([]any)
-	if !ok {
+	// Handle both []any and []map[string]any - YAML parsing can produce either
+	var brownoutArray []any
+	if arrayAny, ok := brownout.([]any); ok {
+		brownoutArray = arrayAny
+	} else if arrayMap, ok := brownout.([]map[string]any); ok {
+		// Convert []map[string]any to []any for consistent processing
+		brownoutArray = make([]any, len(arrayMap))
+		for i, v := range arrayMap {
+			brownoutArray[i] = v
+		}
+	} else {
 		f.addError(report, "deprecation.brownout-invalid", "x-seam-deprecated.brownout must be an array")
 		return
 	}
@@ -1589,6 +1598,30 @@ func isValidISODate(date string) bool {
 			return false
 		}
 	}
+
+	// Parse year, month, day
+	year := (int(date[0]-'0')*1000 + int(date[1]-'0')*100 + int(date[2]-'0')*10 + int(date[3]-'0'))
+	month := (int(date[5]-'0')*10 + int(date[6]-'0'))
+	day := (int(date[8]-'0')*10 + int(date[9]-'0'))
+
+	// Validate ranges
+	if month < 1 || month > 12 {
+		return false
+	}
+	if day < 1 || day > 31 {
+		return false
+	}
+
+	// Validate day based on month
+	daysInMonth := []int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	// Handle leap years for February
+	if month == 2 && ((year%400 == 0) || (year%100 != 0 && year%4 == 0)) {
+		daysInMonth[1] = 29
+	}
+	if day > daysInMonth[month-1] {
+		return false
+	}
+
 	return true
 }
 
@@ -1607,15 +1640,58 @@ func isValidISODateTime(datetime string) bool {
 	if datetime[10] != 'T' && datetime[10] != 't' && datetime[10] != ' ' {
 		return false
 	}
-	// Check time part (HH:MM:SS)
+
+	// Minimum time part: HH:MM:SSZ (8 chars)
 	timePart := datetime[11:]
 	if len(timePart) < 8 {
 		return false
 	}
+
+	// Check time separators
 	if timePart[2] != ':' || timePart[5] != ':' {
 		return false
 	}
-	// This is a simplified check - a full implementation would use time.Parse
+
+	// Validate hours (HH must be 00-23)
+	hours := (int(timePart[0]-'0')*10 + int(timePart[1]-'0'))
+	if hours > 23 {
+		return false
+	}
+
+	// Validate minutes (MM must be 00-59)
+	minutes := (int(timePart[3]-'0')*10 + int(timePart[4]-'0'))
+	if minutes > 59 {
+		return false
+	}
+
+	// Validate seconds (SS must be 00-59)
+	seconds := (int(timePart[6]-'0')*10 + int(timePart[7]-'0'))
+	if seconds > 59 {
+		return false
+	}
+
+	// Check timezone suffix if present (Z, +HH:MM, -HH:MM)
+	if len(timePart) > 8 {
+		suffix := timePart[8:]
+		if suffix == "Z" || suffix == "z" {
+			return true
+		}
+		// Handle ±HH:MM format
+		if len(suffix) == 6 && (suffix[0] == '+' || suffix[0] == '-') {
+			if suffix[3] != ':' {
+				return false
+			}
+			// Validate offset hours and minutes
+			offsetHours := (int(suffix[1]-'0')*10 + int(suffix[2]-'0'))
+			offsetMinutes := (int(suffix[4]-'0')*10 + int(suffix[5]-'0'))
+			if offsetHours > 23 || offsetMinutes > 59 {
+				return false
+			}
+			return true
+		}
+		return false
+	}
+
 	return true
 }
 
