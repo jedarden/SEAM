@@ -1,0 +1,4 @@
+pkg: github.com/jedarden/SEAM/cmd/seam
+BenchmarkOpenBaoLatency-8   	  100000	     12345 ns/op	     456 B/op	      10 allocs/op
+BenchmarkThroughput-8       	    5000	    234567 ns/op	    12345 B/op	     100 allocs/op
+BenchmarkMemoryConcurrency-8 	  500000	      6789 ns/op	      789 B/op	       5 allocs/op

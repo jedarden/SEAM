@@ -348,7 +348,7 @@ func TestCreateEphemeralKeyCaching(t *testing.T) {
 	}
 
 	// Different worker should hit API again
-	key3, err := client.CreateEphemeralKey(ctx, "worker-2")
+	_, err = client.CreateEphemeralKey(ctx, "worker-2")
 	if err != nil {
 		t.Fatalf("Third call failed: %v", err)
 	}
