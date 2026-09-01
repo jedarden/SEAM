@@ -176,7 +176,7 @@ func (l *LeaseLeader) tryAcquireOrRenew(ctx context.Context) bool {
 		},
 		Spec: coordinationv1.LeaseSpec{
 			HolderIdentity:       &l.identity,
-			LeaseDurationSeconds: int32(l.leaseDuration.Seconds()),
+			LeaseDurationSeconds: func() *int32 { d := int32(l.leaseDuration.Seconds()); return &d }(),
 			RenewTime:            &now,
 			LeaseTransitions:     new(int32),
 			AcquireTime:          &now,
