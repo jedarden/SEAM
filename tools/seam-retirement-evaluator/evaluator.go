@@ -192,16 +192,16 @@ This route version is proposed for deprecation based on the following metrics:
 
 ### Changes
 
-This PR adds an \`x-seam-deprecated\` block to the route fragment with:
-- \`since\` date (deprecation declaration)
-- \`sunset\` date (removal target)
+This PR adds an `x-seam-deprecated` block to the route fragment with:
+- `since` date (deprecation declaration)
+- `sunset` date (removal target)
 - Brownout windows (410 Gone periods)
 
 The verdict channel (deprecation state) travels through the existing hot-reload path — no deployment required.
 
 ### Verification
 
-- Route fragment exists at \`%s\`
+- Route fragment exists at `%s`
 - Zero observed traffic in VictoriaMetrics
 - No caller-appears events detected
 
