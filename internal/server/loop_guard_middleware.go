@@ -48,9 +48,7 @@ func (r *LoopGuardRegistry) GetGuard(routeID string) *LoopGuard {
 	return r.guards[routeID]
 }
 
-// Context key for storing loop guard check result in the request context.
-type contextKey int
-
+// Context key constants for storing loop guard check result in the request context.
 const (
 	loopGuardHashKey contextKey = iota
 	loopGuardCheckedKey
