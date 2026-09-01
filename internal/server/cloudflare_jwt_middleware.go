@@ -233,7 +233,7 @@ func (v *CloudflareJWTValidator) ValidateJWT(tokenString string) (*CloudflareAcc
 		return nil, fmt.Errorf("claims validation failed: %w", err)
 	}
 
-	log.Printf("[Cloudflare-JWT] Validated JWT for subject: %s (email: %s)", claims.sub, claims.email)
+	log.Printf("[Cloudflare-JWT] Validated JWT for subject: %s (email: %s)", claims.sub, claims.Email)
 	return claims, nil
 }
 
@@ -351,11 +351,11 @@ func (v *CloudflareJWTValidator) extractClaims(token *jwt.Token) (*CloudflareAcc
 
 	// Cloudflare-specific claims
 	if email, ok := claimsMap["email"].(string); ok {
-		claims.email = email
+		claims.Email = email
 	}
 
 	if country, ok := claimsMap["country"].(string); ok {
-		claims.country = country
+		claims.Country = country
 	}
 
 	if nonce, ok := claimsMap["identity_nonce"].(string); ok {
