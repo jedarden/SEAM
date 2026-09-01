@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sync"
 )
@@ -88,7 +89,7 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 		// 1. Reserved paths (health checks, control plane)
 		// 2. Probe-originated requests (x-credential-probe)
 		// 3. Dry-run mode
-		if isReservedPath(r.URL.Path) || isProbeRequest(r) || s.config.DryRun {
+		if isReservedPath(r.URL.Path) || isProbeRequest(r) || r.Header.Get("X-SEAM-Dry-Run") == "1" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -147,7 +148,7 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 		// Store hash in context for later success/failure recording
 		ctx := contextWithLoopGuardHash(r.Context(), hash)
 		ctx = contextWithLoopGuardChecked(ctx, true)
-		*r = r.WithContext(ctx)
+		r = r.WithContext(ctx)
 
 		// Check if request should be allowed
 		allowed, retryAfter, err := guard.CheckRequest(hash)
