@@ -272,6 +272,11 @@ func (l *Loader) GetAPIVersion() string {
 	return "_unversioned"
 }
 
+// GetBaseURL returns the configured base URL for the server
+func (l *Loader) GetBaseURL() string {
+	return l.baseURL
+}
+
 // GetRawJSON returns the spec as JSON with servers populated
 func (l *Loader) GetRawJSON() ([]byte, error) {
 	// Serialize the document to YAML
