@@ -1,70 +1,188 @@
-# SEAM Build Verification Evidence
+# SEAM Build Evidence - 2026-09-01
 
-**Date**: 2026-09-01  
-**Commit**: 1e16b55dfb8d615806beff718cf616b8e83d41a3  
-**Go Version**: go version go1.26.7 linux/amd64  
-**Workflow**: se-capture-results-6wbr6 in iad-ci cluster
+## Environment
+- **Go Version**: go1.26.0 linux/amd64
+- **Go Binary**: /home/coding/.local/go/bin/go
+- **OS**: NixOS 26.05
+- **Date**: 2026-09-01
+
+## Command Results
+
+### 1. go build ./...
+
+```
+Exit code: 1
+
+# github.com/ardenone/seam/internal/server
+internal/server/lease_leadership.go:179:26: cannot use int32(l.leaseDuration.Seconds()) (value of type int32) as *int32 value in struct literal
+internal/server/server.go:412:56: s.exclusionReportHandler undefined (type *Server has no field or method exclusionReportHandler)
+internal/server/server.go:413:57: s.exclusionAllReportsHandler undefined (type *Server has no field or method exclusionAllReportsHandler)
+internal/server/server.go:414:57: s.exclusionAnalyzeHandler undefined (type *Server has no field or method exclusionAnalyzeHandler)
+internal/server/server.go:415:57: s.exclusionSummaryHandler undefined (type *Server has no field or method exclusionSummaryHandler)
+internal/server/server.go:416:56: s.exclusionAlertsHandler undefined (type *Server has no field or method exclusionAlertsHandler)
+internal/server/server.go:417:63: s.exclusionActiveAlertsHandler undefined (type *Server has no field or method exclusionActiveAlertsHandler)
+internal/server/server.go:418:64: s.exclusionResolveAlertHandler undefined (type *Server has no field or method exclusionResolveAlertHandler)
+internal/server/quota_middleware.go:8:2: "strings" imported and not used
+```
+
+**Build Status**: ❌ FAILED
+
+### 2. go vet ./...
+
+```
+Exit code: 1
+
+internal/server/worker_identity_integration_test.go:12:2: package seam/internal/tailscale is not in std (/home/coding/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.0.linux-amd64/src/seam/internal/tailscale)
+# github.com/ardenone/seam/internal/tailscale [github.com/ardenone/seam/internal/tailscale.test]
+internal/tailscale/cache_test.go:186:2: declared and not used: shortTTL
+internal/tailscale/client_test.go:351:2: declared and not used: key3
+# github.com/ardenone/seam/internal/server
+internal/server/lease_leadership.go:179:26: cannot use int32(l.leaseDuration.Seconds()) (value of type int32) as *int32 value in struct literal
+internal/server/server.go:412:56: s.exclusionReportHandler undefined (type *Server has no field or method exclusionReportHandler)
+internal/server/server.go:413:57: s.exclusionAllReportsHandler undefined (type *Server has no field or method exclusionAllReportsHandler)
+internal/server/server.go:414:57: s.exclusionAnalyzeHandler undefined (type *Server has no field or method exclusionAnalyzeHandler)
+internal/server/server.go:415:57: s.exclusionSummaryHandler undefined (type *Server has no field or method exclusionSummaryHandler)
+internal/server/server.go:416:56: s.exclusionAlertsHandler undefined (type *Server has no field or method exclusionAlertsHandler)
+internal/server/server.go:417:63: s.exclusionActiveAlertsHandler undefined (type *Server has no field or method exclusionActiveAlertsHandler)
+internal/server/server.go:418:64: s.exclusionResolveAlertHandler undefined (type *Server has no field or method exclusionResolveAlertHandler)
+internal/server/quota_middleware.go:8:2: "strings" imported and not used
+```
+
+**Vet Status**: ❌ FAILED
+
+### 3. go test ./...
+
+```
+Exit code: 1
+
+# github.com/ardenone/seam/internal/server
+internal/server/worker_identity_integration_test.go:12:2: package seam/internal/tailscale is not in std (/home/coding/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.0.linux-amd64/src/seam/internal/tailscale)
+FAIL	github.com/ardenone/seam/internal/server [setup failed]
+# github.com/ardenone/seam/internal/tailscale [github.com/ardenone/seam/internal/tailscale.test]
+internal/tailscale/cache_test.go:186:2: declared and not used: shortTTL
+internal/tailscale/client_test.go:351:2: declared and not used: key3
+# github.com/ardenone/seam/internal/server
+internal/server/lease_leadership.go:179:26: cannot use int32(l.leaseDuration.Seconds()) (value of type int32) as *int32 value in struct literal
+internal/server/server.go:412:56: s.exclusionReportHandler undefined (type *Server has no field or method exclusionReportHandler)
+internal/server/server.go:413:57: s.exclusionAllReportsHandler undefined (type *Server has no field or method exclusionAllReportsHandler)
+internal/server/server.go:414:57: s.exclusionAnalyzeHandler undefined (type *Server has no field or method exclusionAnalyzeHandler)
+internal/server/server.go:415:57: s.exclusionSummaryHandler undefined (type *Server has no field or method exclusionSummaryHandler)
+internal/server/server.go:416:56: s.exclusionAlertsHandler undefined (type *Server has no field or method exclusionAlertsHandler)
+internal/server/server.go:417:63: s.exclusionActiveAlertsHandler undefined (type *Server has no field or method exclusionActiveAlertsHandler)
+internal/server/server.go:418:64: s.exclusionResolveAlertHandler undefined (type *Server has no field or method exclusionResolveAlertHandler)
+internal/server/quota_middleware.go:8:2: "strings" imported and not used
+
+ok  	github.com/ardenone/seam/benches	0.009s
+ok  	github.com/ardenone/seam/benchmarks/baseline	0.005s
+?   	github.com/ardenone/seam/cmd/baseline	[no test files]
+FAIL	github.com/ardenone/seam/cmd/seam [build failed]
+ok  	github.com/ardenone/seam/corpus	0.515s
+ok  	github.com/ardenone/seam/internal/buildinfo	0.002s
+
+--- FAIL: TestDispatch_ContextCancellation (0.00s)
+    dispatcher_test.go:433: Expected status error for cancelled context, got timeout
+FAIL
+FAIL	github.com/ardenone/seam/internal/fanout	0.165s
+?   	github.com/ardenone/seam/internal/pluckfallback	[no test files]
+
+--- FAIL: TestCheckDeprecation_InvalidSince (0.00s)
+    deprecation_lint_test.go:65: Expected at least 1 error for invalid since date, got 0
+--- FAIL: TestCheckDeprecation_BrownoutWithoutSunset (0.00s)
+    deprecation_lint_test.go:140: Expected error code 'deprecation.brownout-without-sunset', got "deprecation.brownout-invalid"
+--- FAIL: TestCheckDeprecation_OverlappingBrownouts (0.00s)
+    deprecation_lint_test.go:174: Expected error code 'deprecation.brownout-overlapping', got "deprecation.brownout-invalid"
+--- FAIL: TestCheckDeprecation_BrownoutEndBeforeStart (0.00s)
+    deprecation_lint_test.go:204: Expected error code 'deprecation.brownout-end-before-start', got "deprecation.brownout-invalid"
+--- FAIL: TestCheckDeprecation_BrownoutOutOfRange (0.00s)
+    deprecation_lint_test.go:234: Expected error code 'deprecation.brownout-out-of-range', got "deprecation.brownout-invalid"
+--- FAIL: TestCheckDeprecation_ValidBrownout (0.00s)
+    deprecation_lint_test.go:264: Expected no errors for valid brownout windows, got 1
+    deprecation_lint_test.go:266: Error: deprecation.brownout-invalid - x-seam-deprecated.brownout must be an array
+--- FAIL: TestIsValidISODate (0.00s)
+    --- FAIL: TestIsValidISODate/Invalid_month (0.00s)
+        deprecation_lint_test.go:292: isValidISODate("2024-13-01") = true, want false
+    --- FAIL: TestIsValidISODate/Invalid_day (0.00s)
+        deprecation_lint_test.go:292: isValidISODate("2024-01-32") = true, want false
+
+FAIL
+FAIL	github.com/ardenone/seam/internal/spec	0.310s
+FAIL	github.com/ardenone/seam/internal/tailscale [build failed]
+ok  	github.com/ardenone/seam/internal/testutil	(cached) [no tests to run]
+?   	github.com/ardenone/seam/internal/testutil/openbao	[no test files]
+ok  	github.com/ardenone/seam/internal/testutil/stubupstream	0.717s
+ok  	github.com/ardenone/seam/internal/vault	(cached)
+ok  	github.com/ardenone/seam/internal/version	(cached)
+?   	github.com/ardenone/seam/internal/watcher	[no test files]
+?   	github.com/ardenone/seam/scratch	[no test files]
+?   	github.com/ardenone/seam/tools/starvation-alert-contradiction-detector	[no test files]
+FAIL	github.com/ardenone/seam/tools/starvation-alert-diagnostic [build failed]
+FAIL	github.com/ardenone/seam/tools/starvation-alert-human-monitor [build failed]
+FAIL	github.com/ardenone/seam/tools/starvation-alert-self-resolution [build failed]
+FAIL	github.com/ardenone/seam/tools/starvation-backoff-monitor [build failed]
+FAIL	github.com/ardenone/seam/tools/starvation-diagnostic-daemon [build failed]
+```
+
+**Test Status**: ❌ FAILED
 
 ## Summary
 
-All three verification steps **FAILED**:
-- ❌ `go build ./...` - FAILED
-- ❌ `go vet ./...` - FAILED  
-- ❌ `go test ./...` - FAILED
+### Critical Build Failures (Blocker)
 
-## Detailed Results
+**internal/server** - 9 compilation errors:
+1. `lease_leadership.go:179:26` - Type conversion: cannot use `int32(l.leaseDuration.Seconds())` as `*int32` in struct literal
+2. `server.go:412-418` - 7 undefined handler methods: `exclusionReportHandler`, `exclusionAllReportsHandler`, `exclusionAnalyzeHandler`, `exclusionSummaryHandler`, `exclusionAlertsHandler`, `exclusionActiveAlertsHandler`, `exclusionResolveAlertHandler`
+3. `quota_middleware.go:8:2` - Unused import `"strings"`
 
-### 1. Build Status: FAILED
+**internal/tailscale** - 2 unused variables in tests:
+1. `cache_test.go:186:2` - `shortTTL` declared and not used
+2. `client_test.go:351:2` - `key3` declared and not used
 
-The `go build ./...` command failed with the following package build failures:
+**Downstream Build Failures** (caused by internal/server failures):
+- `cmd/seam` - build failed
+- `tools/starvation-alert-diagnostic` - build failed
+- `tools/starvation-alert-human-monitor` - build failed
+- `tools/starvation-alert-self-resolution` - build failed
+- `tools/starvation-backoff-monitor` - build failed
+- `tools/starvation-diagnostic-daemon` - build failed
 
-- `github.com/ardenone/seam/internal/tailscale` - **build failed**
-- `github.com/ardenone/seam/internal/server` - **build errors**
-- `github.com/ardenone/seam/cmd/seam` - **build errors**
+### Test Failures (Non-Blocker)
 
-### 2. Vet Status: FAILED
+**internal/fanout**:
+1. `TestDispatch_ContextCancellation` - Expected status error for cancelled context, got timeout
 
-The `go vet ./...` command failed, indicating static analysis issues in the codebase.
+**internal/spec**:
+7 deprecation lint test failures related to ISO date validation and brownout window validation.
 
-### 3. Test Status: FAILED
+### Successful Packages
 
-The `go test ./...` command revealed multiple test failures:
-
-#### `internal/spec` Package Failures
-
-Multiple deprecation lint tests failed with unexpected behavior:
-
-- `TestCheckDeprecation_InvalidSince` - Expected at least 1 error for invalid since date, got 0
-- `TestCheckDeprecation_BrownoutWithoutSunset` - Expected error code 'deprecation.brownout-without-sunset', got "deprecation.brownout-invalid"
-- `TestCheckDeprecation_OverlappingBrownouts` - Expected error code 'deprecation.brownout-overlapping', got "deprecation.brownout-invalid"
-- `TestCheckDeprecation_BrownoutEndBeforeStart` - Expected error code 'deprecation.brownout-end-before-start', got "deprecation.brownout-invalid"
-- `TestCheckDeprecation_BrownoutOutOfRange` - Expected error code 'deprecation.brownout-out-of-range', got "deprecation.brownout-invalid"
-- `TestCheckDeprecation_ValidBrownout` - Expected no errors for valid brownout windows, got 1 error: "deprecation.brownout-invalid - x-seam-deprecated.brownout must be an array"
-- `TestIsValidISODate` - Date validation not working correctly (accepting invalid months like 2024-13-01)
-- `TestIsValidISODateTime` - DateTime validation not working correctly
-
-#### `internal/tailscale` Package
-
-- **Build failed** - Compilation errors prevent tests from running
+- `benches` - PASS
+- `benchmarks/baseline` - PASS
+- `corpus` - PASS
+- `internal/buildinfo` - PASS
+- `internal/testutil` - PASS (no tests)
+- `internal/testutil/stubupstream` - PASS
+- `internal/vault` - PASS
+- `internal/version` - PASS
 
 ## Root Cause Analysis
 
-The primary failure is in the `internal/tailscale` package which has compilation errors. This is blocking the entire build process and preventing tests from running properly in that package.
+The primary issue is in `internal/server` which has been broken since 2026-08-30. This package is a critical dependency for:
+- The main `cmd/seam` binary
+- All starvation-alert tools
+- Integration tests in other packages
 
-The secondary failures are in the deprecation linting logic in `internal/spec`, where the validation rules are not working as expected by the test suite.
+The failures fall into three categories:
+1. **Type conversion error** - incorrect pointer usage in struct literal
+2. **Missing handler methods** - 7 exclusion-related handlers referenced but not defined
+3. **Import hygiene** - unused imports and variables
 
-## Related Beads
+## Next Steps Required
 
-Each failure category will be tracked in separate beads:
-1. **Tailscale build failure** - Fix compilation errors in `internal/tailscale` package
-2. **Deprecation lint test failures** - Fix deprecation validation logic in `internal/spec` package
-3. **Server build errors** - Fix compilation errors in `internal/server` package
+To make the SEAM tree green, the following issues need to be resolved:
 
-## Next Steps
+1. **Fix lease_leadership.go:179** - Correct the type conversion to use `*int32` properly
+2. **Implement 7 missing exclusion handlers in server.go** - Add the missing handler methods
+3. **Clean up imports** - Remove unused `"strings"` import and unused test variables
+4. **Fix test failures** - Address fanout context cancellation test and spec deprecation lint tests
 
-The SEAM tree is **NOT GREEN**. All three verification steps must pass before this bead can be closed:
-1. Fix compilation errors to make `go build ./...` pass
-2. Fix static analysis issues to make `go vet ./...` pass  
-3. Fix test failures to make `go test ./...` pass
-
-Each failure needs to be addressed in its own bead before this verification bead can be closed.
+Each issue should be filed as a separate bead with clear dependencies to ensure proper resolution order.
