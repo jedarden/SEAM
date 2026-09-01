@@ -38,7 +38,7 @@ func (s *Server) authorizationMiddleware(next http.Handler) http.Handler {
 
 		// Stage 5.2: Get route match to check x-required-scope
 		routeMatch := routeMatchFromRequest(r)
-		if routeMatch == nil || routeMatch.Route == nil {
+		if routeMatch == nil {
 			// No route match - this is likely a control-plane path
 			// Control-plane paths bypass authorization via reserved path check
 			next.ServeHTTP(w, r)
