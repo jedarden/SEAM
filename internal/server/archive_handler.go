@@ -169,7 +169,7 @@ func (s *Server) applyScopeFiltering(specJSON []byte, effectiveScopes []string) 
 			}
 
 			// Check if this operation has x-required-scope
-			requiredScopes := extractRequiredScopesFromMap(methodOpMap)
+			requiredScopes := spec.ExtractRequiredScopesFromMap(methodOpMap)
 
 			// Determine visibility:
 			// - No required scopes: visible (public route)
@@ -247,12 +247,3 @@ func (s *Server) getBaseURL() string {
 	return "https://seam.example.com"
 }
 
-// IsHTTPMethod checks if a string is an HTTP method (copied from spec package)
-func IsHTTPMethod(s string) bool {
-	switch strings.ToUpper(s) {
-	case "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE":
-		return true
-	default:
-		return false
-	}
-}

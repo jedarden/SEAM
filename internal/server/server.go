@@ -19,7 +19,7 @@ import (
 	"github.com/ardenone/seam/internal/pluckfallback"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/tailscale"
-	"github.com/ardenone/seam/internal/version"
+	apiversion "github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/vault"
 )
 
@@ -923,22 +923,22 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	path := query.Get("path")
 	method := strings.ToUpper(strings.TrimSpace(query.Get("method")))
-	version := query.Get("version")
+	requestedVersion := query.Get("version")
 
 	// Validate version parameter (400 for wrong-alphabet values)
 	// Phase 8: /docs/route accepts x-api-version values (v[1-9][0-9]* or _unversioned)
-	if err := validateVersionParameter(version); err != nil {
-		InvalidParameterValue("version", version).
+	if err := validateVersionParameter(requestedVersion); err != nil {
+		InvalidParameterValue("version", requestedVersion).
 			WithDetail("expected_format", "API version matching grammar ^v[1-9][0-9]*$ or _unversioned").
-			WithDetail("provided_value", version).
+			WithDetail("provided_value", requestedVersion).
 			WithDocsURL("/docs").
 			Write(w, r)
 		return
 	}
 
 	// Set default version
-	if version == "" {
-		version = unversionedAPIVersion
+	if requestedVersion == "" {
+		requestedVersion = apiversion.Default
 	}
 
 	// Validate required parameters
@@ -1023,12 +1023,12 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Route is visible in scope - proceed to get route information from full spec
-	routeInfo, err := s.specLoader.GetRoute(path, method, version)
+	routeInfo, err := s.specLoader.GetRoute(path, method, requestedVersion)
 	if err != nil {
 		requestErr := WrapRequestError(ErrCodeRouteNotFound, "Requested route documentation was not found", err).
 			WithDetail("path", path).
 			WithDetail("method", method).
-			WithDetail("version", version).
+			WithDetail("version", requestedVersion).
 			WithDocsURL("/docs")
 		logRequestError(r, "docs-route", requestErr)
 		requestErr.Write(w, r)
@@ -1769,6 +1769,11 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 	// Resolve the instance target if using x-instance-param
 	route := routeMatch.Route
 		// Resolve to specific instance target and capture for scope checking
+		// Extract instance parameter from path if using x-instance-param
+		var instance string
+		if route.InstanceParam != "" {
+			instance = routeMatch.PathParams[route.InstanceParam]
+		}
 		var selectedInstance string
 		var selectedTarget RouteTarget
 		if target, ok := route.UpstreamMap[instance]; ok && target.URL != "" {
@@ -2214,7 +2219,7 @@ func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Requ
 	methodScopes := make(map[string][]string)
 
 	for httpMethod, methodOp := range pathItemMap {
-		if !isHTTPMethod(httpMethod) {
+		if !spec.IsHTTPMethod(httpMethod) {
 			continue
 		}
 
@@ -2224,7 +2229,7 @@ func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Requ
 		}
 
 		// Get required scopes for this method
-		requiredScopes := extractRequiredScopesFromMap(methodOpMap)
+		requiredScopes := spec.ExtractRequiredScopesFromMap(methodOpMap)
 
 		// Check if caller has the required scopes
 		hasAccess := len(requiredScopes) == 0 // No scopes required = public access
