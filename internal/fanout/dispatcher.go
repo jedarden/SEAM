@@ -227,16 +227,26 @@ func (d *Dispatcher) admitCompletion(completion *InstanceCompletion, envelope *E
 	instanceID := completion.InstanceID
 
 	if completion.Error != nil {
+		// Check for cancellation first (parent context cancelled)
+		if completion.Error == context.Canceled {
+			envelope.AddResult(instanceID, &InstanceResult{
+				Status:   InstanceStatusError,
+				Instance: instanceID,
+				Error:    "Request canceled by client",
+			})
+			return
+		}
+
 		// Check for timeout
 		if completion.Error == context.DeadlineExceeded {
 			envelope.AddResult(instanceID, TimeoutResult(instanceID, int(d.config.Timeout.Milliseconds())))
 			return
 		}
 
-		// Check for dispatch canceled before start
+		// Check for dispatch canceled before start (also treated as cancellation)
 		if completion.Error.Error() == "dispatch canceled before start" {
 			envelope.AddResult(instanceID, &InstanceResult{
-				Status:   InstanceStatusTimeout,
+				Status:   InstanceStatusError,
 				Instance: instanceID,
 				Error:    "Dispatch canceled before request started",
 			})
