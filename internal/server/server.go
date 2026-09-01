@@ -395,7 +395,6 @@ func (s *Server) setupRoutes() {
 	s.callerMux.HandleFunc("/_seam/healthz", s.healthzHandler)
 	s.callerMux.HandleFunc("/_seam/readyz", s.readyzHandler)
 	s.callerMux.HandleFunc("/openapi.json", s.openapiJSONHandler)
-	s.callerMux.HandleFunc("/whoami", s.whoamiHandler)
 
 	// Setup docs handler - fetches spec internally and serves ReDoc UI
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
