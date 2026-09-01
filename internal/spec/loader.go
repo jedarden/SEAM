@@ -358,7 +358,7 @@ func (l *Loader) GetFilteredJSON(identityScopes []string) ([]byte, error) {
 
 		for httpMethod, methodOp := range pathItemMap {
 			// Skip non-method fields (like $ref, summary, etc.)
-			if !isHTTPMethod(httpMethod) {
+			if !IsHTTPMethod(httpMethod) {
 				filteredPathItem[httpMethod] = methodOp
 				continue
 			}
@@ -371,7 +371,7 @@ func (l *Loader) GetFilteredJSON(identityScopes []string) ([]byte, error) {
 			}
 
 			// Check if this operation has x-required-scope
-			requiredScopes := extractRequiredScopesFromMap(methodOpMap)
+			requiredScopes := ExtractRequiredScopesFromMap(methodOpMap)
 
 			// Determine visibility:
 			// - No required scopes: visible (public route)
@@ -440,8 +440,8 @@ func (l *Loader) buildEmptySpec() []byte {
 	return specJSON
 }
 
-// isHTTPMethod checks if a string is an HTTP method
-func isHTTPMethod(s string) bool {
+// IsHTTPMethod checks if a string is an HTTP method
+func IsHTTPMethod(s string) bool {
 	switch strings.ToUpper(s) {
 	case "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE":
 		return true
@@ -450,8 +450,8 @@ func isHTTPMethod(s string) bool {
 	}
 }
 
-// extractRequiredScopesFromMap extracts x-required-scope from an operation map
-func extractRequiredScopesFromMap(opMap map[string]interface{}) []string {
+// ExtractRequiredScopesFromMap extracts x-required-scope from an operation map
+func ExtractRequiredScopesFromMap(opMap map[string]interface{}) []string {
 	extensions, ok := opMap["x-required-scope"]
 	if !ok {
 		return nil

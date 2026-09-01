@@ -183,7 +183,7 @@ func (s *Server) calculateLevel1Changes(sinceSpec, currentSpec []byte, sinceKnow
 
 		// Check each HTTP method
 		for method, operation := range pathItemMap {
-			if !isHTTPMethod(method) {
+			if !spec.IsHTTPMethod(method) {
 				continue
 			}
 
@@ -262,7 +262,7 @@ func (s *Server) calculateLevel1Changes(sinceSpec, currentSpec []byte, sinceKnow
 		}
 
 		for method, operation := range pathItemMap {
-			if !isHTTPMethod(method) {
+			if !spec.IsHTTPMethod(method) {
 				continue
 			}
 
@@ -380,7 +380,7 @@ func (s *Server) calculateVisibilityKinds(sinceOp, currentOp map[string]interfac
 
 // isRouteVisible checks if a route is visible to the caller
 func (s *Server) isRouteVisible(operation map[string]interface{}, effectiveScopes []string) bool {
-	requiredScopes := extractRequiredScopesFromMap(operation)
+	requiredScopes := spec.ExtractRequiredScopesFromMap(operation)
 
 	// No scopes required = public route = visible
 	if len(requiredScopes) == 0 {
