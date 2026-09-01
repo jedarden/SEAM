@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/spec"
@@ -128,6 +129,10 @@ type RouteEntry struct {
 	// Deprecated holds deprecation metadata for this route.
 	// Per Phase 8.3: populated from x-seam-deprecated fragment extension.
 	Deprecated *DeprecationInfo
+
+	// CredentialProbeConfig holds the fragment-root credential probe configuration.
+	// Per Phase 12: populated from x-credential-probe fragment extension.
+	CredentialProbeConfig *CredentialProbeConfig
 }
 
 // RouteTarget is the resolved forwarding and injection metadata for one
@@ -146,6 +151,11 @@ type RouteTarget struct {
 	// this instance. The effective requirement is the union of operation-level
 	// requiredScopes and this instance's RequiredScopes.
 	RequiredScopes []string
+
+	// ProbeInterval is the per-instance probe interval override.
+	// Per Phase 12: populated from x-upstream-map entry's probeInterval field.
+	// Zero means use the fragment-root default from CredentialProbeConfig.
+	ProbeInterval time.Duration
 }
 
 // DeprecationInfo holds deprecation metadata for a route.
@@ -431,6 +441,11 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
+			// Extract credential probe config (Phase 12)
+			credentialProbeConfig, err := extractCredentialProbeConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 
 				// Extract deprecation information (Phase 8.3)
 				deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
@@ -1496,8 +1511,8 @@ func extractRequiredScopes(operation *v3.Operation, pathItem *v3.PathItem, docum
 // Per Phase 8.3: fragment-root only, not operation-specific.
 func extractDeprecation(operation *v3.Operation, pathItem *v3.PathItem, spec *v3.Document) (*DeprecationInfo, error) {
 	// x-seam-deprecated is fragment-root only, so check pathItem extensions first
-	extensionNode := pathItem.Extensions.Get("x-seam-deprecated")
-	if extensionNode == nil {
+	extensionNode, found := pathItem.Extensions.Get("x-seam-deprecated")
+	if !found || extensionNode == nil {
 		// Check if operation has OpenAPI deprecated field
 		if operation != nil && operation.Deprecated != nil && *operation.Deprecated {
 			// Per-operation deprecated: true honored - return minimal deprecation info
