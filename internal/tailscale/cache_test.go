@@ -183,7 +183,6 @@ func TestCacheHoldDown(t *testing.T) {
 }
 
 func TestCacheCleanup(t *testing.T) {
-	shortTTL := 50 * time.Millisecond
 	longTTL := 5 * time.Minute
 	cache := newKeyCache(longTTL, 30*time.Second)
 
