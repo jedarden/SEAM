@@ -7,6 +7,20 @@
 
 ---
 
+## Contents
+
+1. [Executive Summary](#executive-summary)
+2. [Progress Visualization](#progress-visualization)
+3. [Phase Statistics by Category](#phase-statistics-by-category)
+4. [Complete Phases](#complete-phases)
+5. [Incomplete Phases](#incomplete-phases)
+6. [Critical Blockers](#critical-blockers)
+7. [Data Quality Verification](#data-quality-verification)
+8. [Evidence Quality Summary](#evidence-quality-summary)
+9. [Completion Velocity](#completion-velocity)
+
+---
+
 ## Executive Summary
 
 | Metric | Count | Percentage |
@@ -22,8 +36,8 @@
 ## Progress Visualization
 
 ```
-Complete:   ████████░░░░░░░░░░░  6/17  (35.3%)
-Incomplete: ████████████████░░░ 11/17  (64.7%)
+Complete:   ███████░░░░░░░░░░░░░  6/17  (35.3%)
+Incomplete: █████████████░░░░░░░ 11/17  (64.7%)
 ```
 
 ---
@@ -166,7 +180,7 @@ Incomplete: ████████████████░░░ 11/17  (64
 ### ☐ Phase 3: ConfigMap-Mounted Route Fragments
 **Line:** 888 | **Status:** [ ] | **Blocker:** Hot reload not enabled | **Evidence:** phase3-evidence.md (❌ FAIL)
 
-**Description:** Per-service `configMap` volumes (one per service, each mounted whole at `/etc/gateway/routes.d/<svc>/`), in-process file-watch hot reload with atomic route-table swap, a pilot fragment (the ArgoCD read-only proxy), **this is the phase where credential injection is first proved end-to-end**
+**Description:** Per-service `configMap` volumes (one per service, each mounted whole at `/etc/gateway/routes.d/<svc>/`), in-process file-watch hot reload with atomic route-table swap, and a pilot fragment — the existing hand-rolled ArgoCD read-only proxy — as a **pass-through carrying no injection** (unmetered and read-only, so it needs neither the cost governor nor caller auth)
 
 **Issue:** Hot reload flag exists but NOT enabled in deployment.yaml; fragment lifecycle blocked
 
@@ -175,7 +189,7 @@ Incomplete: ████████████████░░░ 11/17  (64
 ### ☐ Phase 4: Onboard z.ai/GLM and twitterapi.io Fragments
 **Line:** 889 | **Status:** [ ] | **Blocker:** Fragments not mounted | **Evidence:** phase4-evidence.md (❌ FAIL)
 
-**Description:** z.ai/GLM and twitterapi.io proxy fragments with credential injection (the first metered routes, but the cost governor is not yet required — that's Phase 13's job; just log the calls)
+**Description:** z.ai/GLM and twitterapi.io proxy fragments (both already reachable from rs-manager — **no new Tailscale Connector needed**); **credential injection is first proved end-to-end** here against a real credential — the Phase 3 pilot injects nothing, so these are the first fragments to exercise the full `x-vault-path` → `x-inject-as` path shipped in Phase 2. Both are metered, so no agent is cut over onto them until Phase 13's cost governor is live
 
 **Issue:** Fragment YAML files exist but NOT mounted in deployment, OpenBao secrets don't exist, routes not served
 
@@ -184,9 +198,9 @@ Incomplete: ████████████████░░░ 11/17  (64
 ### ☐ Phase 5: Multi-Cluster kubectl-proxy Fragments
 **Line:** 890 | **Status:** [ ] | **Blocker:** Missing cluster, YAML bug | **Evidence:** phase5-evidence.md (❌ FAIL)
 
-**Description:** parametrized multi-instance fragment (if the fragment declares `/k8s/{cluster}/…` and names `cluster` as the instance parameter, per Data Model §4), eight bare-MagicDNS `x-upstream-map` hosts in the allowlist, a Tailscale Connector per cluster (no new Tailscale Connector needed), per-instance `requiredScope` distinguishing observer vs admin instances
+**Description:** parametrized multi-instance fragment (if the fragment declares `/k8s/{cluster}/…` and names `cluster` as the instance parameter, per Data Model §4), eight bare-MagicDNS `x-upstream-map` hosts, each added to `seam-upstream-allowlist` as its own line, a Tailscale Connector per cluster on rs-manager as needed, per-instance `requiredScope` distinguishing observer vs admin instances
 
-**Issue:** Missing `iad-native-ads` cluster, YAML parsing bug prevents fragment loading, missing 6 Tailscale Connectors
+**Issue:** Missing `iad-native-ads` cluster, schema validation bug, YAML parsing bug prevents fragment loading, missing 6 Tailscale Connectors
 
 ---
 
@@ -204,7 +218,7 @@ Incomplete: ████████████████░░░ 11/17  (64
 
 **Description:** NEEDLE-side per-worker `tsnet` identity provisioning, `x-required-scope` route tagging, Grant-based scope enforcement at the gateway, the `/whoami` self-service surface (with its `/scopes` subresource for a worker's own scopes), scope-filtered `/openapi.json`, `/docs`, `/docs/{route}`, the 404/403 oracle, per-instance scope enforcement for multi-instance fragments
 
-**Issue:** Uses placeholder test mode; no runtime testing, no real Tailscale integration
+**Issue:** Compilation failures, missing Tailscale LocalClient integration, no live testing — runtime coverage is placeholder test mode only
 
 ---
 
@@ -262,6 +276,14 @@ Incomplete: ████████████████░░░ 11/17  (64
 ✅ **State Verification:** Expected 6 [x], Actual 6 [x] found  
 ✅ **Phase Coverage:** All 17 phases present in data  
 ✅ **Line Number Verification:** Sequential integrity confirmed (lines 868-962)
+
+Second-pass re-verification (2026-09-02, bead `seam-29463a52`) against the
+working tree: `grep -nE '^\s*- \[[ x]\]' docs/plan/plan.md` returns the same
+17 lines with the same states as the table above, and the Evidence Quality
+Summary agrees with `.beads/phase-verdict-summary.md` — that source lists
+FAIL for 3, 4, 5, 6b, 7, 10 and CANNOT VERIFY (in detail) for 12, which is
+why Phase 7 is counted under FAIL/BLOCKED here.  
+✅ **Source Re-verification (2026-09-02):** Checkbox states and line numbers grepped directly from `docs/plan/plan.md` — 11 unticked (868, 881, 882, 888, 889, 890, 896, 897, 931, 950, 960) and 6 ticked (891, 912, 949, 959, 961, 962), matching the tables above line for line. Evidence verdicts cross-checked against `.beads/phase-verdict-summary.md` (6 PASS, 6 FAIL, 1 CANNOT VERIFY, 4 NO EVIDENCE). Per-phase descriptions were corrected where phrases had been attributed to the wrong phase line: the **credential-injection-first-proved** point and the **no-new-Tailscale-Connector** note both belong to Phase 4 (line 889), and Phase 3's pilot is explicitly a pass-through carrying no injection (line 888).
 
 ---
 
