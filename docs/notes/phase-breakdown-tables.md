@@ -40,7 +40,7 @@ blocker type classifies what is holding the phase.
 
 | Phase | Line | Status | Blocker Type | Blocker Detail |
 |-------|-----:|--------|--------------|----------------|
-| **Phase 1a** — Gateway scaffold (Go, ADR-001) | 868 | `[ ]` — NO EVIDENCE | Upstream decision + missing evidence | No evidence file; ADR-001 language decision still pending, so the scaffold cannot start. |
+| **Phase 1a** — Gateway scaffold (Go, ADR-001) | 868 | `[ ]` — NO EVIDENCE | Missing evidence | No evidence file. The once-recorded "ADR-001 decision pending" blocker is stale — ADR-001 ratified Go on 2026-07-20 (`plan.md` decision log) and Phase 6a's PASS shows the scaffold serving traffic, so the gap is evidence, not implementation. |
 | **Phase 1b** — Fragment merge | 881 | `[ ]` — NO EVIDENCE | Missing evidence | No evidence file; merge/validation engine unverified. |
 | **Phase 2** — Secret injection | 882 | `[ ]` — NO EVIDENCE | Missing evidence | No evidence file; OpenBao k8s-auth injection path unverified. |
 | **Phase 3** — ConfigMap-mounted route fragments | 888 | `[ ]` — FAIL | Deployment config | Hot-reload flag exists but is not enabled in `deployment.yaml`, blocking the whole fragment lifecycle. |
@@ -51,6 +51,14 @@ blocker type classifies what is holding the phase.
 | **Phase 9a** — `seam lint` CI gate | 931 | `[ ]` — NO EVIDENCE | Missing evidence | No evidence file; cannot verify the CLI/declarative-config gate wiring. |
 | **Phase 10** — Multi-instance routes | 950 | `[ ]` — FAIL (CRITICAL FAILURE) | Startup crash | SEAM crashes on startup: duplicate `/whoami` route registration. |
 | **Phase 12** — Credential health sentinel | 960 | `[ ]` — FAIL (cannot verify) | Compilation errors | 99 compilation errors in `internal/server` prevent build and runtime verification. |
+
+Blocker detail reflects the verdict summary's 2026-09-01 snapshot. The
+committed blocker-freshness audit in `docs/notes/plan-recommendations-analysis.md`
+(2026-09-02) subsequently marks the 99-error compilation block (Phases 7, 12)
+**stale** — fixed 2026-09-01 — the duplicate-`/whoami` crash (Phase 10) fixed
+pending runtime re-verification, and the YAML-loading failure (Phase 6b) likely
+fixed at the code level with a runtime demonstration still owed. The verdicts
+stand as recorded; several of the blockers behind them may already be retired.
 
 ### Blocker types at a glance
 
