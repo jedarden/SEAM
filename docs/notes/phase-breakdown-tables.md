@@ -86,3 +86,9 @@ Counts and line numbers re-checked 2026-09-02 against the working tree with
 - Incomplete `[ ]` (11): lines 868, 881, 882, 888, 889, 890, 896, 897, 931, 950, 960
 
 6 + 11 = 17 — every phase checkbox in the file appears in exactly one table.
+
+Verdicts re-checked 2026-09-02 row by row against `.beads/phase-verdict-summary.md`:
+all 11 incomplete rows match that file's verdict and headline qualifier
+(BLOCKED, INCOMPLETE, CRITICAL FAILURE, cannot verify), all 6 complete rows
+carry PASS, and the blocker-type rollup counts the same 11 phases — each in
+exactly one rollup row, counts summing to 11.
