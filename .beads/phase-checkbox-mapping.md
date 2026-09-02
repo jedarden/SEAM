@@ -118,10 +118,17 @@ This document provides a structural mapping between:
 ### Phase 7: Identity Resolution (Tailscale + Cloudflare Access)
 - **Plan.md line:** 897
 - **Checkbox state:** `[ ]` (unchecked)
-- **Evidence file:** ❌ NOT FOUND
-- **Verdict:** ⚠️ **NO EVIDENCE**
-- **Alignment:** ⚠️ No evidence to verify completion
-- **Should checkbox be ticked?** Cannot determine without evidence
+- **Evidence file:** `.beads/phase7-evidence.md`
+- **Verdict:** ❌ **INCOMPLETE** (partial implementation, critical blockers)
+- **Alignment:** ✅ CORRECT (unchecked matches incomplete verdict)
+- **Summary:** Code infrastructure exists but uses placeholder test mode; real Tailscale LocalClient WhoIs integration is TODO; no running binary to test acceptance criteria. Scope filtering, 404/403 oracle, per-instance scope enforcement, and operator gating cannot be verified without runtime testing.
+- **Blockers:**
+  - 99 compile errors accumulated since 2026-08-30 prevent code verification
+  - Identity resolution uses test mode (`SEAM_TEST_IDENTITY_MODE`) instead of real Tailscale WhoIs
+  - No running SEAM instance to test against (seam namespace has no pods)
+  - Multiple acceptance criteria require live testing (scope filtering, 404/403 oracle, operator gating)
+- **Passing criteria:** x-required-scope tagging implemented, Stage 5 authorization middleware exists, `/whoami` and `/scopes` endpoints implemented, built-in control-plane scopes defined, scope version cache implemented
+- **Should checkbox be ticked?** ❌ NO - phase is incomplete
 
 ---
 
@@ -223,8 +230,8 @@ This document provides a structural mapping between:
 
 | Alignment Status | Count | Phases |
 |------------------|-------|--------|
-| ✅ CORRECT | 9 | Phase 3, 5, 6a, 6b, 8, 9b, 10, 11, 13, 14 |
-| ⚠️ NO EVIDENCE | 4 | Phase 1a, 1b, 2, 4, 7, 9a |
+| ✅ CORRECT | 11 | Phase 3, 4, 5, 6a, 6b, 7, 8, 9b, 10, 11, 13, 14 |
+| ⚠️ NO EVIDENCE | 4 | Phase 1a, 1b, 2, 9a |
 
 ### Evidence-Based Recommendations
 
@@ -234,11 +241,11 @@ This document provides a structural mapping between:
 | 1b | `[ ]` | ⚠️ UNKNOWN | No evidence file |
 | 2 | `[ ]` | ⚠️ UNKNOWN | No evidence file |
 | 3 | `[ ]` | ❌ NO | FAIL - hot reload not enabled |
-| 4 | `[ ]` | ⚠️ UNKNOWN | No evidence file |
+| 4 | `[ ]` | ❌ NO | FAIL - deployment incomplete, secrets missing |
 | 5 | `[ ]` | ❌ NO | FAIL - multiple critical blockers |
 | 6a | `[x]` | ✅ YES | SUBSTANTIALLY COMPLETE |
 | 6b | `[ ]` | ❌ NO | BLOCKED - YAML fragments cannot load |
-| 7 | `[ ]` | ⚠️ UNKNOWN | No evidence file |
+| 7 | `[ ]` | ❌ NO | INCOMPLETE - placeholder implementation, no running binary |
 | 8 | `[x]` | ✅ YES | PASSING |
 | 9a | `[ ]` | ⚠️ UNKNOWN | No evidence file |
 | 9b | `[x]` | ✅ YES | COMPLETE |
@@ -259,7 +266,14 @@ This document provides a structural mapping between:
    - **Impact:** Core Phase 3 functionality cannot work
    - **Fix:** Enable `-enable-hot-reload` flag in deployment.yaml
 
-2. **Phase 5 (FAIL)** - Multiple critical blockers
+2. **Phase 4 (FAIL)** - Deployment incomplete, missing secrets
+   - **Impact:** Credential injection cannot be demonstrated end-to-end
+   - **Fixes needed:**
+     - Add ConfigMap volumes and volumeMounts for Phase 4 fragments to SEAM deployment
+     - Provision OpenBao secrets for `seam/routes/twitterapi/api-key` and `seam/routes/zai/api-key`
+     - Verify routes are served and cost governor enforces quotas
+
+3. **Phase 5 (FAIL)** - Multiple critical blockers
    - **Impact:** Nine-cluster map functionality incomplete
    - **Fixes needed:**
      - Add missing cluster `iad-native-ads` to upstream map and allowlist
@@ -268,11 +282,19 @@ This document provides a structural mapping between:
      - Add 6 missing Tailscale Connectors
      - Fix binary crash on duplicate `/whoami` route registration
 
-3. **Phase 6b (BLOCKED)** - YAML fragment loading failure
+4. **Phase 6b (BLOCKED)** - YAML fragment loading failure
    - **Impact:** Cannot proceed with service-by-service cutover
    - **Fix:** Fragment loader must support YAML format (currently JSON-only)
 
-4. **Phase 12 (CANNOT VERIFY)** - Compilation errors
+5. **Phase 7 (INCOMPLETE)** - Placeholder implementation, no running binary
+   - **Impact:** Identity resolution and scope enforcement cannot be verified
+   - **Fixes needed:**
+     - Resolve 99 compile errors accumulated since 2026-08-30
+     - Integrate real Tailscale LocalClient WhoIs (replace placeholder test mode)
+     - Build and deploy SEAM for live verification
+     - Test acceptance criteria against running binary
+
+6. **Phase 12 (CANNOT VERIFY)** - Compilation errors
    - **Impact:** Credential health sentinel cannot be verified
    - **Fix:** Resolve 99 compile errors accumulated since 2026-08-30
 
@@ -285,11 +307,11 @@ The following phases have **no evidence files** and cannot be verified:
 - **Phase 1a:** Gateway scaffold
 - **Phase 1b:** Fragment merge
 - **Phase 2:** Secret injection
-- **Phase 4:** Credential Injection (z.ai/GLM and twitterapi.io)
-- **Phase 7:** Identity Resolution (Tailscale + Cloudflare Access)
 - **Phase 9a:** `seam lint` CI Gate
 
-**Recommendation:** Create evidence files for these phases to enable verification.
+**Note:** Phase 4 and Phase 7 now have evidence files (added 2026-09-01).
+
+**Recommendation:** Create evidence files for the remaining phases to enable verification.
 
 ---
 
@@ -310,8 +332,8 @@ The following phases have **no evidence files** and cannot be verified:
 ---
 
 **Generation Notes:**
-- Evidence files analyzed: 11 files (Phase 10 evidence file now included)
-- Phases with evidence: 3, 5, 6a, 6b, 8, 9b, 10, 11, 12, 13, 14
-- Phases without evidence: 1a, 1b, 2, 4, 7, 9a
-- Generated by: Bead seam-4aa9a212
-- Updated: 2026-09-01 (Phase 10 evidence file discovered and integrated)
+- Evidence files analyzed: 13 files
+- Phases with evidence: 3, 4, 5, 6a, 6b, 7, 8, 9b, 10, 11, 12, 13, 14
+- Phases without evidence: 1a, 1b, 2, 9a
+- Generated by: Bead seam-c27f3555
+- Updated: 2026-09-01 (Phase 4 and Phase 7 evidence files discovered and integrated)
