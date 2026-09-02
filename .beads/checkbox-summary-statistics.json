@@ -1,0 +1,144 @@
+{
+  "summary": {
+    "total_checkboxes": 17,
+    "ticked_count": 6,
+    "unticked_count": 11,
+    "completion_rate_percentage": 35.29,
+    "verification_passed": true
+  },
+  "phase_breakdown": {
+    "10": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "11": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    },
+    "12": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "13": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    },
+    "14": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    },
+    "1a": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "1b": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "2": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "3": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "4": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "5": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "6a": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    },
+    "6b": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "7": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "8": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    },
+    "9a": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1,
+      "completion_rate": 0.0,
+      "status": "not_started"
+    },
+    "9b": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0,
+      "completion_rate": 1.0,
+      "status": "complete"
+    }
+  },
+  "metadata": {
+    "source": "checkbox-data-structured.json",
+    "total_phases": 17,
+    "phases_with_complete_items": 6,
+    "phases_fully_complete": 6,
+    "phases_not_started": 11,
+    "calculation_timestamp": "2026-09-02T00:00:00Z",
+    "verified": true
+  },
+  "verification_details": {
+    "count_check": "6 + 11 = 17 (PASSED)",
+    "completeness_check": "All 17 phases accounted for (PASSED)",
+    "integrity_check": "No missing or duplicate data (PASSED)"
+  }
+}
