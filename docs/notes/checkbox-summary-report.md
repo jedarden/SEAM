@@ -18,6 +18,7 @@
 7. [Data Quality Verification](#data-quality-verification)
 8. [Evidence Quality Summary](#evidence-quality-summary)
 9. [Completion Velocity](#completion-velocity)
+10. [Recommendations and Analysis](#recommendations-and-analysis)
 
 ---
 
@@ -320,8 +321,171 @@ why Phase 7 is counted under FAIL/BLOCKED here.
 
 ---
 
+## Recommendations and Analysis
+
+**Added:** 2026-09-02, bead `seam-6ecbb16a`. Synthesizes the checkbox state above with a
+live-state check performed the same day: running pod + logs on rs-manager, the committed
+deployment manifest, the current tree (`internal/spec`, `cmd/seam`), git history, and the
+OpenBao rs-manager prefix. Claims are tagged **[live]** (verified 2026-09-02 against the
+running deployment or tree) or **[evidence]** (per the phase evidence files, not re-verified here).
+
+---
+
+### Blocker Pattern Analysis
+
+The 11 incomplete phases do **not** share one root cause. Grouped by actual blocker:
+
+| Pattern | Phases | Nature | Status |
+|---------|--------|--------|--------|
+| **Stale evidence — fix already landed** | 10, 12, 6b | The defect described in evidence has since been fixed in-tree; verdicts predate the fixes | **[live]** |
+| **Documentation debt — work exists, checkbox/evidence never written** | 1a, 1b, 2, 9a | NO EVIDENCE ≠ NOT BUILT (see below) | **[live]** |
+| **Deployment manifest drift** | 3, 4 | Committed manifest and running pod describe different topologies; a sync today breaks the pod | **[live]** |
+| **Missing external infrastructure** | 5 | Cluster + Tailscale Connectors not provisioned | **[evidence]** |
+| **Missing integration (real build required)** | 7 | NEEDLE-side per-worker `tsnet` identity, never live-tested | **[evidence]** |
+
+**The largest single pattern is stale or missing evidence, not missing code.** Three of the
+six FAIL verdicts were followed by fix commits the same day the verdicts were issued:
+
+- **Phase 10** evidence records `CRITICAL FAILURE` — duplicate `/whoami` registration crashing
+  startup. Fix landed 2026-09-01: commit `52b71e4`; `internal/server/server.go:406` now registers
+  `/whoami` exactly once. **[live]**
+- **Phase 12** evidence records 99 compilation errors blocking verification. Compile-fix commits
+  landed 2026-09-01 (`441bf20` "resolve all 9 internal/server compilation errors", plus
+  `94daec6`, `06b594b`, `ed735c1`, `bb402f2`). Re-verification requires a green build — no Go
+  toolchain exists on ex44, so CI must arbitrate. **[live]**
+- **Phase 6b** evidence records "binary treats YAML as JSON; production fragments fail with
+  `invalid character '#'`". The running pod (image built 2026-08-27) logs **6 fragments loaded,
+  0 errors — all `.yaml` files**, schema-validated (`internal/spec/loader.go:290` has a YAML
+  path alongside `internal/spec/fragment.go:146`'s JSON path). The claim is inconsistent with
+  the deployed build and needs a re-test on a current build before it is believed. **[live]**
+
+**The foundation paradox.** Phase 1a's checkbox is held open on "language decision (ADR-001)
+pending" — yet the repo is a Go module (`github.com/ardenone/seam`, go 1.26) whose server is
+**running in production**. The plan's own dependency graph makes the point: Phase 8 (verified
+PASS) emits `X-SEAM-API-Version` headers, which Phase 1a defines; Phase 4's credential proof
+exercises Phase 2's injection path. Advanced phases could not have passed on top of a missing
+foundation. Phases 1a, 1b and 2 are almost certainly **done-but-unrecorded**; the blocker is
+bookkeeping, not engineering.
+
+**Production reality check.** The `seam` pod on rs-manager has been Running 5d16h with 0
+restarts, serving fragments for **three services** (argocd-ro, k8s, unifi) — two of which
+(pilot argocd-ro, k8s multi-cluster) are the work products of phases marked incomplete (3 and
+5). The checkboxes understate what is actually serving traffic. **[live]**
+
+### Critical Path Summary
+
+Ordered by what unblocks what (tracks within a tier run in parallel):
+
+```
+TIER 1 — Establish ground truth
+  1. Reconcile deployment manifest with the running pod   ── unblocks 3, 4, 6b
+  2. Green build via CI (re-verify 10, 12, 6b)            ── unblocks 3 verdicts
+TIER 2 — Small infra fills (each ≤ 1 line / 1 command)
+  3. SEAM_HOT_RELOAD_ENABLED in deployment                ── unblocks 3
+  4. Provision OpenBao rs-manager/seam/routes/* secrets   ── unblocks 4
+TIER 3 — Real builds (independent tracks)
+  5. Phase 5 fleet infra (connectors, cluster decision)   ── unblocks 5
+  6. Phase 7 NEEDLE tsnet identity                        ── unblocks 7, and 10's
+     scope-enforcement half (plan: "requires Phase 7")
+TIER 4 — Bookkeeping sweep
+  7. Evidence + checkbox reconciliation (1a, 1b, 2, 9a)   ── corrects the headline stat
+```
+
+Tier 1 comes first because **the next ArgoCD sync of the current manifest is a footgun**: git
+declares volumes from ConfigMaps that do not exist in the namespace (`seam-routes-seam`,
+`seam-routes-argocd`, `seam-routes-zai`, `seam-routes-twitterapi`), drops a live one
+(`seam-routes-unifi`), and pins `ronaldraygun/seam:0.1.0` where the pod runs a ghcr digest.
+A blind sync produces a pod stuck in `FailedMount`. **[live]**
+
+### Infrastructure Gaps Identified
+
+1. **Fragment ConfigMaps don't match the manifest.** Namespace has `seam-routes-argocd-ro`,
+   `seam-routes-unifi`, `seam-routes-k8s`; the manifest wants `seam-routes-seam`,
+   `seam-routes-argocd`, `seam-routes-zai`, `seam-routes-twitterapi`, `seam-routes-k8s`.
+   Decide the canonical topology first, then make declarative-config match it. **[live]**
+2. **Image reference drift.** Live: `ghcr.io/jedarden/seam@sha256:5ca69ed0…`; manifest:
+   `ronaldraygun/seam:0.1.0`. One of the two is not where builds actually land. **[live]**
+3. **Hot reload disabled.** `SEAM_HOT_RELOAD_ENABLED` is read at `cmd/seam/main.go:171` and set
+   nowhere in `deployment.yaml` — Phase 3's blocker, confirmed still live. One env var. **[live]**
+4. **Upstream CA ConfigMap is empty** (`seam-upstream-ca`, 0 data entries) — `x-upstream-tls`
+   CA-bundle resolution has nothing to resolve against for any TLS upstream. **[live]**
+5. **Credential paths unprovisioned.** The `rs-manager/seam/routes/*` OpenBao allow-list target
+   has no `seam/` entry under `secret/rs-manager/` (prefix listing). The `secret/seam` prefix
+   itself is not listable by the agent read identity (403 — policy working as designed), so
+   existence there could not be confirmed either way; either way the exact `x-vault-path` targets
+   the Phase 4 fragments declare must be verified, and provisioned via `bao-as
+   rs-manager-provision` if absent. **[live]**
+6. **Phase 5 fleet infra** **[evidence]**: `iad-native-ads` is not among the fleet's eight
+   clusters (though an OpenBao `iad-native-ads/` prefix exists), and 6 Tailscale Connectors on
+   rs-manager are missing.
+7. **Loader hygiene** (minor, found incidentally) **[live]**: the loader walks ConfigMap
+   AtomicWriter temp dirs (`..2026_08_27_…`), producing duplicate loads and 3 spurious
+   quarantines (`x-seam-owner mismatch`) per start. Skip dot-prefixed temp dirs.
+
+### Prioritized Action Items
+
+1. **Reconcile `deployment.yaml` with the running topology before the next ArgoCD sync** —
+   pick the canonical fragment set (the live one serves traffic today), create or rename the
+   ConfigMaps in declarative-config to match, resolve the image-reference question, commit, and
+   let ArgoCD sync. *Unblocks: 3, 4, 6b.*
+2. **Get a green build from CI and re-verify the three stale verdicts** — Phase 10 (crash fix
+   `52b71e4`), Phase 12 (compile fixes `441bf20` et al.), Phase 6b (YAML loading, contradicted
+   by live logs). Update the evidence files and checkboxes to match the re-test. *Unblocks: 3
+   verdict flips.*
+3. **Set `SEAM_HOT_RELOAD_ENABLED: "true"`** in the deployment env. One line. *Unblocks: 3.*
+4. **Verify/provision the OpenBao credential paths** for zai + twitterapi under the
+   `rs-manager/seam/routes/*` allow-list — write-only identity, value piped, verified by
+   metadata version (never read back). *Unblocks: 4's end-to-end credential proof.*
+5. **Reconcile foundation checkboxes 1a / 1b / 2** — write evidence against the existing tree
+   (ADR-001 is de facto discharged: Go), tick what is genuinely done, and correct the headline
+   statistics. *Moves completion from 6/17 toward 9/17 with zero new code.*
+6. **Phase 5 fleet work** — decide `iad-native-ads` membership; add the missing Tailscale
+   Connectors; per-instance `requiredScope` split. *Unblocks: 5.*
+7. **Phase 7 NEEDLE-side identity** — per-worker `tsnet` provisioning + a live `/whoami` test
+   against a minted identity. *Unblocks: 7, and 10's per-instance/fanout-scope enforcement.*
+8. **Phase 9a** — package the merge/validation engine as `seam lint` and wire it as the
+   declarative-config CI gate; write the evidence file. *Unblocks: 9a.*
+9. **Fix the loader to skip AtomicWriter temp dirs** — removes the duplicate-load and spurious
+   quarantine noise on every start. *Quality; no phase gate.*
+
+### Positive Indicators
+
+- **6/17 phases evidence-verified — and they are the hard ones.** Foreign-worker JWT
+  authentication with 35 tests (14), per-route guards and cost governor (13), circuit breaker
+  and passive health (11), version migration + deprecation headers (8), authoring tooling (9b),
+  production deployment (6a). The risky surface of the gateway is the part that is done.
+- **SEAM is not a prototype — it is in production.** Running pod, 5d16h uptime, zero restarts,
+  three services served from schema-validated fragments loaded with zero errors. **[live]**
+- **Incomplete phases have production artifacts.** The Phase 3 pilot (argocd-ro) and the
+  Phase 5.2 k8s multi-cluster fragment are serving traffic today, even though their phases are
+  unticked.
+- **Fix velocity is high.** Five targeted fixes landed on 2026-09-01 — including the Phase 10
+  startup crash and the compile-error family — within a day of the evidence verdicts.
+- **Delivery rails are proven.** OpenBao agent identities (read + write-only provision) are
+  live on rs-manager, Forgejo → ArgoCD GitOps is the working change path, and iad-ci is
+  available for the green-build verification this analysis calls for.
+- **Observability exists beyond plan scope**: vmagent scraping and the retirement-evaluator
+  access/credential-boundary canaries are running in the namespace. **[live]**
+
+### Conclusion
+
+The 35.3% headline is an undercount, in a specific and fixable way. Of the 11 incomplete
+phases: **~4 are documentation debt** (1a, 1b, 2, 9a — work exists, evidence/checkbox never
+written), **3 carry stale verdicts** that predate same-day fixes (10, 12, 6b), **2 are held by
+one deployment-manifest reconciliation** (3, 4), and only **2 require genuine new builds** (5's
+fleet infrastructure, 7's NEEDLE-side identity). No incomplete phase depends on an unproven
+capability; every blocker on the critical path is a known, bounded action.
+
+The right sequence is truth first: reconcile the manifest before the next sync, get a green
+build, and re-verify the three stale verdicts — after which the checkbox count is expected to
+move materially (6/17 toward 9–10/17) without a line of new feature code. The two real builds
+then proceed on parallel tracks. What the project needs now is **verification and
+reconciliation discipline, not invention.**
+
+---
+
 **Report Generated:** 2026-09-02  
-**Task:** seam-29463a52  
+**Task:** seam-29463a52; §10 added by seam-6ecbb16a  
 **Total Phases:** 17  
 **Complete:** 6 (35.3%)  
 **Incomplete:** 11 (64.7%)
