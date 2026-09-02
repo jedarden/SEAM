@@ -1,5 +1,8 @@
 # SEAM Checkbox Summary Statistics
 
+**Generated:** 2026-09-02  
+**Source:** `.beads/checkbox-data-structured.json`
+
 ## Overall Summary
 
 - **Total Checkboxes:** 17
