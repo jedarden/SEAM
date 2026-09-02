@@ -270,7 +270,7 @@ Incomplete: ████████████████░░░ 11/17  (64
 | Evidence Status | Count | Phases |
 |----------------|-------|--------|
 | ✅ PASS/COMPLETE | 6 | 6a, 8, 9b, 11, 13, 14 |
-| ❌ FAIL/BLOCKED | 5 | 3, 4, 5, 6b, 10 |
+| ❌ FAIL/BLOCKED | 6 | 3, 4, 5, 6b, 7, 10 |
 | ❌ CANNOT VERIFY | 1 | 12 |
 | ⚠️ NO EVIDENCE | 4 | 1a, 1b, 2, 9a |
 
