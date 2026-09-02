@@ -33,7 +33,9 @@ verified against code and tests).
 ## Incomplete Phases (11)
 
 Status is the checkbox state in `plan.md` (`[ ]` on every row) combined with
-the verification verdict; blocker type classifies what is holding the phase.
+the verdict from `.beads/phase-verdict-summary.md` (NO EVIDENCE / FAIL / PASS),
+with that file's own headline qualifier in parentheses where it adds one;
+blocker type classifies what is holding the phase.
 
 | Phase | Line | Status | Blocker Type | Blocker Detail |
 |-------|-----:|--------|--------------|----------------|
@@ -42,12 +44,12 @@ the verification verdict; blocker type classifies what is holding the phase.
 | **Phase 2** — Secret injection | 882 | `[ ]` — no evidence | Missing evidence | No evidence file; OpenBao k8s-auth injection path unverified. |
 | **Phase 3** — ConfigMap-mounted route fragments | 888 | `[ ]` — FAIL | Deployment config | Hot-reload flag exists but is not enabled in `deployment.yaml`, blocking the whole fragment lifecycle. |
 | **Phase 4** — Onboard z.ai/GLM and twitterapi.io proxy fragments | 889 | `[ ]` — FAIL | Deployment gap | Fragment YAMLs authored but not mounted in the deployment; OpenBao secrets absent; routes not served. |
-| **Phase 5** — Onboard kubectl-proxy endpoints (multi-instance) | 890 | `[ ]` — FAIL | Missing infrastructure + parser bug | `iad-native-ads` cluster absent, 6 Tailscale Connectors missing, and a YAML parsing bug prevents fragment loading. |
-| **Phase 6b** — Agent cutover | 896 | `[ ]` — BLOCKED | YAML loading bug | Gateway binary accepts JSON only; production fragments die with `invalid character '#'`. |
+| **Phase 5** — Onboard kubectl-proxy endpoints (multi-instance) | 890 | `[ ]` — FAIL | Missing infrastructure + parser bug | `iad-native-ads` cluster absent, 6 Tailscale Connectors missing, plus schema-validation and YAML-parsing bugs in fragment loading. |
+| **Phase 6b** — Agent cutover | 896 | `[ ]` — FAIL (BLOCKED) | YAML loading bug | Gateway binary accepts JSON only; production fragments die with `invalid character '#'`. |
 | **Phase 7** — Per-agent tool scoping | 897 | `[ ]` — FAIL | Compilation errors + missing integration | Compilation failures, placeholder test-mode identity instead of real Tailscale `tsnet` integration, no live testing. |
 | **Phase 9a** — `seam lint` CI gate | 931 | `[ ]` — no evidence | Missing evidence | No evidence file; cannot verify the CLI/declarative-config gate wiring. |
-| **Phase 10** — Multi-instance routes | 950 | `[ ]` — CRITICAL FAILURE | Startup crash | SEAM crashes on startup: duplicate `/whoami` route registration. |
-| **Phase 12** — Credential health sentinel | 960 | `[ ]` — CANNOT VERIFY | Compilation errors | 99 compilation errors in `internal/server` prevent build and runtime verification. |
+| **Phase 10** — Multi-instance routes | 950 | `[ ]` — FAIL (CRITICAL FAILURE) | Startup crash | SEAM crashes on startup: duplicate `/whoami` route registration. |
+| **Phase 12** — Credential health sentinel | 960 | `[ ]` — FAIL (cannot verify) | Compilation errors | 99 compilation errors in `internal/server` prevent build and runtime verification. |
 
 ### Blocker types at a glance
 
