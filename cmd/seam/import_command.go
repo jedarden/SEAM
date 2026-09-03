@@ -24,15 +24,26 @@ func importCommand(args []string) {
 // Usage: seam import --from-url <url> [--owner <name>] [--output <file>] [--paths <paths>] [--methods <methods>]
 //
 // Flags:
-//   --from-url, -u: URL of the OpenAPI spec to import (required)
-//   --owner, -o: Owner/service name for the fragment (default: derived from URL)
-//   --output, -f: Output fragment file path (default: <owner>/fragment.yaml)
-//   --paths, -p: Comma-separated list of paths to import (default: all paths)
-//   --methods, -m: Comma-separated list of HTTP methods to import (default: all methods)
-//   --filter-prefix: Only import paths with this prefix
-//   --strip-prefix: Strip this prefix from imported paths
-//   --add-prefix: Add this prefix to all imported paths
-//   --timeout: HTTP timeout for fetching the spec (default: 30s)
+//
+//	--from-url, -u: URL of the OpenAPI spec to import (required)
+//	--owner, -o: Owner/service name for the fragment (default: derived from URL)
+//	--output, -f: Output fragment file path (default: <owner>/fragment.yaml)
+//	--paths, -p: Comma-separated list of paths to import (default: all paths)
+//	--methods, -m: Comma-separated list of HTTP methods to import (default: all methods)
+//	--filter-prefix: Only import paths with this prefix
+//	--strip-prefix: Strip this prefix from imported paths
+//	--add-prefix: Add this prefix to all imported paths
+//	--timeout: HTTP timeout for fetching the spec (default: 30s)
+//
+// The generated fragment is a curatable bootstrap, not a served fragment:
+// it carries x-seam-schema/x-seam-owner/x-upstream and the imported paths,
+// and leaves the credential/scope decisions (x-vault-path, x-inject-as,
+// x-required-scope, ...) to the curator. x-api-version is deliberately
+// absent — authored values must be v1, v2, ...; _unversioned is assigned by
+// SEAM at merge time and rejected by lint as an authored value.
+// Swagger 2.0 sources are accepted; their top-level definitions/parameters
+// are carried across as components.schemas/components.parameters so $ref
+// pointers in the imported operations keep resolving.
 func runImportCommand(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("import", flag.ExitOnError)
 	fs.SetOutput(stderr)
@@ -127,8 +138,18 @@ func runImportCommand(args []string, stdout, stderr io.Writer) int {
 	// Transform paths (strip/add prefixes)
 	transformedPaths := transformPaths(filteredPaths, stripPrefix, addPrefix)
 
+	// The fragment forwards to the service the spec describes, not to the
+	// spec document itself, so x-upstream is derived as scheme://host[:port].
+	upstream := deriveBaseUpstreamURL(parsedURL)
+	if strings.HasPrefix(upstream, "http://") {
+		// route-fragment-schema requires the plaintext acknowledgement on any
+		// http:// upstream. Emit it (with a loud note) so the bootstrap is
+		// lintable; removing it or switching to https is the curator's call.
+		fmt.Fprintf(stderr, "seam import: upstream %s is http://; emitted x-upstream-plaintext: acknowledged — switch x-upstream to https or remove the marker if this hop is not plaintext\n", upstream)
+	}
+
 	// Build the fragment
-	fragment := buildFragment(owner, transformedPaths, parsedURL)
+	fragment := buildFragment(owner, transformedPaths, upstream, fromURL, parsedSpec)
 
 	// Ensure output directory exists
 	outputDir := filepath.Dir(outputFile)
@@ -147,24 +168,58 @@ func runImportCommand(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "# Fragment successfully imported from %s\n", fromURL)
 	fmt.Fprintf(stdout, "# Owner: %s\n", owner)
 	fmt.Fprintf(stdout, "# Paths imported: %d\n", pathCount)
+	fmt.Fprintf(stdout, "# Upstream (derived from the spec URL): %s\n", upstream)
 	fmt.Fprintf(stdout, "#\n")
 	fmt.Fprintf(stdout, "# IMPORTANT: Add the following fields manually:\n")
-	fmt.Fprintf(stdout, "#   - x-vault-path: rs-manager/seam/routes/%s/<secret-key>\n", owner)
-	fmt.Fprintf(stdout, "#   - x-inject-as: {kind: header|bearer|query, name: <header-name>}\n")
-	fmt.Fprintf(stdout, "#   - x-upstream-tls: (if upstream uses custom CA or needs insecure skip)\n")
-	fmt.Fprintf(stdout, "#   - x-required-scope: (if scope-based access control is needed)\n")
+	fmt.Fprintf(stdout, "#   - x-vault-path: seam/routes/%s/<secret-key> (must start with seam/routes/%s/)\n", owner, owner)
+	fmt.Fprintf(stdout, "#   - x-inject-as: {kind: header|bearer|query, name: <header-name>} (bearer takes no name)\n")
+	fmt.Fprintf(stdout, "#   - x-required-scope: <service>:<action> (if scope-based access control is needed)\n")
+	fmt.Fprintf(stdout, "#   - x-upstream-tls: (if upstream uses a custom CA or needs insecure skip)\n")
 	fmt.Fprintf(stdout, "#   - x-cache-ttl: (if response caching is desired)\n")
+	fmt.Fprintf(stdout, "#   - x-upstream-strip-prefix: (if the upstream expects paths without a prefix)\n")
+	fmt.Fprintf(stdout, "#\n")
+	fmt.Fprintf(stdout, "# x-api-version is intentionally absent: authored values must be v1, v2, ...;\n")
+	fmt.Fprintf(stdout, "# _unversioned is assigned by SEAM at merge time and rejected by lint.\n")
+	fmt.Fprintf(stdout, "# Keep this file in a directory named %s/ — seam lint checks x-seam-owner\n", owner)
+	fmt.Fprintf(stdout, "# against the parent directory name.\n")
 	fmt.Fprintf(stdout, "#\n")
 	fmt.Fprintf(stdout, "# Run 'seam lint %s' to validate the fragment.\n", outputFile)
 
 	return 0
 }
 
+// deriveBaseUpstreamURL reduces a spec URL to scheme://host[:port]. A
+// fragment's x-upstream is the base the imported routes forward to; the path
+// that located the spec document (for example /swagger.json) is not part of it.
+func deriveBaseUpstreamURL(u *url.URL) string {
+	return (&url.URL{Scheme: u.Scheme, Host: u.Host}).String()
+}
+
+// sourceComponents carries the source spec's reusable definitions into the
+// fragment so $ref pointers inside imported operations keep resolving.
+// OpenAPI 3 sources pass components through unchanged; Swagger 2.0 sources
+// map their top-level definitions/parameters into the components shape.
+func sourceComponents(parsedSpec map[string]interface{}) map[string]interface{} {
+	if components, ok := parsedSpec["components"].(map[string]interface{}); ok && len(components) > 0 {
+		return components
+	}
+
+	result := make(map[string]interface{})
+	if definitions, ok := parsedSpec["definitions"].(map[string]interface{}); ok && len(definitions) > 0 {
+		result["schemas"] = definitions
+	}
+	if parameters, ok := parsedSpec["parameters"].(map[string]interface{}); ok && len(parameters) > 0 {
+		result["parameters"] = parameters
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 // deriveOwnerFromURL derives a service owner name from the URL
 func deriveOwnerFromURL(u *url.URL) string {
-	// Remove common API path components and TLD
-	host := strings.TrimPrefix(u.Host, "api.")
-	host = strings.TrimPrefix(host, "www.")
+	host := u.Host
 
 	// Remove port if present
 	if i := strings.Index(host, ":"); i != -1 {
@@ -395,37 +450,49 @@ func transformPaths(paths map[string]map[string]interface{}, stripPrefix, addPre
 	return result
 }
 
+// fragmentDocument is the generated fragment's field order. yaml.Marshal of a
+// plain map sorts keys alphabetically, which buries the SEAM metadata the
+// curator must edit below the paths section; a struct keeps it at the top.
+// Authored fields a curator must decide (x-vault-path, x-inject-as,
+// x-required-scope, x-api-version, ...) are deliberately not generated.
+type fragmentDocument struct {
+	XSeamSchema        string                 `yaml:"x-seam-schema"`
+	XSeamOwner         string                 `yaml:"x-seam-owner"`
+	XUpstream          string                 `yaml:"x-upstream"`
+	XUpstreamPlaintext string                 `yaml:"x-upstream-plaintext,omitempty"`
+	OpenAPI            string                 `yaml:"openapi,omitempty"`
+	Info               map[string]interface{} `yaml:"info,omitempty"`
+	Paths              interface{}            `yaml:"paths"`
+	Components         interface{}            `yaml:"components,omitempty"`
+}
+
 // buildFragment builds a SEAM fragment structure
-func buildFragment(owner string, paths map[string]map[string]interface{}, sourceURL *url.URL) map[string]interface{} {
-	fragment := make(map[string]interface{})
-
-	// Add required SEAM metadata
-	fragment["x-seam-schema"] = "v1"
-	fragment["x-seam-owner"] = owner
-	fragment["x-api-version"] = "_unversioned"
-
-	// Add placeholder for upstream (user must fill in)
-	fragment["x-upstream"] = sourceURL.String()
-
-	// Add OpenAPI version and info
-	fragment["openapi"] = "3.1.0"
-	fragment["info"] = map[string]interface{}{
-		"title":       fmt.Sprintf("%s API", owner),
-		"version":     "1.0.0",
-		"description": fmt.Sprintf("Fragment imported from %s", sourceURL.String()),
+func buildFragment(owner string, paths map[string]map[string]interface{}, upstream, sourceURL string, parsedSpec map[string]interface{}) *fragmentDocument {
+	fragment := &fragmentDocument{
+		XSeamSchema: "v1",
+		XSeamOwner:  owner,
+		XUpstream:   upstream,
+		OpenAPI:     "3.1.0",
+		Info: map[string]interface{}{
+			"title":       fmt.Sprintf("%s API", owner),
+			"version":     "1.0.0",
+			"description": fmt.Sprintf("Fragment imported from %s", sourceURL),
+		},
+		Paths: paths,
 	}
 
-	// Add paths
-	fragment["paths"] = paths
-
-	// Add empty components placeholder (for schemas, securitySchemes, etc.)
-	fragment["components"] = map[string]interface{}{}
+	if strings.HasPrefix(upstream, "http://") {
+		fragment.XUpstreamPlaintext = "acknowledged"
+	}
+	if components := sourceComponents(parsedSpec); components != nil {
+		fragment.Components = components
+	}
 
 	return fragment
 }
 
 // writeFragment writes a fragment to a file in YAML format
-func writeFragment(path string, fragment map[string]interface{}) error {
+func writeFragment(path string, fragment *fragmentDocument) error {
 	// Marshal to YAML
 	yamlBytes, err := yaml.Marshal(fragment)
 	if err != nil {

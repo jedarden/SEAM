@@ -10,7 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	seamspec "github.com/ardenone/seam/internal/spec"
 )
 
 func TestRunImportCommandMissingURL(t *testing.T) {
@@ -209,8 +210,8 @@ func TestImportFromRealArgoCD(t *testing.T) {
 	if code != 0 {
 		// If we can't reach ArgoCD, that's still useful information
 		if strings.Contains(stderr.String(), "failed to fetch spec") ||
-		   strings.Contains(stderr.String(), "HTTP 403") ||
-		   strings.Contains(stderr.String(), "HTTP 401") {
+			strings.Contains(stderr.String(), "HTTP 403") ||
+			strings.Contains(stderr.String(), "HTTP 401") {
 			t.Logf("ArgoCD integration test: Could not reach ArgoCD (expected in some environments): %s", stderr.String())
 			return
 		}
@@ -246,7 +247,6 @@ func TestImportFromRealArgoCD(t *testing.T) {
 	expectedFields := []string{
 		"x-seam-schema: v1",
 		"x-seam-owner: argocd",
-		"x-api-version: _unversioned",
 		"openapi: 3.1.0",
 	}
 
@@ -254,6 +254,12 @@ func TestImportFromRealArgoCD(t *testing.T) {
 		if !strings.Contains(contentStr, field) {
 			t.Errorf("Expected fragment to contain %q", field)
 		}
+	}
+
+	// _unversioned is SEAM-assigned; an authored x-api-version fails lint
+	// (api-version.invalid), so the bootstrap must not emit one.
+	if strings.Contains(contentStr, "x-api-version") {
+		t.Errorf("Expected fragment to NOT contain x-api-version (SEAM assigns it at merge time)")
 	}
 }
 
@@ -411,7 +417,7 @@ func TestImportFromArgoCDFixture(t *testing.T) {
 		contentStr := string(content)
 		// Should have imported 3 paths
 		if !strings.Contains(contentStr, "/api/v1/applications") ||
-		   !strings.Contains(contentStr, "/api/v1/projects") {
+			!strings.Contains(contentStr, "/api/v1/projects") {
 			t.Errorf("Expected fragment to contain multiple paths from ArgoCD spec")
 		}
 
@@ -587,5 +593,171 @@ func TestLintImportedFragment(t *testing.T) {
 	// The important thing is that lint ran and produced output
 	if len(lintOutput) == 0 {
 		t.Error("Expected lint to produce output (even if errors)")
+	}
+}
+
+// argocdSwaggerFixture mirrors the shape of ArgoCD's published spec
+// (https://<server>/swagger.json): a Swagger 2.0 document with top-level
+// definitions referenced as #/definitions/<name>, one path carrying GET and
+// DELETE so method filtering is exercised against it.
+const argocdSwaggerFixture = `{
+  "swagger": "2.0",
+  "info": {"title": "ArgoCD API", "version": "v2.8.0"},
+  "paths": {
+    "/api/v1/applications": {
+      "get": {
+        "summary": "List applications",
+        "operationId": "ApplicationService_List",
+        "responses": {
+          "200": {"description": "A successful response.", "schema": {"$ref": "#/definitions/v1alpha1ApplicationList"}}
+        }
+      }
+    },
+    "/api/v1/applications/{name}": {
+      "get": {
+        "summary": "Get an application",
+        "operationId": "ApplicationService_Get",
+        "responses": {
+          "200": {"description": "A successful response.", "schema": {"$ref": "#/definitions/v1alpha1Application"}}
+        }
+      },
+      "delete": {
+        "summary": "Delete an application",
+        "operationId": "ApplicationService_Delete",
+        "responses": {
+          "200": {"description": "A successful response."}
+        }
+      }
+    }
+  },
+  "definitions": {
+    "v1alpha1Application": {"type": "object", "properties": {"metadata": {"type": "object"}}},
+    "v1alpha1ApplicationList": {"type": "object", "properties": {"items": {"type": "array"}}}
+  }
+}`
+
+// serveFixture serves an OpenAPI/Swagger fixture over HTTP and returns the
+// server; callers must defer Close().
+func serveFixture(t *testing.T, spec string) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(spec))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// TestImportLintPassesAfterCuration is the Phase 9b acceptance chain: the
+// imported bootstrap must reach a lint-clean fragment through curation alone —
+// adding credential/scope metadata, never repairing structural defects.
+func TestImportLintPassesAfterCuration(t *testing.T) {
+	server := serveFixture(t, argocdSwaggerFixture)
+	outputDir := t.TempDir()
+	// The fragment must live in a directory named after the owner; lint
+	// checks x-seam-owner against the parent directory.
+	outputFile := filepath.Join(outputDir, "argocd", "fragment.yaml")
+
+	var stdout, stderr bytes.Buffer
+	if code := runImportCommand([]string{
+		"--from-url", server.URL + "/swagger.json",
+		"--owner", "argocd",
+		"--output", outputFile,
+	}, &stdout, &stderr); code != 0 {
+		t.Fatalf("Import failed: code=%d stderr=%s", code, stderr.String())
+	}
+
+	content, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+	generated := string(content)
+
+	// The generated upstream is the spec URL's base (scheme://host), not the
+	// spec document URL; the document URL survives only as provenance in
+	// info.description.
+	for _, line := range strings.Split(generated, "\n") {
+		if strings.HasPrefix(line, "x-upstream:") && strings.Contains(line, "/swagger.json") {
+			t.Errorf("Expected x-upstream to be the service base URL, got %q", line)
+		}
+	}
+	if !strings.Contains(generated, "imported from "+server.URL+"/swagger.json") {
+		t.Errorf("Expected info.description to record the source spec URL for provenance")
+	}
+
+	// Swagger 2.0 definitions must be carried across as components.schemas so
+	// the imported operations' $ref pointers resolve.
+	if !strings.Contains(generated, "components:") || !strings.Contains(generated, "v1alpha1ApplicationList") {
+		t.Errorf("Expected Swagger 2.0 definitions to be carried across as components.schemas")
+	}
+
+	lint := func(name string) {
+		t.Helper()
+		report, err := seamspec.LintFiles([]string{outputFile}, seamspec.LintOptions{
+			SchemaPath: "../../spec/route-fragment-schema.json",
+		})
+		if err != nil {
+			t.Fatalf("%s: lint engine error: %v", name, err)
+		}
+		if report.HasErrors() {
+			t.Errorf("%s: expected a lint-clean fragment, got %d error(s):", name, len(report.Errors))
+			for _, finding := range report.Errors {
+				t.Errorf("  [%s] %s", finding.Code, finding.Message)
+			}
+		}
+	}
+
+	// The httptest server is an IP literal, which lint rejects for upstreams
+	// by design; a curator points x-upstream at the real named service. This
+	// rewrite stands in for that one decision.
+	generated = strings.Replace(generated, "x-upstream: http://"+server.Listener.Addr().String(), "x-upstream: https://argocd.example.com", 1)
+
+	// A curated credential-free fragment is a legal pass-through proxy, so
+	// the structural bootstrap must already be lint-clean before any
+	// credential metadata is added.
+	curatedPath := filepath.Join(outputDir, "argocd", "fragment.yaml")
+	if err := os.WriteFile(curatedPath, []byte(generated), 0644); err != nil {
+		t.Fatalf("Failed to rewrite fragment: %v", err)
+	}
+	lint("pass-through bootstrap")
+
+	// Curation adds the credential metadata the command's guidance names —
+	// and must keep the fragment lint-clean.
+	generated = strings.Replace(generated, "x-upstream: https://argocd.example.com\n",
+		"x-upstream: https://argocd.example.com\n"+
+			"x-vault-path: seam/routes/argocd/argocd-api-token\n"+
+			"x-inject-as:\n    kind: bearer\n"+
+			"x-required-scope: argocd:read\n", 1)
+	if err := os.WriteFile(curatedPath, []byte(generated), 0644); err != nil {
+		t.Fatalf("Failed to write curated fragment: %v", err)
+	}
+	lint("curated fragment")
+}
+
+// TestImportHTTPOutputRequiresPlaintextAcknowledgement verifies the http://
+// bootstrap carries the schema-mandated plaintext marker so it can lint.
+func TestImportHTTPOutputRequiresPlaintextAcknowledgement(t *testing.T) {
+	server := serveFixture(t, argocdSwaggerFixture)
+	outputDir := t.TempDir()
+	outputFile := filepath.Join(outputDir, "imported", "fragment.yaml")
+
+	var stdout, stderr bytes.Buffer
+	if code := runImportCommand([]string{
+		"--from-url", server.URL,
+		"--owner", "imported",
+		"--output", outputFile,
+	}, &stdout, &stderr); code != 0 {
+		t.Fatalf("Import failed: code=%d stderr=%s", code, stderr.String())
+	}
+
+	content, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+	if !strings.Contains(string(content), "x-upstream-plaintext: acknowledged") {
+		t.Errorf("Expected http:// upstream to emit x-upstream-plaintext: acknowledged, got:\n%s", content)
+	}
+	if !strings.Contains(stderr.String(), "http://") {
+		t.Errorf("Expected a stderr note about the plaintext acknowledgement, got: %s", stderr.String())
 	}
 }
