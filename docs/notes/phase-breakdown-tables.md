@@ -55,7 +55,8 @@ blocker type classifies what is holding the phase.
 Blocker detail reflects the verdict summary's 2026-09-01 snapshot. The
 committed blocker-freshness audit in `docs/notes/plan-recommendations-analysis.md`
 (2026-09-02) subsequently marks the 99-error compilation block (Phases 7, 12)
-**stale** — fixed 2026-09-01 — the duplicate-`/whoami` crash (Phase 10) fixed
+**stale** — fixed 2026-09-01 across six fix commits, `go build` clean at audit
+time — the duplicate-`/whoami` crash (Phase 10) fixed
 pending runtime re-verification, and the YAML-loading failure (Phase 6b) likely
 fixed at the code level with a runtime demonstration still owed. The verdicts
 stand as recorded; several of the blockers behind them may already be retired.
@@ -87,8 +88,15 @@ Counts and line numbers re-checked 2026-09-02 against the working tree with
 
 6 + 11 = 17 — every phase checkbox in the file appears in exactly one table.
 
-Verdicts re-checked 2026-09-02 row by row against `.beads/phase-verdict-summary.md`:
-all 11 incomplete rows match that file's verdict and headline qualifier
-(BLOCKED, INCOMPLETE, CRITICAL FAILURE, cannot verify), all 6 complete rows
-carry PASS, and the blocker-type rollup counts the same 11 phases — each in
-exactly one rollup row, counts summing to 11.
+Verdicts re-checked row by row on 2026-09-02 (final pass, bead `seam-5f0b2f9e`)
+against `.beads/phase-verdict-summary.md`: all 11 incomplete rows match that
+file's verdict and headline qualifier (BLOCKED, INCOMPLETE, CRITICAL FAILURE,
+cannot verify), all 6 complete rows carry PASS, and the blocker-type rollup
+counts the same 11 phases — each in exactly one rollup row, counts summing to
+11. Checkbox lines re-confirmed unchanged by the same pass.
+
+Table structure re-checked 2026-09-02 (bead `seam-2bf38c53`): all three tables
+carry a header and separator row, every data row matches its table's column
+count (4 columns complete, 5 columns incomplete, 3 columns rollup), and the two
+phase tables' `Line` values are unique and each point at the phase named in
+that row of `plan.md` — no duplicate, missing, or double-assigned phase.
