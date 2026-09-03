@@ -201,3 +201,34 @@ requires that hypothesis.
    fails silently.
 5. Configure signing secrets on both hooks and validation on the EventSource
    (signatures are currently empty/unvalidated).
+
+## Outcome (2026-09-03, bead `seam-0e3fbddf`)
+
+Recommendation 1 plus the candidate-5 hardening landed in
+`jedarden/declarative-config` `86e44bb9`: the sensor filter reads
+`header.X-Forgejo-Event` (singular), and the `seam` EventSource route now
+enforces `authSecret` (`forgejo-webhook-secret`, fed by the
+`forgejo-webhook-externalsecret.yml` ExternalSecret from `c547ca12` —
+OpenBao `rs-manager/iad-ci/forgejo/webhook-secret`). A
+`webhook-registration-retry` pod-template annotation bump forces the
+eventsource pod to roll on sync (guard against the silent
+non-registration failure mode, candidate 7). Forgejo hook id 13 was
+re-registered to send `Authorization: Bearer <webhook-secret>` and to
+sign deliveries with the same secret; the value moved OpenBao → env →
+jq `env` builtin → curl stdin and never passed through argv or a
+transcript.
+
+Recommendation 3 resolved by inaction: GitHub hook 659043016 stays as a
+dormant fallback — post-fix its deliveries carry no `X-Forgejo-Event`
+header and are filtered out by design. Recommendations 4 and the
+HMAC-validation half of 5 remain open follow-ups (argo-events v1.9.10
+validates only the Bearer token, not `X-Forgejo-Signature`).
+
+**Blocked end-to-end**: cluster-side verification (Synced/Healthy apps,
+eventsource pod roll, workflow fire) could not complete — a fleet-wide
+GitOps outage began 2026-09-02T23:36Z when ArgoCD's
+`declarative-config-repo` GitHub credential died, so `86e44bb9` and
+everything after it is pushed but unsynced. Diagnosis, restoration
+recipe (operator-bound), and post-restore verification steps:
+`declarative-config:docs/argocd-repo-credential-outage-2026-09-02.md`,
+tracked as `declarat-e1c7de39`.
