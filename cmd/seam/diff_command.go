@@ -20,15 +20,17 @@ func diffCommand(args []string) {
 }
 
 // runDiffCommand implements the diff command
-// Usage: seam diff [--fragments-dir <dir>] [--base <dir>] [--json] [paths...]
+// Usage: seam diff [--fragments-dir <dir>] [--base <dir>] [--json]
 //
 // Flags:
-//   --fragments-dir, -f: Directory containing route fragments (default: ./fragments)
-//   --base, -b: Base directory to compare against (default: compare with git HEAD)
-//   --json: Emit JSON output instead of human-readable diff
-//   --output, -o: Write merged spec to file instead of stdout
 //
-// Positional args: Specific fragment paths to diff (default: diff all fragments)
+//	--fragments-dir, -f: Directory containing route fragments (default: ./fragments)
+//	--base, -b: Base directory to compare against (default: compare with git HEAD)
+//	--json: Emit JSON output instead of human-readable diff
+//	--output, -o: Write merged spec to file instead of stdout
+//
+// Positional args are not supported: the command always diffs the whole
+// fragments directory, and path arguments are rejected rather than ignored.
 func runDiffCommand(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("diff", flag.ExitOnError)
 	fs.SetOutput(stderr)
@@ -54,7 +56,10 @@ func runDiffCommand(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	positional := fs.Args()
+	if len(fs.Args()) > 0 {
+		fmt.Fprintf(stderr, "seam diff: positional path arguments are not supported; pass --fragments-dir instead\n")
+		return 2
+	}
 
 	// Override with environment variable
 	if val := os.Getenv("SEAM_FRAGMENTS_DIR"); val != "" && fragmentsDir == "./fragments" {
@@ -69,7 +74,7 @@ func runDiffCommand(args []string, stdout, stderr io.Writer) int {
 		} else {
 			// No git base, so we can't diff
 			fmt.Fprintf(stderr, "seam diff: no base directory specified and not in a git repository\n")
-			fmt.Fprintf(stderr, "Usage: seam diff [--base <dir>] [--fragments-dir <dir>] [paths...]\n")
+			fmt.Fprintf(stderr, "Usage: seam diff [--base <dir>] [--fragments-dir <dir>]\n")
 			return 2
 		}
 	}
@@ -187,28 +192,28 @@ func detectGitBase() string {
 
 // DiffResult represents the result of comparing two specs
 type DiffResult struct {
-	PathsAdded     []string                 `json:"paths_added"`
-	PathsRemoved   []string                 `json:"paths_removed"`
-	PathsModified  []PathModification       `json:"paths_modified"`
-	FragmentChanges []FragmentChange        `json:"fragment_changes"`
-	BaseHash       string                   `json:"base_hash"`
-	CurrentHash    string                   `json:"current_hash"`
-	Summary        DiffSummary              `json:"summary"`
+	PathsAdded      []string           `json:"paths_added"`
+	PathsRemoved    []string           `json:"paths_removed"`
+	PathsModified   []PathModification `json:"paths_modified"`
+	FragmentChanges []FragmentChange   `json:"fragment_changes"`
+	BaseHash        string             `json:"base_hash"`
+	CurrentHash     string             `json:"current_hash"`
+	Summary         DiffSummary        `json:"summary"`
 }
 
 // PathModification represents a change to a specific path
 type PathModification struct {
-	Path         string                 `json:"path"`
-	Operations   []OperationChange      `json:"operations"`
+	Path       string            `json:"path"`
+	Operations []OperationChange `json:"operations"`
 }
 
 // OperationChange represents a change to an operation within a path
 type OperationChange struct {
-	Method      string                 `json:"method"`
-	ChangeType  string                 `json:"change_type"` // "added", "removed", "modified"
-	OldValue    map[string]interface{} `json:"old_value,omitempty"`
-	NewValue    map[string]interface{} `json:"new_value,omitempty"`
-	FieldChanges []FieldChange         `json:"field_changes,omitempty"`
+	Method       string                 `json:"method"`
+	ChangeType   string                 `json:"change_type"` // "added", "removed", "modified"
+	OldValue     map[string]interface{} `json:"old_value,omitempty"`
+	NewValue     map[string]interface{} `json:"new_value,omitempty"`
+	FieldChanges []FieldChange          `json:"field_changes,omitempty"`
 }
 
 // FieldChange represents a change to a specific field
@@ -220,17 +225,17 @@ type FieldChange struct {
 
 // FragmentChange represents a change to a fragment file
 type FragmentChange struct {
-	File      string   `json:"file"`
-	ChangeType string  `json:"change_type"` // "added", "removed", "modified"
+	File          string   `json:"file"`
+	ChangeType    string   `json:"change_type"` // "added", "removed", "modified"
 	PathsAffected []string `json:"paths_affected,omitempty"`
 }
 
 // DiffSummary provides a summary of the diff
 type DiffSummary struct {
-	TotalChanges int `json:"total_changes"`
-	PathsAdded    int `json:"paths_added"`
-	PathsRemoved  int `json:"paths_removed"`
-	PathsModified int `json:"paths_modified"`
+	TotalChanges  int  `json:"total_changes"`
+	PathsAdded    int  `json:"paths_added"`
+	PathsRemoved  int  `json:"paths_removed"`
+	PathsModified int  `json:"paths_modified"`
 	HasChanges    bool `json:"has_changes"`
 }
 
@@ -250,11 +255,11 @@ func compareSpecs(baseJSON, currentJSON []byte) (*DiffResult, error) {
 	}
 
 	result := &DiffResult{
-		PathsAdded:     []string{},
-		PathsRemoved:   []string{},
-		PathsModified:  []PathModification{},
+		PathsAdded:      []string{},
+		PathsRemoved:    []string{},
+		PathsModified:   []PathModification{},
 		FragmentChanges: []FragmentChange{},
-		Summary:        DiffSummary{},
+		Summary:         DiffSummary{},
 	}
 
 	// Compare paths
@@ -297,10 +302,10 @@ func compareSpecs(baseJSON, currentJSON []byte) (*DiffResult, error) {
 						if !mapsEqual(currentOp, baseOpMap) {
 							fieldChanges := compareMaps(currentOp, baseOpMap)
 							mod.Operations = append(mod.Operations, OperationChange{
-								Method:      strings.ToUpper(method),
-								ChangeType:  "modified",
-								OldValue:    baseOpMap,
-								NewValue:    currentOp,
+								Method:       strings.ToUpper(method),
+								ChangeType:   "modified",
+								OldValue:     baseOpMap,
+								NewValue:     currentOp,
 								FieldChanges: fieldChanges,
 							})
 						}
