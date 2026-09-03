@@ -328,6 +328,9 @@ live-state check performed the same day: running pod + logs on rs-manager, the c
 deployment manifest, the current tree (`internal/spec`, `cmd/seam`), git history, and the
 OpenBao rs-manager prefix. Claims are tagged **[live]** (verified 2026-09-02 against the
 running deployment or tree) or **[evidence]** (per the phase evidence files, not re-verified here).
+The companion file
+[`plan-recommendations-analysis.md`](plan-recommendations-analysis.md) carries the same
+synthesis with a line-by-line blocker freshness audit against the current tree.
 
 ---
 
@@ -351,8 +354,10 @@ six FAIL verdicts were followed by fix commits the same day the verdicts were is
   `/whoami` exactly once. **[live]**
 - **Phase 12** evidence records 99 compilation errors blocking verification. Compile-fix commits
   landed 2026-09-01 (`441bf20` "resolve all 9 internal/server compilation errors", plus
-  `94daec6`, `06b594b`, `ed735c1`, `bb402f2`). Re-verification requires a green build — no Go
-  toolchain exists on ex44, so CI must arbitrate. **[live]**
+  `94daec6`, `06b594b`, `ed735c1`, `bb402f2`). The Go toolchain **does** exist on ex44
+  (`~/sdk/go/bin/go`, go1.26.0; `go` on `PATH` resolves to `~/.local/bin/go`, go1.26.6), and
+  `go build ./cmd/... ./internal/...` was re-run clean on 2026-09-02 and again on 2026-09-03 —
+  local re-verification is unblocked, with a green CI run remaining the durable record. **[live]**
 - **Phase 6b** evidence records "binary treats YAML as JSON; production fragments fail with
   `invalid character '#'`". The running pod (image built 2026-08-27) logs **6 fragments loaded,
   0 errors — all `.yaml` files**, schema-validated (`internal/spec/loader.go:290` has a YAML
