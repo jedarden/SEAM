@@ -303,4 +303,57 @@ read-only:
 The docs-only commit carrying this section is the e2e probe push; its
 delivery, filter and submission outcomes are recorded on bead
 `seam-d20b2887`. The fix belongs to the CRD (cluster install), not to the
-seam-ci manifest.
+seam-ci manifest — tracked as `seam-9a3d5f53` (P1, in progress).
+
+## Probe outcomes, confirmed live (2026-09-03 ~12:30Z, bead `seam-d20b2887`)
+
+The `a34bcc1` docs-only push (delivered 12:23:09Z) proves every hop of the
+trigger chain and pins the failure to exactly one point. All evidence
+read-only (`kubectl --server http://traefik-iad-ci:8001`, Forgejo/GitHub
+hook APIs):
+
+1. **Delivery + auth — PASS.** Hook 13's 12:23:09.293Z POST was accepted by
+   `/seam` and published (eventID `b1574250f35f4fb180eedbcdfb3f9704`) —
+   Bearer auth validated. (`authorization_header` is a top-level field of
+   Forgejo's `GET /hooks/13` response and is set; it is not under `.config`,
+   which only surfaces `content_type` and `url`.)
+2. **Sensor filter — PASS.** The sensor logged
+   `Triggering actions after receiving dependency seam-push` for that
+   eventID: the `86e44bb9` filter fix (`header.X-Forgejo-Event` +
+   `body.ref == refs/heads/main`) demonstrably accepts a real push. The
+   trigger is wired correctly end to end.
+3. **Submission — REJECTED (the CRD defect, deterministic).** 12:23:09.587Z:
+   `Failed to submit workflow: rpc error: code = InvalidArgument desc =
+   templates.pipeline.steps[0].post-pending template 'github-commit-status'
+   type is unknown`. Identical rejection for the 11:49:15Z delivery — two
+   for two. argo-server rejects at validation, so **no `seam-ci-*` workflow
+   object is created and nothing appears in argo-workflows**.
+4. **Mirror copy — no duplicate, stopped one layer earlier than designed.**
+   GitHub hook 659043016 delivered its copy of the same push at
+   12:23:14.012Z and got **HTTP 401** (`invalid auth header` logged at the
+   eventsource 12:23:13.365Z): GitHub cannot send the `Authorization: Bearer`
+   header the route now requires, so the mirror delivery is rejected at the
+   auth layer and never published — the sensor's `X-Forgejo-Event` filter is
+   never even consulted. The earlier "filtered out by design" mechanism note
+   described the pre-`authSecret` state (all mirror deliveries before the
+   11:05Z eventsource roll returned 200 and were filter-rejected); the
+   design outcome is unchanged and now stronger: **exactly one event per
+   push reaches the bus, from Forgejo alone.**
+5. **Template unchanged — verified by deep diff.** Live-vs-git (`0d3ccc09`
+   manifest): the `ci` template carrying the actual gates (gofmt → go vet →
+   golangci-lint v2.12.2 → `go test -race` → seam lint → benchmark gate with
+   the 20% benchstat threshold) plus `image-build`, `resolve-release` and
+   `github-release` are **byte-identical**. The only deltas are the CRD
+   defect itself: step 0's `templateRef {github-commit-status: post}` (live
+   keeps a mangled `template: github-commit-status` string resolving to an
+   in-spec husk `{"name": "github-commit-status"}` with no body), the pruned
+   pipeline `onExit`, and the husk template git doesn't define. Nobody
+   modified the template to route around the defect.
+
+State of acceptance for `seam-d20b2887`: "fired" is proven through
+filter-pass and submission attempt (once per push, zero duplicates), but
+criterion 1 — one observable `seam-ci-*` workflow — waits on `seam-9a3d5f53`
+replacing the CRD. Post-fix verification is mechanical: confirm
+`argo-workflows-ns-iad-ci` is Synced, push one docs-only commit, expect
+exactly one accepted `/seam` delivery → one published eventID → one filter
+pass → one `seam-ci-*` workflow (mirror copy 401s as in item 4).
