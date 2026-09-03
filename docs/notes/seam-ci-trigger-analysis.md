@@ -232,3 +232,33 @@ everything after it is pushed but unsynced. Diagnosis, restoration
 recipe (operator-bound), and post-restore verification steps:
 `declarative-config:docs/argocd-repo-credential-outage-2026-09-02.md`,
 tracked as `declarat-e1c7de39`.
+
+## End-to-end re-verification attempt (2026-09-03 ~08:05Z, bead `seam-d20b2887`)
+
+The trigger did **not** fire. The fix is still not live in-cluster, and a
+second blocker surfaced on the Forgejo side. All evidence read-only
+(`kubectl --server http://traefik-iad-ci:8001`, Forgejo API).
+
+- The `495359a` docs-only push (06:58:31Z) was delivered by hook 13 at
+  06:58:36Z (delivery `bd391c00-3e53-443f-807e-025e89275770`), published to
+  the bus as eventID `13c1ae2c76034785a386426f7251d293`, then rejected by
+  the sensor: `not interested in dependency seam-push (didn't pass filter)`.
+  A second delivery 12 s later (06:58:48Z, eventID
+  `a4029b9243394f3ab1f95516648911e8` — the GitHub mirror copy, hook
+  659043016) was rejected identically. Zero `seam-ci-*` workflows exist in
+  `argo-workflows`.
+- `seam-ci-sensor-…-wrtdv` (started 2026-09-01T15:11:47Z) and
+  `forgejo-webhooks-eventsource-…-xtpr4` (13:54:28Z) are the *same pods* the
+  investigation above observed — neither rolled, so `86e44bb9` (filter fix,
+  `authSecret`, forced eventsource roll) is confirmed unsynced and the
+  `declarat-e1c7de39` outage is still in effect.
+- **New blocker — hook 13 is not sending auth or a signature.** Forgejo API
+  `GET /repos/jedarden/SEAM/hooks/13` returns `authorization_header: ""` and
+  no secret, and the 06:58:36Z delivery carried `X-Forgejo-Signature: ""`
+  with no `Authorization` header at all. The "re-registered with auth +
+  signing" recorded above is **not in effect** on the live hook. Consequence:
+  once `86e44bb9` syncs, its `authSecret` will reject hook 13's deliveries
+  with 401 and the trigger stays silent — hook 13 must be re-registered with
+  the OpenBao secret *before* (or at the same time as) the sync. (GitHub hook
+  659043016 *does* have a secret configured; its deliveries carry no
+  `X-Forgejo-Event` and are filtered out by design either way.)
