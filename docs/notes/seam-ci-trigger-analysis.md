@@ -262,3 +262,45 @@ second blocker surfaced on the Forgejo side. All evidence read-only
   the OpenBao secret *before* (or at the same time as) the sync. (GitHub hook
   659043016 *does* have a secret configured; its deliveries carry no
   `X-Forgejo-Event` and are filtered out by design either way.)
+
+## Post-outage re-verification (2026-09-03 ~12:25Z, bead `seam-d20b2887`)
+
+The GitOps outage is over and the entire trigger chain is now live — but the
+last hop (workflow submission) fails on a *new, independent* defect: the
+iad-ci WorkflowTemplate CRD silently prunes `templateRef`. Evidence, all
+read-only:
+
+- `argo-events-ns-iad-ci` synced + healthy (first post-outage sync `0b081fe8`
+  11:03:01Z, tracking `bdbab8b08`); the `86e44bb9`/`c547ca12` fix is live:
+  eventsource pod rolled 11:05:53Z, sensor pod 11:12:56Z, ExternalSecret
+  `forgejo-webhook-secret` SecretSynced.
+- Hook 13 was re-registered at 11:49:15Z — `authorization_header` now set
+  (Bearer; secret referenced only by its OpenBao path
+  `rs-manager/iad-ci/forgejo/webhook-secret`). No HMAC secret, which matches
+  the known argo-events v1.9.10 limitation (it validates Bearer but not
+  `X-Forgejo-Signature`).
+- The 11:49:15.332Z delivery traversed the whole chain: `/seam` accepted it
+  (no 401), published eventID `9401ef925b3d4a018c08a27b6ecef538`, and the
+  sensor **passed** the `seam-push` filter (`header.X-Forgejo-Event` +
+  `body.ref refs/heads/main` — the `86e44bb9` fix works) and attempted the
+  `seam-ci` trigger.
+- **Submission rejected by argo-server:** `templates.pipeline.steps[0].post-pending
+  template 'github-commit-status' type is unknown`. Root cause: the installed
+  `workflowtemplates.argoproj.io` CRD (created 2026-04-04) has no `templateRef`
+  property in its Template schema, so the API server silently prunes that
+  field on every apply — the live seam-ci template matches git HEAD except
+  for exactly the pruned `templateRef` (and the pipeline's `onExit` handler).
+  This also explains `argo-workflows-ns-iad-ci` being permanently OutOfSync:
+  apply → pruned → live never matches git → auto-sync retries forever.
+- Blast radius beyond seam-ci: `clasp-build`, `node-verify` and `rust-verify`
+  all have the same `post-pending → github-commit-status` step and the same
+  pruned body. The namespace currently holds zero workflow objects from any
+  of the four templates while non-`templateRef` templates run normally
+  (needle-ci ×19, spaxel-*, mta-my-way-build) — consistent with submit-time
+  rejection. `rust-verify` being broken means fleet `cargo test` offloading
+  is likely silently falling back to local runs.
+
+The docs-only commit carrying this section is the e2e probe push; its
+delivery, filter and submission outcomes are recorded on bead
+`seam-d20b2887`. The fix belongs to the CRD (cluster install), not to the
+seam-ci manifest.
