@@ -2,10 +2,13 @@
 
 **Generated:** 2026-09-02
 **Task:** seam-6ecbb16a — Add recommendations and analysis section
-**Data sources:** `docs/notes/checkbox-summary-report.md`, `docs/notes/phase-breakdown-tables.md`,
+**Data sources:** `docs/notes/checkbox-summary-report.md` (its "Recommendations and Analysis"
+section is the live-deployment companion to this file), `docs/notes/phase-breakdown-tables.md`,
 `.beads/phase-verdict-summary.md`, the per-phase evidence files, and `docs/plan/plan.md` lines 860-968
 **Freshness:** every recorded blocker below was re-checked against the working tree on 2026-09-02 —
-see [Blocker freshness audit](#blocker-freshness-audit-verified-2026-09-02)
+see [Blocker freshness audit](#blocker-freshness-audit-verified-2026-09-02) — and the three
+build-health rows were re-verified on 2026-09-03: the scoped build is still clean, `go build
+./tools/...` still fails in exactly five packages, and the one-line test import is still unfixed.
 
 **Baseline:** 17 phases — 6 complete (35.3%), 11 incomplete (64.7%). Verdict split across the
 incomplete set: 6 FAIL, 1 CANNOT VERIFY, 4 NO EVIDENCE.
@@ -82,7 +85,7 @@ precondition is retired; the CANNOT VERIFY verdict on Phase 12 can be revisited 
 | "Go compiler unavailable" (Phases 12, 13, 14 evidence) | **Stale** | `/home/coding/sdk/go/bin/go` builds the module, 2026-09-02 |
 | "`internal/tailscale` missing" (Phase 7) | **Partly stale** | The package exists (`internal/tailscale/{client,cache,types}.go`); the actual break is a wrong import path in one test — `seam/internal/tailscale` at `internal/server/worker_identity_integration_test.go:12` should be `github.com/ardenone/seam/internal/tailscale`, which is why `go test` fails to set up `internal/server` |
 | `go build ./...` fails at repo root | **Intentional, not a defect** | `test_broken.go` is a tracked CI canary (`faaadd5` "test(ci): deliberately break compilation to verify seam-ci gate") — verify with scoped builds, e.g. `go build ./cmd/... ./internal/...` |
-| `tools/starvation-*` do not compile (6 programs) | **Live** | Undefined/drifting `server.*` symbols — `BackoffConfig`, `NewLeaseLeader` now takes `LeaseConfig` and returns two values, `NewRootCauseAnalyzer`, `HumanMonitorConfig`, `RepairQueueConfig`, `SelfResolutionConfig`, etc. |
+| `tools/starvation-*` do not compile (5 main-module packages) | **Live** | Undefined/drifting `server.*` symbols — `BackoffConfig`, `NewLeaseLeader` now takes `LeaseConfig` and returns two values, `NewRootCauseAnalyzer`, `HumanMonitorConfig`, `RepairQueueConfig`, `SelfResolutionConfig`, etc. `go build ./tools/...` reports exactly five failing packages; two further tools (`starvation-alert-revaluator`, `starvation-recovery`) are separate Go modules with their own `go.mod`, so the main-module build skips them and they need the same API pass in their own trees |
 
 Net effect: of the seven headline blockers in the prior report, four are stale, one is a
 one-line fix, one is deliberate — and one genuinely new one (the `tools/starvation-*` drift)
