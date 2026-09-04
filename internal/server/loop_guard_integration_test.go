@@ -9,6 +9,22 @@ import (
 	"time"
 )
 
+// The middleware tests below drive server.LoopGuardMiddleware directly and
+// expect a 429 once a route's MaxRepeats is exhausted. They are currently red
+// for a reason unrelated to loop guard itself: LoopGuardMiddleware resolves the
+// matched route via getRouteMatchFromContext, which is a stub in
+// loop_guard_middleware.go that always returns nil. With no route match the
+// middleware fail-opens and calls next, so every request here reaches the
+// test's next handler and surfaces as "got 500" rather than a 429.
+//
+// The routing layer already publishes the match — request_pipeline.go's
+// withRouteMatch stores a *RouteMatch under routeMatchContextKey{} and is
+// called from route_table.go — so the fix is to have getRouteMatchFromContext
+// read that key instead of returning nil. Note that doing so activates loop
+// guard for every route that declares x-loop-guard, which is a production
+// behaviour change and is tracked separately on bead seam-f2c119f2; it is
+// deliberately not part of the compile fix that made this package build again.
+
 // TestLoopGuardMiddleware_SkipsReservedPaths tests that reserved paths
 // bypass loop guard checking.
 func TestLoopGuardMiddleware_SkipsReservedPaths(t *testing.T) {
@@ -79,7 +95,6 @@ func TestLoopGuardMiddleware_SkipsProbeRequests(t *testing.T) {
 func TestLoopGuardMiddleware_BlocksRepeatedFailures(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -142,7 +157,6 @@ func TestLoopGuardMiddleware_BlocksRepeatedFailures(t *testing.T) {
 func TestLoopGuardMiddleware_SuccessClearsCounter(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -228,7 +242,6 @@ func TestLoopGuardMiddleware_SuccessClearsCounter(t *testing.T) {
 func TestLoopGuardMiddleware_DifferentRequestsIndependent(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -289,7 +302,6 @@ func TestLoopGuardMiddleware_DifferentRequestsIndependent(t *testing.T) {
 func TestLoopGuardMiddleware_ResponseIncludesDetails(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -365,7 +377,6 @@ func TestLoopGuardMiddleware_ResponseIncludesDetails(t *testing.T) {
 func TestLoopGuardMiddleware_QueryParamsInHash(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -423,7 +434,6 @@ func TestLoopGuardMiddleware_QueryParamsInHash(t *testing.T) {
 func TestLoopGuardMiddleware_PathParamsInHash(t *testing.T) {
 	config := &Config{
 		MaxReplayableRequestBytes: 1024 * 1024,
-		DryRun:                   false,
 	}
 	server := &Server{
 		config:            config,
@@ -443,12 +453,6 @@ func TestLoopGuardMiddleware_PathParamsInHash(t *testing.T) {
 		},
 	}}}
 	server.routeTableHolder = NewThreadSafeTableHolder(routeTable)
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
-
-	middleware := server.LoopGuardMiddleware(nextHandler)
 
 	// Note: This test would require proper route matching and path parameter
 	// extraction to be implemented. For now, we test that the hash computation
