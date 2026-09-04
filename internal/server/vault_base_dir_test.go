@@ -44,25 +44,32 @@ func reportedVaultBaseDir(t *testing.T, vaultBaseDir string) (string, *Server) {
 	return got, s
 }
 
-// TestVaultBaseDirDefaultUnchanged pins the behaviour an unset SEAM_VAULT_BASE_DIR
-// must preserve: the canonical portable prefix, documented in
-// docs/notes/route-fragment-schema.md and encoded in the route-fragment-schema
-// pattern, is still what ValidateVaultPath enforces.
-func TestVaultBaseDirDefaultUnchanged(t *testing.T) {
+// TestVaultBaseDirDefaultIsEstatePrefix pins the behaviour an unset
+// SEAM_VAULT_BASE_DIR must preserve: the consolidated estate prefix
+// secret/<installation>/<cluster>/seam/routes, with both segments naming
+// rs-manager, is what ValidateVaultPath enforces. The schema itself stays
+// base-agnostic (docs/notes/route-fragment-schema.md) — this is the default
+// base, not a pattern constraint.
+func TestVaultBaseDirDefaultIsEstatePrefix(t *testing.T) {
 	got, s := reportedVaultBaseDir(t, "")
-	if got != "seam/routes" {
-		t.Fatalf("default vault base dir = %q, want \"seam/routes\"", got)
+	if got != "rs-manager/rs-manager/seam/routes" {
+		t.Fatalf("default vault base dir = %q, want \"rs-manager/rs-manager/seam/routes\"", got)
 	}
 
-	if err := s.allowlistEnforcer.ValidateVaultPath("seam/routes/unifi/api-key", "unifi"); err != nil {
+	if err := s.allowlistEnforcer.ValidateVaultPath("rs-manager/rs-manager/seam/routes/unifi/api-key", "unifi"); err != nil {
 		t.Errorf("path under the default prefix rejected: %v", err)
 	}
-	if err := s.allowlistEnforcer.ValidateVaultPath("seam/routes/twitterapi/api-key", "twitterapi"); err != nil {
+	if err := s.allowlistEnforcer.ValidateVaultPath("rs-manager/rs-manager/seam/routes/twitterapi/api-key", "twitterapi"); err != nil {
 		t.Errorf("path under the default prefix rejected: %v", err)
 	}
 	// A path nesting under a different base is outside the owner directory.
 	if err := s.allowlistEnforcer.ValidateVaultPath("tenants/alpha/unifi/api-key", "unifi"); err == nil {
 		t.Error("path outside the default prefix was accepted")
+	}
+	// The pre-consolidation prefix is no longer the default: a fragment still
+	// carrying the bare seam/routes path must now be rejected.
+	if err := s.allowlistEnforcer.ValidateVaultPath("seam/routes/unifi/api-key", "unifi"); err == nil {
+		t.Error("path under the superseded bare seam/routes prefix was accepted")
 	}
 }
 

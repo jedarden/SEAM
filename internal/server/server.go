@@ -136,7 +136,7 @@ type Config struct {
 	UpstreamURL               string // Default upstream URL for proxying (Phase 2.0: single upstream)
 	UpstreamCADir             string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
 	AllowlistFile             string // Path to upstream host allowlist file (optional, for dev mode)
-	VaultBaseDir              string // Base directory for vault path validation (default: "rs-manager/seam/routes")
+	VaultBaseDir              string // Base directory for vault path validation (default: "rs-manager/rs-manager/seam/routes")
 	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
 	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
 	HotReloadEnabled          bool   // Phase 3.1: Enable file-watch hot reload of route fragments
@@ -206,18 +206,23 @@ func New(cfg *Config) *Server {
 	var specLoader *spec.Loader
 	var err error
 
-	// Set default vault base directory. This is the canonical, portable
-	// prefix documented in docs/notes/route-fragment-schema.md and encoded
-	// in the route-fragment-schema.json pattern — it must stay cluster-
-	// agnostic. A cluster's own OpenBao ACL policy is what's responsible for
-	// granting read on secret/data/seam/routes/*; backup/replication
-	// coverage for that prefix is a cluster-ops concern (see rs-manager's
-	// openbao-replicator-config, which explicitly walks both "seam/" and
-	// its own cluster-name prefix), not something this default should bend
-	// to accommodate.
+	// Set default vault base directory: secret/rs-manager/rs-manager/seam/
+	// routes/<owner>/<name>, the estate convention secret/<installation>/
+	// <cluster>/... where the installation is the OpenBao instance that owns
+	// and replicates the prefix (rs-manager) and the cluster is where SEAM
+	// runs (also rs-manager). This deliberately supersedes the earlier
+	// cluster-agnostic "seam/routes" default: that shape kept the prefix
+	// portable across clusters, but its backup/replication coverage was
+	// carried by rs-manager's legacy OpenBao role walking "seam/" directly,
+	// a role already scheduled for removal. Rather than keep a default whose
+	// durability rested on soon-to-die credentials, the prefix moves under
+	// the installation scope the replicator already walks. The schema stays
+	// base-agnostic (see docs/notes/route-fragment-schema.md) — the base is
+	// still deployment configuration via SEAM_VAULT_BASE_DIR, and moving a
+	// deployment changes only that variable.
 	vaultBaseDir := cfg.VaultBaseDir
 	if vaultBaseDir == "" {
-		vaultBaseDir = "seam/routes"
+		vaultBaseDir = "rs-manager/rs-manager/seam/routes"
 	}
 
 	// Initialize allowlist enforcer

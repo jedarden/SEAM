@@ -109,7 +109,7 @@ func serveCommand(args []string) {
 	fragmentsDir := fs.String("fragments-dir", "./fragments", "Directory containing OpenAPI fragment files")
 	upstreamCADir := fs.String("upstream-ca-dir", "", "Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, refused in-cluster)")
 	allowlistFile := fs.String("allowlist-file", "", "Path to the upstream host allowlist (refused in-cluster)")
-	vaultBaseDir := fs.String("vault-base-dir", "", "Base directory that x-vault-path must nest x-seam-owner under (default: seam/routes)")
+	vaultBaseDir := fs.String("vault-base-dir", "", "Base directory that x-vault-path must nest x-seam-owner under (default: rs-manager/rs-manager/seam/routes)")
 	maxReplayableRequestBytes := fs.Int64("max-replayable-request-bytes", 1024*1024, "Phase 2.5: Maximum request body size to buffer for replay in bytes (default 1 MiB)")
 	maxBufferedResponseBytes := fs.Int64("max-buffered-response-bytes", 1024*1024, "Phase 2.6: Maximum decoded response body size to hold for whole-response scrubbing in bytes (default 1 MiB)")
 	hotReloadEnabled := fs.Bool("enable-hot-reload", false, "Phase 3.1: Enable file-watch hot reload of route fragments")
@@ -296,8 +296,9 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 // --vault-base-dir flag value. The environment wins over the flag, matching
 // SEAM_BASE_URL: the Deployment is the operator's configuration surface. An
 // absent or blank variable returns the flag value untouched — which is ""
-// in the normal case, leaving server.New to apply the in-code "seam/routes"
-// default, so an unset variable is exactly the pre-existing behaviour.
+// in the normal case, leaving server.New to apply the in-code
+// "rs-manager/rs-manager/seam/routes" default, so an unset variable is
+// exactly the pre-existing behaviour.
 func resolveVaultBaseDir(flagValue string) string {
 	val := strings.TrimSpace(os.Getenv("SEAM_VAULT_BASE_DIR"))
 	if val == "" {
