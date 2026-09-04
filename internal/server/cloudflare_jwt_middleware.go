@@ -84,11 +84,11 @@ type JWK struct {
 // CloudflareAccessClaims represents Cloudflare Access JWT claims
 type CloudflareAccessClaims struct {
 	// Standard JWT claims
-	aud []string `json:"aud"`
-	iss string   `json:"iss"`
-	sub string   `json:"sub"`
-	exp int64    `json:"exp"`
-	nbf int64    `json:"nbf"`
+	Aud []string `json:"aud"`
+	Iss string   `json:"iss"`
+	Sub string   `json:"sub"`
+	Exp int64    `json:"exp"`
+	Nbf int64    `json:"nbf"`
 
 	// Cloudflare-specific claims
 	Email         string `json:"email,omitempty"`
@@ -128,12 +128,22 @@ func NewCloudflareJWTValidator(teamDomain string, audience string, enabled bool)
 // This implements Phase 14 rule 2: scopes bound to verified subject via SEAM-side map.
 // The map keys are JWT subjects (sub) or common names (from email claim).
 // The values are slices of scope strings (e.g., ["k8s-ro:get", "argocd:read"]).
+//
+// The map is deep-copied so a later mutation of the caller's map cannot widen or
+// narrow the scopes already bound to a verified subject.
 func (v *CloudflareJWTValidator) SetScopeMap(scopeMap map[string][]string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	v.scopeMap = scopeMap
-	log.Printf("[Cloudflare-JWT] Updated scope map with %d entries", len(scopeMap))
+	copied := make(map[string][]string, len(scopeMap))
+	for subject, scopes := range scopeMap {
+		scopesCopy := make([]string, len(scopes))
+		copy(scopesCopy, scopes)
+		copied[subject] = scopesCopy
+	}
+
+	v.scopeMap = copied
+	log.Printf("[Cloudflare-JWT] Updated scope map with %d entries", len(copied))
 }
 
 // GetScopesForSubject returns scopes for a given JWT subject
@@ -233,7 +243,7 @@ func (v *CloudflareJWTValidator) ValidateJWT(tokenString string) (*CloudflareAcc
 		return nil, fmt.Errorf("claims validation failed: %w", err)
 	}
 
-	log.Printf("[Cloudflare-JWT] Validated JWT for subject: %s (email: %s)", claims.sub, claims.Email)
+	log.Printf("[Cloudflare-JWT] Validated JWT for subject: %s (email: %s)", claims.Sub, claims.Email)
 	return claims, nil
 }
 
@@ -323,30 +333,30 @@ func (v *CloudflareJWTValidator) extractClaims(token *jwt.Token) (*CloudflareAcc
 		case []interface{}:
 			for _, a := range v {
 				if audStr, ok := a.(string); ok {
-					claims.aud = append(claims.aud, audStr)
+					claims.Aud = append(claims.Aud, audStr)
 				}
 			}
 		case []string:
-			claims.aud = v
+			claims.Aud = v
 		case string:
-			claims.aud = []string{v}
+			claims.Aud = []string{v}
 		}
 	}
 
 	if iss, ok := claimsMap["iss"].(string); ok {
-		claims.iss = iss
+		claims.Iss = iss
 	}
 
 	if sub, ok := claimsMap["sub"].(string); ok {
-		claims.sub = sub
+		claims.Sub = sub
 	}
 
 	if exp, ok := claimsMap["exp"].(float64); ok {
-		claims.exp = int64(exp)
+		claims.Exp = int64(exp)
 	}
 
 	if nbf, ok := claimsMap["nbf"].(float64); ok {
-		claims.nbf = int64(nbf)
+		claims.Nbf = int64(nbf)
 	}
 
 	// Cloudflare-specific claims
@@ -379,22 +389,22 @@ func (v *CloudflareJWTValidator) validateClaims(claims *CloudflareAccessClaims) 
 	now := time.Now().Unix()
 
 	// Check exp (expiration)
-	if claims.exp != 0 && claims.exp < now {
-		return fmt.Errorf("token expired at %d (now: %d)", claims.exp, now)
+	if claims.Exp != 0 && claims.Exp < now {
+		return fmt.Errorf("token expired at %d (now: %d)", claims.Exp, now)
 	}
 
 	// Check nbf (not before)
-	if claims.nbf != 0 && claims.nbf > now {
-		return fmt.Errorf("token not valid until %d (now: %d)", claims.nbf, now)
+	if claims.Nbf != 0 && claims.Nbf > now {
+		return fmt.Errorf("token not valid until %d (now: %d)", claims.Nbf, now)
 	}
 
 	// Check aud (audience) - must contain SEAM's Access Application ID
-	if len(claims.aud) == 0 {
+	if len(claims.Aud) == 0 {
 		return fmt.Errorf("token missing audience claim")
 	}
 
 	audienceMatch := false
-	for _, aud := range claims.aud {
+	for _, aud := range claims.Aud {
 		if aud == v.audience {
 			audienceMatch = true
 			break
@@ -402,13 +412,13 @@ func (v *CloudflareJWTValidator) validateClaims(claims *CloudflareAccessClaims) 
 	}
 
 	if !audienceMatch {
-		return fmt.Errorf("token audience %v does not match expected %s", claims.aud, v.audience)
+		return fmt.Errorf("token audience %v does not match expected %s", claims.Aud, v.audience)
 	}
 
 	// Check iss (issuer) - must be from Cloudflare Access for our team domain
 	expectedIssuer := fmt.Sprintf("https://%s.cloudflareaccess.com", v.teamDomain)
-	if claims.iss != expectedIssuer {
-		return fmt.Errorf("token issuer %s does not match expected %s", claims.iss, expectedIssuer)
+	if claims.Iss != expectedIssuer {
+		return fmt.Errorf("token issuer %s does not match expected %s", claims.Iss, expectedIssuer)
 	}
 
 	return nil
@@ -471,7 +481,7 @@ func (s *Server) cloudflareJWTMiddleware(next http.Handler) http.Handler {
 		ctx := contextWithValue(r.Context(), cloudflareJWTClaimsKey{}, claims)
 		*r = *r.WithContext(ctx)
 
-		log.Printf("[Cloudflare-JWT] Successfully validated JWT for subject: %s", claims.sub)
+		log.Printf("[Cloudflare-JWT] Successfully validated JWT for subject: %s", claims.Sub)
 
 		// Proceed to next handler
 		next.ServeHTTP(w, r)
