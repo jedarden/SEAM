@@ -162,6 +162,12 @@ func (re *RetirementEvaluator) openRetirementPR(ctx context.Context, candidate *
   brownouts:
 %s`, now.Format("2006-01-02"), sunsetDate, brownouts)
 
+	// The fragment commit that would carry this block is not implemented yet
+	// (see the placeholder in GitHubClient.OpenPR); surface it for diagnostics.
+	zap.L().Debug("Generated x-seam-deprecated block",
+		zap.String("route", candidate.RouteStats.Route),
+		zap.String("block", deprecationBlock))
+
 	// Create the PR
 	prTitle := fmt.Sprintf("feat(seam): deprecate %s (version %s) - zero traffic for %s",
 		candidate.RouteStats.Route,
@@ -192,16 +198,16 @@ This route version is proposed for deprecation based on the following metrics:
 
 ### Changes
 
-This PR adds an `x-seam-deprecated` block to the route fragment with:
-- `since` date (deprecation declaration)
-- `sunset` date (removal target)
+This PR adds an `+"`x-seam-deprecated`"+` block to the route fragment with:
+- `+"`since`"+` date (deprecation declaration)
+- `+"`sunset`"+` date (removal target)
 - Brownout windows (410 Gone periods)
 
 The verdict channel (deprecation state) travels through the existing hot-reload path — no deployment required.
 
 ### Verification
 
-- Route fragment exists at `%s`
+- Route fragment exists at `+"`%s`"+`
 - Zero observed traffic in VictoriaMetrics
 - No caller-appears events detected
 

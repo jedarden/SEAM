@@ -197,9 +197,9 @@ func (vmc *VictoriaMetricsClient) parseQueryResults(results []Result) []RouteTra
 		// For now, create a basic stats entry
 		// In production, you'd query more detailed metrics
 		stats = append(stats, RouteTrafficStats{
-			Route:        route,
-			SpecVersion:  specVersion,
-			APIVersion:  extractAPIVersion(route),
+			Route:         route,
+			SpecVersion:   specVersion,
+			APIVersion:    extractAPIVersion(route),
 			TotalRequests: 0, // Would be parsed from actual metrics
 		})
 	}
@@ -212,7 +212,7 @@ type QueryResult struct {
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
 	Data   struct {
-		ResultType string `json:"resultType"`
+		ResultType string   `json:"resultType"`
 		Result     []Result `json:"result"`
 	} `json:"data"`
 }
