@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -68,5 +69,86 @@ func TestAllowlistPathIsFixedInCluster(t *testing.T) {
 	}
 	if got := resolveAllowlistFile("/tmp/developer-allowlist.yaml", false); got != "/tmp/developer-allowlist.yaml" {
 		t.Fatalf("local allowlist path = %q, want developer path", got)
+	}
+}
+
+// resolveVaultBaseDir is the whole env-var half of the vault base directory
+// contract: SEAM_VAULT_BASE_DIR overrides the flag, and an unset variable
+// hands back whatever the flag said (normally "") so server.New keeps its
+// in-code default. The prefix ValidateVaultPath enforces is asserted on the
+// server side in internal/server.
+func TestResolveVaultBaseDir(t *testing.T) {
+	const envVar = "SEAM_VAULT_BASE_DIR"
+	oldVal, hadOld := os.LookupEnv(envVar)
+	t.Cleanup(func() {
+		if hadOld {
+			_ = os.Setenv(envVar, oldVal)
+		} else {
+			_ = os.Unsetenv(envVar)
+		}
+	})
+
+	tests := []struct {
+		name     string
+		envValue string
+		setEnv   bool
+		flag     string
+		want     string
+	}{
+		{
+			name:   "unset variable leaves the flag value",
+			setEnv: false,
+			flag:   "tenants/alpha",
+			want:   "tenants/alpha",
+		},
+		{
+			name:   "unset variable and unset flag leaves the server default",
+			setEnv: false,
+			flag:   "",
+			want:   "",
+		},
+		{
+			name:     "set variable overrides the flag",
+			setEnv:   true,
+			envValue: "tenants/alpha",
+			flag:     "from-flag",
+			want:     "tenants/alpha",
+		},
+		{
+			name:     "set variable supplies what the flag omits",
+			setEnv:   true,
+			envValue: "tenants/alpha",
+			flag:     "",
+			want:     "tenants/alpha",
+		},
+		{
+			name:     "blank variable is treated as unset",
+			setEnv:   true,
+			envValue: "   ",
+			flag:     "from-flag",
+			want:     "from-flag",
+		},
+		{
+			name:     "surrounding whitespace is trimmed",
+			setEnv:   true,
+			envValue: "  tenants/alpha  ",
+			flag:     "",
+			want:     "tenants/alpha",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setEnv {
+				_ = os.Setenv(envVar, tc.envValue)
+			} else {
+				_ = os.Unsetenv(envVar)
+			}
+
+			if got := resolveVaultBaseDir(tc.flag); got != tc.want {
+				t.Errorf("resolveVaultBaseDir(%q) with %s=%q = %q, want %q",
+					tc.flag, envVar, tc.envValue, got, tc.want)
+			}
+		})
 	}
 }
