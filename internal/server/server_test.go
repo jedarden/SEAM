@@ -153,11 +153,20 @@ func TestConfigStatusHandler(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// /config/status is an operator-tier endpoint gated on seam:ops:read, so
+	// stage 3 resolves the caller before the handler runs; a loopback caller
+	// resolves to no identity and is default-denied. Present the fixed test
+	// identity so the request reaches the handler under test.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	req := httptest.NewRequest(http.MethodGet, "/config/status", nil)
 	w := httptest.NewRecorder()
 
-	s.operatorMux.ServeHTTP(w, req)
+	// Production mounts stage 3 outside the operator mux
+	// (Start: identityResolutionMiddleware around versionMiddleware(mux)), so
+	// drive that composition — the mux's own scope gate reads the identity
+	// stage 3 puts in the request context.
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()
@@ -190,11 +199,15 @@ func TestConfigStatusHandlerWrongMethod(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// Same gate as the GET case: the method check lives behind stage 3, so the
+	// 405 this test pins is only reachable once the caller resolves.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	req := httptest.NewRequest(http.MethodPost, "/config/status", nil)
 	w := httptest.NewRecorder()
 
-	s.operatorMux.ServeHTTP(w, req)
+	// Same production composition as the GET case above.
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()

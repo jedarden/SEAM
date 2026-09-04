@@ -10,12 +10,18 @@ import (
 
 func newHealthSentinelTestServer(t *testing.T) *Server {
 	t.Helper()
-	return New(&Config{
+	s := New(&Config{
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
 		SpecDir:      "../../spec",
 	})
+	// /health/credentials is a reserved operator surface gated on
+	// seam:ops:read, so stage 3 resolves the caller ahead of the handler; a
+	// loopback caller resolves to none and is denied with 403. Present the
+	// fixed test identity so each test reaches the sentinel it exercises.
+	s.identityResolver = newLoopbackTestIdentityResolver()
+	return s
 }
 
 func TestCredentialHealthSentinelIncludesCircuitBreakerState(t *testing.T) {
@@ -34,7 +40,9 @@ func TestCredentialHealthSentinelIncludesCircuitBreakerState(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/health/credentials", nil)
 	resp := httptest.NewRecorder()
-	s.operatorMux.ServeHTTP(resp, req)
+	// Stage 3 sits outside the operator mux in production and is what puts the
+	// identity the mux's scope gate reads into the request context.
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(resp, req)
 
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected health status 200, got %d", resp.Code)
@@ -63,7 +71,9 @@ func TestCredentialHealthSentinelIncludesCircuitBreakerState(t *testing.T) {
 func TestCredentialHealthSentinelCacheBypassIsFresh(t *testing.T) {
 	s := newHealthSentinelTestServer(t)
 	s.cacheTTLs["/health/credentials"] = 300
-	handler := s.cacheMiddleware(s.operatorMux)
+	// Stage 3 outside the mux, matching the production operator chain, so the
+	// scope gate inside the mux sees the resolved test identity.
+	handler := s.identityResolutionMiddleware(s.cacheMiddleware(s.operatorMux))
 
 	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
 		Origin:  "https://upstream.example",
@@ -113,7 +123,10 @@ func TestCredentialHealthSentinelCacheBypassIsFresh(t *testing.T) {
 func TestCredentialHealthSentinelRejectsNonGet(t *testing.T) {
 	s := newHealthSentinelTestServer(t)
 	resp := httptest.NewRecorder()
-	s.operatorMux.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/health/credentials", nil))
+	// Same stage-3-outside-the-mux composition; the 405 lives behind the scope
+	// gate that reads the identity stage 3 resolves.
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(resp,
+		httptest.NewRequest(http.MethodPost, "/health/credentials", nil))
 	if resp.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected POST health request to return 405, got %d", resp.Code)
 	}

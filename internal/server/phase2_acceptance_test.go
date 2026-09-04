@@ -88,6 +88,12 @@ paths:
 		SpecDir:       specDir,
 		AllowlistFile: allowlist,
 	})
+	// The acceptance request drives a real listener over loopback, and stage 3
+	// default-denies a caller it cannot resolve to a tailnet identity before
+	// dispatch ever reaches the /phase2 route. The route declares no required
+	// scope, so the fixed test identity is enough to reach the credential
+	// injection and scrubbing this scenario exists to pin.
+	seamServer.identityResolver = newLoopbackTestIdentityResolver()
 	if err := seamServer.Start(ctx); err != nil {
 		t.Fatalf("start SEAM: %v", err)
 	}
@@ -101,7 +107,11 @@ paths:
 	req.Header.Set("X-Api-Key", "caller-supplied")
 	req.Header.Set("Authorization", "Bearer caller-supplied")
 	req.Header.Set("X-SEAM-Forged", "caller-supplied")
-	req.Header.Set("X-SEAM-Dry-Run", "1")
+	// No X-SEAM-Dry-Run here: a dry-run returns the validation verdict without
+	// fetching a secret or contacting the upstream (plan.md, dry-run
+	// short-circuit), which is exactly what this scenario exists to exercise.
+	// X-SEAM-API-Version is the documented caller-supplied exception that must
+	// survive sanitation into the forwarded request.
 	req.Header.Set("X-SEAM-API-Version", "v1")
 
 	response, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
@@ -138,8 +148,14 @@ paths:
 	if call.Headers.Get("X-Seam-Forged") != "" {
 		t.Fatal("forged X-SEAM header survived sanitation")
 	}
-	if call.Headers.Get("X-Seam-Dry-Run") != "1" || call.Headers.Get("X-Seam-Api-Version") != "v1" {
-		t.Fatal("documented X-SEAM exceptions did not survive sanitation")
+	if call.Headers.Get("X-Seam-Api-Version") != "v1" {
+		t.Fatal("documented X-SEAM-API-Version exception did not survive sanitation")
+	}
+	// The caller sent no dry-run, so no X-SEAM-Dry-Run may appear upstream:
+	// only the documented exceptions survive sanitation, never SEAM's own
+	// namespace on its own initiative.
+	if call.Headers.Get("X-Seam-Dry-Run") != "" {
+		t.Fatal("upstream saw an X-SEAM-Dry-Run header the caller did not send")
 	}
 }
 

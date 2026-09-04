@@ -40,6 +40,12 @@ func testAllReservedEndpointsReturnCorrectResponses(t *testing.T) {
 }
 
 // testHealthzEndpointResponses comprehensively tests /_seam/healthz endpoints
+// Every helper in this file drives a reserved surface straight through a mux,
+// and the scope-filtered ones (/config/status, /docs, /openapi.json) only
+// answer a caller stage 3 can resolve. A loopback caller resolves to no
+// identity and is default-denied, so each construction presents the fixed test
+// identity the capture suites already use; the exempt probes are unaffected
+// because stage 3 steps aside for them before consulting the resolver.
 func testHealthzEndpointResponses(t *testing.T) {
 	cfg := &Config{
 		CallerPort:   8080,
@@ -49,6 +55,7 @@ func testHealthzEndpointResponses(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	tests := []struct {
 		name           string
@@ -130,6 +137,7 @@ func testReadyzEndpointResponses(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	tests := []struct {
 		name           string
@@ -200,6 +208,7 @@ func testMetricsEndpointResponses(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	tests := []struct {
 		name           string
@@ -281,6 +290,7 @@ func testConfigStatusEndpointResponses(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	tests := []struct {
 		name           string
@@ -312,7 +322,9 @@ func testConfigStatusEndpointResponses(t *testing.T) {
 			req := httptest.NewRequest(method, tt.path, nil)
 			w := httptest.NewRecorder()
 
-			s.operatorMux.ServeHTTP(w, req)
+			// Stage 3 sits outside the operator mux in production and is what
+			// puts the identity the mux's scope gate reads into the context.
+			s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(w, req)
 
 			resp := w.Result()
 			defer func() { _ = resp.Body.Close() }()
@@ -468,6 +480,7 @@ func testForgedHeadersOnReservedPaths(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	reservedPaths := []struct {
 		path   string
@@ -526,6 +539,7 @@ func testCrossListenerAccess(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	// Caller-only endpoints (should be accessible via callerMux, not operatorMux)
 	callerOnlyEndpoints := []struct {
@@ -624,6 +638,7 @@ func testReservedPathBypassProtection(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -637,6 +652,7 @@ func testReservedPathBypassProtection(t *testing.T) {
 	}
 
 	testServer := New(startCfg)
+	testServer.identityResolver = newLoopbackTestIdentityResolver()
 
 	startErr := make(chan error, 1)
 	go func() {
@@ -765,6 +781,7 @@ func TestReservedPathComprehensiveMatrix(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	reservedPathTests := []struct {
 		path           string
@@ -795,6 +812,12 @@ func TestReservedPathComprehensiveMatrix(t *testing.T) {
 		{"/health/upstreams", true, false, true, false},
 	}
 
+	// Stage 3 sits outside both muxes in production, and /config/status on the
+	// operator mux is scope-gated on the identity it resolves; wrap the muxes
+	// the same way so the matrix measures the handlers, not the deny.
+	callerMux := s.identityResolutionMiddleware(s.callerMux)
+	operatorMux := s.identityResolutionMiddleware(s.operatorMux)
+
 	for _, tc := range reservedPathTests {
 		t.Run("matrix_"+strings.ReplaceAll(tc.path, "/", "_"), func(t *testing.T) {
 			// Test GET request
@@ -804,9 +827,9 @@ func TestReservedPathComprehensiveMatrix(t *testing.T) {
 					w := httptest.NewRecorder()
 
 					if tc.callerAccess {
-						s.callerMux.ServeHTTP(w, req)
+						callerMux.ServeHTTP(w, req)
 					} else if tc.operatorAccess {
-						s.operatorMux.ServeHTTP(w, req)
+						operatorMux.ServeHTTP(w, req)
 					} else {
 						t.Fatal("Test case must specify at least one access method")
 					}
@@ -827,9 +850,9 @@ func TestReservedPathComprehensiveMatrix(t *testing.T) {
 					w := httptest.NewRecorder()
 
 					if tc.callerAccess {
-						s.callerMux.ServeHTTP(w, req)
+						callerMux.ServeHTTP(w, req)
 					} else if tc.operatorAccess {
-						s.operatorMux.ServeHTTP(w, req)
+						operatorMux.ServeHTTP(w, req)
 					}
 
 					resp := w.Result()
