@@ -9,9 +9,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/testutil/openbao"
 	"github.com/ardenone/seam/internal/testutil/stubupstream"
 )
+
+// seamRoutePath joins an owner and key onto the vault base dir in force,
+// giving the OpenBao fixture path for one of this file's route credentials.
+// Deriving every fixture from spec.ResolveVaultBaseDir rather than from a
+// literal keeps them under the prefix the server actually enforces: when
+// SEAM_VAULT_BASE_DIR moves, these fixtures move with it instead of being
+// left behind under a prefix the allowlist no longer accepts.
+func seamRoutePath(vaultBaseDir, owner, key string) string {
+	return vaultBaseDir + "/" + owner + "/" + key
+}
 
 // TestE2E_CompleteRequestFlow_HappyPath tests the complete end-to-end request flow:
 // Caller → SEAM listener → OpenBao secret retrieval → Upstream forwarding → Response back to caller
@@ -48,16 +59,22 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Resolve the prefix once and use it for both the OpenBao fixtures and the
+	// server's own VaultBaseDir, so the two cannot drift apart when the
+	// deployment overrides it.
+	vaultBaseDir := spec.ResolveVaultBaseDir("")
+	testserviceTokenPath := seamRoutePath(vaultBaseDir, "testservice", "token")
+
 	// Create test secret for a route
 	testSecret := "test-secret-" + time.Now().Format("20060102150405")
-	err = obClient.WriteSecret(ctx, "seam/routes/testservice/token", map[string]interface{}{
+	err = obClient.WriteSecret(ctx, testserviceTokenPath, map[string]interface{}{
 		"token": testSecret,
 		"type":  "bearer",
 	})
 	if err != nil {
 		t.Fatalf("Failed to write test secret: %v", err)
 	}
-	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/testservice/token") }()
+	defer func() { _ = obClient.DeleteSecret(ctx, testserviceTokenPath) }()
 
 	t.Logf("✓ OpenBao test server running at %s", obServer.BaseURL())
 
@@ -85,6 +102,8 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 		OperatorPort: 8083,
 		BaseURL:      "http://localhost:8082",
 		SpecDir:      "../../spec",
+		// Same prefix the fixtures above were written under.
+		VaultBaseDir: vaultBaseDir,
 	}
 
 	seamServer := New(cfg)
@@ -147,13 +166,13 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected OpenAPI status 200, got %d", resp.StatusCode)
 	}
-	var spec map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&spec); err != nil {
+	var openAPISpec map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&openAPISpec); err != nil {
 		t.Errorf("Failed to decode OpenAPI spec: %v", err)
 	}
-	openAPIVersion, ok := spec["openapi"].(string)
+	openAPIVersion, ok := openAPISpec["openapi"].(string)
 	if !ok || openAPIVersion != "3.1.0" {
-		t.Errorf("Expected OpenAPI version 3.1.0, got %v", spec["openapi"])
+		t.Errorf("Expected OpenAPI version 3.1.0, got %v", openAPISpec["openapi"])
 	}
 	t.Log("✓ OpenAPI spec endpoint responding correctly")
 
@@ -214,7 +233,7 @@ func TestE2E_CompleteRequestFlow_HappyPath(t *testing.T) {
 	// Phase 6: Test secret retrieval from OpenBao
 	t.Log("=== Phase 6: Testing OpenBao secret retrieval ===")
 
-	secretData, err := obClient.ReadSecret(ctx, "seam/routes/testservice/token")
+	secretData, err := obClient.ReadSecret(ctx, testserviceTokenPath)
 	if err != nil {
 		t.Fatalf("Failed to read secret from OpenBao: %v", err)
 	}
@@ -342,15 +361,18 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	defer cancel()
 
 	obClient := obServer.Client()
+	vaultBaseDir := spec.ResolveVaultBaseDir("")
+	scenario1TokenPath := seamRoutePath(vaultBaseDir, "scenario1", "token")
+
 	testSecret := "scenario1-secret-" + time.Now().Format("20060102150405")
-	err = obClient.WriteSecret(ctx, "seam/routes/scenario1/token", map[string]interface{}{
+	err = obClient.WriteSecret(ctx, scenario1TokenPath, map[string]interface{}{
 		"token": testSecret,
 		"type":  "bearer",
 	})
 	if err != nil {
 		t.Fatalf("Failed to write secret: %v", err)
 	}
-	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/scenario1/token") }()
+	defer func() { _ = obClient.DeleteSecret(ctx, scenario1TokenPath) }()
 
 	// Setup stub upstream in echo mode
 	stub := stubupstream.New(stubupstream.Config{
@@ -369,6 +391,8 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 		OperatorPort: 8085,
 		BaseURL:      "http://localhost:8084",
 		SpecDir:      "../../spec",
+		// Same prefix the fixture above was written under.
+		VaultBaseDir: vaultBaseDir,
 	}
 	seamServer := New(cfg)
 	startCtx, startCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -380,7 +404,7 @@ func TestE2E_RequestFlow_Scenario1_SecretInjectionAndScrubbing(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Test: Verify OpenBao secret can be retrieved
-	secretData, err := obClient.ReadSecret(ctx, "seam/routes/scenario1/token")
+	secretData, err := obClient.ReadSecret(ctx, scenario1TokenPath)
 	if err != nil {
 		t.Fatalf("Failed to read secret: %v", err)
 	}
@@ -449,14 +473,17 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	defer cancel()
 
 	obClient := obServer.Client()
+	vaultBaseDir := spec.ResolveVaultBaseDir("")
+	scenario2TokenPath := seamRoutePath(vaultBaseDir, "scenario2", "token")
+
 	initialSecret := "scenario2-initial-" + time.Now().Format("20060102150405")
-	err = obClient.WriteSecret(ctx, "seam/routes/scenario2/token", map[string]interface{}{
+	err = obClient.WriteSecret(ctx, scenario2TokenPath, map[string]interface{}{
 		"token": initialSecret,
 	})
 	if err != nil {
 		t.Fatalf("Failed to write initial secret: %v", err)
 	}
-	defer func() { _ = obClient.DeleteSecret(ctx, "seam/routes/scenario2/token") }()
+	defer func() { _ = obClient.DeleteSecret(ctx, scenario2TokenPath) }()
 
 	// Setup stub upstream that returns 401
 	stub := stubupstream.New(stubupstream.Config{
@@ -470,13 +497,13 @@ func TestE2E_RequestFlow_Scenario2_CredentialRotation(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Test credential rotation
-	newSecret, err := obServer.RotateCredential(ctx, "seam/routes/scenario2/token", "token")
+	newSecret, err := obServer.RotateCredential(ctx, scenario2TokenPath, "token")
 	if err != nil {
 		t.Fatalf("Failed to rotate credential: %v", err)
 	}
 
 	// Verify rotation worked
-	secretData, err := obClient.ReadSecret(ctx, "seam/routes/scenario2/token")
+	secretData, err := obClient.ReadSecret(ctx, scenario2TokenPath)
 	if err != nil {
 		t.Fatalf("Failed to read rotated secret: %v", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ardenone/seam/internal/server"
+	"github.com/ardenone/seam/internal/spec"
 )
 
 // The container image's HEALTHCHECK depends on these semantics: exit zero only
@@ -73,10 +74,14 @@ func TestAllowlistPathIsFixedInCluster(t *testing.T) {
 }
 
 // resolveVaultBaseDir is the whole env-var half of the vault base directory
-// contract: SEAM_VAULT_BASE_DIR overrides the flag, and an unset variable
-// hands back whatever the flag said (normally "") so server.New keeps its
-// in-code default. The prefix ValidateVaultPath enforces is asserted on the
-// server side in internal/server.
+// contract: SEAM_VAULT_BASE_DIR overrides the flag, and when neither names a
+// prefix the choice falls to spec.ResolveVaultBaseDir, which is where
+// spec.DefaultVaultBaseDir lives. Resolving the default here rather than
+// handing back "" for server.New to fill in keeps a single authority for the
+// prefix, so the binary, the allowlist enforcer and the tests that derive
+// fixture paths from the variable all read the same value. The prefix
+// ValidateVaultPath enforces is asserted on the server side in
+// internal/server.
 func TestResolveVaultBaseDir(t *testing.T) {
 	const envVar = "SEAM_VAULT_BASE_DIR"
 	oldVal, hadOld := os.LookupEnv(envVar)
@@ -102,10 +107,13 @@ func TestResolveVaultBaseDir(t *testing.T) {
 			want:   "tenants/alpha",
 		},
 		{
-			name:   "unset variable and unset flag leaves the server default",
+			// Named for the shared default rather than pinned to a literal: the
+			// assertion is that the delegation happened, not which estate the
+			// default happens to name today.
+			name:   "unset variable and unset flag resolves to the shared default",
 			setEnv: false,
 			flag:   "",
-			want:   "",
+			want:   spec.DefaultVaultBaseDir,
 		},
 		{
 			name:     "set variable overrides the flag",

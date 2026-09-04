@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/testutil/openbao"
 )
 
@@ -28,7 +30,7 @@ func TestE2EIsolation(t *testing.T) {
 	}
 
 	t.Run("complete_isolation_validation", func(t *testing.T) {
-		testCompleteIsolation(t)
+		testCompleteIsolation(t, spec.ResolveVaultBaseDir(""))
 	})
 }
 
@@ -61,10 +63,19 @@ type SEAMTestResults struct {
 	Details                  []string
 }
 
-// testCompleteIsolation implements the end-to-end isolation validation
-func testCompleteIsolation(t *testing.T) {
+// testCompleteIsolation implements the end-to-end isolation validation. Both
+// policies and the SEAM fixture path are derived from vaultBaseDir (the prefix
+// actually in force) so the boundary moves with SEAM_VAULT_BASE_DIR instead of
+// being pinned to the prefix that was current when the test was written.
+func testCompleteIsolation(t *testing.T, vaultBaseDir string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+
+	// Same inversion guard as the access-denial test: a base dir reaching into
+	// the evaluator tree would make the "denied" assertions pass vacuously.
+	if leaked := "secret/data/" + evaluatorTreeRoot + "/"; strings.HasPrefix(leaked, strings.TrimSuffix(seamRouteGrant(vaultBaseDir), "*")) {
+		t.Fatalf("configured vault base dir %q grants the evaluator tree %s - isolation boundary would be inverted", vaultBaseDir, evaluatorTreeRoot)
+	}
 
 	report := &IsolationTestReport{
 		TestName:  "SEAM-Evaluator E2E Isolation Test",
@@ -98,7 +109,7 @@ func testCompleteIsolation(t *testing.T) {
 	t.Log("=== Phase 2: Creating SEAM and Evaluator policies ===")
 
 	// Evaluator Policy: Can read own token and VM credentials, denied everything else
-	evaluatorPolicyHCL := `# Allow reading evaluator's own GitHub token
+	evaluatorPolicyHCL := fmt.Sprintf(`# Allow reading evaluator's own GitHub token
 path "secret/data/evaluators/seam-retirement-evaluator/*" {
   capabilities = ["read"]
 }
@@ -109,14 +120,14 @@ path "secret/data/monitoring/victoriametrics/*" {
 }
 
 # Explicitly deny access to SEAM routes
-path "secret/data/seam/routes/*" {
+path %q {
   capabilities = ["deny"]
 }
 
 # Default deny for all other secrets
 path "secret/data/*" {
   capabilities = ["deny"]
-}`
+}`, seamRouteGrant(vaultBaseDir))
 
 	if err := createPolicy(ctx, baseURL, server.DevToken(), "seam-retirement-evaluator-policy", evaluatorPolicyHCL); err != nil {
 		t.Fatalf("Failed to create evaluator policy: %v", err)
@@ -124,8 +135,8 @@ path "secret/data/*" {
 	report.EvaluatorTests.Details = append(report.EvaluatorTests.Details, "✓ Evaluator policy created")
 
 	// SEAM Policy: Can read own routes, denied everything else
-	seamPolicyHCL := `# Allow reading SEAM's own route secrets
-path "secret/data/seam/routes/*" {
+	seamPolicyHCL := fmt.Sprintf(`# Allow reading SEAM's own route secrets
+path %q {
   capabilities = ["read"]
 }
 
@@ -137,7 +148,7 @@ path "secret/data/evaluators/*" {
 # Default deny for all other secrets
 path "secret/data/*" {
   capabilities = ["deny"]
-}`
+}`, seamRouteGrant(vaultBaseDir))
 
 	if err := createPolicy(ctx, baseURL, server.DevToken(), "seam-policy", seamPolicyHCL); err != nil {
 		t.Fatalf("Failed to create SEAM policy: %v", err)
@@ -163,8 +174,8 @@ path "secret/data/*" {
 	}
 	t.Logf("✓ Created evaluator GitHub token at %s", evaluatorTokenPath)
 
-	// Create SEAM route secret
-	seamRoutePath := "seam/routes/testservice/token"
+	// Create SEAM route secret beneath the configured prefix
+	seamRoutePath := vaultBaseDir + "/testservice/token"
 	seamSecret := map[string]interface{}{
 		"token": "test-seam-token-abc123",
 	}
