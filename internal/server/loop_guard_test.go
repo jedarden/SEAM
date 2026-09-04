@@ -65,7 +65,9 @@ func TestLoopGuardConfig_ParseWindow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := LoopGuardConfig{Window: tt.window}
+			// MaxRepeats is set so the loop-guard threshold check in Validate
+			// passes and only the window grammar is under test here.
+			config := LoopGuardConfig{MaxRepeats: 1, Window: tt.window}
 			err := config.Validate()
 
 			if tt.wantErr && err == nil {
@@ -262,10 +264,12 @@ func TestLoopGuard_DifferentHashesIndependent(t *testing.T) {
 // TestLoopGuard_WindowRolling tests that the tumbling window resets
 // correctly and clears failure counters.
 func TestLoopGuard_WindowRolling(t *testing.T) {
+	// The window grammar is closed at whole seconds (^[0-9]+(s|m|h|d)$), so the
+	// shortest window this test can roll is 1s.
 	config := LoopGuardConfig{
 		MaxRepeats:     3,
-		Window:         "100ms",
-		windowDuration: 100 * time.Millisecond,
+		Window:         "1s",
+		windowDuration: 1 * time.Second,
 	}
 	guard, err := NewLoopGuard("test-route", config)
 	if err != nil {
@@ -286,7 +290,7 @@ func TestLoopGuard_WindowRolling(t *testing.T) {
 	}
 
 	// Wait for window to roll
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(1100 * time.Millisecond)
 
 	// Check request (triggers window roll if needed)
 	allowed, _, _ = guard.CheckRequest(hash)
