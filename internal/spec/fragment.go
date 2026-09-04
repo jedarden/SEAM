@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"gopkg.in/yaml.v3"
 )
 
 // Fragment represents a single SEAM route fragment loaded from disk
@@ -78,8 +79,9 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 
 	loadedCount := 0
 	errorCount := 0
+	discoveredCount := 0
 
-	// Walk the directory tree looking for .yaml and .yml files
+	// Walk the directory tree looking for .yaml, .yml and .json files
 	err := filepath.Walk(fragmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("[Fragment] Error accessing path %s: %v", path, err)
@@ -103,8 +105,9 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 			return nil
 		}
 
-		// Only process .yaml, .yml, and .json files
-		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".json") {
+		// Only process fragment files (.yaml, .yml, .json)
+		if fragmentFormat(path) != "" {
+			discoveredCount++
 			log.Printf("[Fragment] Loading fragment file: %s", path)
 			fragment, err := fl.loadFragmentFile(path)
 			if err != nil {
@@ -126,11 +129,35 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 
 	if err != nil {
 		log.Printf("[Fragment] Error walking directory tree: %v", err)
-	} else {
-		log.Printf("[Fragment] Fragment loading complete: %d loaded, %d errors", loadedCount, errorCount)
+		return err
 	}
 
-	return err
+	log.Printf("[Fragment] Fragment loading complete: %d loaded, %d errors", loadedCount, errorCount)
+
+	// Individual failures are tolerated so one bad fragment cannot take down
+	// the rest of the route table. A directory that yields nothing loadable at
+	// all is different: merging it would silently produce an empty API surface
+	// that indistinguishable from a correct one. Report it instead of merging.
+	if discoveredCount > 0 && loadedCount == 0 {
+		return fmt.Errorf("all %d fragment file(s) under %s failed to load; refusing to build an empty API document", discoveredCount, fragmentsDir)
+	}
+
+	return nil
+}
+
+// fragmentFormat reports the serialization format of a fragment file path, or
+// an empty string when the path is not a fragment file. Discovery and parsing
+// both consult this so the set of files discovered and the set of files parsed
+// can never disagree.
+func fragmentFormat(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".json":
+		return "json"
+	default:
+		return ""
+	}
 }
 
 // loadFragmentFile loads a single fragment file
@@ -141,10 +168,32 @@ func (fl *FragmentLoader) loadFragmentFile(path string) (*Fragment, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Parse as JSON
-	var parsed map[string]any
-	if err := json.Unmarshal(content, &parsed); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	// Decode using the format the extension declares. YAML is a superset of
+	// JSON, so the YAML decoder would also read a .json file, but keeping the
+	// two apart gives JSON files JSON's own error messages.
+	var decoded any
+	switch fragmentFormat(path) {
+	case "json":
+		if err := json.Unmarshal(content, &decoded); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		}
+	default:
+		if err := yaml.Unmarshal(content, &decoded); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+	}
+
+	// The rest of the loader asserts nested values as map[string]any and
+	// marshals the result as JSON, so normalize the decoded document into that
+	// shape. This also rejects a fragment whose root is not an object.
+	normalized, err := normalizeLintValue(decoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize fragment: %w", err)
+	}
+
+	parsed, ok := normalized.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("fragment must decode to an object, got %T", decoded)
 	}
 
 	// Compute stable hash
