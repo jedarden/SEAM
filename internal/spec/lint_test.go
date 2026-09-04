@@ -117,6 +117,74 @@ func TestLintDirectoryChecksAllowlistWhenManifestExists(t *testing.T) {
 	assertFindingCodes(t, report.Errors, []string{"upstream.host-not-allowed"})
 }
 
+func TestVaultPathShapeIsBaseAgnostic(t *testing.T) {
+	tests := []struct {
+		name       string
+		vaultPath  string
+		wantErrors []string
+	}{
+		{
+			name:      "consolidated cluster-scoped base",
+			vaultPath: "rs-manager/rs-manager/seam/routes/guard-test/bearer-token",
+		},
+		{
+			name:      "legacy flat base",
+			vaultPath: "seam/routes/guard-test/bearer-token",
+		},
+		{
+			name:      "deep name below the owner",
+			vaultPath: "rs-manager/rs-manager/seam/routes/guard-test/prod/api-key",
+		},
+		{
+			name:       "owner absent from the path",
+			vaultPath:  "seam/routes/other-owner/token",
+			wantErrors: []string{"owner.vault-path-mismatch"},
+		},
+		{
+			name:       "owner as the final segment is not co-ownership",
+			vaultPath:  "seam/routes/guard-test",
+			wantErrors: []string{"owner.vault-path-mismatch"},
+		},
+		{
+			name:       "no base segment above the owner",
+			vaultPath:  "guard-test/token",
+			wantErrors: []string{"fragment.schema", "owner.vault-path-mismatch"},
+		},
+		{
+			name:       "traversal stays a schema failure",
+			vaultPath:  "rs-manager/rs-manager/seam/routes/../guard-test/token",
+			wantErrors: []string{"fragment.schema"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeLintTestFragment(t, root, "guard-test", "route.yaml", vaultPathLintFragment(test.vaultPath))
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			if len(test.wantErrors) == 0 {
+				if report.HasErrors() {
+					t.Fatalf("vault path %q was rejected: %+v", test.vaultPath, report.Errors)
+				}
+				return
+			}
+			assertFindingCodes(t, report.Errors, test.wantErrors)
+		})
+	}
+}
+
+// vaultPathLintFragment returns a valid fragment with a credential pair added,
+// so a test only names the path under test.
+func vaultPathLintFragment(vaultPath string) string {
+	return strings.ReplaceAll(
+		validLintFragment("guard-test", "v1", "https://api.example.com"),
+		"x-seam-owner: guard-test\n",
+		"x-seam-owner: guard-test\nx-vault-path: "+vaultPath+"\nx-inject-as:\n  kind: bearer\n")
+}
+
 func validLintFragment(owner, version, upstream string) string {
 	return "x-seam-schema: v1\n" +
 		"x-seam-owner: " + owner + "\n" +

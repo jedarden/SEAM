@@ -19,10 +19,6 @@ import (
 const (
 	defaultLintFragmentsDir = "./fragments"
 	defaultLintSchemaPath   = "./spec/route-fragment-schema.json"
-
-	// This is the prefix encoded by the v1 route-fragment schema. The owner
-	// segment after it is checked separately against x-seam-owner.
-	vaultRoutesPrefix = "seam/routes/"
 )
 
 var (
@@ -354,10 +350,31 @@ func (f *lintFragment) checkOwnerChain(report *LintReport) {
 	if !ok || vaultPath == "" {
 		return
 	}
-	expectedPrefix := vaultRoutesPrefix + owner + "/"
-	if !strings.HasPrefix(vaultPath, expectedPrefix) {
-		f.addError(report, "owner.vault-path-mismatch", fmt.Sprintf("x-vault-path %q must be under %q for this owner", vaultPath, expectedPrefix))
+	if !vaultPathCoOwned(vaultPath, owner) {
+		f.addError(report, "owner.vault-path-mismatch", fmt.Sprintf("x-vault-path %q must nest x-seam-owner %q as <base>/%s/<name>", vaultPath, owner, owner))
 	}
+}
+
+// vaultPathCoOwned reports whether vaultPath has the <base>/<owner>/<name...>
+// shape: x-seam-owner appears as an interior segment, so something sits above
+// it (the deployment-configured base directory) and a secret name sits below
+// it. The base prefix itself is deliberately not named here — it is
+// deployment configuration (SEAM_VAULT_BASE_DIR), and encoding it in lint the
+// way the v1 schema used to would make every base move a code change in two
+// places instead of one. AllowlistEnforcer.ValidateVaultPath is what checks
+// the configured base at runtime; lint keeps the relative half of the
+// invariant, which is the half that survives a base move unchanged.
+func vaultPathCoOwned(vaultPath, owner string) bool {
+	segments := strings.Split(vaultPath, "/")
+	if len(segments) < 3 {
+		return false
+	}
+	for _, segment := range segments[1 : len(segments)-1] {
+		if segment == owner {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *lintFragment) checkAPIVersion(report *LintReport) {
