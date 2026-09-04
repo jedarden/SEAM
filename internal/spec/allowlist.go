@@ -11,7 +11,7 @@ import (
 
 // AllowlistEnforcer enforces dual allowlists for vault-path co-ownership and upstream-host validation
 type AllowlistEnforcer struct {
-	vaultBaseDir      string             // Base directory for vault paths: seam/routes/
+	vaultBaseDir      string             // Base directory for vault paths, e.g. rs-manager/rs-manager/seam/routes/
 	upstreamAllowlist *UpstreamAllowlist // Upstream host allowlist
 	allowlistSource   string             // Source identifier: "dev-file", "mounted-file", "none"
 }
@@ -40,7 +40,9 @@ const defaultMountedAllowlistFile = "/etc/gateway/allowlist.yaml"
 // NewAllowlistEnforcer creates a new allowlist enforcer
 func NewAllowlistEnforcer(vaultBaseDir string, allowlistFile string) (*AllowlistEnforcer, error) {
 	if vaultBaseDir == "" {
-		vaultBaseDir = "seam/routes"
+		// Kept in step with server.New's default — the estate prefix
+		// secret/rs-manager/rs-manager/seam/routes minus the leading mount.
+		vaultBaseDir = "rs-manager/rs-manager/seam/routes"
 	}
 
 	enforcer := &AllowlistEnforcer{
