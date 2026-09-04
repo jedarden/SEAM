@@ -30,6 +30,7 @@ func TestHTTPErrorPathsUseCommonEnvelope(t *testing.T) {
 		serve      func(http.ResponseWriter, *http.Request)
 		wantStatus int
 		wantCode   ErrorCode
+		verify     func(t *testing.T, body ErrorResponse, recorder *httptest.ResponseRecorder)
 	}{
 		{
 			name:       "invalid version",
@@ -125,10 +126,31 @@ func TestHTTPErrorPathsUseCommonEnvelope(t *testing.T) {
 			method: http.MethodGet,
 			target: "/quota",
 			serve: func(w http.ResponseWriter, r *http.Request) {
-				(&Server{}).writeQuotaExceededResponse(w, r, r.URL.Path, 0, 0)
+				// A real tracker supplies the quota window; the remaining budget
+				// and per-call cost are what the response has to carry.
+				newErrorPathDispatchServer(nil).writeQuotaExceededResponse(w, r, r.URL.Path, 1.25, 0.05)
 			},
 			wantStatus: http.StatusTooManyRequests,
 			wantCode:   ErrCodeQuotaExceeded,
+			verify: func(t *testing.T, body ErrorResponse, recorder *httptest.ResponseRecorder) {
+				t.Helper()
+				if got := recorder.Header().Get("X-SEAM-Budget-Remaining"); !strings.HasPrefix(got, "amount=$1.25 unit=call window=1h resets=") {
+					t.Errorf("X-SEAM-Budget-Remaining = %q, want the $1.25 remaining budget over the default 1h window", got)
+				}
+				quota, ok := body.Details["quota"].(map[string]interface{})
+				if !ok {
+					t.Fatalf("details.quota = %#v, want a quota object", body.Details["quota"])
+				}
+				if got := quota["remaining"]; got != "$1.25" {
+					t.Errorf("details.quota.remaining = %v, want $1.25", got)
+				}
+				if got := quota["costPerCall"]; got != "$0.05" {
+					t.Errorf("details.quota.costPerCall = %v, want $0.05", got)
+				}
+				if got := body.Details["route"]; got != "/quota" {
+					t.Errorf("details.route = %v, want /quota", got)
+				}
+			},
 		},
 	}
 
@@ -158,6 +180,9 @@ func TestHTTPErrorPathsUseCommonEnvelope(t *testing.T) {
 			}
 			if strings.Contains(recorder.Body.String(), "private capture storage failure") {
 				t.Fatalf("response exposed internal cause: %s", recorder.Body.String())
+			}
+			if test.verify != nil {
+				test.verify(t, body, recorder)
 			}
 		})
 	}
