@@ -6,14 +6,15 @@ import (
 
 	"github.com/shurcooL/githubv4"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 )
 
 // GitHubClient wraps GitHub GraphQL API operations
 type GitHubClient struct {
-	client    *githubv4.Client
-	owner     string
-	repo      string
-	token     string // Token is for reference only; never logged
+	client *githubv4.Client
+	owner  string
+	repo   string
+	token  string // Token is for reference only; never logged
 }
 
 // NewGitHubClient creates a new GitHub client
@@ -22,7 +23,9 @@ func NewGitHubClient(token, owner, repo string) *GitHubClient {
 		zap.L().Fatal("GitHub token is required but was not provided")
 	}
 
-	client := githubv4.NewClient(githubv4.NewOAuthClient(token, nil))
+	// githubv4.NewClient takes a plain *http.Client; oauth2 supplies the token transport.
+	src := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	client := githubv4.NewClient(oauth2.NewClient(context.Background(), src))
 
 	return &GitHubClient{
 		client: client,
@@ -97,8 +100,8 @@ func (ghc *GitHubClient) getDefaultBranchRef(ctx context.Context, repoID githubv
 	var query struct {
 		Repository struct {
 			DefaultBranchRef struct {
-				ID  githubv4.ID `graphql:"id"`
-				Name string     `graphql:"name"`
+				ID     string `graphql:"id"`
+				Name   string `graphql:"name"`
 				Target struct {
 					Oid string `graphql:"oid"`
 				} `graphql:"target"`
@@ -114,7 +117,7 @@ func (ghc *GitHubClient) getDefaultBranchRef(ctx context.Context, repoID githubv
 		return "", "", fmt.Errorf("failed to query default branch: %w", err)
 	}
 
-	return string(query.Repository.DefaultBranchRef.ID),
+	return query.Repository.DefaultBranchRef.ID,
 		query.Repository.DefaultBranchRef.Target.Oid,
 		nil
 }
@@ -164,7 +167,7 @@ func (ghc *GitHubClient) createPullRequest(ctx context.Context, repoID githubv4.
 		BaseRefName:  githubv4.String(baseRef),
 		HeadRefName:  githubv4.String(headRef),
 		Title:        githubv4.String(title),
-		Body:         githubv4.String(body),
+		Body:         githubv4.NewString(githubv4.String(body)),
 	}
 
 	if err := ghc.client.Mutate(ctx, &mutation, input, nil); err != nil {
