@@ -2189,12 +2189,24 @@ func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 //
 // Phase 7: This is called before checking route existence for scope-filtered endpoints.
 func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Request, path, method string, identity *Identity) {
+	// Identity and the scope-version cache are both absent on a Server that was
+	// not built through New (tests, bare handlers), so resolve both through
+	// nil-safe paths rather than assuming the identity middleware ran.
+	identityName := "anonymous"
+	if identity != nil {
+		identityName = identity.NodeName
+	}
+	scopeVersion := ""
+	if s.scopeVersionCache != nil {
+		scopeVersion = s.scopeVersionCache.GetCurrentScopeVersion(identity)
+	}
+
 	// Log the resolved route server-side (as specified in task)
 	log.Printf("[Scope-Filter-404] Route not in caller's filtered scope: path=%s method=%s identity=%s scope_version=%s",
 		path,
 		method,
-		identity.NodeName,
-		s.scopeVersionCache.GetCurrentScopeVersion(identity),
+		identityName,
+		scopeVersion,
 	)
 
 	// Get the standard RouteNotFound error (byte-identical to non-existent route)
@@ -2207,11 +2219,8 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 
 	// Add X-SEAM-Scope-Version header for correlation
-	if identity != nil {
-		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
-		if scopeVersion != "" {
-			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
-		}
+	if identity != nil && scopeVersion != "" {
+		w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
 	}
 
 	w.WriteHeader(http.StatusNotFound)
@@ -2227,13 +2236,16 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 		},
 	}
 
+	// Stamp the caller's request ID so the scope-filtered 404 carries the same
+	// envelope field a genuinely non-existent route does.
+	if requestID := GetRequestID(r); requestID != "" {
+		response["request_id"] = requestID
+	}
+
 	// Add scope version to metadata if available
-	if identity != nil {
-		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
-		if scopeVersion != "" {
-			if metadata, ok := response["metadata"].(map[string]interface{}); ok {
-				metadata["x_seam_scope_version"] = scopeVersion
-			}
+	if identity != nil && scopeVersion != "" {
+		if metadata, ok := response["metadata"].(map[string]interface{}); ok {
+			metadata["x_seam_scope_version"] = scopeVersion
 		}
 	}
 
@@ -2249,9 +2261,19 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 //
 // Phase 7: This helps callers understand why they can see a path but not use a specific method.
 func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Request, path, method string, identity *Identity, pathItemMap map[string]interface{}) {
+	// Same nil-safe identity and scope-version resolution as the 404 path above.
+	identityName := "anonymous"
+	if identity != nil {
+		identityName = identity.NodeName
+	}
+	scopeVersion := ""
+	if s.scopeVersionCache != nil {
+		scopeVersion = s.scopeVersionCache.GetCurrentScopeVersion(identity)
+	}
+
 	// Log the visible-but-not-invocable case
 	log.Printf("[Scope-Filter-403] Route visible but method not invocable: path=%s method=%s identity=%s",
-		path, method, identity.NodeName,
+		path, method, identityName,
 	)
 
 	// Find which methods are available and their required scopes
@@ -2302,11 +2324,8 @@ func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 
 	// Add X-SEAM-Scope-Version header for correlation
-	if identity != nil {
-		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
-		if scopeVersion != "" {
-			w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
-		}
+	if identity != nil && scopeVersion != "" {
+		w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
 	}
 
 	w.WriteHeader(http.StatusForbidden)
@@ -2344,12 +2363,9 @@ func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Add scope version to metadata if available
-	if identity != nil {
-		scopeVersion := s.scopeVersionCache.GetCurrentScopeVersion(identity)
-		if scopeVersion != "" {
-			if metadata, ok := response["metadata"].(map[string]interface{}); ok {
-				metadata["x_seam_scope_version"] = scopeVersion
-			}
+	if identity != nil && scopeVersion != "" {
+		if metadata, ok := response["metadata"].(map[string]interface{}); ok {
+			metadata["x_seam_scope_version"] = scopeVersion
 		}
 	}
 
