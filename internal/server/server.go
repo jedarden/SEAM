@@ -20,8 +20,8 @@ import (
 	"github.com/ardenone/seam/internal/pluckfallback"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/tailscale"
-	apiversion "github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/vault"
+	apiversion "github.com/ardenone/seam/internal/version"
 )
 
 // reservedPaths are the control-plane endpoints that short-circuit route-table lookup.
@@ -45,23 +45,23 @@ var reservedPaths = struct {
 	prefixes []string
 }{
 	exact: map[string]bool{
-		"/docs":                    true,
-		"/docs/route":              true,
-		"/docs/paths":              true, // Phase 11.2: All paths with last-2xx status
-		"/openapi.json":            true,
-		"/whoami":                  true,
-		"/scopes":                  true,
-		"/changes":                 true,
-		"/health/credentials":      true, // Health sentinel: credential status check
-		"/health/upstreams":        true, // Health sentinel: upstream connectivity check
-		"/config/status":           true,
-		"/api/v1/tailscale/ephemeral-key": true, // Phase 7: Tailscale ephemeral key endpoint
-		"/api/v1/exclusions/report": true, // Phase 13: Bead exclusion report endpoint
-		"/api/v1/exclusions/reports": true, // Phase 13: All exclusion reports endpoint
-		"/api/v1/exclusions/analyze": true, // Phase 13: On-demand exclusion analysis endpoint
-		"/api/v1/exclusions/summary": true, // Phase 13: Exclusion activity summary endpoint
-		"/api/v1/exclusions/alerts": true, // Phase 13: All alerts endpoint
-		"/api/v1/exclusions/alerts/active": true, // Phase 13: Active alerts endpoint
+		"/docs":                             true,
+		"/docs/route":                       true,
+		"/docs/paths":                       true, // Phase 11.2: All paths with last-2xx status
+		"/openapi.json":                     true,
+		"/whoami":                           true,
+		"/scopes":                           true,
+		"/changes":                          true,
+		"/health/credentials":               true, // Health sentinel: credential status check
+		"/health/upstreams":                 true, // Health sentinel: upstream connectivity check
+		"/config/status":                    true,
+		"/api/v1/tailscale/ephemeral-key":   true, // Phase 7: Tailscale ephemeral key endpoint
+		"/api/v1/exclusions/report":         true, // Phase 13: Bead exclusion report endpoint
+		"/api/v1/exclusions/reports":        true, // Phase 13: All exclusion reports endpoint
+		"/api/v1/exclusions/analyze":        true, // Phase 13: On-demand exclusion analysis endpoint
+		"/api/v1/exclusions/summary":        true, // Phase 13: Exclusion activity summary endpoint
+		"/api/v1/exclusions/alerts":         true, // Phase 13: All alerts endpoint
+		"/api/v1/exclusions/alerts/active":  true, // Phase 13: Active alerts endpoint
 		"/api/v1/exclusions/alerts/resolve": true, // Phase 13: Resolve alert endpoint
 	},
 	prefixes: []string{
@@ -147,48 +147,48 @@ type Config struct {
 	HotReloadEnabled          bool   // Phase 3.1: Enable file-watch hot reload of route fragments
 
 	// Phase 14: Cloudflare Access JWT validation configuration
-	CloudflareAccessEnabled  bool   // Enable Cloudflare Access JWT validation (default: false)
-	CloudflareTeamDomain     string // Cloudflare team domain (e.g., "ardenone")
-	CloudflareAudience       string // Expected JWT audience (Access Application ID)
+	CloudflareAccessEnabled bool   // Enable Cloudflare Access JWT validation (default: false)
+	CloudflareTeamDomain    string // Cloudflare team domain (e.g., "ardenone")
+	CloudflareAudience      string // Expected JWT audience (Access Application ID)
 }
 
 // Server represents the SEAM gateway server with two listeners
 type Server struct {
-	config            *Config
-	callerMux         *http.ServeMux
-	operatorMux       *http.ServeMux
-	callerServer      *http.Server
-	operatorServer    *http.Server
-	callerListener    net.Listener
-	operatorListener  net.Listener
-	wg                sync.WaitGroup
-	specLoader        *spec.Loader
-	routeTableHolder  *ThreadSafeTableHolder   // Thread-safe holder for route table (stage 4)
-	proxyMap          map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
-	proxyMapMu        sync.RWMutex             // Protects proxyMap
-	upstreamClientMap map[string]*http.Client  // Map of TLS identity -> connection-pooled client
-	captureMiddleware *CaptureMiddleware
-	cache             *ResponseCache
-	singleFlight      *SingleFlight
-	cacheTTLs         map[string]int // route path -> cache TTL in seconds
-	circuitBreakers   *CircuitBreakerStateRegistry
-	breakerRegistry   *BreakerRegistry // Per-origin circuit breaker manager (Phase 11.1)
-	last2xxTracker    *Last2xxTracker  // Per-path and per-upstream last-2xx tracking (Phase 11.2)
-	quotaTracker      *QuotaTracker
-	loopGuardRegistry *LoopGuardRegistry // Per-route loop guard manager (Phase 13.1)
-	costPerCalls      map[string]float64 // route -> cost per call
-	metrics           *Metrics
-	mu                sync.RWMutex
-	allowlistEnforcer *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
-	openBaoMu         sync.RWMutex
-	openBaoReady      bool
-	hotReloadManager  *HotReloadManager // Hot reload manager for fragment changes
-	identityResolver  *IdentityResolver  // Phase 7: Identity resolver for Stage 3 (WhoIs)
-	scopeVersionCache *ScopeVersionCache // Phase 7: Bounded scope version retention map
-	tailscaleClient   *tailscale.Client  // Phase 7: Tailscale API client for ephemeral key generation
-	specRingBuffer    *SpecRingBuffer    // Phase 8.4: Ring buffer for spec version history
-	cloudflareJWTValidator *CloudflareJWTValidator // Phase 14: Cloudflare Access JWT validator
-	exclusionTracker  *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
+	config                 *Config
+	callerMux              *http.ServeMux
+	operatorMux            *http.ServeMux
+	callerServer           *http.Server
+	operatorServer         *http.Server
+	callerListener         net.Listener
+	operatorListener       net.Listener
+	wg                     sync.WaitGroup
+	specLoader             *spec.Loader
+	routeTableHolder       *ThreadSafeTableHolder   // Thread-safe holder for route table (stage 4)
+	proxyMap               map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
+	proxyMapMu             sync.RWMutex             // Protects proxyMap
+	upstreamClientMap      map[string]*http.Client  // Map of TLS identity -> connection-pooled client
+	captureMiddleware      *CaptureMiddleware
+	cache                  *ResponseCache
+	singleFlight           *SingleFlight
+	cacheTTLs              map[string]int // route path -> cache TTL in seconds
+	circuitBreakers        *CircuitBreakerStateRegistry
+	breakerRegistry        *BreakerRegistry // Per-origin circuit breaker manager (Phase 11.1)
+	last2xxTracker         *Last2xxTracker  // Per-path and per-upstream last-2xx tracking (Phase 11.2)
+	quotaTracker           *QuotaTracker
+	loopGuardRegistry      *LoopGuardRegistry // Per-route loop guard manager (Phase 13.1)
+	costPerCalls           map[string]float64 // route -> cost per call
+	metrics                *Metrics
+	mu                     sync.RWMutex
+	allowlistEnforcer      *spec.AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
+	openBaoMu              sync.RWMutex
+	openBaoReady           bool
+	hotReloadManager       *HotReloadManager               // Hot reload manager for fragment changes
+	identityResolver       *IdentityResolver               // Phase 7: Identity resolver for Stage 3 (WhoIs)
+	scopeVersionCache      *ScopeVersionCache              // Phase 7: Bounded scope version retention map
+	tailscaleClient        *tailscale.Client               // Phase 7: Tailscale API client for ephemeral key generation
+	specRingBuffer         *SpecRingBuffer                 // Phase 8.4: Ring buffer for spec version history
+	cloudflareJWTValidator *CloudflareJWTValidator         // Phase 14: Cloudflare Access JWT validator
+	exclusionTracker       *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -227,7 +227,7 @@ func New(cfg *Config) *Server {
 	// deployment changes only that variable.
 	vaultBaseDir := cfg.VaultBaseDir
 	if vaultBaseDir == "" {
-		vaultBaseDir = "rs-manager/rs-manager/seam/routes"
+		vaultBaseDir = spec.DefaultVaultBaseDir
 	}
 
 	// Initialize allowlist enforcer
@@ -476,13 +476,13 @@ func (s *Server) initTailscaleClient() error {
 
 	// Create Tailscale client
 	cfg := tailscale.Config{
-		APIKey:              apiKey,
-		Tailnet:             tailnet,
-		BaseURL:             "https://api.tailscale.com",
-		DefaultExpiry:       90 * 24 * time.Hour, // 90 days
-		DefaultTags:         []string{"tag:needle-worker"},
-		CacheTTL:            5 * time.Minute,
-		CacheHoldDown:       30 * time.Second,
+		APIKey:             apiKey,
+		Tailnet:            tailnet,
+		BaseURL:            "https://api.tailscale.com",
+		DefaultExpiry:      90 * 24 * time.Hour, // 90 days
+		DefaultTags:        []string{"tag:needle-worker"},
+		CacheTTL:           5 * time.Minute,
+		CacheHoldDown:      30 * time.Second,
 		EnableDebugLogging: os.Getenv("TS_DEBUG") == "true",
 	}
 
@@ -556,7 +556,7 @@ func (s *Server) buildRouteSnapshots() []RouteSnapshot {
 			Method:          route.Method,
 			RequiredScopes:  route.RequiredScopes,
 			Deprecated:      route.Deprecated != nil, // Convert *DeprecationInfo to bool
-			VisibilityKinds: []string{}, // Could be populated from metadata
+			VisibilityKinds: []string{},              // Could be populated from metadata
 		}
 		snapshots = append(snapshots, snapshot)
 	}
@@ -2248,9 +2248,9 @@ func (s *Server) writeScopeFilteredNotFound(w http.ResponseWriter, r *http.Reque
 
 	// Write the error response
 	response := map[string]interface{}{
-		"error":    notFoundErr.Error,
-		"message":  notFoundErr.Message,
-		"details":  notFoundErr.Details,
+		"error":   notFoundErr.Error,
+		"message": notFoundErr.Message,
+		"details": notFoundErr.Details,
 		"metadata": map[string]interface{}{
 			"docs_url": "/docs",
 			"whoami":   "/whoami",
@@ -2356,11 +2356,11 @@ func (s *Server) writeVisibleButNotInvocable(w http.ResponseWriter, r *http.Requ
 		"error":   "forbidden",
 		"message": fmt.Sprintf("Method %s not allowed for path %s with your current scope", method, path),
 		"details": map[string]interface{}{
-			"path":          path,
-			"requested_method": method,
+			"path":              path,
+			"requested_method":  method,
 			"available_methods": availableMethods,
-			"reason": "visible_but_not_invocable",
-			"documentation": "/docs",
+			"reason":            "visible_but_not_invocable",
+			"documentation":     "/docs",
 		},
 		"metadata": map[string]interface{}{
 			"whoami": "/whoami",
@@ -2639,7 +2639,7 @@ func mergePathParams(base, overlay map[string]string) map[string]string {
 func (s *Server) operatorScopeMiddleware(requiredScope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		
+
 		// Get resolved identity from Stage 3
 		identity := identityFromContext(ctx)
 		if identity == nil {
@@ -2648,21 +2648,21 @@ func (s *Server) operatorScopeMiddleware(requiredScope string, next http.Handler
 			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
 			return
 		}
-		
+
 		// Check if identity is resolved
 		if !identity.Resolved {
 			log.Printf("[Operator-Scope] Identity not resolved for %s - denying (requires scope: %s)", r.URL.Path, requiredScope)
 			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
 			return
 		}
-		
+
 		// Check if identity has the required scope
 		if !identity.HasScope(requiredScope) {
 			log.Printf("[Operator-Scope] Identity lacks required scope %s for %s - denying (has: %v)", requiredScope, r.URL.Path, identity.Capabilities)
 			NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Operator endpoint requires scope: %s", requiredScope)).Write(w, r)
 			return
 		}
-		
+
 		// Scope check passed - proceed to handler
 		log.Printf("[Operator-Scope] Identity has required scope %s for %s - allowing", requiredScope, r.URL.Path)
 		next(w, r)

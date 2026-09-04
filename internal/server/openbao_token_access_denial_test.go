@@ -11,28 +11,60 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/testutil/openbao"
 )
 
 // TestOpenBaoTokenAccessDenial verifies that SEAM's OpenBao role CANNOT read
 // the evaluator's token path, proving proper isolation between services.
 //
-// This test:
+// The SEAM policy is derived from the vault base dir actually in force
+// (spec.ResolveVaultBaseDir, i.e. SEAM_VAULT_BASE_DIR when set) rather than
+// from a literal, and the whole boundary is re-proved under more than one
+// prefix — so the isolation assertion tracks whatever prefix a deployment
+// configures instead of only the one that happened to be current when this
+// test was written.
+//
+// For each prefix under test:
 // 1. Creates a test OpenBao server
-// 2. Writes SEAM policy (restricted to seam/routes/*, explicitly denied evaluators/*)
+// 2. Writes SEAM policy (restricted to <base>/*, explicitly denied evaluators/*)
 // 3. Creates evaluator token path
 // 4. Creates a SEAM token with restricted policy
 // 5. Attempts to read evaluator token using SEAM token
 // 6. Verifies the read is denied with permission error
-// 7. Test passes ONLY when access is denied
+// 7. Verifies SEAM can still read its own secret beneath the same prefix
+// 8. Test passes ONLY when access is denied and the owned path is readable
 func TestOpenBaoTokenAccessDenial(t *testing.T) {
-	t.Run("SEAM_cannot_read_evaluator_token", func(t *testing.T) {
-		testSEAMCannotReadEvaluatorToken(t)
-	})
+	// The prefix actually in force - SEAM_VAULT_BASE_DIR when the deployment
+	// set one, spec.DefaultVaultBaseDir otherwise. Resolving it here is what
+	// makes the boundary below track deployment configuration instead of the
+	// literal this test happened to be written against.
+	inForce := spec.ResolveVaultBaseDir("")
+	// A second prefix, guaranteed distinct from the first so the two cases
+	// cannot collapse into one when an override is in force, proving the
+	// boundary is a property of the isolation rules and not of one estate.
+	alternate := inForce + "/alternate"
+	for _, tc := range []struct {
+		name         string
+		vaultBaseDir string
+	}{
+		{name: "resolved_default", vaultBaseDir: inForce},
+		{name: "explicit_override", vaultBaseDir: alternate},
+	} {
+		t.Run(tc.name+"/SEAM_cannot_read_evaluator_token", func(t *testing.T) {
+			testSEAMCannotReadEvaluatorToken(t, tc.vaultBaseDir)
+		})
+	}
+}
+
+// seamRouteGrant returns the ACL path granting SEAM read access to its own
+// route secrets beneath vaultBaseDir, in KV v2 data-API form.
+func seamRouteGrant(vaultBaseDir string) string {
+	return "secret/data/" + vaultBaseDir + "/*"
 }
 
 // testSEAMCannotReadEvaluatorToken implements the actual test logic
-func testSEAMCannotReadEvaluatorToken(t *testing.T) {
+func testSEAMCannotReadEvaluatorToken(t *testing.T, vaultBaseDir string) {
 	// Step 1: Start OpenBao test server
 	server, err := openbao.NewServer(openbao.ServerConfig{
 		DevToken:   "test-root-token",
@@ -51,9 +83,15 @@ func testSEAMCannotReadEvaluatorToken(t *testing.T) {
 	rootClient := server.Client()
 	baseURL := server.BaseURL()
 
-	// Step 2: Create SEAM policy with restricted access
-	seamPolicyHCL := `# Allow reading SEAM route secrets ONLY
-path "secret/data/seam/routes/*" {
+	// Step 2: Create SEAM policy with restricted access, scoped to the
+	// configured prefix.
+	seamOwnPath := vaultBaseDir + "/testservice/token"
+	// Named once and used for both the create and the token mint: a token
+	// referencing a policy name that was never created carries no usable
+	// policy, which fails everything and would make the denial below vacuous.
+	seamPolicyName := "seam-test-policy-" + safePolicySuffix(t, vaultBaseDir)
+	seamPolicyHCL := fmt.Sprintf(`# Allow reading SEAM route secrets ONLY
+path %q {
   capabilities = ["read"]
 }
 
@@ -65,9 +103,16 @@ path "secret/data/evaluators/*" {
 # Deny access to all other secrets (default-deny)
 path "secret/data/*" {
   capabilities = ["deny"]
-}`
+}`, seamRouteGrant(vaultBaseDir))
 
-	if err := createPolicy(ctx, baseURL, server.DevToken(), "seam-test-policy", seamPolicyHCL); err != nil {
+	// A base dir that reached outside its own tree would make the grant cover
+	// the evaluator path and silently invert the boundary this test exists to
+	// assert, so refuse to run rather than report a pass.
+	if leaked := "secret/data/" + evaluatorTreeRoot + "/"; strings.HasPrefix(leaked, strings.TrimSuffix(seamRouteGrant(vaultBaseDir), "*")) {
+		t.Fatalf("configured vault base dir %q grants the evaluator tree %s - isolation boundary would be inverted", vaultBaseDir, evaluatorTreeRoot)
+	}
+
+	if err := createPolicy(ctx, baseURL, server.DevToken(), seamPolicyName, seamPolicyHCL); err != nil {
 		t.Fatalf("Failed to create SEAM policy: %v", err)
 	}
 
@@ -92,18 +137,39 @@ path "secret/data/*" {
 	}
 
 	// Step 4: Create a SEAM token with restricted policy
-	seamToken, err := createToken(ctx, baseURL, server.DevToken(), "seam-test-policy")
+	seamToken, err := createToken(ctx, baseURL, server.DevToken(), seamPolicyName)
 	if err != nil {
 		t.Fatalf("Failed to create SEAM token: %v", err)
 	}
 
-	// Step 5: Attempt to read evaluator token using SEAM token
-	seamClient := openbao.NewClient(baseURL, seamToken)
+	// Step 5: Positive control FIRST — the SEAM token must be able to read its
+	// own secret beneath the configured prefix. Running this before the denial
+	// assertion is what stops the boundary check below from passing vacuously:
+	// a token that was minted with no usable policy also fails to read the
+	// evaluator path, and without this control that would read as "isolation
+	// verified". This is what proves the derived grant is scoped to the prefix
+	// rather than merely syntactically present.
+	seamOwnSecret := map[string]interface{}{
+		"token": "test-seam-token-abc123",
+	}
+	if err := rootClient.WriteSecret(ctx, seamOwnPath, seamOwnSecret); err != nil {
+		t.Fatalf("Failed to create SEAM's own secret: %v", err)
+	}
 
+	seamClient := openbao.NewClient(baseURL, seamToken)
+	seamOwnData, err := seamClient.ReadSecret(ctx, seamOwnPath)
+	if err != nil {
+		t.Fatalf("SEAM should be able to read its own secrets under %s (the grant is broken, so the denial below would be vacuous): %v", vaultBaseDir, err)
+	}
+	if seamOwnData["token"] != "test-seam-token-abc123" {
+		t.Fatalf("SEAM's own token value mismatch: got %v", seamOwnData)
+	}
+
+	// Step 6: Attempt to read evaluator token using SEAM token
 	// This MUST fail - SEAM should not be able to read evaluator secrets
 	_, err = seamClient.ReadSecret(ctx, evaluatorTokenPath)
 
-	// Step 6: Verify the failure is due to permission denied
+	// Step 7: Verify the failure is due to permission denied
 	if err == nil {
 		// TEST FAILS - SEAM was able to read the evaluator token (security breach!)
 		t.Fatalf("SECURITY BREACH: SEAM token was able to read evaluator token at path %s - isolation failed!", evaluatorTokenPath)
@@ -117,28 +183,26 @@ path "secret/data/*" {
 		!strings.Contains(errorMsg, "code 403") {
 		t.Fatalf("Expected permission denied error (403), got: %v", err)
 	}
-
-	// Additional validation: Verify SEAM CAN read its own secrets
-	seamOwnPath := "seam/routes/testservice/token"
-	seamOwnSecret := map[string]interface{}{
-		"token": "test-seam-token-abc123",
-	}
-	if err := rootClient.WriteSecret(ctx, seamOwnPath, seamOwnSecret); err != nil {
-		t.Fatalf("Failed to create SEAM's own secret: %v", err)
-	}
-
-	seamOwnData, err := seamClient.ReadSecret(ctx, seamOwnPath)
-	if err != nil {
-		t.Fatalf("SEAM should be able to read its own secrets: %v", err)
-	}
-	if seamOwnData["token"] != "test-seam-token-abc123" {
-		t.Fatalf("SEAM's own token value mismatch: got %v", seamOwnData)
-	}
-
 	// TEST PASSES - SEAM can read its own secrets but is denied evaluator access
 	t.Logf("✓ SUCCESS: SEAM token correctly denied access to evaluator token path")
-	t.Logf("✓ SUCCESS: SEAM token can still read its own secrets (seam/routes/*)")
+	t.Logf("✓ SUCCESS: SEAM token can still read its own secrets (%s)", seamRouteGrant(vaultBaseDir))
 	t.Logf("✓ Isolation verified: SEAM and evaluator secrets are properly separated")
+}
+
+// evaluatorTreeRoot is the first path segment of every evaluator secret. It is
+// named separately from the concrete evaluator path below because the
+// inversion guard depends on it.
+const evaluatorTreeRoot = "evaluators"
+
+// safePolicySuffix turns a vault base dir into a suffix OpenBao accepts in a
+// policy name, so per-prefix policies in one server never collide.
+func safePolicySuffix(t *testing.T, vaultBaseDir string) string {
+	t.Helper()
+	replaced := strings.NewReplacer("/", "-", "_", "-", ".", "-").Replace(vaultBaseDir)
+	if replaced == "" {
+		replaced = "default"
+	}
+	return replaced
 }
 
 // createPolicy creates an OpenBao policy via HTTP API

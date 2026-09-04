@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/testutil/openbao"
 	"github.com/ardenone/seam/internal/testutil/stubupstream"
 )
@@ -31,7 +32,12 @@ func TestPhase2Scenario1SecretInjectionAndScrubbingEndToEnd(t *testing.T) {
 	defer func() { _ = openbaoServer.Close() }()
 
 	secret := fmt.Sprintf("phase2-acceptance-%d", time.Now().UnixNano())
-	vaultPath := "seam/routes/phase2/token"
+	// The spec's x-vault-path and the OpenBao fixture both derive from the
+	// configured base dir, and the same value is handed to the server below, so
+	// the credential stays under the prefix actually enforced rather than under
+	// one this test happened to hardcode.
+	vaultBaseDir := spec.ResolveVaultBaseDir("")
+	vaultPath := vaultBaseDir + "/phase2/token"
 	if err := openbaoServer.Client().WriteSecret(ctx, vaultPath, map[string]interface{}{"token": secret}); err != nil {
 		t.Fatalf("write acceptance secret: %v", err)
 	}
@@ -87,6 +93,8 @@ paths:
 		BaseURL:       "http://localhost",
 		SpecDir:       specDir,
 		AllowlistFile: allowlist,
+		// Same prefix the spec above points at.
+		VaultBaseDir: vaultBaseDir,
 	})
 	// The acceptance request drives a real listener over loopback, and stage 3
 	// default-denies a caller it cannot resolve to a tailnet identity before

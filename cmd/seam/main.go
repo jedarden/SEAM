@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ardenone/seam/internal/server"
+	"github.com/ardenone/seam/internal/spec"
 )
 
 func main() {
@@ -296,13 +296,10 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 // --vault-base-dir flag value. The environment wins over the flag, matching
 // SEAM_BASE_URL: the Deployment is the operator's configuration surface. An
 // absent or blank variable returns the flag value untouched — which is ""
-// in the normal case, leaving server.New to apply the in-code
-// "rs-manager/rs-manager/seam/routes" default, so an unset variable is
-// exactly the pre-existing behaviour.
+// in the normal case, leaving server.New to apply spec.DefaultVaultBaseDir, so
+// an unset variable is exactly the pre-existing behaviour. It is a thin wrapper
+// on spec.ResolveVaultBaseDir so the tests that derive fixture paths and ACL
+// grants from the variable resolve it the same way the binary does.
 func resolveVaultBaseDir(flagValue string) string {
-	val := strings.TrimSpace(os.Getenv("SEAM_VAULT_BASE_DIR"))
-	if val == "" {
-		return flagValue
-	}
-	return val
+	return spec.ResolveVaultBaseDir(flagValue)
 }

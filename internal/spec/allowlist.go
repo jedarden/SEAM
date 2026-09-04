@@ -37,12 +37,38 @@ type UpstreamAllowlist struct {
 
 const defaultMountedAllowlistFile = "/etc/gateway/allowlist.yaml"
 
+// DefaultVaultBaseDir is the vault prefix SEAM enforces when neither
+// SEAM_VAULT_BASE_DIR nor --vault-base-dir supplies one: the consolidated
+// estate prefix secret/<installation>/<cluster>/seam/routes with both segments
+// naming rs-manager, minus the leading mount. It is the default base only —
+// the schema stays base-agnostic (see docs/notes/route-fragment-schema.md).
+const DefaultVaultBaseDir = "rs-manager/rs-manager/seam/routes"
+
+// VaultBaseDirEnvVar is the Deployment variable that overrides
+// DefaultVaultBaseDir. It is read by ResolveVaultBaseDir rather than by this
+// package's constructors, which take the resolved value as an argument.
+const VaultBaseDirEnvVar = "SEAM_VAULT_BASE_DIR"
+
+// ResolveVaultBaseDir returns the base dir in force for a configured value:
+// VaultBaseDirEnvVar wins when it is non-blank, otherwise the configured value,
+// otherwise DefaultVaultBaseDir. cmd/seam resolves the flag through this and
+// server.New applies the same default, so a test deriving its OpenBao fixture
+// paths and ACL grants from here is exercising the prefix a Deployment would
+// actually enforce rather than a literal of its own.
+func ResolveVaultBaseDir(configured string) string {
+	if val := strings.TrimSpace(os.Getenv(VaultBaseDirEnvVar)); val != "" {
+		return val
+	}
+	if configured != "" {
+		return configured
+	}
+	return DefaultVaultBaseDir
+}
+
 // NewAllowlistEnforcer creates a new allowlist enforcer
 func NewAllowlistEnforcer(vaultBaseDir string, allowlistFile string) (*AllowlistEnforcer, error) {
 	if vaultBaseDir == "" {
-		// Kept in step with server.New's default — the estate prefix
-		// secret/rs-manager/rs-manager/seam/routes minus the leading mount.
-		vaultBaseDir = "rs-manager/rs-manager/seam/routes"
+		vaultBaseDir = DefaultVaultBaseDir
 	}
 
 	enforcer := &AllowlistEnforcer{
