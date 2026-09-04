@@ -48,6 +48,7 @@ const (
 	quotaCostKey
 	dryRunKey
 	credentialRetryKey // Phase 12: Track if we've already attempted credential refresh
+	quotaChargedKey    // quotaMiddleware already charged this request at admission
 )
 
 // contextWithReplayableBody stores a replayable body in the context
@@ -100,6 +101,20 @@ func quotaCostFromContext(ctx context.Context) float64 {
 		return cost
 	}
 	return 0
+}
+
+// contextWithQuotaCharged marks a request whose quota cost the quota middleware
+// already recorded at admission, so the dispatch-time deduction below skips it
+func contextWithQuotaCharged(ctx context.Context) context.Context {
+	return context.WithValue(ctx, quotaChargedKey, true)
+}
+
+// quotaChargedFromContext reports whether the request was already charged by the
+// quota middleware. A request driven straight into the proxy without passing
+// through that middleware carries no such mark and is charged at dispatch.
+func quotaChargedFromContext(ctx context.Context) bool {
+	charged, ok := ctx.Value(quotaChargedKey).(bool)
+	return ok && charged
 }
 
 // contextWithCredentialRetry tracks whether we've attempted credential refresh
@@ -487,9 +502,14 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	upstreamResp, err := client.Do(upstreamReq)
 	if err != nil {
 		cancel()
-		// Phase 13.2: Transport errors (connection refused, timeout, etc.) do NOT charge quota
-		// The request was never successfully sent to the upstream
-		log.Printf("[proxy] Upstream request failed for %s - not charging quota (transport error): %v", route, err)
+		// Phase 13.2: this branch deducts nothing itself, but "no charge" only
+		// holds for a request the quota middleware did not mark quotaChargedKey.
+		// Those are billed at dispatch below and so genuinely escape a failed
+		// transport. A middleware-driven request was already charged at
+		// admission, before this call, so a transport failure still costs the
+		// caller its per-call price — admission is the billing point, not the
+		// upstream's answer.
+		log.Printf("[proxy] Upstream request failed for %s - no dispatch-time charge (transport error): %v", route, err)
 		return fmt.Errorf("upstream request failed: %w", err)
 	}
 	upstreamResp.Body = &cancelOnClose{ReadCloser: upstreamResp.Body, cancel: cancel}
@@ -502,7 +522,10 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	// a 401 from the upstream is charged like any other: the 401 branch below
 	// returns without reaching the ordinary charge site, and the retry it then
 	// issues charges again through this same line on its own dispatch.
-	if quotaCost > 0 && p.QuotaTracker != nil {
+	// A request that came through the quota middleware is the exception: that
+	// middleware already charged it at admission (quotaChargedKey), and this
+	// second deduction would bill the caller twice for one call.
+	if quotaCost > 0 && p.QuotaTracker != nil && !quotaChargedFromContext(ctx) {
 		// Extract token and user for quota tracking
 		token := r.Header.Get("X-Auth-Token")
 		user := r.Header.Get("X-User-ID")

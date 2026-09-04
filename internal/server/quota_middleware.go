@@ -65,9 +65,13 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Phase 13.2: Check quota without deducting (deduction happens at dispatch)
-		// Pass cost=0 to check quota without deducting
-		allowed, remaining, err := s.quotaTracker.CheckQuotaOnly(r.Context(), route, costPerCall, token, user)
+		// Charge at admission: the check and the record happen under one lock so
+		// concurrent requests cannot all pass the check before any of them
+		// records its cost. The middleware records here rather than at dispatch
+		// because it cannot observe what the downstream handler does — a request
+		// served from the response cache never dispatches at all, and a handler
+		// that is not the proxy has no dispatch-time accounting to fall back on.
+		allowed, remaining, err := s.quotaTracker.CheckAndRecordQuota(r.Context(), route, costPerCall, token, user)
 		if err != nil {
 			requestErr := WrapRequestError(ErrCodeInternalServer, "Error checking quota", err).
 				WithDetail("route", route)
@@ -83,19 +87,25 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Phase 13.2: Store cost in context for deduction at dispatch time
-		ctx := contextWithQuotaCost(r.Context(), costPerCall)
+		// Store the cost in context for the proxy's response headers, and mark the
+		// request as already charged so the proxy's dispatch-time path does not
+		// deduct the same call a second time.
+		ctx := contextWithQuotaCharged(contextWithQuotaCost(r.Context(), costPerCall))
 		r = r.WithContext(ctx)
 
-		log.Printf("[Quota] Quota check passed for %s - cost will be deducted at dispatch", route)
+		log.Printf("[Quota] Quota check passed for %s - charged $%.2f at admission", route, costPerCall)
 
-		// Add X-SEAM-Budget-Remaining header to response (will be set by proxy after dispatch)
-		// For now, set a placeholder - proxy will update with actual remaining after dispatch
 		if costPerCall > 0 {
-			w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemaining(remaining-costPerCall, costPerCall, s.quotaTracker.GetWindowDuration()))
+			if remaining < 0 {
+				remaining = 0
+			}
+			w.Header().Set("X-Quota-Cost-Per-Call", formatCost(costPerCall))
+			w.Header().Set("X-Quota-Remaining", formatCost(remaining))
+			w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemaining(remaining, costPerCall, s.quotaTracker.GetWindowDuration()))
+			s.ensureMetrics().recordQuotaCost(route, costPerCall)
 		}
 
-		// Proceed to next handler (dispatch will deduct quota)
+		// Proceed to next handler
 		next.ServeHTTP(w, r)
 	})
 }

@@ -97,9 +97,13 @@ func (qt *QuotaTracker) scopeKey(scope, route string) string {
 }
 
 // CheckAndRecordQuota checks if a request is within quota and records the cost
-// Returns (allowed, remainingCost, error)
-// For cache hits, pass cost=0 to skip quota deduction
-// DEPRECATED: Use CheckQuotaOnly + RecordQuotaCost for dispatch-time accounting (Phase 13.2)
+// atomically, under one lock. This is the quota middleware's admission-time
+// accounting path: the middleware cannot observe whether the downstream handler
+// dispatches, so it charges here rather than racing a later deduction.
+// Returns (allowed, remainingCost, error), with remainingCost net of the charge.
+// For cache hits, pass cost=0 to skip quota deduction.
+// CheckQuotaOnly + RecordQuotaCost remains the split form for callers that must
+// charge only after a dispatch they performed themselves.
 func (qt *QuotaTracker) CheckAndRecordQuota(ctx context.Context, route string, cost float64, token, user string) (bool, float64, error) {
 	qt.mu.Lock()
 	defer qt.mu.Unlock()
