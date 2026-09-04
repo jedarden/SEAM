@@ -251,3 +251,11 @@ GitHub API issues:
 - **Metrics refinement**: Better gap detection algorithms
 - **Configurable windows**: Per-service custom evaluation windows
 - **Dry-run mode**: Evaluation-only without PR creation
+- **Fragment write**: The PR flow stops short of editing the fragment. Route
+  fragments in declarative-config are JSON entries inside one whole ConfigMap
+  per route owner (`k8s/rs-manager/seam/configmap-routes-*.yaml`), not files
+  under `DECLARATIVE_CONFIG_PATH`, and the fragment schema
+  (`configmap-fragment-schema.json`) does not know `x-seam-deprecated` — so
+  there is nothing to write yet. `GitHubClient.OpenPR` refuses to open a pull
+  request with no file change (GitHub rejects a zero-diff PR), so candidates
+  currently log an error instead of opening an unusable PR.

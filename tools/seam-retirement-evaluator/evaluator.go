@@ -162,8 +162,12 @@ func (re *RetirementEvaluator) openRetirementPR(ctx context.Context, candidate *
   brownouts:
 %s`, now.Format("2006-01-02"), sunsetDate, brownouts)
 
-	// The fragment commit that would carry this block is not implemented yet
-	// (see the placeholder in GitHubClient.OpenPR); surface it for diagnostics.
+	// The block has nowhere to land yet: declarative-config stores route
+	// fragments as JSON entries inside one whole ConfigMap per route owner
+	// (k8s/rs-manager/seam/configmap-routes-*.yaml), not as the
+	// <path>/<route>/fragment.yaml file this tool assumes, and the fragment
+	// schema does not know x-seam-deprecated. Surface it for diagnostics until
+	// a write target that SEAM would actually load exists.
 	zap.L().Debug("Generated x-seam-deprecated block",
 		zap.String("route", candidate.RouteStats.Route),
 		zap.String("block", deprecationBlock))
@@ -228,11 +232,13 @@ Mechanical checks validate fragment path ownership; the human gate is the final 
 		re.getFragmentPath(candidate),
 	)
 
-	// Open the PR
+	// Open the PR. No file change is attached yet (see the note on the
+	// deprecation block above), so OpenPR refuses rather than opening the
+	// zero-diff pull request GitHub would reject.
 	branchName := fmt.Sprintf("seam-deprecate-%s-%s", candidate.RouteStats.Route, candidate.RouteStats.APIVersion)
 	branchName = sanitizeBranchName(branchName)
 
-	prURL, err := re.ghc.OpenPR(ctx, branchName, prTitle, prBody, []string{"seam"})
+	prURL, err := re.ghc.OpenPR(ctx, branchName, prTitle, prBody, nil, []string{"seam"})
 	if err != nil {
 		return fmt.Errorf("failed to open PR: %w", err)
 	}
