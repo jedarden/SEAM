@@ -178,8 +178,10 @@ func (lg *LoopGuard) CheckRequest(hash string) (bool, int, error) {
 		return true, 0, nil
 	}
 
-	// Check if we're over the max repeat threshold
-	if track.failureCount >= lg.config.MaxRepeats {
+	// Check if the failure run has outgrown the tolerated repeat budget.
+	// MaxRepeats failures are still allowed through; only a run that has
+	// already exceeded them blocks the next attempt.
+	if track.failureCount > lg.config.MaxRepeats {
 		// Calculate retry-after: seconds to window close
 		windowEnd := lg.windowStart.Add(lg.config.windowDuration)
 		remaining := windowEnd.Sub(now)
@@ -212,11 +214,11 @@ func (lg *LoopGuard) RecordSuccess(hash string) {
 		return
 	}
 
-	// Record the success time - this clears the failure run
+	// Record the success time and clear the run. Per Phase 13.1 a 2xx on the
+	// same hash clears that hash's counter, so the next failure starts a fresh
+	// run rather than resuming the pre-success tally.
+	track.failureCount = 0
 	track.lastSuccessTime = now
-	// Note: we do NOT reset failureCount to 0 - the presence of a recent
-	// success is what matters, not the count. This allows us to detect
-	// oscillating success/failure patterns.
 }
 
 // RecordFailure records a failed response (non-2xx) for the given hash.

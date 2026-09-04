@@ -207,14 +207,23 @@ func TestLoopGuardHash_NoBody(t *testing.T) {
 func TestLoopGuardHash_NestedJSON(t *testing.T) {
 	hasher := NewRequestHasher(1024)
 
+	// Object keys are reordered at both depths; array order is preserved,
+	// since RFC 8785 canonicalizes object keys only.
 	body1 := []byte(`{"user":{"name":"John","age":30},"tags":["blue","red"]}`)
-	body2 := []byte(`{"tags":["red","blue"],"user":{"age":30,"name":"John"}}`)
+	body2 := []byte(`{"tags":["blue","red"],"user":{"age":30,"name":"John"}}`)
 
 	hash1 := hasher.ComputeHash("POST", "/api/users", map[string]string{}, url.Values{}, body1)
 	hash2 := hasher.ComputeHash("POST", "/api/users", map[string]string{}, url.Values{}, body2)
 
 	if hash1 != hash2 {
 		t.Errorf("Hashes with reordered nested JSON should match: got %s vs %s", hash1, hash2)
+	}
+
+	// Array order is significant and must not be canonicalized away.
+	body3 := []byte(`{"tags":["red","blue"],"user":{"age":30,"name":"John"}}`)
+	hash3 := hasher.ComputeHash("POST", "/api/users", map[string]string{}, url.Values{}, body3)
+	if hash1 == hash3 {
+		t.Errorf("Hashes with reordered array elements should not collide: both are %s", hash1)
 	}
 }
 
