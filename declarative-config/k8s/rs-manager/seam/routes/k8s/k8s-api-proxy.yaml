@@ -77,10 +77,6 @@ x-upstream-map:
       kind: bearer
     probeInterval: 45m
     requiredScope: k8s-rw:get
-x-credential-probe:
-  path: /api/v1/namespaces/default
-  method: GET
-  interval: 1h
 x-required-scope: k8s-ro:get
 x-fanout-scope: k8s-ro:fanout
 
