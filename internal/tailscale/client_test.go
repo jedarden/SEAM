@@ -3,6 +3,7 @@ package tailscale
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -383,7 +384,7 @@ func TestCreateEphemeralKeyHoldDown(t *testing.T) {
 
 	// First call should fail with rate limit
 	_, err = client.CreateEphemeralKey(ctx, "worker-1")
-	if err != ErrRateLimited {
+	if !errors.Is(err, ErrRateLimited) {
 		t.Errorf("Expected ErrRateLimited, got %v", err)
 	}
 	if callCount != 1 {
@@ -392,7 +393,7 @@ func TestCreateEphemeralKeyHoldDown(t *testing.T) {
 
 	// Second call should fail with hold-down without hitting API
 	_, err = client.CreateEphemeralKey(ctx, "worker-1")
-	if err != ErrCacheHoldDown {
+	if !errors.Is(err, ErrCacheHoldDown) {
 		t.Errorf("Expected ErrCacheHoldDown, got %v", err)
 	}
 	if callCount != 1 {
