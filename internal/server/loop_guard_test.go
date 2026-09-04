@@ -1,6 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -488,6 +493,61 @@ func TestLoopGuard_Config(t *testing.T) {
 	}
 	if returnedConfig.Window != "5m" {
 		t.Errorf("Config Window = %s, want 5m", returnedConfig.Window)
+	}
+}
+
+// TestReadReplayableBody_PreservesBodyAboveLimit checks that a body larger
+// than maxReplayableRequestBytes is hashed in prefix form while the request
+// keeps its complete body. Phase 13.1 wants the coarser hash, not a truncated
+// upstream call.
+func TestReadReplayableBody_PreservesBodyAboveLimit(t *testing.T) {
+	const maxSize = int64(16)
+	overLimit := []byte(`{"id":"` + strings.Repeat("x", 64) + `"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/test", bytes.NewReader(overLimit))
+
+	body, err := ReadReplayableBody(req, maxSize)
+	if err != nil {
+		t.Fatalf("ReadReplayableBody returned an error: %v", err)
+	}
+	if int64(len(body)) != maxSize {
+		t.Errorf("hashed body length = %d, want %d (the prefix)", len(body), maxSize)
+	}
+	if !bytes.Equal(body, overLimit[:maxSize]) {
+		t.Errorf("hashed body is not the request prefix")
+	}
+
+	rest, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("re-reading the request body failed: %v", err)
+	}
+	if !bytes.Equal(rest, overLimit) {
+		t.Errorf("request body no longer matches what the caller sent: got %d bytes, want %d", len(rest), len(overLimit))
+	}
+}
+
+// TestReadReplayableBody_UnderLimitRoundTrip checks the ordinary case: a body
+// within the limit hashes whole and re-reads identically.
+func TestReadReplayableBody_UnderLimitRoundTrip(t *testing.T) {
+	const maxSize = int64(128)
+	payload := []byte(`{"id":"small"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/test", bytes.NewReader(payload))
+
+	body, err := ReadReplayableBody(req, maxSize)
+	if err != nil {
+		t.Fatalf("ReadReplayableBody returned an error: %v", err)
+	}
+	if !bytes.Equal(body, payload) {
+		t.Errorf("hashed body = %q, want %q", body, payload)
+	}
+
+	rest, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("re-reading the request body failed: %v", err)
+	}
+	if !bytes.Equal(rest, payload) {
+		t.Errorf("request body = %q, want %q", rest, payload)
 	}
 }
 

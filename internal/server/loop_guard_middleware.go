@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -83,6 +84,11 @@ func loopGuardCheckedFromContext(ctx context.Context) bool {
 
 // LoopGuardMiddleware checks for repeated identical failing requests.
 // Per Phase 13.1: dry-runs and probes never counted.
+//
+// The middleware is not itself wired into the caller-facing chain:
+// dispatchHandler matches routes at stage 4, after every middleware has
+// already run, so putting this in the chain is a separate change. Until that
+// happens a route declaring x-loop-guard still gets no protection.
 func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip loop guard for:
@@ -94,12 +100,25 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Get route match from context
+		// Get route match from context, falling back to a read-only route
+		// table lookup. The routing layer publishes the match via
+		// withRouteMatch, but it does so inside the caller mux — after every
+		// middleware — so a middleware never sees it and has to resolve the
+		// route itself.
 		routeMatch := getRouteMatchFromContext(r.Context())
 		if routeMatch == nil {
-			// No route match, skip loop guard
-			next.ServeHTTP(w, r)
-			return
+			routeMatch = s.routeTableHolder.MatchForLoopGuard(r)
+			if routeMatch == nil {
+				// No route match, skip loop guard
+				next.ServeHTTP(w, r)
+				return
+			}
+			// Publish what we resolved so the exported success/failure
+			// recorders can recover the route ID from the context. The
+			// credential resolver is deliberately left unset: stage 4
+			// re-matches and republishes the authoritative match with its own
+			// resolver before anything injects a secret.
+			withRouteMatch(r, routeMatch, nil)
 		}
 
 		// Check if route has loop guard configured
@@ -171,6 +190,7 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 				}
 			}
 
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 			errResp := NewLoopGuardErrorResponse(
 				repeatCount,
 				retryAfter,
@@ -178,15 +198,59 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 			)
 			errResp.Write(w, r)
 
-			// Add Retry-After header
-			w.Header().Set("Retry-After", string(rune(retryAfter)))
-
 			return
 		}
 
-		// Request allowed, continue to next handler
-		next.ServeHTTP(w, r)
+		// Request allowed, continue to next handler and record how it fared.
+		// CheckRequest never creates a track itself, so without this the
+		// failure count stays at zero and no request can ever be blocked.
+		recorder := &loopGuardResponseWriter{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		if recorder.settledStatus()/100 == 2 {
+			guard.RecordSuccess(hash)
+		} else {
+			guard.RecordFailure(hash)
+		}
 	})
+}
+
+// loopGuardResponseWriter captures the status code a request settled on so the
+// caller can record it as a loop-guard success or failure. The code stays zero
+// until WriteHeader says otherwise, matching net/http's implicit 200.
+type loopGuardResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (lw *loopGuardResponseWriter) WriteHeader(status int) {
+	if lw.statusCode == 0 {
+		lw.statusCode = status
+	}
+	lw.ResponseWriter.WriteHeader(status)
+}
+
+func (lw *loopGuardResponseWriter) Write(b []byte) (int, error) {
+	if lw.statusCode == 0 {
+		lw.statusCode = http.StatusOK
+	}
+	return lw.ResponseWriter.Write(b)
+}
+
+// Flush forwards to the underlying writer when it supports flushing, so
+// streaming responses through this middleware are not buffered.
+func (lw *loopGuardResponseWriter) Flush() {
+	if flusher, ok := lw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// settledStatus returns the captured status code, defaulting to 200 when the
+// handler returned without writing a header.
+func (lw *loopGuardResponseWriter) settledStatus() int {
+	if lw.statusCode == 0 {
+		return http.StatusOK
+	}
+	return lw.statusCode
 }
 
 // RecordLoopGuardSuccess records a successful response for loop guard tracking.
@@ -263,11 +327,14 @@ func isProbeRequest(r *http.Request) bool {
 	return r.Header.Get("X-SEAM-Probe") == "true"
 }
 
-// Helper function to get route match from context
+// getRouteMatchFromContext resolves the route match published by the routing
+// layer via withRouteMatch (request_pipeline.go).
 func getRouteMatchFromContext(ctx context.Context) *RouteMatch {
-	// This would be set by the route matching middleware
-	// For now, we'll need to add this to the context in the routing layer
-	return nil
+	if ctx == nil {
+		return nil
+	}
+	match, _ := ctx.Value(routeMatchContextKey{}).(*RouteMatch)
+	return match
 }
 
 // ID returns a stable identifier for this route.

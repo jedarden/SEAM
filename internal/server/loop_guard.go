@@ -427,17 +427,22 @@ func ReadReplayableBody(r *http.Request, maxSize int64) ([]byte, error) {
 		return nil, nil
 	}
 
-	// Read the entire body
+	// Read one byte past the limit so an over-limit body is detectable
+	// without having to buffer the whole thing.
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxSize+1))
 	if err != nil {
+		// Hand back whatever was read before the failure, followed by the
+		// unread remainder, so a downstream handler still sees every byte.
+		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	// Check if we exceeded the limit
 	if int64(len(body)) > maxSize {
-		// For loop guard, we truncate at maxSize
-		// (This is "strictly coarser, under-match only" per Phase 13.1)
-		body = body[:maxSize]
+		// Over the limit: hash only the prefix (strictly coarser, under-match
+		// only, per Phase 13.1) but put back every byte read plus the unread
+		// remainder, so the upstream still receives the complete body.
+		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
+		return body[:maxSize], nil
 	}
 
 	// Restore the body for re-reading
