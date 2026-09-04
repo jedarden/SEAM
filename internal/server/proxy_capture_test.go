@@ -115,6 +115,11 @@ func NewProxyTestHarness(t *testing.T, captureEnabled bool) *ProxyTestHarness {
 	}
 
 	harness.server = New(cfg)
+	// The harness drives a real listener over loopback, which the production
+	// WhoIs path cannot resolve, so stage 3 would default-deny every request
+	// before the capture middleware or the proxied handler ran. Present the
+	// fixed test identity instead of asserting the deny.
+	harness.server.identityResolver = newLoopbackTestIdentityResolver()
 	// Mount the test proxy after production routes are initialized. The
 	// capture middleware wraps the caller mux in Server.Start, so requests
 	// through this route exercise the same capture boundary as production.
