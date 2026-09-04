@@ -12,12 +12,20 @@ import (
 func newVersionTestServer(t *testing.T) *Server {
 	t.Helper()
 
-	return New(&Config{
+	s := New(&Config{
 		CallerPort:   8080,
 		OperatorPort: 8081,
 		BaseURL:      "http://localhost:8080",
 		SpecDir:      "../../spec",
 	})
+	// The operator endpoints in the matrix (/config/status,
+	// /health/credentials) sit behind stage 3, so a valid version only gets as
+	// far as the mux, where an unresolvable loopback caller is denied with 403.
+	// Present the fixed test identity so the matrix measures version handling.
+	// An invalid version still never reaches the mux: the version middleware
+	// rejects it first, so the 400 suite is unaffected by this identity.
+	s.identityResolver = newLoopbackTestIdentityResolver()
+	return s
 }
 
 func versionedTestHandler(s *Server, next http.Handler) http.Handler {
@@ -101,6 +109,11 @@ func TestVersionValidationIsWiredToBothListeners(t *testing.T) {
 		BaseURL:      "http://localhost:8080",
 		SpecDir:      "../../spec",
 	})
+	// These requests traverse the real listener chain, where stage 3 resolves
+	// the caller before version middleware runs; a loopback caller resolves to
+	// none and is denied with 403 before the 400 under test can be produced.
+	// Present the fixed test identity so the version check is what answers.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	if err := s.Start(context.Background()); err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -191,7 +204,11 @@ func TestVersionMiddlewareAcceptsOnlyUnversioned(t *testing.T) {
 func TestValidVersionAcceptedOnAllEndpoints(t *testing.T) {
 	s := newVersionTestServer(t)
 	callerHandler := versionedTestHandler(s, s.callerMux)
-	operatorHandler := versionedTestHandler(s, s.operatorMux)
+	// The operator mux scope-gates /config/status and /health/credentials on
+	// the identity stage 3 resolves, and stage 3 sits outside the mux in
+	// production; put it between the version layer and the mux so a valid
+	// version reaches the handlers with an identity attached.
+	operatorHandler := versionedTestHandler(s, s.identityResolutionMiddleware(s.operatorMux))
 
 	tests := []struct {
 		name       string

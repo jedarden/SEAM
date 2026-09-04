@@ -281,9 +281,11 @@ func TestScopesHandler(t *testing.T) {
 			query:          "?all=1",
 			expectedStatus: http.StatusForbidden,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				// Should get error response
-				if body["error_code"] == nil {
-					t.Error("Should return error for missing seam:scopes:read-all")
+				// Should get the documented forbidden envelope; the error code
+				// travels in the "error" field (errors.go ErrorResponse), and
+				// arrives as a plain JSON string.
+				if body["error"] != string(ErrCodeForbidden) {
+					t.Errorf("Should return %q for missing seam:scopes:read-all, got %v", ErrCodeForbidden, body["error"])
 				}
 			},
 		},
