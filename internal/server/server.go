@@ -1793,14 +1793,16 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Resolve the instance target if using x-instance-param
 	route := routeMatch.Route
+	var instance string
+	var selectedInstance string
+	var selectedTarget RouteTarget
+	if route.InstanceParam != "" && len(route.UpstreamMap) > 0 {
 		// Resolve to specific instance target and capture for scope checking
-		// Extract instance parameter from path if using x-instance-param
-		var instance string
-		if route.InstanceParam != "" {
-			instance = routeMatch.PathParams[route.InstanceParam]
+		instance = routeMatch.PathParams[route.InstanceParam]
+		if instance == "" {
+			s.handleNoUpstream(w, r)
+			return
 		}
-		var selectedInstance string
-		var selectedTarget RouteTarget
 		if target, ok := route.UpstreamMap[instance]; ok && target.URL != "" {
 			selectedInstance = instance
 			selectedTarget = target
@@ -1825,62 +1827,73 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 			s.handleNoUpstream(w, r)
 			return
 		}
-		
-		// Phase 7: Check per-instance requiredScope
-		// Effective requirement = union of operation-level and instance-level requiredScopes
-		identity := identityFromContext(r.Context())
-		if identity != nil && identity.Resolved {
-			// Build effective required scopes
-			effectiveRequiredScopes := make([]string, 0, len(route.RequiredScopes) + len(selectedTarget.RequiredScopes))
-			effectiveRequiredScopes = append(effectiveRequiredScopes, route.RequiredScopes...)
-			effectiveRequiredScopes = append(effectiveRequiredScopes, selectedTarget.RequiredScopes...)
-			
-			// Check if identity has any of the required scopes
-			if len(effectiveRequiredScopes) > 0 {
-				hasRequiredScope := false
-				for _, scope := range effectiveRequiredScopes {
-					if identity.HasScope(scope) {
-						hasRequiredScope = true
-						log.Printf("[Per-Instance-Scope] Identity has required scope %s for instance %s", scope, selectedInstance)
-						break
-					}
-				}
-				
-				if !hasRequiredScope {
-					log.Printf("[Per-Instance-Scope] Identity lacks required scopes %v for instance %s (has: %v) - denying",
-						effectiveRequiredScopes, selectedInstance, identity.Capabilities)
-					NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Instance %q requires one of scopes: %v", selectedInstance, effectiveRequiredScopes)).Write(w, r)
-					return
+	}
+
+	// Single-instance request path: a route with a plain x-upstream target and
+	// no x-upstream-map resolves directly to UpstreamTarget.
+	if route.UpstreamTarget == "" {
+		// No upstream configured for this route - return 503
+		s.handleNoUpstream(w, r)
+		return
+	}
+
+	// Phase 7: Check per-instance requiredScope
+	// Effective requirement = union of operation-level and instance-level requiredScopes.
+	// Only applies when an upstream-map instance was selected; the single-instance
+	// path has no per-instance scopes to merge.
+	identity := identityFromContext(r.Context())
+	if selectedInstance != "" && identity != nil && identity.Resolved {
+		// Build effective required scopes
+		effectiveRequiredScopes := make([]string, 0, len(route.RequiredScopes)+len(selectedTarget.RequiredScopes))
+		effectiveRequiredScopes = append(effectiveRequiredScopes, route.RequiredScopes...)
+		effectiveRequiredScopes = append(effectiveRequiredScopes, selectedTarget.RequiredScopes...)
+
+		// Check if identity has any of the required scopes
+		if len(effectiveRequiredScopes) > 0 {
+			hasRequiredScope := false
+			for _, scope := range effectiveRequiredScopes {
+				if identity.HasScope(scope) {
+					hasRequiredScope = true
+					log.Printf("[Per-Instance-Scope] Identity has required scope %s for instance %s", scope, selectedInstance)
+					break
 				}
 			}
-		}
-		// Phase 11.1: Circuit breaker check (if enabled)
-		if route.UpstreamTarget != "" {
-			origin, err := ParseOrigin(route.UpstreamTarget)
-			if err != nil {
-				log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", route.UpstreamTarget, err)
-			} else {
-				// Get or create breaker for this origin
-				config := route.BreakerConfig
-				if config == nil {
-					defaultConfig := DefaultBreakerConfig()
-					config = &defaultConfig
-				}
-				breaker := s.breakerRegistry.GetOrCreate(origin, *config)
 
-				// Check if breaker allows the request
-				if !breaker.Allow() {
-					// Breaker is open, return structured 503
-					log.Printf("[circuit-breaker] Request refused by breaker for origin %s", origin)
-					WriteCircuitBreakerRefused(w, r, breaker.Snapshot())
-					return
-				}
-
-				// Store breaker in request context for post-response tracking
-				ctx := context.WithValue(r.Context(), circuitBreakerContextKey, breakerContext{breaker: breaker, origin: origin})
-				r = r.WithContext(ctx)
+			if !hasRequiredScope {
+				log.Printf("[Per-Instance-Scope] Identity lacks required scopes %v for instance %s (has: %v) - denying",
+					effectiveRequiredScopes, selectedInstance, identity.Capabilities)
+				NewErrorResponse(ErrCodeForbidden, fmt.Sprintf("Instance %q requires one of scopes: %v", selectedInstance, effectiveRequiredScopes)).Write(w, r)
+				return
 			}
 		}
+	}
+	// Phase 11.1: Circuit breaker check (if enabled)
+	if route.UpstreamTarget != "" && s.breakerRegistry != nil {
+		origin, err := ParseOrigin(route.UpstreamTarget)
+		if err != nil {
+			log.Printf("[circuit-breaker] Failed to parse origin for %s: %v", route.UpstreamTarget, err)
+		} else {
+			// Get or create breaker for this origin
+			config := route.BreakerConfig
+			if config == nil {
+				defaultConfig := DefaultBreakerConfig()
+				config = &defaultConfig
+			}
+			breaker := s.breakerRegistry.GetOrCreate(origin, *config)
+
+			// Check if breaker allows the request
+			if !breaker.Allow() {
+				// Breaker is open, return structured 503
+				log.Printf("[circuit-breaker] Request refused by breaker for origin %s", origin)
+				WriteCircuitBreakerRefused(w, r, breaker.Snapshot())
+				return
+			}
+
+			// Store breaker in request context for post-response tracking
+			ctx := context.WithValue(r.Context(), circuitBreakerContextKey, breakerContext{breaker: breaker, origin: origin})
+			r = r.WithContext(ctx)
+		}
+	}
 
 	// Get or create proxy for this upstream
 	proxy, err := s.getOrCreateProxyWithError(route.UpstreamTarget, route.TLSConfig)

@@ -104,6 +104,8 @@ func TestDispatchHandler_RouteTableMatch(t *testing.T) {
 		singleFlight:     NewSingleFlight(),
 		cacheTTLs:        make(map[string]int),
 		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		breakerRegistry:  NewBreakerRegistry(NewCircuitBreakerStateRegistry()),
+		last2xxTracker:   NewLast2xxTracker(),
 		quotaTracker:     NewQuotaTracker(),
 		costPerCalls:     make(map[string]float64),
 	}
@@ -573,6 +575,8 @@ func TestDispatchHandler_PathParameters(t *testing.T) {
 		singleFlight:     NewSingleFlight(),
 		cacheTTLs:        make(map[string]int),
 		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+		breakerRegistry:  NewBreakerRegistry(NewCircuitBreakerStateRegistry()),
+		last2xxTracker:   NewLast2xxTracker(),
 		quotaTracker:     NewQuotaTracker(),
 		costPerCalls:     make(map[string]float64),
 	}

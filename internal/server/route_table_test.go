@@ -966,6 +966,106 @@ func TestBuildRouteTable_NilPathItem(t *testing.T) {
 	}
 }
 
+func TestBuildRouteTable_PathItemWithoutExtensions(t *testing.T) {
+	// A PathItem built directly in Go rather than parsed from YAML leaves its
+	// Extensions map nil. BuildRouteTable must still build a route for it —
+	// extractDeprecation used to dereference the nil map and panic, which took
+	// down the whole test binary rather than failing a single test.
+	spec := &v3.Document{
+		Paths: &v3.Paths{
+			PathItems: func() *orderedmap.Map[string, *v3.PathItem] {
+				items := orderedmap.New[string, *v3.PathItem]()
+				items.Set("/test", &v3.PathItem{
+					Get: &v3.Operation{
+						Responses: &v3.Responses{
+							Codes: orderedmap.New[string, *v3.Response](),
+						},
+					},
+				})
+				return items
+			}(),
+		},
+	}
+
+	table, err := BuildRouteTable(spec)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if table == nil {
+		t.Fatal("expected non-nil table, got nil")
+	}
+	if table.RouteCount() != 1 {
+		t.Fatalf("expected 1 route, got %d", table.RouteCount())
+	}
+
+	// No x-seam-deprecated extension anywhere, so no deprecation info.
+	routes := table.GetRoutes()
+	if routes[0].Deprecated != nil {
+		t.Errorf("expected nil Deprecated without x-seam-deprecated, got %+v", routes[0].Deprecated)
+	}
+}
+
+func TestExtractDeprecation_NilPathItemAndExtensions(t *testing.T) {
+	// Covers both nil shapes extractDeprecation can be handed: no pathItem at
+	// all, and a pathItem whose Extensions map was never populated. Each must
+	// fall through to the operation-level deprecated flag, not panic.
+	trueVal := true
+	tests := []struct {
+		name      string
+		operation *v3.Operation
+		pathItem  *v3.PathItem
+		wantNil   bool
+		wantSince string
+	}{
+		{
+			name:     "nil pathItem without deprecated operation",
+			pathItem: nil,
+			wantNil:  true,
+		},
+		{
+			name:     "nil Extensions map without deprecated operation",
+			pathItem: &v3.PathItem{},
+			wantNil:  true,
+		},
+		{
+			name:      "nil pathItem with deprecated operation",
+			operation: &v3.Operation{Deprecated: &trueVal},
+			pathItem:  nil,
+			wantNil:   false,
+			wantSince: "unknown",
+		},
+		{
+			name:      "nil Extensions map with deprecated operation",
+			operation: &v3.Operation{Deprecated: &trueVal},
+			pathItem:  &v3.PathItem{},
+			wantNil:   false,
+			wantSince: "unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := extractDeprecation(tt.operation, tt.pathItem, nil)
+
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+			if tt.wantNil && info != nil {
+				t.Fatalf("expected nil deprecation info, got %+v", info)
+			}
+			if !tt.wantNil {
+				if info == nil {
+					t.Fatal("expected deprecation info, got nil")
+				}
+				if info.Since != tt.wantSince {
+					t.Errorf("expected Since=%q, got %q", tt.wantSince, info.Since)
+				}
+			}
+		})
+	}
+}
+
 func TestExtractAPIVersion(t *testing.T) {
 	tests := []struct {
 		name          string

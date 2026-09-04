@@ -161,6 +161,8 @@ func newDispatchTLSConfigTestServer(table *RouteTable, upstreamCADir string) *Se
 		singleFlight:      NewSingleFlight(),
 		cacheTTLs:         make(map[string]int),
 		circuitBreakers:   NewCircuitBreakerStateRegistry(),
+		breakerRegistry:   NewBreakerRegistry(NewCircuitBreakerStateRegistry()),
+		last2xxTracker:    NewLast2xxTracker(),
 		quotaTracker:      NewQuotaTracker(),
 		costPerCalls:      make(map[string]float64),
 	}

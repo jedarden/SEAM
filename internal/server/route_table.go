@@ -1536,8 +1536,16 @@ func extractRequiredScopes(operation *v3.Operation, pathItem *v3.PathItem, docum
 // extractDeprecation extracts x-seam-deprecated information from an operation.
 // Per Phase 8.3: fragment-root only, not operation-specific.
 func extractDeprecation(operation *v3.Operation, pathItem *v3.PathItem, spec *v3.Document) (*DeprecationInfo, error) {
-	// x-seam-deprecated is fragment-root only, so check pathItem extensions first
-	extensionNode, found := pathItem.Extensions.Get("x-seam-deprecated")
+	// x-seam-deprecated is fragment-root only, so check pathItem extensions first.
+	// Both a nil pathItem and a nil Extensions map are ordinary here — a fragment
+	// root carries no extensions unless the author set one, and a PathItem built
+	// in Go rather than parsed leaves the map nil — so fall through to the
+	// operation-level deprecated flag instead of dereferencing.
+	var extensionNode *yaml.Node
+	var found bool
+	if pathItem != nil && pathItem.Extensions != nil {
+		extensionNode, found = pathItem.Extensions.Get("x-seam-deprecated")
+	}
 	if !found || extensionNode == nil {
 		// Check if operation has OpenAPI deprecated field
 		if operation != nil && operation.Deprecated != nil && *operation.Deprecated {
