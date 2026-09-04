@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -54,8 +53,8 @@ func TestCloudflareJWTValidator_ScopeMap(t *testing.T) {
 
 	// Test setting scope map
 	scopeMap := map[string][]string{
-		"service-token-1": {"k8s-ro:get", "argocd:read"},
-		"user@example.com":  {"config:read", "seam:ops:read"},
+		"service-token-1":  {"k8s-ro:get", "argocd:read"},
+		"user@example.com": {"config:read", "seam:ops:read"},
 	}
 	validator.SetScopeMap(scopeMap)
 
@@ -379,8 +378,8 @@ func TestCloudflareJWTValidator_Middleware_NoValidator(t *testing.T) {
 // TestCloudflareJWTClaimsFromContext tests extracting claims from context
 func TestCloudflareJWTClaimsFromContext(t *testing.T) {
 	claims := &CloudflareAccessClaims{
-		sub: "test-user",
-		email: "user@example.com",
+		Sub:   "test-user",
+		Email: "user@example.com",
 	}
 
 	ctx := contextWithValue(context.Background(), cloudflareJWTClaimsKey{}, claims)
@@ -390,18 +389,20 @@ func TestCloudflareJWTClaimsFromContext(t *testing.T) {
 		t.Fatal("Expected claims to be extracted, got nil")
 	}
 
-	if extractedClaims.sub != "test-user" {
-		t.Errorf("Expected sub 'test-user', got '%s'", extractedClaims.sub)
+	if extractedClaims.Sub != "test-user" {
+		t.Errorf("Expected sub 'test-user', got '%s'", extractedClaims.Sub)
 	}
 
-	if extractedClaims.email != "user@example.com" {
-		t.Errorf("Expected email 'user@example.com', got '%s'", extractedClaims.email)
+	if extractedClaims.Email != "user@example.com" {
+		t.Errorf("Expected email 'user@example.com', got '%s'", extractedClaims.Email)
 	}
 }
 
-// TestCloudflareJWTClaimsFromContext_NilContext tests extracting claims from nil context
-func TestCloudflareJWTClaimsFromContext_NilContext(t *testing.T) {
-	claims := cloudflareJWTClaimsFromContext(nil)
+// TestCloudflareJWTClaimsFromContext_EmptyContext tests extracting claims from
+// a context carrying no claims. A nil context.Context cannot be used here:
+// Context.Value on a nil interface panics.
+func TestCloudflareJWTClaimsFromContext_EmptyContext(t *testing.T) {
+	claims := cloudflareJWTClaimsFromContext(context.Background())
 
 	if claims != nil {
 		t.Error("Expected nil claims from nil context, got non-nil")
@@ -449,19 +450,19 @@ func TestCloudflareScopesFromContext_NoClaims(t *testing.T) {
 // TestJWKSURLConstruction tests that JWKS URL is constructed correctly
 func TestJWKSURLConstruction(t *testing.T) {
 	testCases := []struct {
-		teamDomain     string
+		teamDomain      string
 		expectedJWKSURL string
 	}{
 		{
-			teamDomain:     "ardenone",
+			teamDomain:      "ardenone",
 			expectedJWKSURL: "https://ardenone.cloudflareaccess.com/cdn-cgi/access/certs",
 		},
 		{
-			teamDomain:     "example-team",
+			teamDomain:      "example-team",
 			expectedJWKSURL: "https://example-team.cloudflareaccess.com/cdn-cgi/access/certs",
 		},
 		{
-			teamDomain:     "test",
+			teamDomain:      "test",
 			expectedJWKSURL: "https://test.cloudflareaccess.com/cdn-cgi/access/certs",
 		},
 	}
@@ -553,20 +554,20 @@ func TestCloudflareAccessClaims_JSONUnmarshalling(t *testing.T) {
 		t.Fatalf("Failed to unmarshal claims: %v", err)
 	}
 
-	if len(claims.aud) != 1 || claims.aud[0] != "test-audience" {
-		t.Errorf("Expected aud ['test-audience'], got %v", claims.aud)
+	if len(claims.Aud) != 1 || claims.Aud[0] != "test-audience" {
+		t.Errorf("Expected aud ['test-audience'], got %v", claims.Aud)
 	}
 
-	if claims.iss != "https://test-team.cloudflareaccess.com" {
-		t.Errorf("Expected issuer 'https://test-team.cloudflareaccess.com', got '%s'", claims.iss)
+	if claims.Iss != "https://test-team.cloudflareaccess.com" {
+		t.Errorf("Expected issuer 'https://test-team.cloudflareaccess.com', got '%s'", claims.Iss)
 	}
 
-	if claims.sub != "test-user" {
-		t.Errorf("Expected sub 'test-user', got '%s'", claims.sub)
+	if claims.Sub != "test-user" {
+		t.Errorf("Expected sub 'test-user', got '%s'", claims.Sub)
 	}
 
-	if claims.email != "user@example.com" {
-		t.Errorf("Expected email 'user@example.com', got '%s'", claims.email)
+	if claims.Email != "user@example.com" {
+		t.Errorf("Expected email 'user@example.com', got '%s'", claims.Email)
 	}
 
 	if len(claims.Scopes) != 2 {
@@ -618,15 +619,15 @@ func TestCloudflareAccessClaims_MultipleAudiences(t *testing.T) {
 		t.Fatalf("Failed to unmarshal claims: %v", err)
 	}
 
-	if len(claims.aud) != 3 {
-		t.Errorf("Expected 3 audiences, got %d", len(claims.aud))
+	if len(claims.Aud) != 3 {
+		t.Errorf("Expected 3 audiences, got %d", len(claims.Aud))
 	}
 
 	// Verify all audiences are captured
 	expectedAudiences := []string{"audience1", "audience2", "test-audience"}
 	for i, expected := range expectedAudiences {
-		if claims.aud[i] != expected {
-			t.Errorf("Expected audience %d to be '%s', got '%s'", i, expected, claims.aud[i])
+		if claims.Aud[i] != expected {
+			t.Errorf("Expected audience %d to be '%s', got '%s'", i, expected, claims.Aud[i])
 		}
 	}
 }
