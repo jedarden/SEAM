@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -108,6 +109,7 @@ func serveCommand(args []string) {
 	fragmentsDir := fs.String("fragments-dir", "./fragments", "Directory containing OpenAPI fragment files")
 	upstreamCADir := fs.String("upstream-ca-dir", "", "Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, refused in-cluster)")
 	allowlistFile := fs.String("allowlist-file", "", "Path to the upstream host allowlist (refused in-cluster)")
+	vaultBaseDir := fs.String("vault-base-dir", "", "Base directory that x-vault-path must nest x-seam-owner under (default: seam/routes)")
 	maxReplayableRequestBytes := fs.Int64("max-replayable-request-bytes", 1024*1024, "Phase 2.5: Maximum request body size to buffer for replay in bytes (default 1 MiB)")
 	maxBufferedResponseBytes := fs.Int64("max-buffered-response-bytes", 1024*1024, "Phase 2.6: Maximum decoded response body size to hold for whole-response scrubbing in bytes (default 1 MiB)")
 	hotReloadEnabled := fs.Bool("enable-hot-reload", false, "Phase 3.1: Enable file-watch hot reload of route fragments")
@@ -153,6 +155,14 @@ func serveCommand(args []string) {
 	}
 	if val := os.Getenv("SEAM_UPSTREAM_ALLOWLIST"); val != "" {
 		*allowlistFile = val
+	}
+	// The vault base directory is a Deployment-level knob: it moves the prefix
+	// AllowlistEnforcer.ValidateVaultPath enforces, so it has to be settable
+	// without a rebuild. An unset variable falls through to the in-code default
+	// applied by server.New.
+	if resolved := resolveVaultBaseDir(*vaultBaseDir); resolved != *vaultBaseDir {
+		log.Printf("[config] SEAM_VAULT_BASE_DIR=%s", resolved)
+		*vaultBaseDir = resolved
 	}
 	if val := os.Getenv("SEAM_MAX_REPLAYABLE_REQUEST_BYTES"); val != "" {
 		if parsed, err := fmt.Sscanf(val, "%d", maxReplayableRequestBytes); err == nil && parsed == 1 {
@@ -222,6 +232,9 @@ func serveCommand(args []string) {
 	if isInCluster && *allowlistFile != "" {
 		log.Printf("  (Running in-cluster, custom --allowlist-file refused)")
 	}
+	if *vaultBaseDir != "" {
+		log.Printf("  Vault base directory: %s", *vaultBaseDir)
+	}
 	log.Printf("  Max replayable request bytes: %d", *maxReplayableRequestBytes)
 	log.Printf("  Max buffered response bytes: %d", *maxBufferedResponseBytes)
 	log.Printf("  Hot reload enabled: %v", *hotReloadEnabled)
@@ -238,6 +251,7 @@ func serveCommand(args []string) {
 		FragmentsDir:              *fragmentsDir,
 		UpstreamCADir:             finalUpstreamCADir,
 		AllowlistFile:             finalAllowlistFile,
+		VaultBaseDir:              *vaultBaseDir,
 		MaxReplayableRequestBytes: *maxReplayableRequestBytes,
 		MaxBufferedResponseBytes:  *maxBufferedResponseBytes,
 		HotReloadEnabled:          *hotReloadEnabled,
@@ -276,4 +290,18 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 		return server.DefaultUpstreamAllowlistFile
 	}
 	return requested
+}
+
+// resolveVaultBaseDir applies the SEAM_VAULT_BASE_DIR override on top of the
+// --vault-base-dir flag value. The environment wins over the flag, matching
+// SEAM_BASE_URL: the Deployment is the operator's configuration surface. An
+// absent or blank variable returns the flag value untouched — which is ""
+// in the normal case, leaving server.New to apply the in-code "seam/routes"
+// default, so an unset variable is exactly the pre-existing behaviour.
+func resolveVaultBaseDir(flagValue string) string {
+	val := strings.TrimSpace(os.Getenv("SEAM_VAULT_BASE_DIR"))
+	if val == "" {
+		return flagValue
+	}
+	return val
 }
