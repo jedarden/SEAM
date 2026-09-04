@@ -60,8 +60,9 @@ func TestCloudflareJWTValidator_ScopeMap(t *testing.T) {
 
 	// Test getting scopes for subject
 	scopes := validator.GetScopesForSubject("service-token-1")
+	// Fatalf: scopes[0] below would panic and abort the package on an empty slice.
 	if len(scopes) != 2 {
-		t.Errorf("Expected 2 scopes for service-token-1, got %d", len(scopes))
+		t.Fatalf("Expected 2 scopes for service-token-1, got %d", len(scopes))
 	}
 
 	if scopes[0] != "k8s-ro:get" {
@@ -428,8 +429,9 @@ func TestCloudflareScopesFromContext(t *testing.T) {
 	ctx := contextWithValue(context.Background(), cloudflareJWTClaimsKey{}, claims)
 	scopes := cloudflareScopesFromContext(ctx)
 
+	// Fatalf: scopes[0] below would panic and abort the package on an empty slice.
 	if len(scopes) != 2 {
-		t.Errorf("Expected 2 scopes, got %d", len(scopes))
+		t.Fatalf("Expected 2 scopes, got %d", len(scopes))
 	}
 
 	if scopes[0] != "k8s-ro:get" {
@@ -492,8 +494,9 @@ func TestScopeMapIsolation(t *testing.T) {
 
 	// Check that validator's scope map is unchanged
 	scopes := validator.GetScopesForSubject("service-1")
+	// Fatalf: scopes[0] below would panic and abort the package on an empty slice.
 	if len(scopes) != 2 {
-		t.Errorf("Expected 2 scopes (original map should be copied), got %d", len(scopes))
+		t.Fatalf("Expected 2 scopes (original map should be copied), got %d", len(scopes))
 	}
 
 	if scopes[0] != "scope1" {
@@ -619,8 +622,11 @@ func TestCloudflareAccessClaims_MultipleAudiences(t *testing.T) {
 		t.Fatalf("Failed to unmarshal claims: %v", err)
 	}
 
+	// Fatalf, not Errorf: the loop below indexes claims.Aud directly, so a
+	// length mismatch has to stop the test here rather than panic and abort
+	// the whole package.
 	if len(claims.Aud) != 3 {
-		t.Errorf("Expected 3 audiences, got %d", len(claims.Aud))
+		t.Fatalf("Expected 3 audiences, got %d", len(claims.Aud))
 	}
 
 	// Verify all audiences are captured
