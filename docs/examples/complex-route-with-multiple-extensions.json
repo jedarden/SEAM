@@ -9,7 +9,7 @@
   "x-seam-owner": "complex-example",
   "x-api-version": "v2",
   "x-upstream": "https://api.example.com",
-  "x-vault-path": "seam/routes/complex-example/token",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/complex-example/token",
   "x-inject-as": {
     "kind": "bearer"
   },

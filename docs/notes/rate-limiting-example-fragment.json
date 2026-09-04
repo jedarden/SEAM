@@ -25,12 +25,12 @@
   "x-upstream-map": {
     "production": {
       "url": "https://weather-api.production.svc.cluster.local",
-      "vaultPath": "seam/routes/weather-service/prod-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/prod-credentials",
       "injectAs": { "kind": "bearer" }
     },
     "staging": {
       "url": "https://weather-api.staging.svc.cluster.local",
-      "vaultPath": "seam/routes/weather-service/staging-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/staging-credentials",
       "injectAs": { "kind": "bearer" }
     }
   },

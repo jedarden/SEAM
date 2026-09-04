@@ -12,7 +12,7 @@
   "x-upstream-map": {
     "_all": {
       "url": "https://api.saas-provider.com",
-      "vaultPath": "seam/routes/saas-gateway/fanout-secret",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/saas-gateway/fanout-secret",
       "injectAs": {
         "kind": "header",
         "name": "X-Fanout-Token"
@@ -27,7 +27,7 @@
     },
     "acme-corp": {
       "url": "https://acme-corp.saas-provider.com",
-      "vaultPath": "seam/routes/saas-gateway/acme-corp-token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/saas-gateway/acme-corp-token",
       "injectAs": {
         "kind": "header",
         "name": "X-Tenant-Token"
@@ -44,7 +44,7 @@
     },
     "globex-inc": {
       "url": "https://globex-inc.saas-provider.com",
-      "vaultPath": "seam/routes/saas-gateway/globex-inc-token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/saas-gateway/globex-inc-token",
       "injectAs": {
         "kind": "header",
         "name": "X-Tenant-Token"
@@ -60,7 +60,7 @@
     },
     "soylent-corp": {
       "url": "https://soylent-corp.saas-provider.com",
-      "vaultPath": "seam/routes/saas-gateway/soylent-corp-token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/saas-gateway/soylent-corp-token",
       "injectAs": {
         "kind": "bearer"
       },

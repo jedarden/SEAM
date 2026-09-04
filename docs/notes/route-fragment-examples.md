@@ -56,7 +56,7 @@ x-upstream: https://weather.internal:443
 x-upstream-tls:
   caBundle: weather-internal-ca
   serverName: weather.internal
-x-vault-path: seam/routes/weather-service/api-key
+x-vault-path: rs-manager/rs-manager/seam/routes/weather-service/api-key
 x-inject-as:
   kind: header
   name: X-API-Key
@@ -146,21 +146,21 @@ x-instance-param: cluster
 x-upstream-map:
   prod-us-east:
     url: https://k8s-prod-us-east.example.com
-    vaultPath: seam/routes/k8s-fleet/prod-us-east
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/prod-us-east
     injectAs:
       kind: bearer
     probeInterval: 60s
     requiredScope: k8s:prod
   prod-us-west:
     url: https://k8s-prod-us-west.example.com
-    vaultPath: seam/routes/k8s-fleet/prod-us-west
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/prod-us-west
     injectAs:
       kind: bearer
     probeInterval: 60s
     requiredScope: k8s:prod
   dev:
     url: https://k8s-dev.example.com
-    vaultPath: seam/routes/k8s-fleet/dev
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/dev
     injectAs:
       kind: bearer
     probeInterval: 120s
@@ -313,7 +313,7 @@ paths:
 x-seam-schema: v1
 x-seam-owner: test-service
 x-upstream: https://api.example.com
-x-vault-path: seam/routes/test-service/secret
+x-vault-path: rs-manager/rs-manager/seam/routes/test-service/secret
 # Missing x-inject-as
 
 paths:

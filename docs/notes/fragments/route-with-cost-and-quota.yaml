@@ -2,7 +2,7 @@ x-seam-schema: v1
 x-seam-owner: ml-inference
 x-api-version: v1
 x-upstream: https://ml-inference.ardenone.svc.cluster.local:8443
-x-vault-path: seam/routes/ml-inference/bearer-token
+x-vault-path: rs-manager/rs-manager/seam/routes/ml-inference/bearer-token
 x-inject-as:
   kind: bearer
 x-upstream-tls:

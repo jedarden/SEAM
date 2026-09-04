@@ -9,7 +9,7 @@
   "x-seam-owner": "llm-gateway",
   "x-api-version": "v1",
   "x-upstream": "https://api.llm-provider.com",
-  "x-vault-path": "seam/routes/llm-gateway/api-key",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/llm-gateway/api-key",
   "x-inject-as": {
     "kind": "bearer"
   },

@@ -2,7 +2,7 @@ x-seam-schema: v1
 x-seam-owner: argocd
 x-api-version: v1
 x-upstream: https://argocd-server.ardenone.svc.cluster.local:8080
-x-vault-path: seam/routes/argocd/readonly
+x-vault-path: rs-manager/rs-manager/seam/routes/argocd/readonly
 x-inject-as:
   kind: bearer
 x-upstream-strip-prefix: /argocd
