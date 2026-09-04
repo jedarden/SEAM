@@ -147,7 +147,7 @@
         "x-seam-owner": "glm-proxy",
         "x-api-version": "v1",
         "x-upstream": "https://open.bigmodel.cn/api/paas/v4",
-        "x-vault-path": "seam/routes/glm-proxy/api-key",
+        "x-vault-path": "rs-manager/rs-manager/seam/routes/glm-proxy/api-key",
         "x-inject-as": {
           "kind": "bearer"
         },
@@ -213,7 +213,7 @@
         "x-seam-owner": "twitter-proxy",
         "x-api-version": "v2",
         "x-upstream": "https://api.twitterapi.io",
-        "x-vault-path": "seam/routes/twitter-proxy/bearer-token",
+        "x-vault-path": "rs-manager/rs-manager/seam/routes/twitter-proxy/bearer-token",
         "x-inject-as": {
           "kind": "bearer"
         },
@@ -301,7 +301,7 @@
         "x-seam-owner": "kalshi-weather",
         "x-api-version": "v1",
         "x-upstream": "https://kalshi-api.example.com/weather",
-        "x-vault-path": "seam/routes/kalshi-weather/api-token",
+        "x-vault-path": "rs-manager/rs-manager/seam/routes/kalshi-weather/api-token",
         "x-inject-as": {
           "kind": "header",
           "name": "X-Kalshi-API-Key"
@@ -434,7 +434,7 @@
         "x-upstream-map": {
           "us-east": {
             "url": "https://weather.api.example.com",
-            "vaultPath": "seam/routes/weather-forecast/us-east-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/weather-forecast/us-east-token",
             "injectAs": { "kind": "bearer" },
             "tls": {
               "caBundle": "weather-ca-bundle",
@@ -450,7 +450,7 @@
           },
           "eu-central": {
             "url": "https://weather.eu.example.com",
-            "vaultPath": "seam/routes/weather-forecast/eu-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/weather-forecast/eu-token",
             "injectAs": { "kind": "bearer" },
             "probeInterval": "45s",
             "breaker": {
@@ -462,7 +462,7 @@
           },
           "ap-southeast": {
             "url": "https://weather.ap.example.com",
-            "vaultPath": "seam/routes/weather-forecast/ap-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/weather-forecast/ap-token",
             "injectAs": {
               "kind": "header",
               "name": "X-Weather-API-Key"

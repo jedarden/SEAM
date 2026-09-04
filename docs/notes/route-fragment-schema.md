@@ -162,6 +162,8 @@ The `acknowledged` singleton (no `false` form) for `insecureSkipVerify` / `x-ups
 
 These are illustrative, not shipped — they render the schema's intent for the two flagship cases. The ArgoCD pilot (Phase 3) is the first real fragment this schema unblocks.
 
+**Vault base used below:** every `x-vault-path` is written against the deployment default base `rs-manager/rs-manager/seam/routes` — the estate convention `secret/<installation>/<cluster>/...`, so `rs-manager/rs-manager/seam/routes/argocd/ro-token` is `secret/data/rs-manager/rs-manager/seam/routes/argocd/ro-token` in KV v2 terms. The earlier cluster-agnostic base `seam/routes` is **retired** (consolidated 2026-09-04): with `SEAM_VAULT_BASE_DIR` unset the runtime enforcer now rejects it, and it appears in these notes only where a historical record is being quoted. The base is deployment configuration, not part of the schema — see [§4.4](#44-manifest-level-the-schema-must-assume-these-never-encode-them).
+
 ### 6.1 Single-instance, credential-injecting — the ArgoCD pilot (Phase 3)
 
 The existing hand-rolled read-only proxy, expressed as a fragment. Injects its own read-only bearer token server-side; needs no caller credential; strips the `/argocd` service prefix.
@@ -173,7 +175,7 @@ The existing hand-rolled read-only proxy, expressed as a fragment. Injects its o
   "x-upstream": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
   "x-upstream-tls": { "caBundle": "argocd-ro.pem" },
   "x-upstream-strip-prefix": "/argocd",
-  "x-vault-path": "seam/routes/argocd/ro-token",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/argocd/ro-token",
   "x-inject-as": { "kind": "bearer" },
   "x-credential-probe": { "path": "/argocd/api/v1/applications", "method": "GET", "interval": "6h" },
   "paths": {
@@ -202,7 +204,7 @@ Nine near-identical cluster APIs collapsed into one fragment. Each entry holds i
   "x-upstream-map": {
     "ardenone-cluster": {
       "url": "https://traefik-ardenone-cluster:8001",
-      "vaultPath": "seam/routes/k8s/ardenone-cluster-ro",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/k8s/ardenone-cluster-ro",
       "injectAs": { "kind": "bearer" },
       "requiredScope": ["k8s-ro:get"],
       "probeInterval": "24h"
@@ -210,7 +212,7 @@ Nine near-identical cluster APIs collapsed into one fragment. Each entry holds i
     "apexalgo-iad": {
       "url": "http://kubectl-proxy-apexalgo-iad:8001",
       "plaintext": "acknowledged",
-      "vaultPath": "seam/routes/k8s/apexalgo-iad-admin",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/k8s/apexalgo-iad-admin",
       "injectAs": { "kind": "bearer" },
       "requiredScope": ["k8s-rw:admin"],
       "probeInterval": "12h"

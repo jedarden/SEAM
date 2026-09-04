@@ -14,7 +14,7 @@
         "x-upstream-map": {
           "us-east": {
             "url": "https://weather.api.example.com",
-            "vaultPath": "seam/routes/weather-service/api-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/api-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "weather.api.example.com",
             "rewrite_path": "/api/v1/forecast",
@@ -22,7 +22,7 @@
           },
           "eu-west": {
             "url": "https://weather.eu.example.com",
-            "vaultPath": "seam/routes/weather-service/eu-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/eu-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "weather.eu.example.com",
             "rewrite_path": "/api/v1/forecast",
@@ -90,7 +90,7 @@
         "x-seam-owner": "billing-service",
         "x-api-version": "v2",
         "x-upstream": "https://premium.api.example.com",
-        "x-vault-path": "seam/routes/billing-service/api-key",
+        "x-vault-path": "rs-manager/rs-manager/seam/routes/billing-service/api-key",
         "x-inject-as": { "kind": "bearer" },
         "x-credential-probe": {
           "path": "/health",
@@ -157,21 +157,21 @@
         "x-upstream-map": {
           "us": {
             "url": "https://us.api.example.com",
-            "vaultPath": "seam/routes/multi-region/us-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/multi-region/us-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "us.api.example.com",
             "rewrite_path": "/v1/data"
           },
           "eu": {
             "url": "https://eu.api.example.com",
-            "vaultPath": "seam/routes/multi-region/eu-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/multi-region/eu-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "eu.api.example.com",
             "rewrite_path": "/v1/data"
           },
           "ap": {
             "url": "https://ap.api.example.com",
-            "vaultPath": "seam/routes/multi-region/ap-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/multi-region/ap-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "ap.api.example.com",
             "rewrite_path": "/v1/data"
@@ -234,7 +234,7 @@
         "x-upstream-map": {
           "prod": {
             "url": "https://prod.service.example.com",
-            "vaultPath": "seam/routes/env-router/prod-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/env-router/prod-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "prod.service.example.com",
             "rewrite_path": "/api/status",
@@ -242,7 +242,7 @@
           },
           "staging": {
             "url": "https://staging.service.example.com",
-            "vaultPath": "seam/routes/env-router/staging-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/env-router/staging-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "staging.service.example.com",
             "rewrite_path": "/api/status",
@@ -250,7 +250,7 @@
           },
           "dev": {
             "url": "https://dev.service.example.com",
-            "vaultPath": "seam/routes/env-router/dev-token",
+            "vaultPath": "rs-manager/rs-manager/seam/routes/env-router/dev-token",
             "injectAs": { "kind": "bearer" },
             "target_host": "dev.service.example.com",
             "rewrite_path": "/api/status",

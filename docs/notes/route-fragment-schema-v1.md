@@ -41,7 +41,7 @@ type RouteFragment struct {
 	Upstream         *string              `json:"x-upstream,omitempty" validate:"omitempty,url,startswith=https://"` // Single upstream URL
 	UpstreamMap      map[string]Instance  `json:"x-upstream-map,omitempty"`                                         // Multi-instance mapping
 	InstanceParam    string               `json:"x-instance-param,omitempty" validate:"omitempty,^[a-z][a-z0-9_-]*$"` // Path param name
-	VaultPath        string               `json:"x-vault-path,omitempty" validate:"omitempty,^seam/routes/[a-z][a-z0-9_-]+"`
+	VaultPath        string               `json:"x-vault-path,omitempty" validate:"omitempty,^[a-z0-9]([a-z0-9-]*[a-z0-9])?(/[a-z0-9]([a-z0-9-]*[a-z0-9])?){2,}$"` // <base>/<owner>/<name>; base is deployment config (SEAM_VAULT_BASE_DIR)
 	InjectAs         *InjectAs            `json:"x-inject-as,omitempty"`                                            // How credential injected
 	RequiredScope     interface{}          `json:"x-required-scope,omitempty"`                                       // string or []string (fragment-root default)
 	CredentialProbe  *CredentialProbe      `json:"x-credential-probe,omitempty"`                                    // Health probe config
@@ -140,7 +140,7 @@ type Components struct {
 // Required when x-instance-param is present; forbidden when absent.
 type Instance struct {
 	URL            string        `json:"url" validate:"required,url,startswith=https://"` // Per-instance upstream URL
-	VaultPath      string        `json:"vaultPath,omitempty" validate:"omitempty,^seam/routes/[a-z][a-z0-9_-]+"`
+	VaultPath      string        `json:"vaultPath,omitempty" validate:"omitempty,^[a-z0-9]([a-z0-9-]*[a-z0-9])?(/[a-z0-9]([a-z0-9-]*[a-z0-9])?){2,}$"` // <base>/<owner>/<name>; base is deployment config (SEAM_VAULT_BASE_DIR)
 	InjectAs       *InjectAs     `json:"injectAs,omitempty" validate:"omitempty"`
 	TLS            *InstanceTLS  `json:"tls,omitempty" validate:"omitempty"`
 	Plaintext      string        `json:"plaintext,omitempty" validate:"omitempty,eq=acknowledged"`
@@ -166,8 +166,12 @@ type Instance struct {
 
 ```go
 // VaultPath specifies which OpenBao secret to fetch.
-// Must be inside seam/routes/<x-seam-owner>/* (co-ownership rule).
-// Example: "seam/routes/argocd-ro/readonly-token"
+// Shaped <base>/<x-seam-owner>/<name>: at least one base segment above the
+// owner and a name below it. The base prefix is deployment configuration
+// (SEAM_VAULT_BASE_DIR, default rs-manager/rs-manager/seam/routes) and is
+// deliberately not encoded in the tag — pinning it would turn every base move
+// into a schema release. The pre-consolidation base `seam/routes` is retired.
+// Example: "rs-manager/rs-manager/seam/routes/argocd-ro/readonly-token"
 //
 // Lint checks allowlist prefix. Gateway re-checks at merge time.
 ```

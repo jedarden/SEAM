@@ -38,7 +38,7 @@
     "x-upstream-plaintext": { "$ref": "#/$defs/acknowledged", "$comment": "Fragment-root. Required when x-upstream is http://. Mutually exclusive with x-upstream-map (per-entry plaintext is used there instead)." },
 
     "x-upstream-tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Fragment-root upstream transport policy; absent means verify against system trust store with hostname checking. Upstream-facing: taken from targetVersion on an x-adapter fragment." },
-    "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (prefix seam/routes/<owner>/*) and allowlist membership are validator-side." },
+    "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (prefix rs-manager/rs-manager/seam/routes/<owner>/*) and allowlist membership are validator-side." },
     "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither)." },
     "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as)." },
     "x-breaker": { "$ref": "#/$defs/breaker", "$comment": "Fragment-root tuning of the per-upstream circuit breaker. On by default (infrastructure guard); enabled:false is the opt-out. Upstream-facing: forbidden on an x-adapter fragment." },
@@ -120,8 +120,8 @@
     },
     "vaultPath": {
       "type": "string",
-      "pattern": "^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/",
-      "$comment": "Must resolve inside the OpenBao allowlist prefix seam/routes/* and be co-owned: seam/routes/<x-seam-owner>/*. The prefix shape is encoded; equality with the fragment's owner is validator-side.",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(/[a-z0-9]([a-z0-9-]*[a-z0-9])?){2,}$",
+      "$comment": "An owner-scoped OpenBao KV path: <base>/<x-seam-owner>/<name>. The base prefix is deployment configuration (SEAM_VAULT_BASE_DIR), not schema vocabulary -- encoding it here would turn every base move (e.g. the 2026-09-04 consolidation onto secret/rs-manager/rs-manager/seam/routes/*) into a schema release. The retired pre-consolidation base was the bare `seam/routes`. Which base is live, and that the owner segment equals x-seam-owner, are validator-side (AllowlistEnforcer.ValidateVaultPath and seam lint).",
       "allOf": [
         { "not": { "pattern": "(^|/)\\.\\.(/|$)" }, "$comment": "Reject path traversal." },
         { "not": { "pattern": "[*?]" }, "$comment": "Reject globs." },
