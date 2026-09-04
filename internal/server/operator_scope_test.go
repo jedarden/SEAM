@@ -287,9 +287,10 @@ func TestOperatorScopeMiddleware_ErrorResponseFormat(t *testing.T) {
 		t.Fatalf("failed to parse response JSON: %v", err)
 	}
 
-	// Verify error response structure
-	if code, ok := response["code"].(string); !ok || code != "forbidden" {
-		t.Errorf("expected code=forbidden, got %v", response["code"])
+	// Verify error response structure. The public envelope carries the code in
+	// the "error" field (ErrorResponse in errors.go), not "code".
+	if code, ok := response["error"].(string); !ok || code != "forbidden" {
+		t.Errorf("expected error=forbidden, got %v", response["error"])
 	}
 
 	// Verify the scope name is in the message
