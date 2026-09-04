@@ -138,11 +138,14 @@ func (c *ScopeVersionCache) RecordScopeVersion(identity *Identity, scopes []stri
 
 	idEntry.versions = append(idEntry.versions, newEntry)
 
-	// Enforce per-identity cap (keep most recent)
+	// Enforce the per-identity cap, retaining the most recent versions.
+	// Entries are held in ascending timestamp order so that the last element is
+	// always the newest (GetCurrentScopeVersion reads it as such), so the
+	// retained window is the tail of the sorted slice -- slicing the head would
+	// evict the newest entries instead of the oldest.
 	if len(idEntry.versions) > c.maxPerID {
-		// Sort by timestamp descending and keep maxPerID most recent
 		sortEntries(idEntry.versions)
-		idEntry.versions = idEntry.versions[:c.maxPerID]
+		idEntry.versions = idEntry.versions[len(idEntry.versions)-c.maxPerID:]
 	}
 
 	// Enforce global LRU cap
@@ -244,9 +247,11 @@ func (c *ScopeVersionCache) evictIfNecessary() {
 	}
 }
 
-// sortEntries sorts version entries by timestamp (oldest first)
+// sortEntries sorts version entries by timestamp, oldest first. The sort is
+// stable so recordings sharing a clock tick keep their insertion order and the
+// cap still evicts the genuinely oldest entry rather than an arbitrary one.
 func sortEntries(entries []*scopeVersionEntry) {
-	sort.Slice(entries, func(i, j int) bool {
+	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].timestamp.Before(entries[j].timestamp)
 	})
 }
