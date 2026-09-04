@@ -91,6 +91,16 @@ func runDiffCommand(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	// A directory that is missing or holds no fragment files loads zero
+	// fragments without erroring, and both sides would then merge to the same
+	// minimal empty document. That is a mistyped --fragments-dir reading as
+	// "no changes", so refuse it. Only the current side is fatal: an empty
+	// base still yields a meaningful diff of everything as added.
+	if currentLoader.GetValidFragmentCount() == 0 {
+		fmt.Fprintf(stderr, "seam diff: no fragments loaded from %s; diffing an empty route table is not the same as finding no changes\n", fragmentsDir)
+		return 2
+	}
+
 	// Merge current fragments
 	currentJSON, err := currentLoader.MergeFragments("http://localhost:8080")
 	if err != nil {
@@ -108,6 +118,12 @@ func runDiffCommand(args []string, stdout, stderr io.Writer) int {
 	if err := baseLoader.LoadDirectory(baseDir); err != nil {
 		fmt.Fprintf(stderr, "seam diff: failed to load base fragments: %v\n", err)
 		return 2
+	}
+
+	// An empty base is legitimate but easy to reach by accident, and it reports
+	// every current path as added. Say so instead of leaving an unreadable diff.
+	if baseLoader.GetValidFragmentCount() == 0 {
+		fmt.Fprintf(stderr, "seam diff: warning: no fragments loaded from base %s; every current path will be reported as added\n", baseDir)
 	}
 
 	// Merge base fragments
