@@ -1196,6 +1196,12 @@ func (t *RouteTable) InjectableNames(r *http.Request) (map[string]bool, map[stri
 	return nil, nil
 }
 
+// injectableHeaderNames returns the header names a route fills with an
+// injected credential, keyed in lower case. Header names are case-insensitive,
+// and redactCapturedHeaders looks entries up by the lower-cased header name
+// from the request, so a route configured as "X-Partner-Credential" must still
+// match a request carrying "x-partner-credential". Query names are compared
+// verbatim by redactCapturedQuery and stay case-sensitive.
 func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 	result := make(map[string]struct{})
 	add := func(injectAs *InjectAs) {
@@ -1204,9 +1210,9 @@ func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 		}
 		switch injectAs.Kind {
 		case InjectionHeader:
-			result[injectAs.Name] = struct{}{}
+			result[strings.ToLower(injectAs.Name)] = struct{}{}
 		case InjectionBearer:
-			result["Authorization"] = struct{}{}
+			result["authorization"] = struct{}{}
 		}
 	}
 	add(route.InjectAs)

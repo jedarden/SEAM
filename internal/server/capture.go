@@ -299,6 +299,10 @@ func (cm *CaptureMiddleware) injectableNames(r *http.Request) (map[string]bool, 
 	return headerNames, queryNames
 }
 
+// redactCapturedHeaders replaces the value of every header that carries a
+// credential with the redaction marker. injectableNames holds the route's
+// injectable header names; entries are matched case-insensitively so a route
+// configured with one spelling still redacts a client that sends another.
 func redactCapturedHeaders(headers http.Header, injectableNames map[string]bool) {
 	for name := range headers {
 		if isCredentialHeader(name) || injectableNames[strings.ToLower(name)] {

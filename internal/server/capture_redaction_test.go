@@ -114,6 +114,54 @@ func TestCaptureRedactsRouteInjectableNames(t *testing.T) {
 	}
 }
 
+// TestCaptureRedactsInjectableHeaderAcrossNameCase pins down that the route's
+// configured header spelling does not have to match the client's. The injected
+// value is a credential whichever side capitalises it, so the whole saved
+// corpus blob is scanned for it rather than a single decoded field.
+func TestCaptureRedactsInjectableHeaderAcrossNameCase(t *testing.T) {
+	const secretValue = "case-variant-credential"
+
+	cases := []struct {
+		name       string
+		configName string
+		clientName string
+	}{
+		{name: "mixed config, canonical client", configName: "X-Partner-Credential", clientName: "X-Partner-Credential"},
+		{name: "mixed config, lower client", configName: "X-Partner-Credential", clientName: "x-partner-credential"},
+		{name: "lower config, canonical client", configName: "x-partner-credential", clientName: "X-Partner-Credential"},
+		{name: "upper config, mixed client", configName: "X-PARTNER-CREDENTIAL", clientName: "X-Partner-Credential"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := NewCaptureMiddleware(t.TempDir(), "test-service", "test-incumbent", false)
+			cm.setRouteTableHolder(NewThreadSafeTableHolder(&RouteTable{routes: []RouteEntry{{
+				PathTemplate: "/capture",
+				Method:       http.MethodGet,
+				APIVersion:   "v1",
+				InjectAs:     &InjectAs{Kind: InjectionHeader, Name: tc.configName},
+			}}}))
+
+			handler := cm.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.Header.Get(tc.clientName); got != secretValue {
+					t.Errorf("handler %s = %q, want the injected value", tc.clientName, got)
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/capture", nil)
+			req.Header.Set(tc.clientName, secretValue)
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			_, raw := saveAndReadRedactionCorpus(t, cm)
+			if bytes.Contains(raw, []byte(secretValue)) {
+				t.Fatalf("saved corpus contains route credential value %q (config %q, client %q)",
+					secretValue, tc.configName, tc.clientName)
+			}
+		})
+	}
+}
+
 func saveAndReadRedactionCorpus(t *testing.T, cm *CaptureMiddleware) (CorpusFile, []byte) {
 	t.Helper()
 
