@@ -44,12 +44,17 @@ const (
 	// wire value has always been validation_failed in the validator path.
 	ErrCodeValidationError = ErrCodeValidationFailed
 
-	// Fan-out multi-status errors (Phase 10.2).
-	// These are used within 207 Multi-Status responses, not as top-level error codes.
-	ErrCodeFanoutBreakerRefused ErrorCode = "fanout_breaker_refused"
-	ErrCodeFanoutTimeout        ErrorCode = "fanout_timeout"
-	ErrCodeFanoutTruncated      ErrorCode = "fanout_truncated"
-	ErrCodeFanoutScopeWithheld  ErrorCode = "fanout_scope_withheld"
+	// The fan-out phase declared four parallel codes here
+	// (fanout_breaker_refused, fanout_timeout, fanout_truncated,
+	// fanout_scope_withheld). They are removed because fan-out never returns
+	// them: a 207 Multi-Status envelope reports per-instance outcomes through
+	// the hyphenated InstanceStatus vocabulary (internal/fanout Envelope --
+	// InstanceResult.Status is "breaker-refused" / "timeout" / "truncated" /
+	// "scope-withheld"), and InstanceResult.Error is a plain message rather
+	// than an ErrorCode. None of the four was ever emitted as a top-level
+	// ErrorResponse, so listing them in the public enum asserted statuses the
+	// server cannot produce. Re-add only if a fan-out path starts returning an
+	// ErrorResponse whose error is one of them.
 
 	// Credential health sentinel errors (Phase 12).
 	// These errors are returned when credential refresh fails or cannot be retried.
@@ -83,13 +88,6 @@ var HTTPStatusMapping = map[ErrorCode]int{
 	ErrCodeCaptureFailed:        http.StatusInternalServerError,
 	ErrCodeSpecLoadFailed:       http.StatusInternalServerError,
 	ErrCodeConfigError:          http.StatusInternalServerError,
-
-	// Fan-out errors map to their appropriate HTTP status codes.
-	// These are used within 207 responses, not as top-level codes.
-	ErrCodeFanoutBreakerRefused: http.StatusServiceUnavailable,
-	ErrCodeFanoutTimeout:        http.StatusGatewayTimeout,
-	ErrCodeFanoutTruncated:      http.StatusPartialContent,
-	ErrCodeFanoutScopeWithheld:  http.StatusForbidden,
 
 	// Credential health errors map to their appropriate HTTP status codes.
 	ErrCodeCredentialRefreshNotRetried: http.StatusUnauthorized,

@@ -32,7 +32,14 @@ components:
       properties:
         error:
           type: string
-          description: Machine-readable error code identifier
+          description: >-
+            Machine-readable error code identifier. This enum covers every code
+            SEAM can return in a top-level ErrorResponse. Fan-out requests are
+            the one exception: a 207 Multi-Status envelope reports per-instance
+            outcomes through the hyphenated `status` vocabulary
+            ("ok", "error", "timeout", "breaker-refused", "truncated",
+            "scope-withheld") carried by each entry in `instances`, not through
+            this field.
           enum:
             - bad_request
             - unauthorized
@@ -46,6 +53,7 @@ components:
             - validation_failed
             - quota_exceeded
             - rate_limit_exceeded
+            - loop_guard_exceeded
             - internal_server_error
             - bad_gateway
             - service_unavailable
@@ -56,6 +64,8 @@ components:
             - capture_failed
             - spec_load_failed
             - config_error
+            - credential_refresh_not_retried
+            - secret_store_unavailable
         message:
           type: string
           description: Human-readable error description

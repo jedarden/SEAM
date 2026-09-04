@@ -27,6 +27,7 @@ func TestErrorTaxonomyWritesDocumentedEnvelopeAndStatus(t *testing.T) {
 		{ErrCodeValidationFailed, http.StatusBadRequest},
 		{ErrCodeQuotaExceeded, http.StatusTooManyRequests},
 		{ErrCodeRateLimitExceeded, http.StatusTooManyRequests},
+		{ErrCodeLoopGuardExceeded, http.StatusTooManyRequests},
 		{ErrCodeInternalServer, http.StatusInternalServerError},
 		{ErrCodeBadGateway, http.StatusBadGateway},
 		{ErrCodeServiceUnavailable, http.StatusServiceUnavailable},
@@ -37,6 +38,10 @@ func TestErrorTaxonomyWritesDocumentedEnvelopeAndStatus(t *testing.T) {
 		{ErrCodeCaptureFailed, http.StatusInternalServerError},
 		{ErrCodeSpecLoadFailed, http.StatusInternalServerError},
 		{ErrCodeConfigError, http.StatusInternalServerError},
+
+		// Credential health sentinels (Phase 12).
+		{ErrCodeCredentialRefreshNotRetried, http.StatusUnauthorized},
+		{ErrCodeSecretStoreUnavailable, http.StatusServiceUnavailable},
 	}
 
 	if len(HTTPStatusMapping) != len(tests) {
