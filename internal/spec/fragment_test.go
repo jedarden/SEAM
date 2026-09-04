@@ -1126,3 +1126,242 @@ func TestKubernetesInternalDirectoriesSkipped(t *testing.T) {
 		}
 	}
 }
+
+// writeFragment writes a fragment file, creating its parent directory first.
+func writeFragment(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("Failed to create directory for %s: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("Failed to write fragment %s: %v", path, err)
+	}
+}
+
+// mergedPaths loads fragments from dir and returns the merged document's paths.
+func mergedPaths(t *testing.T, dir string) map[string]interface{} {
+	t.Helper()
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := loader.LoadDirectory(dir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+	merged, err := loader.MergeFragments("http://localhost:8080")
+	if err != nil {
+		t.Fatalf("Failed to merge fragments: %v", err)
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(merged, &doc); err != nil {
+		t.Fatalf("Failed to parse merged document: %v", err)
+	}
+	paths, _ := doc["paths"].(map[string]interface{})
+	return paths
+}
+
+// TestLoadDirectoryParsesYAMLFragments is the regression test for the loader
+// decoding every discovered file as JSON. A .yaml fragment must contribute its
+// real paths to the merged document instead of being dropped, which used to
+// make an empty-document merge look identical to an unchanged one.
+func TestLoadDirectoryParsesYAMLFragments(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, filepath.Join(dir, "owner", "route.yaml"), `x-seam-schema: v1
+x-seam-owner: owner
+x-api-version: v1
+paths:
+  /api/test:
+    get:
+      summary: Test endpoint
+      x-upstream: http://owner.internal/api/test
+`)
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := loader.LoadDirectory(dir); err != nil {
+		t.Fatalf("Failed to load fragments: %v", err)
+	}
+
+	if got := loader.GetValidFragmentCount(); got != 1 {
+		t.Fatalf("Expected 1 loaded fragment, got %d", got)
+	}
+
+	// Nested YAML mappings must arrive as map[string]any so the merge and
+	// schema-validation type assertions hold all the way down.
+	fragment := loader.fragments[0]
+	paths, ok := fragment.ParsedFragment["paths"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected paths to be map[string]any, got %T", fragment.ParsedFragment["paths"])
+	}
+	pathItem, ok := paths["/api/test"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected path item to be map[string]any, got %T", paths["/api/test"])
+	}
+	if _, ok := pathItem["get"].(map[string]any); !ok {
+		t.Fatalf("Expected get operation to be map[string]any, got %T", pathItem["get"])
+	}
+
+	if fragment.SchemaVer != "v1" {
+		t.Errorf("Expected schema version v1, got %q", fragment.SchemaVer)
+	}
+	if fragment.APIVersion != "v1" {
+		t.Errorf("Expected API version v1, got %q", fragment.APIVersion)
+	}
+	if got := fragment.Owner; got != "owner" {
+		t.Errorf("Expected owner derived from parent directory, got %q", got)
+	}
+
+	// The end-to-end symptom: the fragment's routes reach the merged document.
+	got := mergedPaths(t, dir)
+	if len(got) != 1 {
+		t.Fatalf("Expected 1 merged path, got %d: %v", len(got), got)
+	}
+	if _, ok := got["/api/test"]; !ok {
+		t.Errorf("Expected /api/test in merged document, got %v", got)
+	}
+}
+
+// TestLoadDirectoryParsesEveryDiscoveredExtension verifies each discovered
+// extension is parsed with a decoder that understands it.
+func TestLoadDirectoryParsesEveryDiscoveredExtension(t *testing.T) {
+	fragmentYAML := `x-seam-owner: owner
+paths:
+  /from-yaml:
+    get:
+      summary: YAML
+`
+	fragmentYML := `x-seam-owner: owner
+paths:
+  /from-yml:
+    get:
+      summary: YML
+`
+	fragmentJSON := `{"x-seam-owner": "owner", "paths": {"/from-json": {"get": {"summary": "JSON"}}}}`
+
+	testCases := []struct {
+		name         string
+		filename     string
+		content      string
+		wantPath     string
+		wantFragment string
+	}{
+		{name: "yaml", filename: "route.yaml", content: fragmentYAML, wantPath: "/from-yaml", wantFragment: "yaml"},
+		{name: "yml", filename: "route.yml", content: fragmentYML, wantPath: "/from-yml", wantFragment: "yaml"},
+		{name: "json", filename: "route.json", content: fragmentJSON, wantPath: "/from-json", wantFragment: "json"},
+		// Discovery and parsing share one extension test, so an
+		// upper-case extension is both discovered and parsed as YAML.
+		{name: "upper-case yaml", filename: "route.YAML", content: fragmentYAML, wantPath: "/from-yaml", wantFragment: "yaml"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFragment(t, filepath.Join(dir, "owner", tc.filename), tc.content)
+
+			if got := fragmentFormat(filepath.Join(dir, "owner", tc.filename)); got != tc.wantFragment {
+				t.Errorf("Expected fragmentFormat %q, got %q", tc.wantFragment, got)
+			}
+
+			paths := mergedPaths(t, dir)
+			if _, ok := paths[tc.wantPath]; !ok {
+				t.Errorf("Expected %s in merged document, got %v", tc.wantPath, paths)
+			}
+		})
+	}
+}
+
+// TestLoadDirectoryToleratesPartialParseFailure verifies one unparseable
+// fragment is skipped without taking the rest of the route table with it.
+func TestLoadDirectoryToleratesPartialParseFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, filepath.Join(dir, "owner", "broken.yaml"), "x-seam-owner: owner\npaths:\n\t/get: [unclosed\n")
+	writeFragment(t, filepath.Join(dir, "other", "fine.yaml"), `x-seam-owner: other
+paths:
+  /fine:
+    get:
+      summary: Fine
+`)
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := loader.LoadDirectory(dir); err != nil {
+		t.Fatalf("Expected a partial failure to be tolerated, got: %v", err)
+	}
+
+	if got := loader.GetValidFragmentCount(); got != 1 {
+		t.Errorf("Expected the parseable fragment to load, got %d valid", got)
+	}
+	paths := mergedPaths(t, dir)
+	if _, ok := paths["/fine"]; !ok {
+		t.Errorf("Expected /fine in merged document, got %v", paths)
+	}
+}
+
+// TestLoadDirectoryRejectsFullyUnparseableFragments verifies the loader fails
+// loudly when every discovered fragment is unparseable, rather than merging
+// zero fragments into an empty document that a diff would read as "no changes".
+func TestLoadDirectoryRejectsFullyUnparseableFragments(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, filepath.Join(dir, "owner", "route.yaml"), "x-seam-owner: owner\npaths:\n\t/get: [unclosed\n")
+	writeFragment(t, filepath.Join(dir, "other", "route.json"), "{not json")
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	err = loader.LoadDirectory(dir)
+	if err == nil {
+		t.Fatal("Expected an error when no fragment could be loaded, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to load") {
+		t.Errorf("Expected the error to name the failure, got: %v", err)
+	}
+
+	// The empty-directory case stays a no-op: nothing was discovered, so there
+	// is nothing to distinguish from a correct empty document.
+	empty := t.TempDir()
+	emptyLoader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("Failed to create fragment loader: %v", err)
+	}
+	if err := emptyLoader.LoadDirectory(empty); err != nil {
+		t.Errorf("Expected an empty directory to load cleanly, got: %v", err)
+	}
+}
+
+// TestLoadDirectoryRejectsNonObjectFragment verifies a fragment whose root is
+// not a mapping is reported rather than silently loaded with no fields.
+func TestLoadDirectoryRejectsNonObjectFragment(t *testing.T) {
+	testCases := []struct {
+		name     string
+		filename string
+		content  string
+	}{
+		{name: "yaml sequence", filename: "route.yaml", content: "- a\n- b\n"},
+		{name: "yaml scalar", filename: "route.yaml", content: "just a string\n"},
+		{name: "empty yaml", filename: "route.yaml", content: ""},
+		{name: "json array", filename: "route.json", content: `[1, 2, 3]`},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFragment(t, filepath.Join(dir, "owner", tc.filename), tc.content)
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatalf("Failed to create fragment loader: %v", err)
+			}
+			if err := loader.LoadDirectory(dir); err == nil {
+				t.Fatalf("Expected a non-object fragment to be rejected")
+			}
+			if got := loader.GetValidFragmentCount(); got != 0 {
+				t.Errorf("Expected 0 loaded fragments, got %d", got)
+			}
+		})
+	}
+}
