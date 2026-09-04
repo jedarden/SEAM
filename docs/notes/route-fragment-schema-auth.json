@@ -32,12 +32,12 @@
   "$defs": {
     "vaultPath": {
       "type": "string",
-      "pattern": "^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/",
-      "description": "OpenBao secret path for credential storage. Must resolve inside the allowlist prefix seam/routes/* and be co-owned with the fragment owner (seam/routes/<owner>/*).",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(/[a-z0-9]([a-z0-9-]*[a-z0-9])?){2,}$",
+      "description": "OpenBao secret path for credential storage, shaped <base>/<owner>/<name>. The base is deployment configuration (SEAM_VAULT_BASE_DIR) and is deliberately not encoded here; the live default is rs-manager/rs-manager/seam/routes. The pre-consolidation base `seam/routes` is retired.",
       "examples": [
-        "seam/routes/my-service/api-key",
-        "seam/routes/k8s-ro/token",
-        "seam/routes/weather-service/secret"
+        "rs-manager/rs-manager/seam/routes/my-service/api-key",
+        "rs-manager/rs-manager/seam/routes/k8s-ro/token",
+        "rs-manager/rs-manager/seam/routes/weather-service/secret"
       ],
       "allOf": [
         {
