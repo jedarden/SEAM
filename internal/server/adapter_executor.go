@@ -74,7 +74,7 @@ func jsonPointerGet(data any, ptr string) (any, bool, error) {
 
 // AdapterConfig holds the x-adapter configuration for a route
 type AdapterConfig struct {
-	TargetVersion     string
+	TargetVersion      string
 	RequestTransforms  []AdapterTransform
 	ResponseTransforms []AdapterTransform
 }
@@ -225,10 +225,14 @@ func applyTransform(transform AdapterTransform, data any, isRequest bool) (any, 
 
 // applyRenameTransform moves/renames a field by JSON Pointer
 func applyRenameTransform(data any, transform *RenameTransform) (any, error) {
-	// Resolve source pointer
-	sourceValue, _, err := jsonPointerGet(data, transform.From)
+	// Resolve source pointer; a rename is a move, so a missing source is an
+	// adapter failure rather than a silent no-op
+	sourceValue, found, err := jsonPointerGet(data, transform.From)
 	if err != nil {
 		return nil, fmt.Errorf("rename: failed to resolve source pointer %q: %w", transform.From, err)
+	}
+	if !found {
+		return nil, fmt.Errorf("rename: source pointer %q does not exist", transform.From)
 	}
 
 	// Resolve destination pointer parent (for in-place modification)
@@ -237,11 +241,29 @@ func applyRenameTransform(data any, transform *RenameTransform) (any, error) {
 		return nil, fmt.Errorf("rename: failed to resolve destination pointer %q: %w", transform.To, err)
 	}
 
-	// Set the value at destination
-	if destMap, ok := destParent.(map[string]any); ok {
-		destMap[destKey] = sourceValue
-	} else {
-		return nil, fmt.Errorf("rename: destination parent is not an object")
+	// Resolve the source parent so the original can be removed. Both
+	// resolutions happen before either mutation, so a failure leaves the
+	// body unmodified rather than half-moved.
+	sourceParent, sourceKey, err := getParentAndKey(data, transform.From)
+	if err != nil {
+		return nil, fmt.Errorf("rename: failed to resolve source pointer %q: %w", transform.From, err)
+	}
+
+	destMap, ok := destParent.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("rename: destination parent of %q is not an object", transform.To)
+	}
+	sourceMap, ok := sourceParent.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("rename: source parent of %q is not an object", transform.From)
+	}
+
+	destMap[destKey] = sourceValue
+
+	// Remove the source, unless the rename names its own location — writing
+	// the destination first means deleting then would drop the value
+	if transform.From != transform.To {
+		delete(sourceMap, sourceKey)
 	}
 
 	return data, nil
@@ -250,10 +272,13 @@ func applyRenameTransform(data any, transform *RenameTransform) (any, error) {
 // applyDefaultTransform sets a default value if the field is missing
 func applyDefaultTransform(data any, transform *DefaultTransform) (any, error) {
 	// Try to resolve the pointer
-	_, _, err := jsonPointerGet(data, transform.Pointer)
+	_, found, err := jsonPointerGet(data, transform.Pointer)
+	if err != nil {
+		return nil, fmt.Errorf("default: failed to resolve pointer %q: %w", transform.Pointer, err)
+	}
 
-	// If field exists, do nothing
-	if err == nil {
+	// If field exists (including an explicit null), do nothing
+	if found {
 		return data, nil
 	}
 
@@ -266,7 +291,7 @@ func applyDefaultTransform(data any, transform *DefaultTransform) (any, error) {
 	if parentMap, ok := parent.(map[string]any); ok {
 		parentMap[key] = transform.Value
 	} else {
-		return nil, fmt.Errorf("default: parent is not an object")
+		return nil, fmt.Errorf("default: parent of %q is not an object", transform.Pointer)
 	}
 
 	return data, nil
