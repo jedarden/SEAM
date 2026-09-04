@@ -70,7 +70,12 @@ var reservedPaths = struct {
 		"/config/",    // Configuration management endpoints
 		"/approvals/", // Approval workflow endpoints
 		"/_seam/",     // Internal SEAM endpoints (metrics, health, ready)
-		"/api/v1/",    // API v1 endpoints
+		// No "/api/v1/" prefix. Fragment routes legitimately live there —
+		// the ArgoCD surface is /api/v1/applications — and a reserved prefix
+		// would exempt every one of them from spec validation, capture, quota,
+		// cache and metrics, so capture records nothing for exactly the traffic
+		// it exists to record. The control-plane endpoints under /api/v1/ are
+		// reserved by exact path instead.
 	},
 }
 

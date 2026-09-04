@@ -53,6 +53,15 @@ type IdentityResolver struct {
 	// For now, this is a placeholder that will be integrated with Tailscale
 	mu     sync.RWMutex
 	testMode bool // When true, returns resolved test identities for development
+
+	// resolveOverride, when set, replaces Tailscale resolution entirely and is
+	// handed the caller's remote address. Tests install it where there is no
+	// tailnet address to resolve — a suite driving a real listener over
+	// loopback can never present one — and production leaves it nil, so the
+	// non-tailnet default-deny below is untouched. Only test code can set it:
+	// the setter lives in identity_resolution_test.go, so the production binary
+	// carries the field and the branch that honors it but no way to arm it.
+	resolveOverride func(remoteAddr string) (*Identity, error)
 }
 
 // NewIdentityResolver creates a new identity resolver
@@ -78,6 +87,11 @@ func (ir *IdentityResolver) Resolve(ctx context.Context, remoteAddr string) (*Id
 
 	ir.mu.RLock()
 	defer ir.mu.RUnlock()
+
+	// A test override stands in for WhoIs resolution in its entirety.
+	if fn := ir.resolveOverride; fn != nil {
+		return fn(remoteAddr)
+	}
 
 	// TODO: Integrate with Tailscale LocalClient.WhoIs
 	// For now, this is a placeholder that will be replaced with actual WhoIs resolution

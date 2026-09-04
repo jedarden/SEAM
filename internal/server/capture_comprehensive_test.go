@@ -141,6 +141,12 @@ func runCaptureNonIntrusionRequest(t *testing.T, fixture *captureProxyFixture, t
 	}
 
 	s := New(cfg)
+	// Every path this helper requests is a fragment route, so stage 3 resolves
+	// an identity for it before stage 4 matches the route; a loopback caller
+	// resolves to none and is default-denied before the proxy is ever reached.
+	// Present the fixed test identity so the comparison below measures what
+	// capture changes, not what identity resolution denies.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -894,6 +900,12 @@ func TestCaptureFullLifecycleIntegration(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// The lifecycle mixes all three stage-3 populations on one server: the
+	// exempt probes, the scope-filtered control-plane surface (/openapi.json,
+	// /docs) and a fragment route (/api/v1/applications) — plus capture status
+	// on the operator port. Only the probes pass without an identity, so
+	// present the fixed test identity for the rest.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

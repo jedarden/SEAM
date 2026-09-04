@@ -43,6 +43,10 @@ func TestArgoCDProxyBaselineOperation(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// The baseline covers identity-gated surfaces (/docs, /openapi.json, the
+	// operator endpoints) that a loopback caller cannot resolve an identity
+	// for; present the fixed test identity instead of asserting the deny.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -185,6 +189,7 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 	}
 
 	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -271,6 +276,17 @@ func TestArgoCDProxyBaselineResponseTimes(t *testing.T) {
 
 // TestArgoCDProxyBaselineConsistency tests that the proxy responds consistently
 // across multiple requests without capture enabled.
+//
+// This is the one baseline case that deliberately does not install
+// newLoopbackTestIdentityResolver: /_seam/readyz is a probe path, and a probe
+// caller has no identity to resolve in production either. Stage 3 steps aside
+// for it (identityExemptPaths), so these requests reach the readyz handler
+// unauthenticated, exactly as a kubelet probe does. That is the property under
+// test: stage 3's deny envelope carries a per-request request_id, so had the
+// probe been left to default-deny, the twenty bodies below would differ and
+// the comparison would fail. Passing here therefore shows the answer is stable
+// because of the exemption, not because the caller holds a privileged
+// identity.
 func TestArgoCDProxyBaselineConsistency(t *testing.T) {
 	callerPort := getAvailablePort(t)
 	operatorPort := getAvailablePort(t)
@@ -350,6 +366,11 @@ func TestArgoCDProxyBaselineCaptureStatusDisabled(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// Capture status lives on the operator port behind stage 3, and it reports
+	// capture state the two-tier rule exists to withhold — it is identity-gated
+	// on purpose, so the loopback caller presents the test identity instead of
+	// asserting the deny.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
