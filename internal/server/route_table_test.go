@@ -335,22 +335,6 @@ func TestValidateMultipleInvalidRoutes(t *testing.T) {
 	}
 }
 
-// Helper function to check if a string contains a substring
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			containsMiddle(s, substr)))
-}
-
-func containsMiddle(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
 // Test that RouteMatcher interface is correctly defined
 func TestRouteMatcherInterface(t *testing.T) {
 	// This test verifies that the RouteMatcher interface is correctly defined

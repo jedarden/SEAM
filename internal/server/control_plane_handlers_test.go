@@ -257,7 +257,7 @@ func TestScopesHandler(t *testing.T) {
 
 				// Check for builtin scope
 				foundBuiltin := false
-				for scopeID, info := range scopes {
+				for _, info := range scopes {
 					if infoMap, ok := info.(map[string]interface{}); ok {
 						if source, ok := infoMap["source"].(string); ok && source == "builtin" {
 							foundBuiltin = true
