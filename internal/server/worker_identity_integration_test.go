@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"seam/internal/tailscale"
+	"github.com/ardenone/seam/internal/tailscale"
 )
 
 // TestConcurrentWorkerIdentityCreation tests that multiple workers
@@ -28,9 +28,6 @@ func TestConcurrentWorkerIdentityCreation(t *testing.T) {
 		wg.Add(1)
 		go func(workerNum int) {
 			defer wg.Done()
-
-			// Each worker gets a unique workerID
-			workerID := fmt.Sprintf("test-worker-%d", workerNum)
 
 			// Create identity resolver (simulating SEAM's identity resolution)
 			resolver := NewIdentityResolver()
@@ -87,8 +84,6 @@ func TestConcurrentWorkerIdentityCreation(t *testing.T) {
 // TestIdentityTagging verifies that worker identities are properly
 // tagged with 'tag:needle-worker' in the tailnet
 func TestIdentityTagging(t *testing.T) {
-	resolver := NewIdentityResolver()
-
 	// Create a test identity with tags
 	identity := &Identity{
 		NodeKey:   "test-node-key",
@@ -468,7 +463,6 @@ func TestIdentityExpiryCleanup(t *testing.T) {
 
 	// Create some keys (these will be cached internally, but we're testing
 	// the cache cleanup mechanism)
-	ctx := context.Background()
 
 	// Note: This will fail without a real server, so we're testing the cache
 	// cleanup logic directly through the client's cache operations

@@ -7,509 +7,291 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"sync"
 	"testing"
-	"time"
-
-	"github.com/ardenone/seam/internal/vault"
 )
 
-// TestPhase12Scenario4_CredentialRefreshRetry tests the complete Phase 12.4 implementation:
-// - 401 detection and credential refresh
-// - Request replay with fresh credentials (replayable bodies)
-// - credential-refresh-not-retried envelope (unreplayable bodies)
-// - secret-store-unavailable degradation (refetch failure)
-// - No infinite retry loops
-// - Quota charging on retry path (charged twice)
-func TestPhase12Scenario4_CredentialRefreshRetry(t *testing.T) {
-	t.Run("successful_retry_with_replayable_body", func(t *testing.T) {
-		// Test that 401 with replayable body triggers refresh and retry
-		server := createTestServer(t)
-		defer server.Close()
+// Phase 12.4 covers the 401 credential-refresh-and-retry path. The logic lives
+// on *ReverseProxy (proxy.go handle401CredentialRefresh), not on *Server, and
+// ReverseProxy is both constructible (NewReverseProxyWithConfig) and an
+// http.Handler — so each scenario is driven end to end through ServeHTTP
+// against an httptest upstream that only accepts the fresh credential.
+//
+// The one seam these tests cannot reach is RouteTable.secretClient: the
+// credential resolver is injected per request via withRouteMatch, which is
+// exactly the hook the tests substitute a counting stub into.
+const (
+	phase12StaleSecret = "stale-secret"
+	phase12FreshSecret = "fresh-secret"
+	phase12Route       = "/api/dispatch"
+)
 
-		// Configure upstream to return 401 on first request, 200 on retry
-		requestCount := 0
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestCount++
-			auth := r.Header.Get("Authorization")
-			if requestCount == 1 {
-				// First request - return 401
-				if auth != "Bearer old-token" {
-					t.Errorf("Expected first request with old-token, got: %s", auth)
-				}
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error": "invalid_token"}`))
-			} else {
-				// Second request - should have fresh token
-				if auth != "Bearer fresh-token" {
-					t.Errorf("Expected retry with fresh-token, got: %s", auth)
-				}
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"success": true}`))
+// phase12Upstream is a stub upstream that answers 401 for any credential other
+// than the fresh one, recording every Authorization value and body it saw.
+type phase12Upstream struct {
+	mu        sync.Mutex
+	fresh     string
+	auth      []string
+	bodies    []string
+	always401 bool
+}
+
+func (u *phase12Upstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	auth := r.Header.Get("Authorization")
+	u.mu.Lock()
+	u.auth = append(u.auth, auth)
+	u.bodies = append(u.bodies, string(body))
+	always401 := u.always401
+	u.mu.Unlock()
+
+	if !always401 && auth == "Bearer "+u.fresh {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.WriteHeader(http.StatusUnauthorized)
+	_, _ = w.Write([]byte(`{"error":"stale credential"}`))
+}
+
+func (u *phase12Upstream) sawAuth() []string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return append([]string(nil), u.auth...)
+}
+
+func (u *phase12Upstream) sawBodies() []string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return append([]string(nil), u.bodies...)
+}
+
+// phase12Scenario wires one request through the proxy with a counting
+// credential resolver. The resolver hands out the stale secret on its first
+// call and the fresh secret thereafter, unless an override says otherwise.
+func phase12Scenario(t *testing.T, maxReplayable int64, body []byte, resolve func(call int) ([]byte, error)) (*ReverseProxy, *httptest.ResponseRecorder, *http.Request, *int, *phase12Upstream) {
+	t.Helper()
+
+	upstream := &phase12Upstream{fresh: phase12FreshSecret}
+	upstreamSrv := httptest.NewServer(upstream)
+	t.Cleanup(upstreamSrv.Close)
+
+	cfg := &ReverseProxyConfig{Client: upstreamSrv.Client()}
+	if maxReplayable > 0 {
+		cfg.MaxReplayableRequestBytes = maxReplayable
+	}
+	proxy, err := NewReverseProxyWithConfig(upstreamSrv.URL, cfg)
+	if err != nil {
+		t.Fatalf("NewReverseProxyWithConfig: %v", err)
+	}
+
+	calls := 0
+	resolver := routeSecretResolver(func(_ context.Context, _ RouteEntry) ([]byte, error) {
+		calls++
+		return resolve(calls)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, phase12Route, bytes.NewReader(body))
+	req.Header.Set("X-Auth-Token", "test-token")
+	req.Header.Set("X-User-ID", "test-user")
+
+	route := RouteEntry{
+		PathTemplate: phase12Route,
+		Method:       http.MethodPost,
+		VaultPath:    "secret/rs-manager/phase12/credential",
+		InjectAs:     &InjectAs{Kind: InjectionBearer},
+	}
+	withRouteMatch(req, &RouteMatch{Route: route, PathParams: map[string]string{}}, resolver)
+
+	rec := httptest.NewRecorder()
+	return proxy, rec, req, &calls, upstream
+}
+
+// TestPhase12Scenario4_SuccessfulRetryWithReplayableBody covers the happy path:
+// a replayable POST hits a 401 on the stale credential, the proxy invalidates
+// and refetches, re-injects the fresh credential, and retries exactly once to a
+// transparent 200.
+func TestPhase12Scenario4_SuccessfulRetryWithReplayableBody(t *testing.T) {
+	proxy, rec, req, calls, upstream := phase12Scenario(t, 0, []byte(`{"job":"run"}`),
+		func(call int) ([]byte, error) {
+			if call == 1 {
+				return []byte(phase12StaleSecret), nil
 			}
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection
-		route := "/api/protected"
-		vaultPath := "secret/protected-api"
-		server.routeTable.SetUpstreamURL(upstream.URL)
-
-		// Mock vault client that returns fresh credentials on refresh
-		refreshCallCount := 0
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{
-				vaultPath: []byte("fresh-token"),
-			},
-			onRefresh: func(path string) {
-				refreshCallCount++
-			},
-		}
-
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
-
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath: vaultPath,
-			InjectAs:  &InjectAs{Kind: InjectionBearer},
+			return []byte(phase12FreshSecret), nil
 		})
 
-		// Make request with replayable body
-		body := bytes.NewReader([]byte(`{"test": "data"}`))
-		req := httptest.NewRequest("POST", route, body)
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
+	proxy.ServeHTTP(rec, req)
 
-		server.ServeHTTP(w, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	if got := *calls; got != 2 {
+		t.Errorf("credential resolver calls = %d, want 2 (initial + refresh)", got)
+	}
+	auth := upstream.sawAuth()
+	if len(auth) != 2 {
+		t.Fatalf("upstream requests = %d, want 2 (initial + retry)", len(auth))
+	}
+	if auth[0] != "Bearer "+phase12StaleSecret {
+		t.Errorf("first upstream credential = %q, want the stale secret", auth[0])
+	}
+	if auth[1] != "Bearer "+phase12FreshSecret {
+		t.Errorf("retry upstream credential = %q, want the fresh secret", auth[1])
+	}
+	// The replayed body must survive the retry.
+	if bodies := upstream.sawBodies(); len(bodies) != 2 || bodies[1] != `{"job":"run"}` {
+		t.Errorf("retry body = %v, want the original body replayed", bodies)
+	}
+}
 
-		// Should get 200 OK after successful retry
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected 200 OK after retry, got %d", w.Code)
-		}
+// TestPhase12Scenario4_UnreplayableBodyReturnsCredentialRefreshNotRetried
+// covers a body over MaxReplayableRequestBytes: the credential is still
+// invalidated and refetched, but the request is not retried and the caller gets
+// the credential-refresh-not-retried envelope with a scrubbed upstream body.
+func TestPhase12Scenario4_UnreplayableBodyReturnsCredentialRefreshNotRetried(t *testing.T) {
+	const capBytes = 16
+	bigBody := bytes.Repeat([]byte("x"), int(capBytes)*4)
 
-		var resp map[string]interface{}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Errorf("Failed to parse response: %v", err)
-		}
-		if resp["success"] != true {
-			t.Errorf("Expected success=true, got: %v", resp["success"])
-		}
-
-		// Verify credential refresh was called exactly once
-		if refreshCallCount != 1 {
-			t.Errorf("Expected 1 refresh call, got %d", refreshCallCount)
-		}
-
-		// Verify upstream was called twice (original + retry)
-		if requestCount != 2 {
-			t.Errorf("Expected 2 upstream requests, got %d", requestCount)
-		}
-
-		t.Log("✓ 401 retry with replayable body succeeded with fresh credentials")
-	})
-
-	t.Run("unreplayable_body_returns_credential_refresh_not_retried", func(t *testing.T) {
-		// Test that unreplayable body returns credential-refresh-not-retried envelope
-		server := createTestServer(t)
-		defer server.Close()
-
-		// Configure upstream to return 401
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error": "token_expired"}`))
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection
-		route := "/api/large-payload"
-		vaultPath := "secret/large-api"
-		server.routeTable.SetUpstreamURL(upstream.URL)
-
-		// Mock vault client
-		refreshCallCount := 0
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{
-				vaultPath: []byte("refreshed-token"),
-			},
-			onRefresh: func(path string) {
-				refreshCallCount++
-			},
-		}
-
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
-
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath: vaultPath,
-			InjectAs:  &InjectAs{Kind: InjectionBearer},
-		})
-
-		// Make request with unreplayable body (exceeds maxReplayableRequestBytes)
-		largeBody := bytes.NewReader(make([]byte, 2*1024*1024)) // 2MB > default 1MB limit
-		req := httptest.NewRequest("POST", route, largeBody)
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-
-		server.ServeHTTP(w, req)
-
-		// Should get credential-refresh-not-retried envelope
-		if w.Code != http.StatusUnauthorized {
-			t.Errorf("Expected 401 Unauthorized, got %d", w.Code)
-		}
-
-		var resp ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Errorf("Failed to parse error response: %v", err)
-		}
-
-		if resp.Error != ErrCodeCredentialRefreshNotRetried {
-			t.Errorf("Expected error code %s, got %s", ErrCodeCredentialRefreshNotRetried, resp.Error)
-		}
-
-		// Verify the message mentions credential refresh succeeded
-		if !strings.Contains(resp.Message, "refreshed") {
-			t.Errorf("Expected message about credential refresh, got: %s", resp.Message)
-		}
-
-		// Verify upstream status is included
-		if resp.Details == nil {
-			t.Errorf("Expected details in error response")
-		}
-		if resp.Details["upstream_status"] != float64(401) {
-			t.Errorf("Expected upstream_status 401, got: %v", resp.Details["upstream_status"])
-		}
-
-		// Verify credential refresh was still called
-		if refreshCallCount != 1 {
-			t.Errorf("Expected 1 refresh call (even for unreplayable body), got %d", refreshCallCount)
-		}
-
-		// Verify header indicating refresh succeeded
-		if w.Header().Get("X-SEAM-Credential-Refresh") != "succeeded" {
-			t.Errorf("Expected X-SEAM-Credential-Refresh header")
-		}
-
-		t.Log("✓ Unreplayable body returned credential-refresh-not-retried envelope")
-	})
-
-	t.Run("refetch_failure_degrades_to_secret_store_unavailable", func(t *testing.T) {
-		// Test that refetch failure degrades to secret-store-unavailable 503
-		server := createTestServer(t)
-		defer server.Close()
-
-		// Configure upstream to return 401
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error": "invalid_token"}`))
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection
-		route := "/api/fail-refresh"
-		vaultPath := "secret/failing-api"
-		server.routeTable.SetUpstreamURL(upstream.URL)
-
-		// Mock vault client that fails on refresh
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{},
-			refreshErr: &vault.SecretStoreUnavailableError{
-				Dependency: "OpenBao",
-				Class:      vault.FailureClassNetwork,
-				RetryAt:    time.Now().Add(30 * time.Second),
-				Now:        time.Now(),
-			},
-		}
-
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
-
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath: vaultPath,
-			InjectAs:  &InjectAs{Kind: InjectionBearer},
-		})
-
-		// Make request
-		req := httptest.NewRequest("GET", route, nil)
-		w := httptest.NewRecorder()
-
-		server.ServeHTTP(w, req)
-
-		// Should get secret-store-unavailable 503
-		if w.Code != http.StatusServiceUnavailable {
-			t.Errorf("Expected 503 Service Unavailable, got %d", w.Code)
-		}
-
-		var resp ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Errorf("Failed to parse error response: %v", err)
-		}
-
-		if resp.Error != ErrCodeSecretStoreUnavailable {
-			t.Errorf("Expected error code %s, got %s", ErrCodeSecretStoreUnavailable, resp.Error)
-		}
-
-		// Verify Retry-After header is present
-		retryAfter := w.Header().Get("Retry-After")
-		if retryAfter == "" {
-			t.Errorf("Expected Retry-After header")
-		}
-
-		t.Log("✓ Refetch failure degraded to secret-store-unavailable 503")
-	})
-
-	t.Run("no_infinite_retry_loops", func(t *testing.T) {
-		// Test that we don't retry infinitely on repeated 401s
-		server := createTestServer(t)
-		defer server.Close()
-
-		// Configure upstream to always return 401
-		requestCount := 0
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestCount++
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error": "always_unauthorized"}`))
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection
-		route := "/api/stale-token"
-		vaultPath := "secret/stale-api"
-		server.routeTable.SetUpstreamURL(upstream.URL)
-
-		// Mock vault client that always returns the same stale token
-		refreshCallCount := 0
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{
-				vaultPath: []byte("still-stale-token"),
-			},
-			onRefresh: func(path string) {
-				refreshCallCount++
-			},
-		}
-
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
-
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath: vaultPath,
-			InjectAs:  &InjectAs{Kind: InjectionBearer},
-		})
-
-		// Make request
-		req := httptest.NewRequest("GET", route, nil)
-		w := httptest.NewRecorder()
-
-		server.ServeHTTP(w, req)
-
-		// Should get 401 after failed retry
-		if w.Code != http.StatusUnauthorized {
-			t.Errorf("Expected 401 Unauthorized, got %d", w.Code)
-		}
-
-		// Verify upstream was called exactly twice (original + one retry)
-		if requestCount != 2 {
-			t.Errorf("Expected 2 upstream requests (no infinite loop), got %d", requestCount)
-		}
-
-		// Verify credential refresh was called exactly once
-		if refreshCallCount != 1 {
-			t.Errorf("Expected 1 refresh call, got %d", refreshCallCount)
-		}
-
-		t.Log("✓ No infinite retry loops - exactly one retry attempt")
-	})
-
-	t.Run("quota_charged_twice_on_retry_path", func(t *testing.T) {
-		// Test that quota is charged twice on the retry path (dispatch-time accounting)
-		server := createTestServer(t)
-		defer server.Close()
-
-		// Configure upstream to return 401 then 200
-		requestCount := 0
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestCount++
-			if requestCount == 1 {
-				w.WriteHeader(http.StatusUnauthorized)
-			} else {
-				w.WriteHeader(http.StatusOK)
+	proxy, rec, req, calls, _ := phase12Scenario(t, capBytes, bigBody,
+		func(call int) ([]byte, error) {
+			if call == 1 {
+				return []byte(phase12StaleSecret), nil
 			}
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection and quota
-		route := "/api/quota-test"
-		vaultPath := "secret/quota-api"
-		costPerCall := 0.10
-		quotaLimit := 1.00
-
-		server.routeTable.SetUpstreamURL(upstream.URL)
-		server.quotaTracker.SetCostPerCall(route, costPerCall)
-		server.quotaTracker.SetQuota(route, QuotaConfig{
-			Limit:  quotaLimit,
-			Window: 1 * time.Hour,
-			Scope:  "per-route",
+			return []byte(phase12FreshSecret), nil
 		})
 
-		// Mock vault client
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{
-				vaultPath: []byte("fresh-token"),
-			},
-		}
+	proxy.ServeHTTP(rec, req)
 
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
+	if rec.Code != GetHTTPStatus(ErrCodeCredentialRefreshNotRetried) {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code,
+			GetHTTPStatus(ErrCodeCredentialRefreshNotRetried), rec.Body.String())
+	}
+	if got := rec.Header().Get("X-SEAM-Credential-Refresh"); got != "succeeded" {
+		t.Errorf("X-SEAM-Credential-Refresh = %q, want %q", got, "succeeded")
+	}
+	// Refresh happened; the request itself did not.
+	if got := *calls; got != 2 {
+		t.Errorf("credential resolver calls = %d, want 2 (refresh still happens)", got)
+	}
 
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath: vaultPath,
-			InjectAs:  &InjectAs{Kind: InjectionBearer},
+	var envelope ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decoding envelope: %v\nbody: %s", err, rec.Body.String())
+	}
+	if envelope.Error != ErrCodeCredentialRefreshNotRetried {
+		t.Errorf("error code = %q, want %q", envelope.Error, ErrCodeCredentialRefreshNotRetried)
+	}
+	if envelope.Details["upstream_status"] != float64(http.StatusUnauthorized) {
+		t.Errorf("details.upstream_status = %v, want %d",
+			envelope.Details["upstream_status"], http.StatusUnauthorized)
+	}
+}
+
+// TestPhase12Scenario4_RefetchFailureDegradesToSecretStoreUnavailable covers a
+// resolver that fails on the refresh: the caller gets secret-store-unavailable
+// rather than a retry.
+func TestPhase12Scenario4_RefetchFailureDegradesToSecretStoreUnavailable(t *testing.T) {
+	proxy, rec, req, calls, _ := phase12Scenario(t, 0, []byte(`{"job":"run"}`),
+		func(call int) ([]byte, error) {
+			if call == 1 {
+				return []byte(phase12StaleSecret), nil
+			}
+			return nil, io.ErrUnexpectedEOF
 		})
 
-		// Make first request - should succeed after retry
-		req1 := httptest.NewRequest("GET", route, nil)
-		w1 := httptest.NewRecorder()
-		server.ServeHTTP(w1, req1)
+	proxy.ServeHTTP(rec, req)
 
-		// Should get 200 OK after retry
-		if w1.Code != http.StatusOK {
-			t.Errorf("Expected 200 OK, got %d", w1.Code)
-		}
+	if got := *calls; got != 2 {
+		t.Errorf("credential resolver calls = %d, want 2 (the failing refresh is still attempted)", got)
+	}
+	if rec.Code != GetHTTPStatus(ErrCodeSecretStoreUnavailable) {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code,
+			GetHTTPStatus(ErrCodeSecretStoreUnavailable), rec.Body.String())
+	}
+	var envelope ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decoding envelope: %v\nbody: %s", err, rec.Body.String())
+	}
+	if envelope.Error != ErrCodeSecretStoreUnavailable {
+		t.Errorf("error code = %q, want %q", envelope.Error, ErrCodeSecretStoreUnavailable)
+	}
+}
 
-		// Verify quota was charged twice (original dispatch + retry dispatch)
-		remaining := server.quotaTracker.GetRemaining(route, "", "")
-		expectedRemaining := quotaLimit - (2 * costPerCall) // Charged twice
-		if remaining != expectedRemaining {
-			t.Errorf("Expected remaining $%.2f (charged twice), got $%.2f", expectedRemaining, remaining)
-		}
-
-		// Calculate how many more requests we can make
-		remainingRequests := int(remaining / costPerCall)
-		if remainingRequests != 8 {
-			t.Errorf("Expected 8 remaining requests, got %d", remainingRequests)
-		}
-
-		t.Log("✓ Quota charged twice on retry path (dispatch-time accounting)")
-	})
-
-	t.Run("protocol_upgrade_not_replayed", func(t *testing.T) {
-		// Test that protocol upgrades (WebSocket) are not replayed
-		server := createTestServer(t)
-		defer server.Close()
-
-		// Configure upstream to return 401
-		upstreamCalled := false
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			upstreamCalled = true
-			w.WriteHeader(http.StatusUnauthorized)
-		}))
-		defer upstream.Close()
-
-		// Configure route with credential injection
-		route := "/api/websocket"
-		vaultPath := "secret/websocket-api"
-		server.routeTable.SetUpstreamURL(upstream.URL)
-
-		// Mock vault client
-		refreshCallCount := 0
-		mockClient := &mockVaultClient{
-			secrets: map[string][]byte{
-				vaultPath: []byte("ws-token"),
-			},
-			onRefresh: func(path string) {
-				refreshCallCount++
-			},
-		}
-
-		// Set the vault client in the route table
-		server.routeTable.mu.Lock()
-		server.routeTable.secretClient = mockClient
-		server.routeTable.mu.Unlock()
-
-		server.routeTable.AddRoute(route, RouteEntry{
-			VaultPath:   vaultPath,
-			InjectAs:    &InjectAs{Kind: InjectionBearer},
-			Unscrubbable: true,
+// TestPhase12Scenario4_NoInfiniteRetryLoops covers the loop guard: the retry
+// itself gets a 401 and must NOT trigger a second refresh. The caller sees the
+// upstream's own 401 and the upstream saw exactly two requests.
+func TestPhase12Scenario4_NoInfiniteRetryLoops(t *testing.T) {
+	proxy, rec, req, calls, upstream := phase12Scenario(t, 0, []byte(`{"job":"run"}`),
+		func(call int) ([]byte, error) {
+			// Every credential resolves to the same value the upstream rejects.
+			return []byte(phase12StaleSecret), nil
 		})
 
-		// Make WebSocket upgrade request
-		req := httptest.NewRequest("GET", route, nil)
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Connection", "Upgrade")
-		w := httptest.NewRecorder()
+	proxy.ServeHTTP(rec, req)
 
-		server.ServeHTTP(w, req)
-
-		// Should get credential-refresh-not-retried (protocol upgrades are unreplayable)
-		if w.Code != http.StatusUnauthorized {
-			t.Errorf("Expected 401 Unauthorized, got %d", w.Code)
-		}
-
-		var resp ErrorResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Errorf("Failed to parse error response: %v", err)
-		}
-
-		if resp.Error != ErrCodeCredentialRefreshNotRetried {
-			t.Errorf("Expected error code %s, got %s", ErrCodeCredentialRefreshNotRetried, resp.Error)
-		}
-
-		// Verify upstream was called exactly once (no retry for protocol upgrade)
-		if !upstreamCalled {
-			t.Errorf("Expected upstream to be called")
-		}
-
-		// Verify credential refresh was still called
-		if refreshCallCount != 1 {
-			t.Errorf("Expected 1 refresh call, got %d", refreshCallCount)
-		}
-
-		t.Log("✓ Protocol upgrade not replayed (returned credential-refresh-not-retried)")
-	})
-}
-
-// mockVaultClient is a test double for vault.Client
-type mockVaultClient struct {
-	secrets     map[string][]byte
-	refreshErr  error
-	onRefresh   func(path string)
-	refreshCall int
-}
-
-func (m *mockVaultClient) GetSecret(ctx context.Context, vaultPath string) (vault.Secret, error) {
-	if secret, ok := m.secrets[vaultPath]; ok {
-		return vault.Secret{"value": secret}, nil
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401; body = %s", rec.Code, rec.Body.String())
 	}
-	return nil, &vault.SecretStoreUnavailableError{
-		Dependency: "OpenBao",
-		Class:      vault.FailureClassNetwork,
+	if got := *calls; got != 2 {
+		t.Errorf("credential resolver calls = %d, want 2 (refresh must happen exactly once)", got)
+	}
+	if got := len(upstream.sawAuth()); got != 2 {
+		t.Errorf("upstream requests = %d, want 2 (initial + one retry, no more)", got)
 	}
 }
 
-func (m *mockVaultClient) RefreshAfterUnauthorized(ctx context.Context, vaultPath string) (vault.Secret, error) {
-	m.refreshCall++
-	if m.onRefresh != nil {
-		m.onRefresh(vaultPath)
+// TestPhase12Scenario4_QuotaChargedTwiceOnRetryPath covers Phase 13.2
+// dispatch-time accounting interacting with the retry: both the initial
+// dispatch and the retry charge quota, because both reached the upstream.
+func TestPhase12Scenario4_QuotaChargedTwiceOnRetryPath(t *testing.T) {
+	proxy, rec, req, _, _ := phase12Scenario(t, 0, []byte(`{"job":"run"}`),
+		func(call int) ([]byte, error) {
+			if call == 1 {
+				return []byte(phase12StaleSecret), nil
+			}
+			return []byte(phase12FreshSecret), nil
+		})
+
+	const cost = 0.25
+	const limit = 10.00
+	proxy.QuotaTracker = NewQuotaTracker()
+	proxy.QuotaTracker.SetCostPerCall(phase12Route, cost)
+	proxy.QuotaTracker.SetQuota(phase12Route, QuotaConfig{Limit: limit, Window: 0, Scope: "per-route"})
+	*req = *req.WithContext(contextWithQuotaCost(req.Context(), cost))
+
+	proxy.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
-	if m.refreshErr != nil {
-		return nil, m.refreshErr
+	want := limit - 2*cost
+	if got := proxy.QuotaTracker.GetRemaining(phase12Route, "test-token", "test-user"); got != want {
+		t.Errorf("remaining = $%.2f, want $%.2f (charged once per dispatch)", got, want)
 	}
-	return m.GetSecret(ctx, vaultPath)
+	if hdr := rec.Header().Get("X-SEAM-Budget-Remaining"); hdr == "" {
+		t.Error("X-SEAM-Budget-Remaining header missing on the retry response")
+	}
 }
 
-func (m *mockVaultClient) Invalidate(vaultPath string) {
-	// No-op for mock
-}
+// TestPhase12Scenario4_ProtocolUpgradeNotReplayed covers the guard in
+// ServeHTTP that refuses credential injection into a protocol upgrade rather
+// than buffering or replaying it.
+func TestPhase12Scenario4_ProtocolUpgradeNotReplayed(t *testing.T) {
+	proxy, rec, req, calls, upstream := phase12Scenario(t, 0, []byte(`{"job":"run"}`),
+		func(call int) ([]byte, error) { return []byte(phase12FreshSecret), nil })
 
-func (m *mockVaultClient) Login(ctx context.Context) error {
-	return nil
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+
+	proxy.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusSwitchingProtocols {
+		t.Fatalf("protocol upgrade was proxied with credential injection (status %d)", rec.Code)
+	}
+	// The request never reached the upstream: injection is refused first.
+	if got := len(upstream.sawAuth()); got != 0 {
+		t.Errorf("upstream requests = %d, want 0", got)
+	}
+	if got := *calls; got != 0 {
+		t.Errorf("credential resolver calls = %d, want 0 (refused before resolving)", got)
+	}
 }

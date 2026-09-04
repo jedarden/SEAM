@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"testing"
-	"time"
 )
 
 func TestComputeScopeVersionHash(t *testing.T) {

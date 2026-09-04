@@ -25,6 +25,7 @@ type replayableBody struct {
 	exceededLimit  bool
 	unreplayable   bool // Set when body is protocol upgrade or unbounded chunked
 	bytesRead      int64
+	contentLength  int64 // as declared by the sender; -1 when unknown
 }
 
 // newReplayableBody creates a new replayable body from the source reader.
@@ -35,9 +36,10 @@ func newReplayableBody(source io.ReadCloser, contentLength int64, maxBytes int64
 	}
 
 	rb := &replayableBody{
-		source:   source,
-		maxBytes: maxBytes,
-		buffer:   &bytes.Buffer{},
+		source:        source,
+		maxBytes:      maxBytes,
+		buffer:        &bytes.Buffer{},
+		contentLength: contentLength,
 	}
 
 	// Detect unreplayable conditions
@@ -128,7 +130,20 @@ func (rb *replayableBody) CanReplay() bool {
 
 // canReplayLocked is the internal implementation that assumes the lock is already held.
 func (rb *replayableBody) canReplayLocked() bool {
-	return rb.bufferComplete && !rb.exceededLimit && !rb.unreplayable
+	if rb.exceededLimit || rb.unreplayable {
+		return false
+	}
+	if rb.bufferComplete {
+		return true
+	}
+	// A body with a declared length is replayable as soon as every declared
+	// byte has passed through the tee, even before the sender closes it. The
+	// HTTP transport drains a Content-Length body with a final Read that
+	// returns the remaining bytes but no EOF, so the EOF-driven detection in
+	// Read never fires for it; and the 401 retry in the proxy reads the buffer
+	// as soon as response headers arrive, which is before the transport closes
+	// the request body — waiting for Close there lost the retry every time.
+	return rb.contentLength >= 0 && rb.bytesRead >= rb.contentLength
 }
 
 // GetBufferedBytes returns a copy of the buffered body bytes.

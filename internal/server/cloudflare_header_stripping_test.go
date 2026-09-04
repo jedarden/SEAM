@@ -160,7 +160,7 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 			}
 
 			// Check that scope headers were deleted
-			for headerName := range tt.expectedDeleted {
+			for range tt.expectedDeleted {
 				// Check if header still exists in the request
 				// Note: The middleware modifies the request before passing to the handler
 				// We need to check if the header was deleted by examining the handler's view

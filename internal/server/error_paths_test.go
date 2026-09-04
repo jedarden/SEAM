@@ -125,7 +125,7 @@ func TestHTTPErrorPathsUseCommonEnvelope(t *testing.T) {
 			method: http.MethodGet,
 			target: "/quota",
 			serve: func(w http.ResponseWriter, r *http.Request) {
-				(&Server{}).writeQuotaExceededResponse(w, r, r.URL.Path, 0)
+				(&Server{}).writeQuotaExceededResponse(w, r, r.URL.Path, 0, 0)
 			},
 			wantStatus: http.StatusTooManyRequests,
 			wantCode:   ErrCodeQuotaExceeded,

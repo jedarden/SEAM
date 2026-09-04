@@ -469,7 +469,14 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	if timeout <= 0 {
 		timeout = upstreamRequestTimeout
 	}
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	// Derive the deadline from the outbound request's own context, not the
+	// inbound one. WithContext below *replaces* the request's context, so
+	// parenting the timeout on ctx would silently drop every value
+	// buildUpstreamRequest stored there — notably the Phase 2.5 replayable
+	// body tee, whose absence made every 401 take the not-retried path. The
+	// outbound context already derives from ctx, so this keeps the deadline,
+	// quota cost and scrub state while preserving the tee.
+	timeoutCtx, cancel := context.WithTimeout(upstreamReq.Context(), timeout)
 	upstreamReq = upstreamReq.WithContext(timeoutCtx)
 
 	client := p.Client
@@ -490,6 +497,23 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 
 	log.Printf("[proxy] Upstream %s %s -> %d (%v)", upstreamReq.Method, upstreamReq.URL.Path, upstreamResp.StatusCode, time.Since(startTime))
 
+	// Phase 13.2: Record quota cost AT DISPATCH time, before any 401 handling.
+	// The rule is per upstream request actually issued, so a request that drew
+	// a 401 from the upstream is charged like any other: the 401 branch below
+	// returns without reaching the ordinary charge site, and the retry it then
+	// issues charges again through this same line on its own dispatch.
+	if quotaCost > 0 && p.QuotaTracker != nil {
+		// Extract token and user for quota tracking
+		token := r.Header.Get("X-Auth-Token")
+		user := r.Header.Get("X-User-ID")
+
+		// Record the quota cost
+		log.Printf("[proxy] Recording quota cost at dispatch: route=%s, cost=$%.2f, status=%d", route, quotaCost, upstreamResp.StatusCode)
+		if err := p.QuotaTracker.RecordQuotaCost(route, quotaCost, token, user); err != nil {
+			log.Printf("[proxy] ERROR recording quota cost: %v", err)
+		}
+	}
+
 	// Phase 12.4: Handle 401 responses with credential refresh and retry
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
@@ -503,21 +527,6 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 			}
 			// Retry was attempted and response was sent, return nil
 			return nil
-		}
-	}
-
-	// Phase 13.2: Record quota cost AT DISPATCH time
-	// The request was successfully sent to upstream, so we charge quota
-	// Even 5xx responses charge quota (the upstream received and processed the request)
-	if quotaCost > 0 && p.QuotaTracker != nil {
-		// Extract token and user for quota tracking
-		token := r.Header.Get("X-Auth-Token")
-		user := r.Header.Get("X-User-ID")
-
-		// Record the quota cost
-		log.Printf("[proxy] Recording quota cost at dispatch: route=%s, cost=$%.2f, status=%d", route, quotaCost, upstreamResp.StatusCode)
-		if err := p.QuotaTracker.RecordQuotaCost(route, quotaCost, token, user); err != nil {
-			log.Printf("[proxy] ERROR recording quota cost: %v", err)
 		}
 	}
 
@@ -569,8 +578,11 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 	// Mark that we're attempting credential refresh to prevent infinite loops
 	ctx = contextWithCredentialRetry(ctx, true)
 
-	// Check if we have a replayable body for retry
-	replayable := replayableBodyFromContext(ctx)
+	// Check if we have a replayable body for retry. The tee is stored on the
+	// outbound request's context (buildUpstreamRequest), not on ServeHTTP's, so
+	// read it from there — the inbound ctx never carries it, and reading it
+	// here made every 401 take the not-retried path regardless of body size.
+	replayable := replayableBodyFromContext(upstreamReq.Context())
 	route := r.URL.Path
 
 	// Resolve the secret resolver
@@ -1048,7 +1060,7 @@ func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err e
 type responseWriterTracker struct {
 	http.ResponseWriter
 	wroteHeader bool
-	statusCode   int // Tracks the HTTP status code written
+	statusCode  int // Tracks the HTTP status code written
 }
 
 func (w *responseWriterTracker) WriteHeader(statusCode int) {
