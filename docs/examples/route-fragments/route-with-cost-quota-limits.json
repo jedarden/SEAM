@@ -9,7 +9,7 @@
   "x-seam-owner": "weather-api",
   "x-api-version": "v1",
   "x-upstream": "https://api.weatherprovider.com",
-  "x-vault-path": "seam/routes/weather-api/provider-api-key",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/weather-api/provider-api-key",
   "x-inject-as": {
     "kind": "header",
     "name": "X-API-Key"

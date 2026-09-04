@@ -11,7 +11,7 @@
   "x-upstream-map": {
     "iad": {
       "url": "https://db-iad.example.com",
-      "vaultPath": "seam/routes/db-proxy/iad-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/db-proxy/iad-credentials",
       "injectAs": {
         "kind": "header",
         "name": "X-DB-Token"
@@ -31,7 +31,7 @@
     },
     "ord": {
       "url": "https://db-ord.example.com",
-      "vaultPath": "seam/routes/db-proxy/ord-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/db-proxy/ord-credentials",
       "injectAs": {
         "kind": "header",
         "name": "X-DB-Token"
@@ -51,7 +51,7 @@
     },
     "dfw": {
       "url": "https://db-dfw.example.com",
-      "vaultPath": "seam/routes/db-proxy/dfw-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/db-proxy/dfw-credentials",
       "injectAs": {
         "kind": "header",
         "name": "X-DB-Token"
@@ -71,7 +71,7 @@
     },
     "_all": {
       "url": "https://db-iad.example.com",
-      "vaultPath": "seam/routes/db-proxy/iad-credentials",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/db-proxy/iad-credentials",
       "injectAs": {
         "kind": "header",
         "name": "X-DB-Token"

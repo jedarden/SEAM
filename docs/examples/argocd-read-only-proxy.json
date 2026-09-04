@@ -13,7 +13,7 @@
   "x-seam-owner": "argocd-proxy",
   "x-api-version": "v1",
   "x-upstream": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
-  "x-vault-path": "seam/routes/argocd-proxy/readonly-token",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/argocd-proxy/readonly-token",
   "x-inject-as": {
     "kind": "bearer"
   },

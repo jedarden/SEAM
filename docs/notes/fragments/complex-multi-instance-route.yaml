@@ -5,7 +5,7 @@ x-instance-param: cluster
 x-upstream-map:
   prod-us-east:
     url: https://k8s-prod-us-east.ardenone.svc.cluster.local:6443
-    vaultPath: seam/routes/k8s-fleet/prod-us-east
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/prod-us-east
     injectAs:
       kind: bearer
     tls:
@@ -20,7 +20,7 @@ x-upstream-map:
 
   prod-us-west:
     url: https://k8s-prod-us-west.ardenone.svc.cluster.local:6443
-    vaultPath: seam/routes/k8s-fleet/prod-us-west
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/prod-us-west
     injectAs:
       kind: bearer
     tls:
@@ -35,7 +35,7 @@ x-upstream-map:
 
   staging:
     url: https://k8s-staging.ardenone.svc.cluster.local:6443
-    vaultPath: seam/routes/k8s-fleet/staging
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/staging
     injectAs:
       kind: bearer
     tls:
@@ -47,7 +47,7 @@ x-upstream-map:
 
   _all:
     url: https://k8s-fanout-aggregator.ardenone.svc.cluster.local:8443
-    vaultPath: seam/routes/k8s-fleet/fanout
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s-fleet/fanout
     injectAs:
       kind: bearer
 

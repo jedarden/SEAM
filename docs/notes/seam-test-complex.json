@@ -8,7 +8,7 @@
   "x-upstream-map": {
     "us-east": {
       "url": "https://weather.api.example.com",
-      "vaultPath": "seam/routes/weather-service/api-token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/api-token",
       "injectAs": {
         "kind": "bearer"
       },
@@ -18,7 +18,7 @@
     },
     "eu-west": {
       "url": "https://weather.eu.example.com",
-      "vaultPath": "seam/routes/weather-service/eu-token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/weather-service/eu-token",
       "injectAs": {
         "kind": "bearer"
       },

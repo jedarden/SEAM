@@ -92,7 +92,7 @@ x-seam-schema: v1
 x-seam-owner: weather-service
 x-api-version: v1
 x-upstream: https://weather-backend.ardenone.internal
-x-vault-path: seam/routes/weather-service/api-key
+x-vault-path: rs-manager/rs-manager/seam/routes/weather-service/api-key
 x-inject-as:
   kind: header
   name: X-API-Key

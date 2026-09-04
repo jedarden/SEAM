@@ -174,7 +174,7 @@ x-upstream: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
 x-upstream-tls:
   caBundle: argocd-ro.pem
 x-upstream-strip-prefix: /argocd
-x-vault-path: seam/routes/argocd/ro-token
+x-vault-path: rs-manager/rs-manager/seam/routes/argocd/ro-token
 x-inject-as:
   kind: bearer
   name: authorization
@@ -208,7 +208,7 @@ x-fanout-scope:
 x-upstream-map:
   ardenone-cluster:
     url: https://traefik-ardenone-cluster:8001
-    vaultPath: seam/routes/k8s/ardenone-cluster-ro
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s/ardenone-cluster-ro
     injectAs:
       kind: bearer
       name: authorization
@@ -218,7 +218,7 @@ x-upstream-map:
   apexalgo-iad:
     url: http://kubectl-proxy-apexalgo-iad:8001
     plaintext: acknowledged
-    vaultPath: seam/routes/k8s/apexalgo-iad-admin
+    vaultPath: rs-manager/rs-manager/seam/routes/k8s/apexalgo-iad-admin
     injectAs:
       kind: bearer
       name: authorization
@@ -399,7 +399,7 @@ These **cannot** be expressed in JSON Schema and are enforced by `internal/spec`
 6. **Unit equality** — `x-quota.unit` must equal `x-cost-per-call.unit`
 7. **Per-instance resolution** — effective `(vaultPath, injectAs)` per map entry
 8. **Upstream allowlist** — host membership in operator-owned allowlist
-9. **Vault prefix enforcement** — `x-vault-path` must be within `seam/routes/<owner>/*`
+9. **Vault prefix enforcement** — `x-vault-path` must be within `rs-manager/rs-manager/seam/routes/<owner>/*`
 10. **Owner binding** — `x-seam-owner` must equal mounted parent directory
 11. **CA bundle existence** — `x-upstream-tls.caBundle` must exist in secret
 12. **Collision detection** — `(path, method, x-api-version)` uniqueness across fragments
