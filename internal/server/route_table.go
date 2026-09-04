@@ -284,6 +284,23 @@ func (h *ThreadSafeTableHolder) Match(req *http.Request) (*RouteMatch, error) {
 	return h.current.Match(req)
 }
 
+// MatchForLoopGuard resolves the route a loop-guard check applies to, without
+// any of the side effects Match carries. Route matching normally runs inside
+// the caller mux, after every middleware, so a middleware cannot read a match
+// published into the request context and has to resolve the route itself. This
+// read deliberately neither sanitises the request nor publishes a match into
+// it, so the authoritative stage-4 match is left untouched.
+func (h *ThreadSafeTableHolder) MatchForLoopGuard(req *http.Request) *RouteMatch {
+	if h == nil {
+		return nil
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	return h.current.loopGuardMatch(req)
+}
+
 // Snapshot returns a copy of the current route table's routes for inspection.
 // The returned routes are a snapshot at the time of the call and are not
 // affected by subsequent swaps.
@@ -1105,6 +1122,53 @@ func (t *RouteTable) Match(req *http.Request) (*RouteMatch, error) {
 	}
 	withRouteMatch(req, selected, t.resolveCredential)
 	return selected, nil
+}
+
+// loopGuardMatch is Match with the request sanitisation and context publication
+// removed, so a caller that only needs the route entry can resolve it without
+// mutating the request. Selection mirrors Match: X-SEAM-API-Version pins the
+// version when present, otherwise the highest-ranked version wins.
+func (t *RouteTable) loopGuardMatch(req *http.Request) *RouteMatch {
+	if t == nil || req == nil || req.URL == nil {
+		return nil
+	}
+
+	requestedVersion := req.Header.Get("X-SEAM-API-Version")
+	method := strings.ToUpper(req.Method)
+	requestPath := req.URL.EscapedPath()
+	if requestPath == "" {
+		requestPath = req.URL.Path
+	}
+
+	var selected *RouteEntry
+	var selectedParams map[string]string
+	selectedRank := int(^uint(0) >> 1)
+	for i := range t.routes {
+		route := &t.routes[i]
+		if strings.ToUpper(route.Method) != method {
+			continue
+		}
+		if requestedVersion != "" && route.APIVersion != requestedVersion {
+			continue
+		}
+		pathParams, ok := matchRoutePath(route.PathTemplate, requestPath)
+		if !ok {
+			continue
+		}
+		if requestedVersion != "" {
+			return &RouteMatch{Route: *route, PathParams: pathParams}
+		}
+		if rank := routeVersionRank(route.APIVersion); rank < selectedRank {
+			selected = route
+			selectedRank = rank
+			selectedParams = pathParams
+		}
+	}
+
+	if selected == nil {
+		return nil
+	}
+	return &RouteMatch{Route: *selected, PathParams: selectedParams}
 }
 
 func matchRoutePath(template, path string) (map[string]string, bool) {

@@ -124,8 +124,11 @@ func TestLoopGuardMiddleware_BlocksRepeatedFailures(t *testing.T) {
 
 	middleware := server.LoopGuardMiddleware(nextHandler)
 
-	// Make repeated failing requests
-	for i := 0; i < 4; i++ {
+	// Make repeated failing requests. MaxRepeats counts the identical failures
+	// a route tolerates, so with MaxRepeats 3 the first four requests go through
+	// and the fifth is the one that gets blocked (CheckRequest blocks once the
+	// failure run has exceeded the budget, not equalled it).
+	for i := 0; i < 5; i++ {
 		body := strings.NewReader(`{"test":"data"}`)
 		req := httptest.NewRequest("POST", "/api/test", body)
 		req.Header.Set("Content-Type", "application/json")
@@ -133,13 +136,13 @@ func TestLoopGuardMiddleware_BlocksRepeatedFailures(t *testing.T) {
 
 		middleware.ServeHTTP(w, req)
 
-		if i < 3 {
-			// First 3 should be allowed (even though they fail)
+		if i < 4 {
+			// First 4 should be allowed (even though they fail)
 			if w.Code != http.StatusInternalServerError {
 				t.Errorf("Request %d should be allowed (fail), got status %d", i+1, w.Code)
 			}
 		} else {
-			// 4th should be blocked by loop guard
+			// 5th should be blocked by loop guard
 			if w.Code != http.StatusTooManyRequests {
 				t.Errorf("Request %d should be blocked by loop guard, got status %d", i+1, w.Code)
 			}
@@ -466,5 +469,97 @@ func TestLoopGuardMiddleware_PathParamsInHash(t *testing.T) {
 
 	if hash1 == hash2 {
 		t.Errorf("Hashes with different path params should differ")
+	}
+}
+
+// TestLoopGuardMiddleware_UsesRouteMatchFromContext verifies that a match the
+// routing layer published under routeMatchContextKey{} drives loop guard. The
+// route table here is deliberately empty so the request path cannot resolve
+// through it — only the published match can.
+func TestLoopGuardMiddleware_UsesRouteMatchFromContext(t *testing.T) {
+	config := &Config{
+		MaxReplayableRequestBytes: 1024 * 1024,
+	}
+	server := &Server{
+		config:            config,
+		loopGuardRegistry: NewLoopGuardRegistry(),
+		routeTableHolder:  NewThreadSafeTableHolder(&RouteTable{}),
+	}
+
+	route := RouteEntry{
+		PathTemplate: "/api/published",
+		Method:       "POST",
+		APIVersion:   "v1",
+		LoopGuardConfig: &LoopGuardConfig{
+			MaxRepeats:     1,
+			Window:         "1m",
+			windowDuration: 1 * time.Minute,
+		},
+	}
+
+	middleware := server.LoopGuardMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+
+	// MaxRepeats 1 tolerates one identical failure, so the third request is the
+	// first one blocked (CheckRequest blocks once the run exceeds the budget).
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("POST", "/api/published", strings.NewReader(`{"test":"data"}`))
+		withRouteMatch(req, &RouteMatch{Route: route, PathParams: map[string]string{}}, nil)
+		w := httptest.NewRecorder()
+
+		middleware.ServeHTTP(w, req)
+
+		if i < 2 && w.Code != http.StatusInternalServerError {
+			t.Fatalf("Request %d should be allowed, got status %d", i+1, w.Code)
+		}
+		if i == 2 && w.Code != http.StatusTooManyRequests {
+			t.Errorf("Third request should be blocked via the published route match, got status %d", w.Code)
+		}
+	}
+}
+
+// TestLoopGuardMiddleware_FallsBackToRouteTable verifies that when no match has
+// been published the middleware resolves the route itself. Route matching runs
+// inside the caller mux, after every middleware, so this is the path a mounted
+// middleware actually takes.
+func TestLoopGuardMiddleware_FallsBackToRouteTable(t *testing.T) {
+	config := &Config{
+		MaxReplayableRequestBytes: 1024 * 1024,
+	}
+	server := &Server{
+		config:            config,
+		loopGuardRegistry: NewLoopGuardRegistry(),
+	}
+
+	server.routeTableHolder = NewThreadSafeTableHolder(&RouteTable{routes: []RouteEntry{{
+		PathTemplate: "/api/fallback",
+		Method:       "POST",
+		APIVersion:   "v1",
+		LoopGuardConfig: &LoopGuardConfig{
+			MaxRepeats:     1,
+			Window:         "1m",
+			windowDuration: 1 * time.Minute,
+		},
+	}}})
+
+	middleware := server.LoopGuardMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+
+	// MaxRepeats 1 tolerates one identical failure, so the third request is the
+	// first one blocked (CheckRequest blocks once the run exceeds the budget).
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("POST", "/api/fallback", strings.NewReader(`{"test":"data"}`))
+		w := httptest.NewRecorder()
+
+		middleware.ServeHTTP(w, req)
+
+		if i < 2 && w.Code != http.StatusInternalServerError {
+			t.Fatalf("Request %d should be allowed, got status %d", i+1, w.Code)
+		}
+		if i == 2 && w.Code != http.StatusTooManyRequests {
+			t.Errorf("Third request should be blocked via the route table fallback, got status %d", w.Code)
+		}
 	}
 }
