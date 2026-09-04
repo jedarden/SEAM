@@ -105,11 +105,17 @@ func TestRequestValidationFixtureAllowsValidRequest(t *testing.T) {
 }
 
 func TestDocsRouteFixtureIncludesRouteSliceAndExample(t *testing.T) {
-	s := &Server{specLoader: newRequestValidationFixture(t)}
+	s := &Server{
+		specLoader:       newRequestValidationFixture(t),
+		identityResolver: newLoopbackTestIdentityResolver(),
+	}
 	path := url.QueryEscape("/widgets/{id}")
 	req := httptest.NewRequest(http.MethodGet, "/docs/route?path="+path, nil)
 	res := httptest.NewRecorder()
-	s.docsRouteHandler(res, req)
+	// The handler scope-filters the route it documents against the identity
+	// stage 3 resolves; a bare handler call has no identity in the request
+	// context, so wrap it the way production does.
+	s.identityResolutionMiddleware(http.HandlerFunc(s.docsRouteHandler)).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf("docs route status = %d, want %d: %s", res.Code, res.Code, res.Body.String())
@@ -155,7 +161,7 @@ func TestDocsRouteFixtureIncludesRouteSliceAndExample(t *testing.T) {
 
 	methodReq := httptest.NewRequest(http.MethodGet, "/docs/route?path="+path+"&method=POST&version=_unversioned", nil)
 	methodRes := httptest.NewRecorder()
-	s.docsRouteHandler(methodRes, methodReq)
+	s.identityResolutionMiddleware(http.HandlerFunc(s.docsRouteHandler)).ServeHTTP(methodRes, methodReq)
 	if methodRes.Code != http.StatusOK {
 		t.Fatalf("specific docs route status = %d, want %d", methodRes.Code, http.StatusOK)
 	}

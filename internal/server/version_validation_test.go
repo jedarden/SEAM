@@ -203,11 +203,14 @@ func TestVersionMiddlewareAcceptsOnlyUnversioned(t *testing.T) {
 
 func TestValidVersionAcceptedOnAllEndpoints(t *testing.T) {
 	s := newVersionTestServer(t)
-	callerHandler := versionedTestHandler(s, s.callerMux)
-	// The operator mux scope-gates /config/status and /health/credentials on
-	// the identity stage 3 resolves, and stage 3 sits outside the mux in
-	// production; put it between the version layer and the mux so a valid
-	// version reaches the handlers with an identity attached.
+	callerHandler := versionedTestHandler(s, s.identityResolutionMiddleware(s.callerMux))
+	// Both muxes scope-gate their control-plane endpoints on the identity stage
+	// 3 resolves — /config/status and /health/credentials on the required
+	// scope, /docs/route on the caller's own filtered spec — and stage 3 sits
+	// outside the mux in production; put it between the version layer and each
+	// mux so a valid version reaches the handlers with an identity attached.
+	// The probe paths in the matrix are exempt at stage 3, so they are
+	// unchanged by this.
 	operatorHandler := versionedTestHandler(s, s.identityResolutionMiddleware(s.operatorMux))
 
 	tests := []struct {

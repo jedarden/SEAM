@@ -313,6 +313,11 @@ func TestValidationIntegration_DocsRouteEndpoint_Verified(t *testing.T) {
 
 	server := &Server{
 		specLoader: loader,
+		// The docs route is scope-filtered to the identity stage 3 resolves, and
+		// a handler called directly has none in its request context — an
+		// anonymous caller is reduced to no visible routes. Resolve the fixed
+		// test identity the way production does before the handler runs.
+		identityResolver: newLoopbackTestIdentityResolver(),
 	}
 
 	// Test /docs/route endpoint with various query parameters
@@ -369,7 +374,7 @@ func TestValidationIntegration_DocsRouteEndpoint_Verified(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
 			w := httptest.NewRecorder()
 
-			server.docsRouteHandler(w, req)
+			server.identityResolutionMiddleware(http.HandlerFunc(server.docsRouteHandler)).ServeHTTP(w, req)
 
 			if w.Code != tt.wantStatus {
 				t.Errorf("Expected status %d, got %d. Body: %s", tt.wantStatus, w.Code, w.Body.String())

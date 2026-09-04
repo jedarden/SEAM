@@ -639,12 +639,18 @@ func TestDocsRouteHandlerValidRoute(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// /docs/route is scope-filtered to the identity stage 3 resolves, and the
+	// bare mux carries none — an anonymous caller is reduced to no visible
+	// routes and 404s on a route that exists. Present the fixed test identity
+	// and drive the production composition (stage 3 around the mux) so the
+	// handler reads it from the request context.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	// Test valid route lookup
 	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=GET", nil)
 	w := httptest.NewRecorder()
 
-	s.callerMux.ServeHTTP(w, req)
+	s.identityResolutionMiddleware(s.callerMux).ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()
@@ -706,12 +712,15 @@ func TestDocsRouteHandlerAllMethods(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// Same gate as the valid-route case: the scope filter runs on the identity
+	// stage 3 resolves, so /docs itself is only visible to a caller with one.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	// Test route lookup without method parameter (should return all methods)
 	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/docs", nil)
 	w := httptest.NewRecorder()
 
-	s.callerMux.ServeHTTP(w, req)
+	s.identityResolutionMiddleware(s.callerMux).ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()
@@ -814,12 +823,15 @@ func TestDocsRouteHandlerVersionParameter(t *testing.T) {
 	}
 
 	s := New(cfg)
+	// Same gate as the valid-route case: the version parameter is only reached
+	// once the scope filter has admitted the route against a resolved identity.
+	s.identityResolver = newLoopbackTestIdentityResolver()
 
 	// Test with explicit version parameter
 	req := httptest.NewRequest(http.MethodGet, "/docs/route?path=/openapi.json&method=GET&version=_unversioned", nil)
 	w := httptest.NewRecorder()
 
-	s.callerMux.ServeHTTP(w, req)
+	s.identityResolutionMiddleware(s.callerMux).ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()

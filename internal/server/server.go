@@ -1037,8 +1037,13 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 				// No specific method requested - path is visible if any method exists
 				routeVisibleInScope = true
 			} else {
-				// Specific method requested - check if that method exists
-				_, methodExists := pathItemMap[method]
+				// Specific method requested - check if that method exists.
+				// OpenAPI spells operation keys lowercase ("get", "post"), while
+				// the query parameter was normalized to upper case above, so
+				// compare in the document's case: an exact match against the
+				// upper-case parameter misses every operation a path declares
+				// and reports a route the caller can see as not invocable.
+				_, methodExists := pathItemMap[strings.ToLower(method)]
 				if methodExists {
 					routeVisibleInScope = true
 				} else {
@@ -1232,7 +1237,13 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Phase 11.2: Add last-2xx status for the path
 	// This tracking is in-memory and restart-scoped (lost on process restart)
-	last2xxStatus := s.last2xxTracker.GetPathStatus(path)
+	// The tracker is absent on a Server that was not built through New (tests,
+	// bare handlers), so answer the no-attempt status a tracker with no
+	// observation for this path returns anyway rather than dereferencing nil.
+	last2xxStatus := Last2xxStatus{State: Last2xxNoAttempt}
+	if s.last2xxTracker != nil {
+		last2xxStatus = s.last2xxTracker.GetPathStatus(path)
+	}
 	response["last_2xx"] = last2xxStatus
 
 	// Set headers and return response
