@@ -93,7 +93,7 @@ and do not commit, until the tree at `main` passes verify again. A red gate
 means the tree does not satisfy its own Definition of Done; anything built on
 it inherits that.
 
-Mechanically, three layers enforce this:
+Mechanically, five layers enforce this:
 
 1. **`scripts/ci-gate.sh`** — is the gate red? Green (`exit 0`), red (`1`),
    cluster error (`2`), or no completed run yet (`3`). It checks the latest
@@ -127,5 +127,41 @@ are the difference between a gate and a dashboard.
    releases work). With the timer installed you only need the manual
    `open`/`close` above on a machine that does not run it. Transitions log to
    `~/.local/state/seam-ci-gate/watch.log`.
+
+5. **`.claude/hooks/seam-ci-claim-gate.py`** — the layer that needs no
+   cooperation at all. A Claude Code `PreToolUse` hook, wired by this repo's
+   `.claude/settings.json`, it runs on every `Bash` call and refuses any that
+   *invokes a claim* — `bead claim`, or `bead update --assignee ...` — while
+   `scripts/ci-gate.sh` reports red. Layers 1-4 rely on a worker choosing to
+   consult them; this one fires on the path itself, so the refusal arrives
+   with the gate's own verdict attached:
+
+   > seam-ci gate is RED — bead claim refused. GATE red revision=1e2b4fcc4
+   > workflow=seam-ci-kgr42 phase=Failed. …
+
+   Deliberate shapes, so the gate is not a second outage:
+   - **It decides nothing itself.** It shells out to `scripts/ci-gate.sh`
+     (layer 1) and quotes the verdict, so there is one definition of "red"
+     here. An earlier draft re-implemented the cluster query and promptly
+     disagreed with layer 1 about the same cluster — duplication is how a
+     gate drifts into decoration.
+   - **Fail open.** A missing `ci-gate.sh` (fresh clone), an unreachable
+     cluster, a pending run, or an unparsable response all *allow* the call.
+     Only a definitive red blocks. Never build on "the gate let me".
+   - **Only claims are gated.** Finishing, verifying, closing or committing
+     an already-assigned bead passes, as does any command that merely
+     mentions claims. Dispatched work arrives pre-assigned by the NEEDLE
+     daemon and never touches this hook — which is the way out of a red
+     gate: complete what you hold, claim nothing new.
+   - **The pre-commit bypass does not apply here.** `SEAM_ALLOW_RED_GATE=1`
+     exists to land the commit that *fixes* a red gate; landing a fix needs
+     no claim.
+   - Verdicts are cached for 60 s (`SEAM_CI_GATE_CACHE` overrides the path)
+     so parallel workers do not each pay the round trip.
+
+   Because the hook is repo-scoped and committed, it self-activates for any
+   Claude Code session opened on this checkout — nothing to install, and no
+   NEEDLE-side change is needed. Consult it without attempting a claim:
+   `python3 .claude/hooks/seam-ci-claim-gate.py --check`.
 
 
