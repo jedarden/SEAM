@@ -357,3 +357,37 @@ replacing the CRD. Post-fix verification is mechanical: confirm
 `argo-workflows-ns-iad-ci` is Synced, push one docs-only commit, expect
 exactly one accepted `/seam` delivery → one published eventID → one filter
 pass → one `seam-ci-*` workflow (mirror copy 401s as in item 4).
+
+## Post-fix state, confirmed live (2026-09-05, bead `seam-d20b2887`)
+
+`seam-9a3d5f53` closed and the CRD defect is gone. The recipe above already
+fired once on a production push:
+
+- **`seam-ci-9prjf`** — revision `25fb17f3` ("chore(ci): keep python's
+  `__pycache__` out of the claim gate's tree"), auto-fired by the sensor
+  (labels `events.argoproj.io/sensor=seam-ci-sensor`,
+  `trigger=seam-ci`, creator `system-serviceaccount-argo-events-default`),
+  created 11:22:47Z, **Succeeded** 12:11:38Z. Every node green:
+  `post-pending`, `verify`, `image-build`, `resolve-release`,
+  `github-release`, `post-final-status`, and the workflow-level `onExit`.
+- **One event per push, from Forgejo alone.** The eventsource log for that
+  push shows exactly one accepted `/seam` delivery → one published eventID
+  (11:22:43.894Z), followed ~1s later by two `invalid auth header`
+  rejections (11:22:44.9Z, 11:22:45.06Z) — GitHub hook 659043016's mirror
+  copies, stopped at the auth layer and never published. The two-rejections
+  shape (not one) is steady across every push since the `authSecret` roll.
+- **Template — correction to item 5's manifest pointer.** The in-repo copy
+  `SEAM:declarative-config/k8s/iad-ci/argo-workflows/seam-ci.yaml` is a
+  stale early snapshot (it still runs `./scripts/definition-of-done.sh
+  --all` and clones from `github.com`) and is not what ArgoCD applies. The
+  authoritative manifest is `jedarden/declarative-config`
+  `k8s/iad-ci/argo-workflows/seam-ci-workflowtemplate.yml`: the live
+  WorkflowTemplate is byte-identical to it at `b465bd34` (manifest last
+  touched by `95a850fe`), modulo the `argocd.argoproj.io/instance` label.
+  The `ci` template still carries the documented gates — gofmt → go vet →
+  golangci-lint v2.12.2 → `go test -race` → seam lint → benchmark gate with
+  the 20% benchstat threshold.
+
+The docs-only commit carrying this section is the post-fix e2e probe push
+for `seam-d20b2887`; its per-push outcome (workflow name, phase, any failed
+step, duplicate count) is recorded on that bead.
