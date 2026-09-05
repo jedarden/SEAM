@@ -4,7 +4,13 @@
 #   docker build -f containers/seam/Dockerfile -t seam:local .
 
 # Stage 1: compile a static Linux binary.
-FROM golang:1.25.7-bookworm AS builder
+#
+# Tracked to go.mod's `go` directive, not frozen at a patch release: the
+# golang images set GOTOOLCHAIN=local, so an image older than the directive
+# hard-fails `go mod download` with "go.mod requires go >= ..." instead of
+# self-upgrading. This drifted behind at 0c3d484 and broke seam-ci's
+# image-build step on every run after go.mod reached go 1.26.0.
+FROM golang:1.26-bookworm AS builder
 
 ARG REVISION
 
