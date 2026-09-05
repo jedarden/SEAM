@@ -7,6 +7,7 @@
   },
   "x-seam-schema": "v1",
   "x-seam-owner": "test-service",
+  "x-upstream": "https://httpbin.org",
   "paths": {
     "/test/new-dynamic-route": {
       "get": {

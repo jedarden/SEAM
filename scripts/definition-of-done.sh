@@ -170,22 +170,36 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
   # benchmark gate (if baseline exists)
   if [ -f bench/baseline.txt ]; then
     run_check "benchmark gate" bash -c '
+      # Both stages below pipe through tee, so without pipefail a bench run
+      # that fails to build would report tee success and compare stale data.
+      set -o pipefail
       go test -bench=. -benchmem -run=^$ ./... | tee /tmp/bench-new.txt
 
-      # Install benchstat
+      # Install benchstat; go install puts it in GOPATH/bin, which is not on
+      # PATH (in CI least of all), so invoke it by absolute path.
       go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d
-      benchstat bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt
+      "$(go env GOPATH)/bin/benchstat" bench/baseline.txt /tmp/bench-new.txt | tee /tmp/benchstat.txt
 
-      python3 -c "
+      # benchstat compares only benchmarks that appear in BOTH files with the
+      # same name and GOMAXPROCS suffix. When nothing matches -- placeholder
+      # baseline, or a baseline recorded on a different machine/core count --
+      # it prints no percentage deltas at all, so say so instead of silently
+      # passing an empty comparison.
+      python3 - <<PY
 import re, sys
-worst = 0.0
+worst = None
 for line in open("/tmp/benchstat.txt"):
     m = re.search(r"([+-]\d+(?:\.\d+)?)%", line)
     if m:
-        worst = max(worst, float(m.group(1)))
+        delta = float(m.group(1))
+        worst = delta if worst is None else max(worst, delta)
+if worst is None:
+    print("No matched benchmarks between baseline and this run -- "
+          "comparison skipped, not passed.")
+    sys.exit(0)
 print(f"Worst regression: {worst:.1f}%")
 sys.exit(1 if worst > 20.0 else 0)
-      "
+PY
     '
   else
     echo "Skipping benchmark gate - no committed bench/baseline.txt yet"

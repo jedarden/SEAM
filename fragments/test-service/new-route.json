@@ -4,6 +4,9 @@
     "title": "Test Service - New Route",
     "version": "1.0.0"
   },
+  "x-seam-schema": "v1",
+  "x-seam-owner": "test-service",
+  "x-upstream": "https://httpbin.org",
   "paths": {
     "/test/new": {
       "get": {

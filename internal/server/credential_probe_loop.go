@@ -352,7 +352,7 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Record probe spend rate
 	result.ProbeSpendRate = time.Since(startTime).Milliseconds()

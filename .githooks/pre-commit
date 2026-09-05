@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Pre-commit hook: Definition of Done (fast lane)
+# Pre-commit hook: Definition of Done (fast lane) + the seam-ci gate
 #
-# This hook runs the fast lane definition-of-done checks before allowing a commit.
-# It counts bypasses so we know when quality gates are being skipped.
+# Two checks run before a commit is allowed:
 #
-# To bypass this hook (NOT RECOMMENDED), use:
-#   git commit --no-verify -m "..."
-# This will be recorded in .beads/bypasses.jsonl
+#   1. The fast-lane Definition of Done (gofmt, go vet, golangci-lint).
+#   2. The seam-ci gate: if the latest seam-ci run for origin/main Failed,
+#      the tree at main is known-broken and committing on top of it is how
+#      this repo accumulated 25+ commits over a red verify (2026-08-27..31).
+#      See AGENTS.md, "The seam-ci gate".
+#
+# Bypasses are counted in .beads/bypasses.jsonl either way:
+#   git commit --no-verify            (skips both checks, recorded)
+#   SEAM_ALLOW_RED_GATE=1 git commit  (skips only the gate check, recorded)
 
 set -euo pipefail
 
@@ -26,6 +31,33 @@ if ! scripts/definition-of-done.sh --fast --count-bypass; then
   echo "To bypass (not recommended), use: git commit --no-verify"
   echo "This will be recorded in .beads/bypasses.jsonl"
   exit 1
+fi
+
+echo "=== Checking the seam-ci gate ==="
+
+if [[ "${SEAM_ALLOW_RED_GATE:-0}" == "1" ]]; then
+  mkdir -p .beads
+  echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"lane\":\"ci-gate\",\"pwd\":\"$(pwd -P)\"}" >> .beads/bypasses.jsonl
+  echo "⚠ SEAM_ALLOW_RED_GATE=1 — gate check skipped (recorded in .beads/bypasses.jsonl)"
+else
+  gate_status=0
+  scripts/ci-gate.sh || gate_status=$?
+  if [[ "$gate_status" == "1" ]]; then
+    echo ""
+    echo "❌ Commit refused: the seam-ci gate is red."
+    echo ""
+    echo "The latest seam-ci run on the tree at origin/main Failed, so this commit"
+    echo "would land on a tree that does not pass its own Definition of Done."
+    echo "Fix or revert what broke the gate first; see AGENTS.md, 'The seam-ci gate'."
+    echo ""
+    echo "To commit anyway (recorded in .beads/bypasses.jsonl):"
+    echo "  SEAM_ALLOW_RED_GATE=1 git commit -m \"...\""
+    exit 1
+  elif [[ "$gate_status" != "0" ]]; then
+    # 2 = could not determine (cluster unreachable), 3 = no completed run yet.
+    # Neither is a red gate, and neither should block work offline.
+    echo "⚠ gate status indeterminate (exit $gate_status) — continuing"
+  fi
 fi
 
 echo "✓ Pre-commit checks passed"
