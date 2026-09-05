@@ -68,16 +68,28 @@ status="$(printf '%s' "$runs_json" | REVISION="$REVISION" python3 -c '
 import json, sys, os
 
 rev = os.environ["REVISION"]
+
+# An unparsable or truncated payload must land on "error", never "red".
+# Under `set -e` an uncaught exception here would exit 1, and ci-gate-watch
+# reads exit 1 as "block the whole claim frontier" -- so a mangled kubectl
+# response would halt every SEAM bead and log a traceback nobody could act
+# on. Exit 2 (hold) is the documented answer for "I could not tell".
+try:
+    items = json.load(sys.stdin).get("items", [])
+except (ValueError, AttributeError):
+    print("error|none|unparsable workflow list from kubectl")
+    sys.exit(0)
+
 runs = []
-for wf in json.load(sys.stdin).get("items", []):
+for wf in items:
     params = (wf.get("spec", {}).get("arguments", {}) or {}).get("parameters", []) or []
     run_rev = next((p.get("value", "") for p in params if p.get("name") == "revision"), "")
     if run_rev != rev:
         continue
     runs.append((
-        wf["metadata"].get("creationTimestamp", ""),
-        wf["metadata"].get("name", "?"),
-        wf.get("status", {}).get("phase", "Unknown"),
+        (wf.get("metadata") or {}).get("creationTimestamp", ""),
+        (wf.get("metadata") or {}).get("name", "?"),
+        (wf.get("status") or {}).get("phase", "Unknown"),
     ))
 
 if not runs:
