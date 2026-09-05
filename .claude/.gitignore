@@ -1,2 +1,6 @@
 # Claude Code's per-repo scratch: session worktrees it manages itself.
 worktrees/
+# Python's own scratch. The claim gate is a .py file, so importing it (as the
+# verification harness does) leaves a __pycache__ beside it that would
+# otherwise read as an uncommitted change to a mechanism file.
+__pycache__/
