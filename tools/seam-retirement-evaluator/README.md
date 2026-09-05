@@ -1,10 +1,20 @@
 # SEAM Retirement Evaluator
 
-**Phase 8.5**: Autonomous retirement evaluation with GitHub PR opening
+**Phase 8.5**: Detection-only retirement evaluation. The evaluator finds route
+versions that have gone quiet and reports them; it never writes to a git host.
 
 ## Overview
 
-The `seam-retirement-evaluator` is a deployable component that evaluates route versions for retirement eligibility based on observed traffic patterns. It operates as a separate deployment from SEAM, with its own ServiceAccount and OpenBao role, ensuring complete isolation from SEAM's credential paths.
+The `seam-retirement-evaluator` is a deployable component that evaluates route
+versions for retirement eligibility based on observed traffic patterns. It
+operates as a separate deployment from SEAM, with its own ServiceAccount and
+OpenBao role, ensuring complete isolation from SEAM's credential paths.
+
+**The evaluator is detection-only.** Its entire output is one structured log
+record and one Prometheus counter per deprecation candidate. The
+`x-seam-deprecated` block it proposes is landed by a human as an ordinary
+commit to `main` in `declarative-config`, and reverted the same way if a caller
+appears. There is no PR, no branch, no token, and no write path of any kind.
 
 ## Architecture
 
@@ -15,7 +25,7 @@ seam-retirement-evaluator (Deployment)
 │   ├── Reads: secret/evaluators/seam-retirement-evaluator/*
 │   ├── Reads: secret/monitoring/victoriametrics/*
 │   └── Explicitly DENIED: secret/seam/routes/* (isolation from SEAM)
-└── GitHub Token: secret/evaluators/seam-retirement-evaluator/github-token
+└── VictoriaMetrics endpoint (read-only query, no credential)
 ```
 
 ### Key Isolation Guarantees
@@ -24,6 +34,7 @@ seam-retirement-evaluator (Deployment)
 - **Explicit Deny Policy**: SEAM policy explicitly denies access to evaluator paths
 - **Separate SA**: Independent ServiceAccount with minimal RBAC
 - **No Cross-Access**: Evaluator cannot read SEAM route secrets; SEAM cannot read evaluator credentials
+- **No write path**: the evaluator holds no git-host credential and cannot reach one
 
 ## Functionality
 
@@ -33,58 +44,59 @@ The evaluator queries VictoriaMetrics for per-route-version traffic metrics:
 
 ```promql
 # Per-route-version request counter (Phase 8.4 metric)
-seam_route_version_requests_total{route="...", spec_version="..."}
+max_over_time(seam_route_version_requests_total[14d])
 ```
 
-For each `(route, x-api-version)` combination, it calculates:
+For each `(route, x-api-version)` combination, it reads the observed request
+count and derives:
 
 - **Observed max inter-request gap**: Maximum time between requests
 - **Quiet-since**: Timestamp of last observed request
 - **Total history**: Duration of available metrics
 
+An unreadable sample is treated as *traffic*, not as quietness — a count the
+evaluator cannot read is never allowed to make a route eligible.
+
 ### 2. Retirement Eligibility
 
 A route version is eligible for retirement when:
 
-1. **Zero observed traffic** in evaluation window (NECESSARY condition)
+1. **Zero observed traffic** (NECESSARY condition)
 2. Quiet period exceeds evaluation window:
    ```
    evaluation_window = max(3 x observed_max_gap, 7 days)
    ```
 3. Sufficient history exists (≥14 days), otherwise 7-day floor applies
 
-**Nothing retires autonomously** - the evaluator only OPENS PRs; humans merge.
+### 3. Detection Emission
 
-### 3. GitHub PR Opening
+For each eligible route version the evaluator emits, as a structured zap
+record and a Prometheus counter:
 
-For eligible route versions, the evaluator opens a PR to `jedarden/declarative-config`:
+- route, `x-api-version`, spec version
+- quiet-since timestamp and evaluation window
+- the reason the route qualified
+- the proposed sunset date (90 days out)
+- the computed brownout windows
+- the path of the route fragment the proposal applies to
+- the `x-seam-deprecated` block itself, fragment-shaped and ready to paste
+- the human-readable proposal text
 
-```yaml
-# Added to fragment:
-x-seam-deprecated:
-  since: "2026-08-28"
-  sunset: "2026-11-26"
-  brownouts:
-    - start: "2026-09-27T00:00:00Z"
-      end: "2026-10-04T00:00:00Z"
-    - start: "2026-10-27T00:00:00Z"
-      end: "2026-11-03T00:00:00Z"
-    - start: "2026-11-19T00:00:00Z"
-      end: "2026-11-26T00:00:00Z"
+```
+seam_retirement_deprecation_candidates_total{route=...,api_version=...,spec_version=...}
+seam_retirement_evaluation_runs_total{result="success"|"error"}
+seam_retirement_routes_evaluated
 ```
 
-### PR Structure
-
-- **Title**: `feat(seam): deprecate <route> (version <v>) - zero traffic for <duration>`
-- **Body**: Detailed eligibility metrics, timeline, and verification steps
-- **Labels**: `seam`
-- **Branch**: `seam-deprecate-<route>-<version>`
+`seam_retirement_deprecation_candidates_total` accumulates per route version,
+so a route that stays quiet keeps counting up across evaluation runs.
 
 ### 4. The Verdict Channel
 
 The deprecation verdict travels through SEAM's existing hot-reload path:
 
-1. PR merged → ConfigMap updated → ArgoCD syncs
+1. A human adds the `x-seam-deprecated` block to the route fragment and commits
+   to `main`; ArgoCD syncs
 2. SEAM hot-reloads fragment with `x-seam-deprecated`
 3. DeprecationMiddleware emits Deprecation/Sunset headers
 4. BrownoutScheduler returns 410 Gone during windows
@@ -99,52 +111,17 @@ The deprecation verdict travels through SEAM's existing hot-reload path:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `VICTORIAMETRICS_ENDPOINT` | No | `http://victorialogs-single...` | VictoriaMetrics query endpoint |
-| `GITHUB_OWNER` | No | `jedarden` | GitHub repository owner |
-| `GITHUB_REPO` | No | `declarative-config` | GitHub repository name |
-| `GITHUB_TOKEN` | **Yes** | - | GitHub PAT (from OpenBao) |
-| `DECLARATIVE_CONFIG_PATH` | No | `k8s/rs-manager/seam/routes.d` | Fragment path in repo |
-| `EVALUATION_INTERVAL_HOURS` | No | `1` | Evaluation loop interval |
+| `DECLARATIVE_CONFIG_PATH` | No | `k8s/rs-manager/seam/routes.d` | Fragment path prefix reported in findings |
+| `LISTEN_ADDRESS` | No | `:8080` | Health/ready/metrics listen address. This server carries the evaluator's only output, so a bind failure exits rather than losing the metric silently |
 
-### OpenBao Setup
-
-The evaluator requires a GitHub PAT stored at:
-
-```
-secret/evaluators/seam-retirement-evaluator/github-token
-```
-
-Token requirements:
-- **Scope**: `repo` (full repository access)
-- **Permissions**: Pull requests, Contents, Metadata
-- **Source**: Created manually at https://github.com/settings/tokens
-
-**Never** read this token through SEAM's paths - isolation is enforced by OpenBao policy.
+There is no credential. The evaluator is configurable from an empty
+environment; the defaults above are the whole configuration. The evaluation
+interval is a compile-time constant (`EvaluationInterval`, 1 hour).
 
 ## Deployment
 
-The evaluator deploys to `k8s/rs-manager/seam-retirement-evaluator/` (deliberately OUTSIDE `seam/`):
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: seam-retirement-evaluator
-  namespace: seam
-spec:
-  replicas: 1
-  template:
-    spec:
-      serviceAccountName: seam-retirement-evaluator
-      containers:
-      - name: evaluator
-        image: ronaldraygun/seam-retirement-evaluator:0.1.0
-        env:
-        - name: GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: seam-retirement-evaluator-github-token
-              key: token
-```
+The evaluator deploys to `k8s/rs-manager/seam-retirement-evaluator/` (deliberately OUTSIDE `seam/`).
+It needs only network reach to VictoriaMetrics and nothing mounted.
 
 ### Internal Scheduling Loop
 
@@ -163,24 +140,23 @@ for range ticker.C {
 
 Routes with ANY observed requests are NEVER retired - this is a necessary condition, not a heuristic.
 
-### 2. Human Gate
+### 2. Reversibility Is The Gate
 
-All PRs require human approval. The mechanical checks validate:
-- Fragment path ownership (`routes/<service>/-only`)
-- GitHub token validity
-
-The human merge gate bounds blast radius.
+There is no review gate and none is needed. Landing a proposal is a one-line
+block committed directly to `main`, reversible with a revert commit, and ArgoCD
+re-syncs. The evaluator's own blast radius is zero: it cannot write anywhere.
 
 ### 3. Rollback Safety
 
-If a PR is merged in error:
+If a deprecation lands in error:
 1. Caller-appears events immediately invalidate the verdict
-2. Follow-up PR removing the block is mechanical
+2. A revert commit removes the block
 3. Hot-reload path means no deployment rollback
 
 ### 4. No Autonomous Sunset
 
-The evaluator only OPENS PRs - it never merges, never pushes directly, never bypasses review.
+The evaluator only reports. It never edits a repository, never opens a PR, and
+never holds a credential that could.
 
 ## Integration with SEAM Phases
 
@@ -188,7 +164,7 @@ The evaluator only OPENS PRs - it never merges, never pushes directly, never byp
 - **Phase 8.2**: x-adapter (version migration) → provides replacement paths
 - **Phase 8.3**: Deprecation/brownout scheduler → enforces the verdict
 - **Phase 8.4**: Per-route-version metrics → fuels the evaluation
-- **Phase 8.5** (this): Retirement evaluator → generates the verdict
+- **Phase 8.5** (this): Retirement evaluator → detects the verdict
 
 ## Development
 
@@ -207,29 +183,12 @@ go test -v ./...
 
 ### Local Development
 
-Set environment variables for local testing:
-
 ```bash
 export VICTORIAMETRICS_ENDPOINT="http://localhost:8428"
-export GITHUB_TOKEN="ghp_..."
-export GITHUB_OWNER="jedarden"
-export GITHUB_REPO="declarative-config"
 ./seam-retirement-evaluator
 ```
 
 ## Troubleshooting
-
-### "GitHub token is required but was not provided"
-
-The OpenBao secret is not populated or the Kubernetes Secret is not synced. Run:
-
-```bash
-# Check OpenBao
-bao kv get secret/evaluators/seam-retirement-evaluator/github-token
-
-# Check Kubernetes
-kubectl get secret seam-retirement-evaluator-github-token -n seam
-```
 
 ### "Failed to query route traffic"
 
@@ -238,24 +197,25 @@ VictoriaMetrics endpoint is unreachable. Check:
 - Network policies allow traffic
 - VictoriaMetrics is healthy
 
-### "Failed to open PR"
+### No candidates, but a route is definitely quiet
 
-GitHub API issues:
-- Token has `repo` scope
-- Token is not expired
-- Repository exists and is accessible
+Zero observed traffic is necessary but not sufficient. The route also needs a
+quiet period longer than `evaluation_window` (`max(3 x observed_max_gap, 7
+days)`), and an unreadable sample counts as traffic. Check
+`seam_retirement_routes_evaluated` to confirm the route was considered at all,
+and the run's log records for the eligibility reason per route version.
 
 ## Future Enhancements
 
-- **Caller-appears detection**: Automatic PR reversal when traffic resumes
-- **Metrics refinement**: Better gap detection algorithms
+- **Caller-appears detection**: Automatic flagging when traffic resumes on a
+  deprecated route, so the revert is proposed rather than noticed
+- **Metrics refinement**: Better gap detection algorithms (QuietSince and
+  MaxGap currently need a range query this instant query does not perform)
 - **Configurable windows**: Per-service custom evaluation windows
-- **Dry-run mode**: Evaluation-only without PR creation
-- **Fragment write**: The PR flow stops short of editing the fragment. Route
-  fragments in declarative-config are JSON entries inside one whole ConfigMap
-  per route owner (`k8s/rs-manager/seam/configmap-routes-*.yaml`), not files
-  under `DECLARATIVE_CONFIG_PATH`, and the fragment schema
-  (`configmap-fragment-schema.json`) does not know `x-seam-deprecated` — so
-  there is nothing to write yet. `GitHubClient.OpenPR` refuses to open a pull
-  request with no file change (GitHub rejects a zero-diff PR), so candidates
-  currently log an error instead of opening an unusable PR.
+- **Fragment write**: The evaluator does not edit fragments. Route fragments in
+  declarative-config are JSON entries inside one whole ConfigMap per route
+  owner (`k8s/rs-manager/seam/configmap-routes-*.yaml`), not files under
+  `DECLARATIVE_CONFIG_PATH`, and the fragment schema
+  (`configmap-fragment-schema.json`) does not know `x-seam-deprecated`. The
+  reported path is therefore a proposal locator, not a writable target — the
+  edit is a human commit to `main`.

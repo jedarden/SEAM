@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -10,18 +11,19 @@ import (
 
 // RetirementEvaluator evaluates routes for retirement eligibility
 type RetirementEvaluator struct {
-	vmc          *VictoriaMetricsClient
-	ghc          *GitHubClient
-	config       *Config
+	vmc     *VictoriaMetricsClient
+	config  *Config
+	metrics *retirementMetrics
+
 	fragmentPath string
 }
 
 // NewRetirementEvaluator creates a new retirement evaluator
-func NewRetirementEvaluator(vmc *VictoriaMetricsClient, ghc *GitHubClient, config *Config) *RetirementEvaluator {
+func NewRetirementEvaluator(vmc *VictoriaMetricsClient, config *Config, metrics *retirementMetrics) *RetirementEvaluator {
 	return &RetirementEvaluator{
 		vmc:          vmc,
-		ghc:          ghc,
 		config:       config,
+		metrics:      metrics,
 		fragmentPath: config.DeclarativeConfigPath,
 	}
 }
@@ -33,6 +35,7 @@ func (re *RetirementEvaluator) RunEvaluation(ctx context.Context) error {
 	// Step 1: Query all route versions from VictoriaMetrics
 	routeStats, err := re.vmc.QueryRouteVersionTraffic(ctx)
 	if err != nil {
+		re.metrics.recordRun("error", 0)
 		return fmt.Errorf("failed to query route traffic: %w", err)
 	}
 
@@ -74,20 +77,13 @@ func (re *RetirementEvaluator) RunEvaluation(ctx context.Context) error {
 		}
 	}
 
-	// Step 3: Open PRs for eligible candidates
-	for _, candidate := range candidates {
-		if err := re.openRetirementPR(ctx, &candidate); err != nil {
-			zap.L().Error("Failed to open retirement PR",
-				zap.String("route", candidate.RouteStats.Route),
-				zap.String("version", candidate.RouteStats.APIVersion),
-				zap.Error(err))
-			continue
-		}
-
-		zap.L().Info("Successfully opened retirement PR",
-			zap.String("route", candidate.RouteStats.Route),
-			zap.String("version", candidate.RouteStats.APIVersion))
+	// Step 3: Emit the findings. The evaluator is detection-only: its verdict
+	// is this record and this metric, and the x-seam-deprecated edit that
+	// follows is landed by a human as an ordinary commit to main.
+	for i := range candidates {
+		re.emitRetirementFinding(&candidates[i])
 	}
+	re.metrics.recordRun("success", len(routeStats))
 
 	zap.L().Info("Retirement evaluation completed",
 		zap.Int("total_routes", len(routeStats)),
@@ -145,8 +141,12 @@ func (re *RetirementEvaluator) isEligibleForRetirement(stats RouteTrafficStats, 
 		quietDuration.Round(time.Hour), window.Round(time.Hour))
 }
 
-// openRetirementPR opens a PR to declarative-config with sunset and brownout schedule
-func (re *RetirementEvaluator) openRetirementPR(ctx context.Context, candidate *RetirementCandidate) error {
+// emitRetirementFinding publishes one deprecation candidate as a detection.
+// There is deliberately no git host on the other end of this: the evaluator
+// establishes from VictoriaMetrics that a route version has been quiet since a
+// point, over a window, with no caller-appears events, and reports it. Landing
+// the x-seam-deprecated block is a human edit to declarative-config on main.
+func (re *RetirementEvaluator) emitRetirementFinding(candidate *RetirementCandidate) {
 	now := time.Now()
 
 	// Calculate sunset date (typically 90-180 days out)
@@ -155,30 +155,19 @@ func (re *RetirementEvaluator) openRetirementPR(ctx context.Context, candidate *
 	// Calculate brownout windows (2-3 windows before sunset)
 	brownouts := re.calculateBrownouts(now, sunsetDate)
 
-	// Build the deprecation block
+	// Build the deprecation block. The fragment schema does not know
+	// x-seam-deprecated yet and declarative-config stores route fragments as
+	// JSON entries inside one whole ConfigMap per route owner, so this block is
+	// the proposal the human lands, not something this process writes.
 	deprecationBlock := fmt.Sprintf(`x-seam-deprecated:
   since: "%s"
   sunset: "%s"
   brownouts:
 %s`, now.Format("2006-01-02"), sunsetDate, brownouts)
 
-	// The block has nowhere to land yet: declarative-config stores route
-	// fragments as JSON entries inside one whole ConfigMap per route owner
-	// (k8s/rs-manager/seam/configmap-routes-*.yaml), not as the
-	// <path>/<route>/fragment.yaml file this tool assumes, and the fragment
-	// schema does not know x-seam-deprecated. Surface it for diagnostics until
-	// a write target that SEAM would actually load exists.
-	zap.L().Debug("Generated x-seam-deprecated block",
-		zap.String("route", candidate.RouteStats.Route),
-		zap.String("block", deprecationBlock))
+	fragmentPath := re.getFragmentPath(candidate)
 
-	// Create the PR
-	prTitle := fmt.Sprintf("feat(seam): deprecate %s (version %s) - zero traffic for %s",
-		candidate.RouteStats.Route,
-		candidate.RouteStats.APIVersion,
-		time.Since(candidate.QuietSince).Round(24*time.Hour))
-
-	prBody := fmt.Sprintf(`## Deprecation Proposal
+	body := fmt.Sprintf(`## Deprecation Proposal
 
 **Route:** %s
 **API Version:** %s
@@ -198,11 +187,12 @@ This route version is proposed for deprecation based on the following metrics:
 
 - **Deprecation declared:** %s
 - **Sunset:** %s (90 days from declaration)
-- **Brownout windows:** See fragment
+- **Brownout windows:**
+%s
 
-### Changes
+### Change
 
-This PR adds an `+"`x-seam-deprecated`"+` block to the route fragment with:
+Landing this adds an `+"`x-seam-deprecated`"+` block to the route fragment with:
 - `+"`since`"+` date (deprecation declaration)
 - `+"`sunset`"+` date (removal target)
 - Brownout windows (410 Gone periods)
@@ -215,10 +205,11 @@ The verdict channel (deprecation state) travels through the existing hot-reload 
 - Zero observed traffic in VictoriaMetrics
 - No caller-appears events detected
 
-### Approval Required
+### Follow-up
 
-This PR requires human approval before merging to ensure blast radius is bounded.
-Mechanical checks validate fragment path ownership; the human gate is the final approval.
+The edit is a one-line block on the route fragment, committed directly to main
+and reverted the same way if a caller appears. No review gate is required;
+reversibility is the gate.
 `,
 		candidate.RouteStats.Route,
 		candidate.RouteStats.APIVersion,
@@ -229,25 +220,28 @@ Mechanical checks validate fragment path ownership; the human gate is the final 
 		candidate.Reason,
 		now.Format("2006-01-02"),
 		sunsetDate,
-		re.getFragmentPath(candidate),
+		brownouts,
+		fragmentPath,
 	)
 
-	// Open the PR. No file change is attached yet (see the note on the
-	// deprecation block above), so OpenPR refuses rather than opening the
-	// zero-diff pull request GitHub would reject.
-	branchName := fmt.Sprintf("seam-deprecate-%s-%s", candidate.RouteStats.Route, candidate.RouteStats.APIVersion)
-	branchName = sanitizeBranchName(branchName)
+	zap.L().Info("Deprecation candidate detected",
+		zap.String("route", candidate.RouteStats.Route),
+		zap.String("api_version", candidate.RouteStats.APIVersion),
+		zap.String("spec_version", candidate.RouteStats.SpecVersion),
+		zap.Time("quiet_since", candidate.QuietSince),
+		zap.Duration("eval_window", candidate.EvalWindow),
+		zap.String("reason", candidate.Reason),
+		zap.String("proposed_sunset", sunsetDate),
+		zap.String("brownout_windows", brownouts),
+		zap.String("fragment_path", fragmentPath),
+		zap.String("x_seam_deprecated_block", deprecationBlock),
+		zap.String("body", body))
 
-	prURL, err := re.ghc.OpenPR(ctx, branchName, prTitle, prBody, nil, []string{"seam"})
-	if err != nil {
-		return fmt.Errorf("failed to open PR: %w", err)
-	}
-
-	zap.L().Info("Opened retirement PR",
-		zap.String("pr_url", prURL),
-		zap.String("branch", branchName))
-
-	return nil
+	re.metrics.recordCandidate(routeVersionKey{
+		route:       candidate.RouteStats.Route,
+		apiVersion:  candidate.RouteStats.APIVersion,
+		specVersion: candidate.RouteStats.SpecVersion,
+	})
 }
 
 // calculateBrownouts calculates brownout windows leading up to sunset
@@ -289,8 +283,12 @@ func (re *RetirementEvaluator) formatBrownout(start, end time.Time) string {
       end: "%s"`, start.Format(time.RFC3339), end.Format(time.RFC3339))
 }
 
+// getFragmentPath renders where a human would land the x-seam-deprecated
+// block. Route labels are URL paths and carry a leading slash of their own, so
+// the two halves are joined without stacking a second separator.
 func (re *RetirementEvaluator) getFragmentPath(candidate *RetirementCandidate) string {
-	return fmt.Sprintf("%s/%s/fragment.yaml", re.fragmentPath, candidate.RouteStats.Route)
+	return fmt.Sprintf("%s/%s/fragment.yaml", strings.TrimSuffix(re.fragmentPath, "/"),
+		strings.TrimPrefix(candidate.RouteStats.Route, "/"))
 }
 
 // RetirementCandidate represents a route version eligible for retirement
@@ -301,17 +299,4 @@ type RetirementCandidate struct {
 	EvalWindow     time.Duration
 	QualifyingTime time.Time
 	Reason         string
-}
-
-func sanitizeBranchName(name string) string {
-	// Sanitize for GitHub branch names
-	result := ""
-	for _, c := range name {
-		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' {
-			result += string(c)
-		} else {
-			result += "-"
-		}
-	}
-	return result
 }

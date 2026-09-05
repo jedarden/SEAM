@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -31,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	zap.ReplaceGlobals(logger)
 	zap.L().Info("Starting SEAM Retirement Evaluator")
@@ -42,13 +41,15 @@ func main() {
 		zap.L().Fatal("Failed to load configuration", zap.Error(err))
 	}
 
-	// Initialize components
+	// Initialize components. The evaluator is detection-only: it needs
+	// VictoriaMetrics read access and nothing else — no git host, no
+	// third-party credential.
+	metrics := newRetirementMetrics()
 	victoriaMetricsClient := NewVictoriaMetricsClient(cfg.VictoriaMetricsEndpoint)
-	githubClient := NewGitHubClient(cfg.GitHubToken, cfg.GitHubOwner, cfg.GitHubRepo)
-	evaluator := NewRetirementEvaluator(victoriaMetricsClient, githubClient, cfg)
+	evaluator := NewRetirementEvaluator(victoriaMetricsClient, cfg, metrics)
 
-	// Start HTTP server for health/ready probes
-	go startHealthServer()
+	// Start HTTP server for health/ready probes and the metrics surface
+	go startHealthServer(metrics)
 
 	// Run evaluation loop
 	ctx := context.Background()
@@ -70,43 +71,39 @@ func main() {
 	}
 }
 
-// startHealthServer starts an HTTP server for health/ready probes
-func startHealthServer() {
+// startHealthServer starts an HTTP server for health/ready probes and the
+// evaluator's own Prometheus surface
+func startHealthServer(metrics *retirementMetrics) {
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Ready"))
+		_, _ = w.Write([]byte("Ready"))
 	})
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		zap.L().Fatal("Health server failed", zap.Error(err))
+	http.Handle("/metrics", metrics)
+
+	addr := getEnv("LISTEN_ADDRESS", ":8080")
+	// This server carries the only output a detection-only evaluator has, so a
+	// bind failure has to be loud rather than a silent loss of the metric.
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		zap.L().Fatal("Health server failed", zap.String("address", addr), zap.Error(err))
 	}
 }
 
 // Config holds the evaluator configuration
 type Config struct {
 	VictoriaMetricsEndpoint string
-	GitHubOwner             string
-	GitHubRepo              string
-	GitHubToken             string
 	DeclarativeConfigPath   string
 }
 
 func loadConfig() (*Config, error) {
 	cfg := &Config{
 		VictoriaMetricsEndpoint: getEnv("VICTORIAMETRICS_ENDPOINT", "http://victorialogs-single-ardenone-manager-vector-headless.monitoring.svc.cluster.local:8428"),
-		GitHubOwner:             getEnv("GITHUB_OWNER", "jedarden"),
-		GitHubRepo:              getEnv("GITHUB_REPO", "declarative-config"),
-		GitHubToken:             getEnv("GITHUB_TOKEN", ""),
 		DeclarativeConfigPath:   getEnv("DECLARATIVE_CONFIG_PATH", "k8s/rs-manager/seam/routes.d"),
-	}
-
-	if cfg.GitHubToken == "" {
-		return nil, fmt.Errorf("GITHUB_TOKEN environment variable is required")
 	}
 
 	return cfg, nil

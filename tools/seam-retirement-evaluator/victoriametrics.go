@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,6 +18,15 @@ type VictoriaMetricsClient struct {
 	endpoint string
 	client   *http.Client
 }
+
+// queryWindowDays is the lookback, in days, the traffic query covers. It is
+// also the bound on what a zero sample proves: an instant query over this
+// window shows a route was quiet across the window and says nothing about
+// earlier, so it is the earliest quiet-since the client can honestly report.
+const queryWindowDays = 14
+
+// queryWindow is queryWindowDays as a Duration.
+var queryWindow = queryWindowDays * 24 * time.Hour
 
 // NewVictoriaMetricsClient creates a new VictoriaMetrics client
 func NewVictoriaMetricsClient(endpoint string) *VictoriaMetricsClient {
@@ -44,7 +54,7 @@ type RouteTrafficStats struct {
 // Returns stats for each (route, x-api-version) combination
 func (vmc *VictoriaMetricsClient) QueryRouteVersionTraffic(ctx context.Context) ([]RouteTrafficStats, error) {
 	// Query for per-route-version metrics using the Phase 8.4 counter
-	query := `max_over_time(seam_route_version_requests_total[14d])`
+	query := fmt.Sprintf(`max_over_time(seam_route_version_requests_total[%dd])`, queryWindowDays)
 
 	// Build the query URL
 	u, err := url.Parse(vmc.endpoint)
@@ -67,7 +77,7 @@ func (vmc *VictoriaMetricsClient) QueryRouteVersionTraffic(ctx context.Context) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -118,7 +128,7 @@ func (vmc *VictoriaMetricsClient) QueryLastRequestTime(ctx context.Context, rout
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return time.Time{}, nil // Treat errors as "no data"
@@ -170,7 +180,7 @@ func (vmc *VictoriaMetricsClient) QueryMaxInterRequestGap(ctx context.Context, r
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, nil
@@ -194,17 +204,64 @@ func (vmc *VictoriaMetricsClient) parseQueryResults(results []Result) []RouteTra
 		route := r.Metric["route"]
 		specVersion := r.Metric["spec_version"]
 
-		// For now, create a basic stats entry
-		// In production, you'd query more detailed metrics
+		// The sample value is the observed request count. It has to be read:
+		// zero observed traffic is the necessary condition for a retirement
+		// candidate, and assuming zero would make a busy route eligible.
+		totalRequests, err := sampleValue(r.Value)
+		if err != nil {
+			zap.L().Warn("Unreadable sample value, treating as traffic",
+				zap.String("route", route),
+				zap.Error(err))
+			// An unreadable count is not evidence of quietness.
+			totalRequests = -1
+		}
+
+		// Gap detection and quiet-since remain coarse: MaxGap needs a range
+		// query this instant query does not perform, so it stays at zero and
+		// the evaluation window falls through to its 7-day floor.
+		//
+		// QuietSince is not left coarse. A zero sample over [queryWindowDays]
+		// really does prove the route answered nothing at any instant in that
+		// window, so the window's start is the earliest point this query can
+		// vouch for. Leaving it at the zero time.Time instead would publish a
+		// detection claiming ~292 years of quiet, which is false and would
+		// cost the whole record its credibility.
+		quietSince := time.Time{}
+		if totalRequests == 0 {
+			quietSince = time.Now().Add(-queryWindow)
+		}
+
 		stats = append(stats, RouteTrafficStats{
-			Route:         route,
-			SpecVersion:   specVersion,
-			APIVersion:    extractAPIVersion(route),
-			TotalRequests: 0, // Would be parsed from actual metrics
+			QuietSince:   quietSince,
+			HistoryStart: quietSince,
+			Route:        route,
+			SpecVersion:  specVersion,
+			APIVersion:   extractAPIVersion(route),
+
+			TotalRequests: totalRequests,
 		})
 	}
 
 	return stats
+}
+
+// sampleValue reads the [timestamp, value] pair VictoriaMetrics returns.
+func sampleValue(value []interface{}) (int64, error) {
+	if len(value) < 2 {
+		return 0, fmt.Errorf("sample has %d fields, want [timestamp, value]", len(value))
+	}
+
+	raw, ok := value[1].(string)
+	if !ok {
+		return 0, fmt.Errorf("sample value is %T, want a string", value[1])
+	}
+
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("sample value %q: %w", raw, err)
+	}
+
+	return int64(parsed), nil
 }
 
 // QueryResult represents a VictoriaMetrics query response
