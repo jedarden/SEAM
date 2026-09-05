@@ -196,7 +196,7 @@ func (c *Client) createKey(ctx context.Context, req CreateKeyRequest) (*Key, err
 
 	// Handle error responses
 	if resp.StatusCode != http.StatusOK {
-		return c.handleErrorResponse(resp.StatusCode, respBody)
+		return nil, c.handleErrorResponse(resp.StatusCode, respBody)
 	}
 
 	// Parse successful response
@@ -208,8 +208,11 @@ func (c *Client) createKey(ctx context.Context, req CreateKeyRequest) (*Key, err
 	return &key, nil
 }
 
-// handleErrorResponse processes error responses from the API
-func (c *Client) handleErrorResponse(statusCode int, body []byte) (*Key, error) {
+// handleErrorResponse processes error responses from the API. Every path
+// returns a non-nil error, so it returns only an error: the old (*Key, error)
+// shape always yielded a nil key and made `if err != nil` at every call site
+// dead code (staticcheck SA4023).
+func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
 	// Try to extract error message from response
 	var errMsg struct {
 		Message string `json:"message"`
@@ -230,13 +233,13 @@ func (c *Client) handleErrorResponse(statusCode int, body []byte) (*Key, error) 
 	switch statusCode {
 	case http.StatusTooManyRequests:
 		c.logger.Printf("Rate limited by Tailscale API")
-		return nil, fmt.Errorf("%w: %s", ErrRateLimited, apiErr)
+		return fmt.Errorf("%w: %s", ErrRateLimited, apiErr)
 	case http.StatusUnauthorized, http.StatusForbidden:
 		c.logger.Printf("Authentication failed with Tailscale API")
-		return nil, fmt.Errorf("%w: %s", ErrAuthFailed, apiErr)
+		return fmt.Errorf("%w: %s", ErrAuthFailed, apiErr)
 	default:
 		c.logger.Printf("API error (status %d): %s", statusCode, msg)
-		return nil, fmt.Errorf("%w: %s", ErrKeyCreation, apiErr)
+		return fmt.Errorf("%w: %s", ErrKeyCreation, apiErr)
 	}
 }
 
@@ -263,8 +266,7 @@ func (c *Client) ListKeys(ctx context.Context) ([]Key, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		_, err := c.handleErrorResponse(resp.StatusCode, body)
-		return nil, err
+		return nil, c.handleErrorResponse(resp.StatusCode, body)
 	}
 
 	var listResp ListKeysResponse
@@ -298,10 +300,7 @@ func (c *Client) DeleteKey(ctx context.Context, keyID string) error {
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		_, err := c.handleErrorResponse(resp.StatusCode, body)
-		if err != nil {
-			return err
-		}
+		return c.handleErrorResponse(resp.StatusCode, body)
 	}
 
 	return nil
