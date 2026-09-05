@@ -119,3 +119,13 @@ If you find the gate red and the gate bead missing, run `open`. If you find
 it green and the gate bead still open, run `close`. Both take seconds; both
 are the difference between a gate and a dashboard.
 
+4. **`scripts/ci-gate-watch.sh`** — does that for you, every 5 minutes.
+   Installed by `tools/install_ci_gate_watch.sh` as the `ci-gate-watch.timer`
+   systemd user timer, it reconciles the gate bead with live CI state: red →
+   `open`, green → `close`, pending or cluster-error → hold (a run in flight
+   never flaps the frontier, and an unreachable cluster never blocks or
+   releases work). With the timer installed you only need the manual
+   `open`/`close` above on a machine that does not run it. Transitions log to
+   `~/.local/state/seam-ci-gate/watch.log`.
+
+

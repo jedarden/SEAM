@@ -64,40 +64,57 @@ runs_json="$(kubectl --server="$KUBECTL_SERVER" get workflows -n "$NAMESPACE" \
   exit 2
 }
 
-status="$(printf '%s' "$runs_json" | REVISION="$REVISION" python3 -c '
+# `if !` rather than a bare assignment: under `set -e` a failing command
+# substitution aborts the script with the substitution's own exit code, which
+# here would be the parser's 1 -- indistinguishable from a red gate. Capture
+# inside the conditional so a dead parser can be reported as exit 2 instead.
+if ! status="$(printf '%s' "$runs_json" | REVISION="$REVISION" python3 -c '
 import json, sys, os
 
 rev = os.environ["REVISION"]
 
-# An unparsable or truncated payload must land on "error", never "red".
-# Under `set -e` an uncaught exception here would exit 1, and ci-gate-watch
-# reads exit 1 as "block the whole claim frontier" -- so a mangled kubectl
-# response would halt every SEAM bead and log a traceback nobody could act
-# on. Exit 2 (hold) is the documented answer for "I could not tell".
+# Any payload this cannot confidently judge must land on "error", never "red".
+# Under `set -e` an uncaught exception here would exit 1, and both
+# ci-gate-watch and .githooks/pre-commit read exit 1 as "block work" -- so a
+# mangled kubectl response would halt every SEAM bead and log a traceback
+# nobody could act on. Exit 2 (hold) is the documented answer for "I could
+# not tell". The guard covers the parse *and* the shape: valid JSON whose
+# `items` is not a list, or whose items are not mappings, is exactly as
+# undecidable as JSON that does not parse at all.
 try:
     items = json.load(sys.stdin).get("items", [])
-except (ValueError, AttributeError):
-    print("error|none|unparsable workflow list from kubectl")
+    runs = []
+    for wf in items:
+        params = (wf.get("spec", {}).get("arguments", {}) or {}).get("parameters", []) or []
+        run_rev = next((p.get("value", "") for p in params if p.get("name") == "revision"), "")
+        if run_rev != rev:
+            continue
+        runs.append((
+            (wf.get("metadata") or {}).get("creationTimestamp", ""),
+            (wf.get("metadata") or {}).get("name", "?"),
+            (wf.get("status") or {}).get("phase", "Unknown"),
+        ))
+except Exception:
+    print("error|none|workflow list from kubectl was unparsable or had an unexpected shape")
     sys.exit(0)
-
-runs = []
-for wf in items:
-    params = (wf.get("spec", {}).get("arguments", {}) or {}).get("parameters", []) or []
-    run_rev = next((p.get("value", "") for p in params if p.get("name") == "revision"), "")
-    if run_rev != rev:
-        continue
-    runs.append((
-        (wf.get("metadata") or {}).get("creationTimestamp", ""),
-        (wf.get("metadata") or {}).get("name", "?"),
-        (wf.get("status") or {}).get("phase", "Unknown"),
-    ))
 
 if not runs:
     print("pending|none|no seam-ci run for this revision yet")
 else:
     created, name, phase = max(runs)
     print(phase.lower() + "|" + name + "|" + phase)
-')"
+')" ; then
+  echo "GATE error revision=${REVISION:0:9} workflow=none (gate parser failed)"
+  exit 2
+fi
+
+# Net for anything the parser's own guard did not anticipate: a parser that
+# died must read as "could not tell" (exit 2), never as an empty status that
+# could be misread downstream as a verdict.
+if [[ -z "$status" ]]; then
+  echo "GATE error revision=${REVISION:0:9} workflow=none (gate parser produced no verdict)"
+  exit 2
+fi
 
 phase="${status%%|*}"
 rest="${status#*|}"

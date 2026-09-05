@@ -1,0 +1,15 @@
+[Unit]
+Description=SEAM CI gate watch (one reconcile pass of the bead-claim frontier)
+
+[Service]
+Type=oneshot
+User=coding
+Group=users
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/run/current-system/sw/bin/bash /home/coding/SEAM/scripts/ci-gate-watch.sh
+NoNewPrivileges=true
+PrivateTmp=true
+Environment=WORKSPACE=/home/coding/SEAM
+Environment=PATH=/run/current-system/sw/bin:/home/coding/.local/bin:/usr/local/bin:/usr/bin:/bin
+StandardOutput=journal
+StandardError=journal

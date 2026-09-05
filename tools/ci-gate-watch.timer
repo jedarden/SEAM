@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile the SEAM bead-claim frontier with the seam-ci gate every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=ci-gate-watch.service
+
+[Install]
+WantedBy=timers.target
