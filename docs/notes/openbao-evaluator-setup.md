@@ -1,5 +1,27 @@
 # OpenBao Setup for seam-retirement-evaluator
 
+> **ROUTE BOUNDARY REPOINTED — 2026-09-04.** SEAM's enforced vault base dir is
+> now `rs-manager/rs-manager/seam/routes`
+> (`internal/spec/allowlist.go` `DefaultVaultBaseDir`, overridable via
+> `SEAM_VAULT_BASE_DIR`). A path under the old bare `seam/routes` base falls
+> outside the enforced prefix and fails validation. The route credentials
+> consolidated from `secret/seam/*` to `secret/rs-manager/rs-manager/seam/*`,
+> and the deployed evaluator policy denies **both** prefixes — consolidated
+> `secret/data/rs-manager/rs-manager/seam/routes/*`, and legacy
+> `secret/data/seam/routes/*` kept until the old paths retire.
+>
+> **Source checked, 2026-09-04:** `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
+> at commit `eec9f2f3` ("deny the evaluator on the consolidated seam route
+> path"), cross-checked against live ConfigMap
+> `seam/seam-retirement-evaluator-access-canaries` on the rs-manager cluster
+> (argocd instance `seam-retirement-evaluator-ns-rs-manager`), whose
+> `evaluator.sh` probes both prefixes expecting 403. The `declarative-config/`
+> paths named below are SEAM's stale in-repo snapshot — read the live repo.
+>
+> Note the deny set, not just the prefix: a policy carrying only the legacy
+> `seam/routes/*` deny reads as correct while silently granting the evaluator
+> read on the consolidated route credentials, because a glob is prefix-exact.
+
 ## Precondition Status
 
 **Bead:** `bf-38lwm`
@@ -10,7 +32,7 @@ This document describes the OpenBao role and policy for the seam-retirement-eval
 
 ### 1. Evaluator Policy (`openbao-policy.hcl`)
 
-**Location:** `/home/coding/SEAM/declarative-config/infra/seam-retirement-evaluator/openbao-policy.hcl`
+**Location:** `/home/coding/SEAM/declarative-config/infra/seam-retirement-evaluator/openbao-policy.hcl` *(stale in-repo snapshot — live copy at `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`)*
 
 **Policy:**
 ```hcl
@@ -24,7 +46,15 @@ path "secret/data/monitoring/victoriametrics/*" {
   capabilities = ["read"]
 }
 
-# Explicitly deny access to SEAM's route secrets
+# Explicitly deny access to SEAM's route secrets -- the consolidated prefix,
+# which is the base in force.
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
+  capabilities = ["deny"]
+}
+
+# LEGACY / RETIRED base. Kept until the old paths retire. A glob is
+# prefix-exact, so dropping this one before the legacy data is gone would
+# silently re-open the old location.
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -168,6 +198,9 @@ path "secret/data/seam-retirement-evaluator/*" {
 path "secret/data/monitoring/victoriametrics/*" {
   capabilities = ["read"]
 }
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
+  capabilities = ["deny"]
+}
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -209,10 +242,11 @@ EOF
 **Verification checks:**
 1. ✓ Evaluator ServiceAccount can authenticate to OpenBao via Kubernetes auth
 2. ✓ Evaluator can read own GitHub token at `seam-retirement-evaluator/github-token`
-3. ✓ Evaluator cannot read SEAM route secrets (`seam/routes/*`)
-4. ✓ Evaluator can read VictoriaMetrics credentials (`monitoring/victoriametrics/*`)
-5. ✓ Evaluator policy correctly bounded (default-deny enforced)
-6. ✓ SEAM cannot access evaluator's GitHub token (isolation verified)
+3. ✓ Evaluator cannot read SEAM route secrets (`rs-manager/rs-manager/seam/routes/*`, the base in force)
+4. ✓ Evaluator cannot read SEAM route secrets on the legacy base (`seam/routes/*`, retired — kept only until the old paths are gone)
+5. ✓ Evaluator can read VictoriaMetrics credentials (`monitoring/victoriametrics/*`)
+6. ✓ Evaluator policy correctly bounded (default-deny enforced)
+7. ✓ SEAM cannot access evaluator's GitHub token (isolation verified)
 
 ## Architecture Overview
 
@@ -226,13 +260,16 @@ EOF
 │  │  (seam-openbao-policy)   │  │  (seam-retirement-evaluator) │
 │  ├──────────────────────────┤  ├──────────────────────────┤   │
 │  │ Can read:                │  │ Can read:                │   │
-│  │ - seam/routes/*          │  │ - seam-retirement-evaluator/*│
-│  │                           │  │ - monitoring/victoriametrics/*│
-│  │ DENIED:                   │  │                           │   │
-│  │ - seam-retirement-evaluator/* │  │ DENIED:                   │
-│  │ - other paths             │  │ - seam/routes/*          │   │
-│  └──────────────────────────┘  │ - other paths             │   │
-│                                 └──────────────────────────┘   │
+│  │ - rs-manager/rs-manager/ │  │ - seam-retirement-evaluator/*│
+│  │   seam/routes/*          │  │ - monitoring/victoriametrics/*│
+│  │   (consolidated)         │  │                          │   │
+│  │ DENIED:                  │  │ DENIED:                  │   │
+│  │ - seam-retirement-eval/* │  │ - rs-manager/rs-manager/ │   │
+│  │ - other paths            │  │   seam/routes/* (in force)│  │
+│  │                          │  │ - seam/routes/* (legacy, │   │
+│  │                          │  │   retired)               │   │
+│  │                          │  │ - other paths            │   │
+│  └──────────────────────────┘  └──────────────────────────┘   │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐ │
 │  │  secret/data/seam-retirement-evaluator/github-token       │ │
@@ -266,12 +303,12 @@ The evaluator's OpenBao access is deliberately isolated from SEAM:
 - ✅ Read `secret/data/monitoring/victoriametrics/*` (metrics query credentials)
 
 **Denied for Evaluator:**
-- ❌ Read `secret/data/seam/routes/*` (SEAM's route secrets)
+- ❌ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM's route secrets)
 - ❌ Read any other secrets (default-deny)
 - ❌ Write any secrets (read-only)
 
 **Allowed for SEAM:**
-- ✅ Read `secret/data/seam/routes/*` (SEAM route secrets)
+- ✅ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM route secrets)
 
 **Denied for SEAM:**
 - ❌ Read `secret/data/seam-retirement-evaluator/*` (evaluator's GitHub token)
@@ -308,8 +345,8 @@ The hostile-fragment threat model requires that:
 | **Token TTL** | 24h | 24h |
 | **Token Max TTL** | 72h | 72h |
 | **Setup Method** | Shell script | Argo WorkflowTemplate |
-| **Primary Secret Access** | `seam/routes/*` | `seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
-| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `seam/routes/*`, `*` (default) |
+| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | `seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
+| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `rs-manager/rs-manager/seam/routes/*`, `*` (default) |
 
 ## GitHub Token Requirements
 

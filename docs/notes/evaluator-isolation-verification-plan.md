@@ -35,7 +35,7 @@ path "secret/data/monitoring/victoriametrics/*" {
   capabilities = ["read"]
 }
 
-path "secret/data/seam/routes/*" {
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["deny"]
 }
 
@@ -46,7 +46,7 @@ path "secret/data/*" {
 
 **SEAM Policy (`seam-openbao-policy` or `seam`):**
 ```hcl
-path "secret/data/seam/routes/*" {
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["read"]
 }
 
@@ -68,7 +68,7 @@ bao policy read seam-retirement-evaluator-policy
 bao policy read seam
 
 # Check for deny rules
-bao policy read seam-retirement-evaluator-policy | grep 'seam/routes'
+bao policy read seam-retirement-evaluator-policy | grep 'rs-manager/rs-manager/seam/routes'
 bao policy read seam | grep 'evaluators'
 ```
 
@@ -172,8 +172,8 @@ Based on code inspection:
 
 ✅ **Policy Structure:**
 - Evaluator policy correctly scoped to `evaluators/seam-retirement-evaluator/*` and `monitoring/victoriametrics/*`
-- Evaluator policy explicitly denies `seam/routes/*`
-- SEAM policy allows `seam/routes/*` only
+- Evaluator policy explicitly denies `rs-manager/rs-manager/seam/routes/*`
+- SEAM policy allows `rs-manager/rs-manager/seam/routes/*` only
 - SEAM policy explicitly denies `evaluators/*`
 - Both policies use default-deny for all other paths
 
@@ -191,7 +191,7 @@ Based on code inspection:
 
 1. **Path Separation:**
    - Evaluator token: `secret/data/evaluators/seam-retirement-evaluator/*`
-   - SEAM routes: `secret/data/seam/routes/*`
+   - SEAM routes: `secret/data/rs-manager/rs-manager/seam/routes/*`
    - VictoriaMetrics: `secret/data/monitoring/victoriametrics/*`
    - No overlap between paths
 

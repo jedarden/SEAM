@@ -2,7 +2,32 @@
 
 **Status:** ❌ **ROLE NOT FOUND - Configuration is Template/Expected Only**
 
+> **SUPERSEDED DENY BOUNDARY — 2026-09-04.** The `secret/data/seam/routes/*`
+> deny shown throughout this page is the **legacy / retired** base. The policy
+> actually deployed for this role now denies
+> `secret/data/rs-manager/rs-manager/seam/routes/*` **and** keeps the legacy
+> `secret/data/seam/routes/*` deny until the old paths retire. Source:
+> `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
+> at commit `eec9f2f3` (2026-09-04), cross-checked against live ConfigMap
+> `seam/seam-retirement-evaluator-access-canaries`, whose `evaluator.sh` probes
+> both prefixes expecting 403.
+>
+> **Two further stale claims on this page.** (1) The OpenBao server named below
+> (`openbao-ardenone.tail1b1987.ts.net:8200`) is the legacy ardenone-cluster
+> instance, **decommissioned 2026-08-29** — the evaluator is provisioned on the
+> rs-manager instance, reached as `bao-as rs-manager`, and authenticates through
+> the `auth/k8s-rs-manager/login` mount, not `auth/kubernetes`. (2) The headline
+> "role not provisioned" no longer holds: live pod
+> `seam-retirement-evaluator-access-canary-8458c77b6c-q8rbm` authenticates with
+> role `seam-retirement-evaluator` and reads its GitHub credential successfully
+> (2026-09-04), so the role and policy do exist on rs-manager. That canary is
+> currently failing *later* in its loop — GitHub returns 401 on the credential —
+> so it is not presently reaching its deny probes and provides no current PASS
+> attestation of either route deny. Everything below is otherwise an unexecuted
+> 2026-08-16 expectation, not a record of what exists.
+
 **Documentation Date:** 2026-08-16  
+**Boundary re-checked:** 2026-09-04  
 **Bead:** seam-d70c5345  
 **OpenBao Server:** `http://openbao-ardenone.tail1b1987.ts.net:8200`
 
@@ -57,7 +82,9 @@ This policy is defined in the workflow template and would be created during setu
 ```hcl
 # OpenBao HCL policy for seam-retirement-evaluator
 # Allows read access to evaluator's own GitHub token path and VictoriaMetrics credentials
-# Explicitly denies access to seam/routes/* to ensure SEAM cannot read evaluator's token
+# Explicitly denies access to SEAM's route secrets. The deny below is the
+# LEGACY / RETIRED base -- the deployed policy also carries the consolidated
+# deny (see the banner above and the breakdown table).
 
 # Allow reading evaluator's own GitHub token from dedicated evaluators path
 path "secret/data/evaluators/seam-retirement-evaluator/*" {
@@ -69,7 +96,10 @@ path "secret/data/monitoring/victoriametrics/*" {
   capabilities = ["read"]
 }
 
-# Explicitly deny access to SEAM's route secrets
+# Explicitly deny access to SEAM's route secrets -- LEGACY / RETIRED base.
+# The route data now lives under the consolidated
+# secret/rs-manager/rs-manager/seam/* prefix, and SEAM's enforced vault base
+# dir is rs-manager/rs-manager/seam/routes.
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -82,11 +112,19 @@ path "secret/data/*" {
 
 ### Policy Breakdown
 
+The first two `deny` rows are the boundary actually in force
+(`~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`,
+commit `eec9f2f3`). The remaining rows are this page's unexecuted 2026-08-16
+expectation.
+
 | Path Pattern | Capabilities | Purpose |
 |--------------|-------------|---------|
-| `secret/data/evaluators/seam-retirement-evaluator/*` | `read` | Allow evaluator to read its own credentials (GitHub token) |
-| `secret/data/monitoring/victoriametrics/*` | `read` | Allow metrics query access to VictoriaMetrics |
-| `secret/data/seam/routes/*` | `deny` | Explicitly deny SEAM route secrets (security isolation) |
+| `secret/data/rs-manager/rs-manager/seam/routes/*` | `deny` | **In force.** Deny SEAM route credentials at the consolidated prefix |
+| `secret/data/seam/routes/*` | `deny` | **In force, legacy/retired base.** Kept until the old paths retire |
+| `secret/data/seam-retirement-evaluator/github/token` | ~~`read`~~ | **RETIRED 2026-09-05 (74ce49b0).** Grant removed; the evaluator is detection-only and holds no GitHub credential. Formerly: Exact evaluator GitHub credential path (+ `secret/metadata/`) |
+| `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query` | `read` | **In force.** Query-only VictoriaMetrics credential (+ `secret/metadata/`) |
+| `secret/data/evaluators/seam-retirement-evaluator/*` | `read` | *Unexecuted draft* — broad prefix never applied |
+| `secret/data/monitoring/victoriametrics/*` | `read` | *Unexecuted draft* — broad prefix never applied |
 | `secret/data/*` | `deny` | Deny all other secrets by default |
 
 ### Security Model
@@ -208,6 +246,18 @@ According to the comprehensive OpenBao report (OPENBAO_RESOURCES_FINAL_REPORT.md
 
 ### Current Status ⚠️
 Policies are correctly designed for security isolation, but since they are not loaded into OpenBao, the security model is not enforced.
+
+**Update 2026-09-04:** the role and policy *are* loaded on the rs-manager OpenBao
+instance — the live access canary authenticates with role
+`seam-retirement-evaluator` and reads its own GitHub credential, which it could
+not do if they were absent. The deny half of the isolation is specified in
+`~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
+(both the consolidated and the legacy route deny) and is wired into the deployed
+ConfigMap `seam/seam-retirement-evaluator-access-canaries`, but that canary is
+presently failing at its GitHub-credential step and so is not currently
+attesting the denies. Do not treat either route deny as live-verified until that
+canary reports `PASS` again; confirming it needs an OpenBao operator session,
+which the `sys/policies/acl` read path requires from ex44.
 
 ---
 

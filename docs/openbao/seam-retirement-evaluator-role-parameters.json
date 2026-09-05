@@ -1,6 +1,6 @@
 {
-  "description": "Prepared, unapplied OpenBao Kubernetes-auth role configuration for seam-retirement-evaluator.",
-  "status": "prepared-not-applied",
+  "description": "Prepared, unapplied OpenBao Kubernetes-auth role configuration for seam-retirement-evaluator. This is a historical draft, not the policy in force: the deployed policy is declarative-config k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl (commit eec9f2f3, 2026-09-04), which grants read on exact credential paths and denies BOTH the consolidated and the legacy SEAM route prefixes. Path shape here (evaluators/... prefix grants, single legacy route deny) predates the secret/seam/* to secret/rs-manager/rs-manager/seam/* consolidation.",
+  "status": "prepared-not-applied-superseded-by-declarative-config",
   "role": {
     "name": "seam-retirement-evaluator",
     "auth_mount": "kubernetes",
@@ -46,11 +46,18 @@
     ],
     "denied_paths": [
       {
+        "path": "secret/data/rs-manager/rs-manager/seam/routes/*",
+        "capabilities": [
+          "deny"
+        ],
+        "purpose": "Prevent access to SEAM route credentials at the consolidated prefix now in force. This deny is present in the deployed policy (declarative-config k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl, commit eec9f2f3) but was absent from this prepared draft."
+      },
+      {
         "path": "secret/data/seam/routes/*",
         "capabilities": [
           "deny"
         ],
-        "purpose": "Prevent access to SEAM route credentials."
+        "purpose": "LEGACY / RETIRED base. Kept only because the deployed policy carries both denies until the legacy paths retire. SEAM's enforced vault base dir is rs-manager/rs-manager/seam/routes; a bare seam/routes path no longer validates."
       },
       {
         "path": "secret/data/*",

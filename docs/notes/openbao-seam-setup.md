@@ -15,7 +15,7 @@ This document describes the OpenBao role and policy that must be created in Open
 **Policy:**
 ```hcl
 # Allow reading SEAM route secrets ONLY
-path "secret/data/seam/routes/*" {
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["read"]
 }
 
@@ -32,7 +32,7 @@ path "secret/data/*" {
 
 **Critical Security Properties:**
 - **Read-only:** SEAM can only read, never write secrets
-- **Namespace-scoped:** Only `seam/routes/*` is accessible
+- **Namespace-scoped:** Only `rs-manager/rs-manager/seam/routes/*` is accessible
 - **Explicit deny:** All other paths are explicitly denied, including:
   - `seam-retirement-evaluator/*` (evaluator's GitHub token)
   - `kalshi/*` (Kalshi credentials)
@@ -47,7 +47,7 @@ path "secret/data/*" {
 **What it does:**
 1. Writes the SEAM policy to OpenBao
 2. Creates Kubernetes auth role `seam` bound to ServiceAccount `seam` in namespace `seam`
-3. Creates test secret at `seam/routes/test-secret`
+3. Creates test secret at `rs-manager/rs-manager/seam/routes/test-secret`
 4. Verifies the role can read the test secret and is denied elsewhere
 
 **Usage:**
@@ -105,7 +105,7 @@ H="-H X-Vault-Token:${BAO_TOKEN}"
 
 # Write policy
 POLICY='
-path "secret/data/seam/routes/*" {
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["read"]
 }
 path "secret/data/seam-retirement-evaluator/*" {
@@ -133,7 +133,7 @@ curl -s ${H} "${BAO_ADDR}/v1/auth/kubernetes/role/seam" \
 
 After applying the setup, the script automatically verifies:
 
-1. **Can read** `seam/routes/test-secret` → SUCCESS
+1. **Can read** `rs-manager/rs-manager/seam/routes/test-secret` → SUCCESS
 2. **Cannot read** `seam-retirement-evaluator/*` → DENIED
 3. **Cannot read** `kalshi/*` → DENIED
 4. **Cannot list** `secret/` → DENIED
@@ -150,7 +150,7 @@ This precondition creates the **server-side** OpenBao role and policy. The **clu
 ## Threat Model
 
 The hostile-fragment threat model requires that:
-1. SEAM's OpenBao token has **literally no access** outside `seam/routes/*`
+1. SEAM's OpenBao token has **literally no access** outside `rs-manager/rs-manager/seam/routes/*`
 2. A malicious fragment author cannot exfiltrate other secrets via `x-vault-path`
 3. Even if lint is bypassed, the gateway's token cannot reach other paths
 

@@ -1,6 +1,24 @@
 # OpenBao Kubernetes-auth Research: SEAM and seam-retirement-evaluator
 
+> **ROUTE BOUNDARY SUPERSEDED — 2026-09-04.** This research predates the
+> `secret/seam/*` → `secret/rs-manager/rs-manager/seam/*` consolidation. Every
+> `seam/routes` path below is the **legacy / retired** base: SEAM's enforced
+> vault base dir is now `rs-manager/rs-manager/seam/routes`
+> (`internal/spec/allowlist.go` `DefaultVaultBaseDir`), a bare `seam/routes`
+> path fails SEAM-side validation, and the deployed evaluator policy denies
+> **both** prefixes — consolidated
+> `secret/data/rs-manager/rs-manager/seam/routes/*` and legacy
+> `secret/data/seam/routes/*`. Source:
+> `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
+> at commit `eec9f2f3` (2026-09-04), cross-checked against live ConfigMap
+> `seam/seam-retirement-evaluator-access-canaries`. The OpenBao endpoint named
+> at the bottom (`openbao-ardenone.tail1b1987.ts.net:8200`) is the legacy
+> ardenone-cluster instance, **decommissioned 2026-08-29**; the evaluator is
+> provisioned on the rs-manager instance. All `declarative-config/...` paths
+> are SEAM's stale in-repo snapshot, not the live repo.
+
 **Research Date:** 2026-08-09  
+**Boundary re-checked:** 2026-09-04  
 **Bead:** bf-37z98  
 **Purpose:** Document existing OpenBao Kubernetes-auth configuration patterns for SEAM to understand requirements for dedicated roles
 
@@ -43,6 +61,9 @@ metadata:
 
 ```hcl
 # Allow reading SEAM route secrets ONLY
+# LEGACY / RETIRED base as written. The read grant in force is on the
+# consolidated prefix secret/data/rs-manager/rs-manager/seam/routes/*,
+# written by the OpenBao hardening reconciler (ref declarat-0c5206e7).
 path "secret/data/seam/routes/*" {
   capabilities = ["read"]
 }
@@ -72,14 +93,15 @@ export BAO_TOKEN="<admin-token>"
 **What the script does:**
 1. Creates policy `seam` in OpenBao
 2. Creates Kubernetes auth role `seam` 
-3. Creates test secret at `seam/routes/test-secret`
-4. Verifies role permissions (can read `seam/routes/*`, denied elsewhere)
+3. Creates test secret at `seam/routes/test-secret` *(legacy base — the live equivalent writes under `rs-manager/rs-manager/seam/routes/`)*
+4. Verifies role permissions (can read `seam/routes/*` — legacy base, now `rs-manager/rs-manager/seam/routes/*` — denied elsewhere)
 5. Cleans up test token
 
 ### Security Boundaries
 
 **Allowed:**
-- ✅ Read `secret/data/seam/routes/*` (SEAM route secrets)
+- ✅ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM route secrets — consolidated prefix, in force; granted by the OpenBao hardening reconciler, ref `declarat-0c5206e7`)
+- ✅ *(historical, retired)* Read `secret/data/seam/routes/*` (legacy base — retained only until the old paths retire)
 
 **Denied:**
 - ❌ Read `secret/data/seam-retirement-evaluator/*` (evaluator's GitHub token)
@@ -93,7 +115,7 @@ export BAO_TOKEN="<admin-token>"
 ### Threat Model
 
 The **hostile-fragment threat model** requires that:
-1. SEAM's OpenBao token has **literally no access** outside `seam/routes/*`
+1. SEAM's OpenBao token has **literally no access** outside SEAM's own route prefix — `rs-manager/rs-manager/seam/routes/*` today; `seam/routes/*` was that prefix when this research was written and is now retired
 2. A malicious fragment author cannot exfiltrate other secrets via `x-vault-path`
 3. Even if lint is bypassed, the gateway's token cannot reach other paths
 
@@ -146,6 +168,8 @@ path "secret/data/monitoring/victoriametrics/*" {
 }
 
 # Explicitly deny access to SEAM's route secrets
+# LEGACY / RETIRED base as written. The deployed policy carries this deny AND
+# the consolidated secret/data/rs-manager/rs-manager/seam/routes/* deny.
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -193,7 +217,8 @@ EOF
 - ✅ Read `secret/data/monitoring/victoriametrics/*` (VictoriaMetrics credentials)
 
 **Denied:**
-- ❌ Read `secret/data/seam/routes/*` (SEAM's route secrets)
+- ❌ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM's route secrets — consolidated prefix, in force)
+- ❌ Read `secret/data/seam/routes/*` (SEAM's route secrets — **legacy/retired** base, kept until the old paths retire)
 - ❌ Read any other secrets (default-deny)
 
 ### Verification Workflow
@@ -220,8 +245,8 @@ Tests:
 | **Token TTL** | 24h | 24h |
 | **Token Max TTL** | 72h | 72h |
 | **Setup Method** | Shell script (`setup-seam-openbao.sh`) | Argo WorkflowTemplate |
-| **Primary Secret Access** | `seam/routes/*` | `seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
-| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `seam/routes/*`, `*` (default) |
+| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` (was `seam/routes/*`, now retired) | `seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
+| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `rs-manager/rs-manager/seam/routes/*` (consolidated, in force) **and** `seam/routes/*` (legacy, retired), `*` (default) |
 
 ### Key Security Design Principles
 
@@ -262,7 +287,13 @@ path "secret/data/<service>/*" {
   capabilities = ["read"]
 }
 
-# Explicitly deny access to other services' secrets
+# Explicitly deny access to other services' secrets.
+# SEAM's route credentials live at the CONSOLIDATED prefix -- that is the base
+# in force and the one a new policy must deny. The legacy secret/data/seam/routes/*
+# deny is carried alongside it only while the old paths still exist.
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
+  capabilities = ["deny"]
+}
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -317,12 +348,14 @@ Create documentation file (`docs/research/<service>-openbao-research.md`) coveri
 ### Required Role Permissions
 
 **SEAM Role:**
-- ✅ Read `secret/data/seam/routes/*` (SEAM route secrets)
+- ✅ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM route secrets — consolidated prefix, in force)
 - ❌ Everything else explicitly denied
 
 **seam-retirement-evaluator Role:**
 - ✅ Read `secret/data/seam-retirement-evaluator/*` (GitHub token)
 - ✅ Read `secret/data/monitoring/victoriametrics/*` (metrics credentials)
+- ❌ `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM route secrets — consolidated, in force)
+- ❌ `secret/data/seam/routes/*` (SEAM route secrets — legacy/retired)
 - ❌ Everything else explicitly denied
 
 ### Security Boundaries
@@ -340,7 +373,8 @@ Both roles enforce:
 - ❌ `seam-retirement-evaluator/*` (evaluator's GitHub token)
 
 **seam-retirement-evaluator cannot read:**
-- ❌ `seam/routes/*` (SEAM's route secrets)
+- ❌ `rs-manager/rs-manager/seam/routes/*` (SEAM's route secrets — consolidated prefix, in force)
+- ❌ `seam/routes/*` (SEAM's route secrets — **legacy/retired** base)
 
 This isolation is enforced by:
 1. **Explicit deny rules** in respective policies
@@ -378,6 +412,8 @@ The setup script (`setup-seam-openbao.sh`) automatically tests:
 
 ```bash
 # Test 1: Reading seam/routes/test-secret (should succeed)
+#                  ^^^^^^^^^^ legacy base -- the live equivalent probes
+#                  rs-manager/rs-manager/seam/routes/test-secret
 ✓ SUCCESS: Can read seam/routes/*
 
 # Test 2: Reading seam-retirement-evaluator/* (should be denied)
