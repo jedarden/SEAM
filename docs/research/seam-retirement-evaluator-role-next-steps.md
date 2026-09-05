@@ -1,7 +1,20 @@
 # seam-retirement-evaluator OpenBao Role: Next Steps
 
 **Decision date:** 2026-08-16
+**Boundary re-checked:** 2026-09-04
 **Related beads:** `seam-b9d1656f`, `seam-2496976a`, `seam-d70c5345`, `seam-7b5ee880`
+
+> **Deny boundary update, 2026-09-04.** The `secret/data/seam/routes/*` deny
+> named below is the **legacy / retired** base. The policy actually deployed
+> (`~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`,
+> commit `eec9f2f3`) denies the consolidated
+> `secret/data/rs-manager/rs-manager/seam/routes/*` and keeps the legacy deny
+> alongside it until the old paths retire. SEAM's enforced vault base dir is
+> `rs-manager/rs-manager/seam/routes`. The gap list at step 4 below is also
+> partly resolved: the live policy uses exact paths
+> (`secret/data/seam-retirement-evaluator/github/token`,
+> `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query`),
+> not the broad `evaluators/...` prefix this page was weighing.
 
 ## Decision
 
@@ -29,7 +42,7 @@ The repository and declarative-config files describe the intended role, but they
 - Token TTL: `24h`
 - Token max TTL: `72h`
 
-The attached policy must remain least-privilege: read the evaluator's own credential path and the required VictoriaMetrics path, explicitly deny `secret/data/seam/routes/*`, and deny unrelated secret paths.
+The attached policy must remain least-privilege: read the evaluator's own credential path and the required VictoriaMetrics path, explicitly deny SEAM's route secrets on **both** prefixes — the consolidated `secret/data/rs-manager/rs-manager/seam/routes/*`, which is the base in force, and the legacy `secret/data/seam/routes/*`, retained only until the old paths retire — and deny unrelated secret paths.
 
 ## Configuration gaps to resolve
 
@@ -45,6 +58,6 @@ The attached policy must remain least-privilege: read the evaluator's own creden
 2. Resolve the credential-path convention and make all policy/workflow/verification references consistent.
 3. Have an authorized operator enable/configure Kubernetes auth on the target OpenBao instance and run the provisioning WorkflowTemplate using the approved secret-delivery mechanism. Do not place credential values in this repository, logs, or task notes.
 4. Read back `auth/kubernetes/role/seam-retirement-evaluator` and `seam-retirement-evaluator-policy`; confirm the binding, policies, TTLs, and path capabilities match the approved configuration.
-5. Run the verification workflow from the evaluator identity. Confirm authentication, access to the evaluator's own path and VictoriaMetrics, and denial of SEAM route and unrelated secret paths without recording secret contents.
+5. Run the verification workflow from the evaluator identity. Confirm authentication, access to the evaluator's own path and VictoriaMetrics, and denial of SEAM route secrets on both the consolidated and the legacy prefixes, plus unrelated secret paths, without recording secret contents.
 
 Until those checks pass, the evaluator's OpenBao prerequisite should remain marked **not provisioned**. The next implementation action is role and policy creation, followed by verification; it is not an update to an already confirmed role.

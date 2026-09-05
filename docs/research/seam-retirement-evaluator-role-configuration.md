@@ -1,5 +1,15 @@
 # seam-retirement-evaluator OpenBao Role Configuration
 
+> **DENY BOUNDARY SUPERSEDED — 2026-09-04.** The `secret/data/seam/routes/*`
+> deny quoted below is the **legacy / retired** base. The deployed policy
+> (`~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`,
+> commit `eec9f2f3`) denies the consolidated
+> `secret/data/rs-manager/rs-manager/seam/routes/*` and keeps the legacy deny
+> alongside it until the old paths retire. SEAM's enforced vault base dir is
+> `rs-manager/rs-manager/seam/routes`; a bare `seam/routes` path no longer
+> validates. All `declarative-config/...` paths on this page are SEAM's stale
+> in-repo snapshot, not the live repo.
+
 **Documentation Date:** 2026-08-14  
 **Bead:** bf-a38su  
 **Purpose:** Document the role configuration for seam-retirement-evaluator following cluster patterns
@@ -95,7 +105,8 @@ path "secret/data/monitoring/victoriametrics/*" {
   capabilities = ["read"]
 }
 
-# Explicitly deny access to SEAM's route secrets
+# Explicitly deny access to SEAM's route secrets -- LEGACY / RETIRED base;
+# the deployed policy also carries the consolidated deny below.
 path "secret/data/seam/routes/*" {
   capabilities = ["deny"]
 }
@@ -113,7 +124,8 @@ path "secret/data/*" {
 - ✅ Read `secret/data/monitoring/victoriametrics/*` (VictoriaMetrics credentials)
 
 ### Denied Access
-- ❌ Read `secret/data/seam/routes/*` (SEAM's route secrets)
+- ❌ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM's route secrets — consolidated prefix, in force)
+- ❌ Read `secret/data/seam/routes/*` (SEAM's route secrets — **legacy/retired** base, kept until the old paths retire)
 - ❌ Read any other secrets (default-deny)
 
 ## Cluster Pattern Reference

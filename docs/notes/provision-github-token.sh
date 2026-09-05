@@ -1,4 +1,14 @@
 #!/bin/bash
+# **RETIRED 2026-09-05.** The seam-retirement-evaluator no longer holds a GitHub
+# credential of any kind. It is detection-only: it emits deprecation candidates as
+# a structured record plus a metric and opens no pull requests, so the credential
+# had no consumer. The read grant on
+# `secret/data/seam-retirement-evaluator/github/token` was removed from the
+# authoritative policy in declarative-config (commit 74ce49b0), and the verify
+# template's assertion was inverted so the grant reappearing is now an error.
+# **Do not provision this token.** Everything below about obtaining or storing it
+# is historical.
+
 # GitHub Token Provisioning Script for seam-retirement-evaluator
 # Task: bf-2hwgv
 #
@@ -121,7 +131,9 @@ Using OpenBao CLI:
     purpose="Pull requests for seam-retirement-evaluator"
 
 IMPORTANT SECURITY NOTES:
-- Store OUTSIDE seam/routes/* hierarchy ✓
+- Store OUTSIDE SEAM's route hierarchy ✓ (SEAM's enforced vault base dir is
+  rs-manager/rs-manager/seam/routes; the legacy bare seam/routes base is
+  retired and no longer validates. Path above already complies.)
 - Only evaluator ServiceAccount can read ✓
 - SEAM's OpenBao role MUST NOT have access ✓
 - Token has minimal scope (repo only) ✓
