@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/seam-ci-claim-gate.py\"",
+            "timeout": 15,
+            "statusMessage": "seam-ci claim gate"
+          }
+        ]
+      }
+    ]
+  }
+}
