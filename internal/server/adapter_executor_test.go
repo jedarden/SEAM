@@ -10,11 +10,11 @@ import (
 
 func TestApplyRequestTransforms_Rename(t *testing.T) {
 	tests := []struct {
-		name     string
-		body     string
+		name      string
+		body      string
 		transform AdapterTransform
-		want     string
-		wantErr  bool
+		want      string
+		wantErr   bool
 	}{
 		{
 			name: "rename simple field",
@@ -335,11 +335,11 @@ func TestApplyRequestTransforms_Unwrap(t *testing.T) {
 
 func TestApplyRequestTransforms_RenameParam(t *testing.T) {
 	tests := []struct {
-	name      string
-	query     string
-	transform AdapterTransform
-	wantQuery string
-	wantErr   bool
+		name      string
+		query     string
+		transform AdapterTransform
+		wantQuery string
+		wantErr   bool
 	}{
 		{
 			name:  "rename query parameter",
@@ -440,10 +440,10 @@ func TestRenameHeaderParam(t *testing.T) {
 			want:   "New-Header: value",
 		},
 		{
-			name:   "rename missing header - no-op",
-			from:   "Missing",
-			to:     "New",
-			want:   "",
+			name: "rename missing header - no-op",
+			from: "Missing",
+			to:   "New",
+			want: "",
 		},
 	}
 
@@ -655,7 +655,7 @@ func TestParseAdapterTransforms(t *testing.T) {
 		{
 			name: "missing targetVersion",
 			configInput: map[string]any{
-				"request": []any{},
+				"request":  []any{},
 				"response": []any{},
 			},
 			wantErr: true,

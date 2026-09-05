@@ -18,91 +18,91 @@ import (
 type ExclusionReason string
 
 const (
-	ExclusionActiveAssignee      ExclusionReason = "has_active_assignee"
-	ExclusionStaleAssignee       ExclusionReason = "has_stale_assignee"
-	ExclusionBlockedByDeps       ExclusionReason = "blocked_by_unclosed_dependencies"
-	ExclusionStatusNotOpen       ExclusionReason = "status_not_open"
-	ExclusionLabelsExclude       ExclusionReason = "labels_exclude_from_worker_type"
-	ExclusionDependencyLoop      ExclusionReason = "dependency_loop_detected"
-	ExclusionStaleRevision       ExclusionReason = "stale_revision_conflict"
+	ExclusionActiveAssignee     ExclusionReason = "has_active_assignee"
+	ExclusionStaleAssignee      ExclusionReason = "has_stale_assignee"
+	ExclusionBlockedByDeps      ExclusionReason = "blocked_by_unclosed_dependencies"
+	ExclusionStatusNotOpen      ExclusionReason = "status_not_open"
+	ExclusionLabelsExclude      ExclusionReason = "labels_exclude_from_worker_type"
+	ExclusionDependencyLoop     ExclusionReason = "dependency_loop_detected"
+	ExclusionStaleRevision      ExclusionReason = "stale_revision_conflict"
 	ExclusionDatabaseCorruption ExclusionReason = "database_corruption"
 	ExclusionOther              ExclusionReason = "other_reason"
 )
 
 // BeadExclusion represents a single bead's exclusion from the ready set.
 type BeadExclusion struct {
-	BeadID        string            `json:"bead_id"`
-	Title         string            `json:"title,omitempty"`
-	Status        string            `json:"status"`
-	Assignee      string            `json:"assignee,omitempty"`
-	Priority      int               `json:"priority,omitempty"`
-	Reason        ExclusionReason   `json:"exclusion_reason"`
-	Details       string            `json:"details,omitempty"`
-	Dependencies  []string          `json:"dependencies,omitempty"`
-	Labels        []string          `json:"labels,omitempty"`
-	Timestamp     time.Time         `json:"timestamp"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
+	BeadID       string            `json:"bead_id"`
+	Title        string            `json:"title,omitempty"`
+	Status       string            `json:"status"`
+	Assignee     string            `json:"assignee,omitempty"`
+	Priority     int               `json:"priority,omitempty"`
+	Reason       ExclusionReason   `json:"exclusion_reason"`
+	Details      string            `json:"details,omitempty"`
+	Dependencies []string          `json:"dependencies,omitempty"`
+	Labels       []string          `json:"labels,omitempty"`
+	Timestamp    time.Time         `json:"timestamp"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
 // ExclusionReport holds a complete exclusion analysis for a workspace.
 type ExclusionReport struct {
-	WorkspacePath    string         `json:"workspace_path"`
-	Timestamp        time.Time      `json:"timestamp"`
-	ReadyCount       int            `json:"ready_count"`
-	OpenCount        int            `json:"open_count"`
-	ExcludedBeads    []BeadExclusion `json:"excluded_beads"`
-	Summary          ExclusionSummary `json:"summary"`
-	QuerySuccessful  bool           `json:"query_successful"`
-	QueryError       string         `json:"query_error,omitempty"`
+	WorkspacePath   string           `json:"workspace_path"`
+	Timestamp       time.Time        `json:"timestamp"`
+	ReadyCount      int              `json:"ready_count"`
+	OpenCount       int              `json:"open_count"`
+	ExcludedBeads   []BeadExclusion  `json:"excluded_beads"`
+	Summary         ExclusionSummary `json:"summary"`
+	QuerySuccessful bool             `json:"query_successful"`
+	QueryError      string           `json:"query_error,omitempty"`
 }
 
 // ExclusionSummary aggregates exclusion reasons.
 type ExclusionSummary struct {
-	TotalExcluded       int                       `json:"total_excluded"`
-	ByReason            map[ExclusionReason]int   `json:"by_reason"`
-	MostCommonReason    ExclusionReason           `json:"most_common_reason"`
-	MostCommonCount     int                       `json:"most_common_count"`
+	TotalExcluded    int                     `json:"total_excluded"`
+	ByReason         map[ExclusionReason]int `json:"by_reason"`
+	MostCommonReason ExclusionReason         `json:"most_common_reason"`
+	MostCommonCount  int                     `json:"most_common_count"`
 }
 
 // RollingWindow maintains a time-bounded window of exclusion statistics.
 type RollingWindow struct {
-	mu               sync.RWMutex
-	window           time.Duration // How far back to keep data
-	dataPoints       []WindowDataPoint
-	maxDataPoints    int // Maximum data points to keep (prevents unbounded growth)
+	mu            sync.RWMutex
+	window        time.Duration // How far back to keep data
+	dataPoints    []WindowDataPoint
+	maxDataPoints int // Maximum data points to keep (prevents unbounded growth)
 }
 
 // WindowDataPoint represents a single exclusion observation in the rolling window.
 type WindowDataPoint struct {
-	Timestamp     time.Time       `json:"timestamp"`
-	Workspace     string          `json:"workspace"`
-	Reason        ExclusionReason `json:"reason"`
-	BeadID        string          `json:"bead_id"`
-	Count         int             `json:"count"` // Number of beads with this reason
+	Timestamp time.Time       `json:"timestamp"`
+	Workspace string          `json:"workspace"`
+	Reason    ExclusionReason `json:"reason"`
+	BeadID    string          `json:"bead_id"`
+	Count     int             `json:"count"` // Number of beads with this reason
 }
 
 // SystemicIssueAlert represents a detected systemic issue.
 type SystemicIssueAlert struct {
-	ID            string        `json:"id"`
-	Timestamp     time.Time     `json:"timestamp"`
-	Workspace     string        `json:"workspace"`
-	AlertType     string        `json:"alert_type"`
-	Reason        ExclusionReason `json:"reason"`
-	Severity      string        `json:"severity"`
-	Description   string        `json:"description"`
-	Metrics       SystemicIssueMetrics `json:"metrics"`
-	Resolved      bool          `json:"resolved"`
-	ResolvedAt    *time.Time    `json:"resolved_at,omitempty"`
+	ID          string               `json:"id"`
+	Timestamp   time.Time            `json:"timestamp"`
+	Workspace   string               `json:"workspace"`
+	AlertType   string               `json:"alert_type"`
+	Reason      ExclusionReason      `json:"reason"`
+	Severity    string               `json:"severity"`
+	Description string               `json:"description"`
+	Metrics     SystemicIssueMetrics `json:"metrics"`
+	Resolved    bool                 `json:"resolved"`
+	ResolvedAt  *time.Time           `json:"resolved_at,omitempty"`
 }
 
 // SystemicIssueMetrics captures the metrics that triggered the alert.
 type SystemicIssueMetrics struct {
-	TotalOpen         int            `json:"total_open"`
-	TotalExcluded     int            `json:"total_excluded"`
-	ExclusionRate     float64        `json:"exclusion_rate"`
-	ReasonCount       int            `json:"reason_count"`
-	ReasonPercentage  float64        `json:"reason_percentage"`
-	Threshold         float64        `json:"threshold"`
+	TotalOpen        int     `json:"total_open"`
+	TotalExcluded    int     `json:"total_excluded"`
+	ExclusionRate    float64 `json:"exclusion_rate"`
+	ReasonCount      int     `json:"reason_count"`
+	ReasonPercentage float64 `json:"reason_percentage"`
+	Threshold        float64 `json:"threshold"`
 }
 
 // ExclusionTracker tracks why beads are excluded from the ready frontier.
@@ -129,7 +129,7 @@ func NewExclusionTracker(logPath string, verbose bool, workspaceRoot string, sta
 		staleWorkerThreshold: staleThreshold,
 		rollingWindow: &RollingWindow{
 			window:        24 * time.Hour, // Keep 24 hours of data
-			maxDataPoints: 10000,           // Prevent unbounded growth
+			maxDataPoints: 10000,          // Prevent unbounded growth
 			dataPoints:    make([]WindowDataPoint, 0),
 		},
 		alerts:         make([]SystemicIssueAlert, 0),
@@ -504,7 +504,7 @@ func (et *ExclusionTracker) logReport(report *ExclusionReport) {
 	}
 
 	fmt.Fprintf(et.logFile, "%s\n", string(data))
-	et.logFile.Sync()
+	_ = et.logFile.Sync()
 }
 
 // logSummary logs a human-readable summary of the exclusion report.
@@ -607,12 +607,12 @@ func (et *ExclusionTracker) GetRollingWindowStats() map[string]interface{} {
 	defer et.rollingWindow.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"window_duration":    et.rollingWindow.window.String(),
-		"data_points_count":  len(et.rollingWindow.dataPoints),
-		"oldest_timestamp":   nil,
-		"newest_timestamp":   nil,
-		"by_workspace":       make(map[string]int),
-		"by_reason":          make(map[string]int),
+		"window_duration":   et.rollingWindow.window.String(),
+		"data_points_count": len(et.rollingWindow.dataPoints),
+		"oldest_timestamp":  nil,
+		"newest_timestamp":  nil,
+		"by_workspace":      make(map[string]int),
+		"by_reason":         make(map[string]int),
 	}
 
 	if len(et.rollingWindow.dataPoints) == 0 {
@@ -667,24 +667,24 @@ func (et *ExclusionTracker) DetectSystemicIssue(report *ExclusionReport) *System
 
 	// Generate alert
 	alert := &SystemicIssueAlert{
-		ID:          fmt.Sprintf("sysalert-%s-%d", filepath.Base(report.WorkspacePath), time.Now().Unix()),
-		Timestamp:   time.Now(),
-		Workspace:   report.WorkspacePath,
-		AlertType:   "high_exclusion_rate",
-		Reason:      report.Summary.MostCommonReason,
-		Severity:    et.calculateSeverity(exclusionRate, mostCommonRate),
+		ID:        fmt.Sprintf("sysalert-%s-%d", filepath.Base(report.WorkspacePath), time.Now().Unix()),
+		Timestamp: time.Now(),
+		Workspace: report.WorkspacePath,
+		AlertType: "high_exclusion_rate",
+		Reason:    report.Summary.MostCommonReason,
+		Severity:  et.calculateSeverity(exclusionRate, mostCommonRate),
 		Description: fmt.Sprintf("%s: %.1f%% of open beads excluded, %.1f%% of exclusions are due to %s",
 			filepath.Base(report.WorkspacePath),
 			exclusionRate*100,
 			mostCommonRate*100,
 			report.Summary.MostCommonReason),
 		Metrics: SystemicIssueMetrics{
-			TotalOpen:         report.OpenCount,
-			TotalExcluded:     report.Summary.TotalExcluded,
-			ExclusionRate:     exclusionRate,
-			ReasonCount:       report.Summary.MostCommonCount,
-			ReasonPercentage:  mostCommonRate,
-			Threshold:         et.alertThreshold,
+			TotalOpen:        report.OpenCount,
+			TotalExcluded:    report.Summary.TotalExcluded,
+			ExclusionRate:    exclusionRate,
+			ReasonCount:      report.Summary.MostCommonCount,
+			ReasonPercentage: mostCommonRate,
+			Threshold:        et.alertThreshold,
 		},
 		Resolved: false,
 	}
@@ -797,7 +797,7 @@ func (et *ExclusionTracker) getLastHeartbeat(worker string) (*WorkerHeartbeat, e
 	if err != nil {
 		return nil, fmt.Errorf("open heartbeats file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var lastHeartbeat *WorkerHeartbeat
 	scanner := bufio.NewScanner(f)

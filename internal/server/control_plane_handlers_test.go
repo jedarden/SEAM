@@ -22,12 +22,12 @@ func TestWhoamiHandler(t *testing.T) {
 		{
 			name: "resolved identity with scopes",
 			identity: &Identity{
-				NodeKey:     "test-node-1",
+				NodeKey:      "test-node-1",
 				NodeName:     "test-node.example.com",
-				User:        "testuser",
-				Tags:        []string{"tag:prod", "tag:cluster:prod"},
+				User:         "testuser",
+				Tags:         []string{"tag:prod", "tag:cluster:prod"},
 				Capabilities: []string{"seam:read", "seam:write"},
-				Resolved:    true,
+				Resolved:     true,
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
@@ -81,11 +81,11 @@ func TestWhoamiHandler(t *testing.T) {
 		{
 			name: "unresolved identity",
 			identity: &Identity{
-				NodeKey:     "anonymous",
-				NodeName:    "unknown",
-				Resolved:    false,
+				NodeKey:      "anonymous",
+				NodeName:     "unknown",
+				Resolved:     false,
 				Capabilities: []string{},
-				Tags:        []string{},
+				Tags:         []string{},
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
@@ -186,11 +186,11 @@ func TestScopesHandler(t *testing.T) {
 	testTable := &RouteTable{
 		routes: []RouteEntry{
 			{
-				PathTemplate:    "/api/v1/test",
-				Method:          "GET",
-				APIVersion:      "v1",
-				UpstreamTarget:  "http://example.com",
-				RequiredScopes:  []string{"test:read", "test:write"},
+				PathTemplate:   "/api/v1/test",
+				Method:         "GET",
+				APIVersion:     "v1",
+				UpstreamTarget: "http://example.com",
+				RequiredScopes: []string{"test:read", "test:write"},
 			},
 		},
 	}
@@ -206,9 +206,9 @@ func TestScopesHandler(t *testing.T) {
 		{
 			name: "scope-filtered response (default)",
 			identity: &Identity{
-				NodeKey:     "user-with-scopes",
-				NodeName:    "user.example.com",
-				Resolved:    true,
+				NodeKey:      "user-with-scopes",
+				NodeName:     "user.example.com",
+				Resolved:     true,
 				Capabilities: []string{"seam:read", "test:read"},
 			},
 			query:          "",
@@ -236,9 +236,9 @@ func TestScopesHandler(t *testing.T) {
 		{
 			name: "all scopes with seam:scopes:read-all",
 			identity: &Identity{
-				NodeKey:     "admin-user",
-				NodeName:    "admin.example.com",
-				Resolved:    true,
+				NodeKey:      "admin-user",
+				NodeName:     "admin.example.com",
+				Resolved:     true,
 				Capabilities: []string{"seam:scopes:read-all"},
 			},
 			query:          "?all=1",
@@ -273,9 +273,9 @@ func TestScopesHandler(t *testing.T) {
 		{
 			name: "all scopes denied without seam:scopes:read-all",
 			identity: &Identity{
-				NodeKey:     "regular-user",
-				NodeName:    "user.example.com",
-				Resolved:    true,
+				NodeKey:      "regular-user",
+				NodeName:     "user.example.com",
+				Resolved:     true,
 				Capabilities: []string{"seam:read"},
 			},
 			query:          "?all=1",
@@ -292,9 +292,9 @@ func TestScopesHandler(t *testing.T) {
 		{
 			name: "unresolved identity gets empty filtered response",
 			identity: &Identity{
-				NodeKey:     "anonymous",
-				NodeName:    "unknown",
-				Resolved:    false,
+				NodeKey:      "anonymous",
+				NodeName:     "unknown",
+				Resolved:     false,
 				Capabilities: []string{},
 			},
 			query:          "",
@@ -427,29 +427,29 @@ func TestFilterScopesByEffective(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
+		name            string
 		effectiveScopes []string
-		expectedCount  int
+		expectedCount   int
 	}{
 		{
-			name:           "empty effective scopes",
+			name:            "empty effective scopes",
 			effectiveScopes: []string{},
-			expectedCount:  0,
+			expectedCount:   0,
 		},
 		{
-			name:           "one matching scope",
+			name:            "one matching scope",
 			effectiveScopes: []string{"scope-a"},
-			expectedCount:  1,
+			expectedCount:   1,
 		},
 		{
-			name:           "multiple matching scopes",
+			name:            "multiple matching scopes",
 			effectiveScopes: []string{"scope-a", "scope-b"},
-			expectedCount:  2,
+			expectedCount:   2,
 		},
 		{
-			name:           "case insensitive matching",
+			name:            "case insensitive matching",
 			effectiveScopes: []string{"SCOPE-A"},
-			expectedCount:  1,
+			expectedCount:   1,
 		},
 	}
 
@@ -467,34 +467,34 @@ func TestHasScope(t *testing.T) {
 	effectiveScopes := []string{"seam:read", "seam:write"}
 
 	tests := []struct {
-		name           string
+		name            string
 		effectiveScopes []string
-		targetScope    string
-		expected       bool
+		targetScope     string
+		expected        bool
 	}{
 		{
-			name:           "exact match",
+			name:            "exact match",
 			effectiveScopes: effectiveScopes,
-			targetScope:    "seam:read",
-			expected:       true,
+			targetScope:     "seam:read",
+			expected:        true,
 		},
 		{
-			name:           "case insensitive match",
+			name:            "case insensitive match",
 			effectiveScopes: effectiveScopes,
-			targetScope:    "SEAM:READ",
-			expected:       true,
+			targetScope:     "SEAM:READ",
+			expected:        true,
 		},
 		{
-			name:           "no match",
+			name:            "no match",
 			effectiveScopes: effectiveScopes,
-			targetScope:    "seam:admin",
-			expected:       false,
+			targetScope:     "seam:admin",
+			expected:        false,
 		},
 		{
-			name:           "empty effective scopes",
+			name:            "empty effective scopes",
 			effectiveScopes: []string{},
-			targetScope:    "seam:read",
-			expected:       false,
+			targetScope:     "seam:read",
+			expected:        false,
 		},
 	}
 
@@ -524,7 +524,7 @@ func TestEffectiveScopesFromIdentity(t *testing.T) {
 		{
 			name: "unresolved identity",
 			identity: &Identity{
-				Resolved: false,
+				Resolved:     false,
 				Capabilities: []string{"seam:read"},
 			},
 			expectedCount:  0,
@@ -533,7 +533,7 @@ func TestEffectiveScopesFromIdentity(t *testing.T) {
 		{
 			name: "resolved identity with scopes",
 			identity: &Identity{
-				Resolved:    true,
+				Resolved:     true,
 				Capabilities: []string{"zebra:write", "alpha:read", "middle:scope"},
 			},
 			expectedCount:  3,
@@ -542,7 +542,7 @@ func TestEffectiveScopesFromIdentity(t *testing.T) {
 		{
 			name: "identity with empty/whitespace scopes",
 			identity: &Identity{
-				Resolved:    true,
+				Resolved:     true,
 				Capabilities: []string{"seam:read", "", "  ", "seam:write"},
 			},
 			expectedCount:  2,

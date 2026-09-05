@@ -14,22 +14,22 @@ import (
 // Phase 8.4: This ring buffer supports the /changes endpoint and the archive endpoint
 // by maintaining a short-lived history of spec versions for diffing and serving.
 type SpecRingBuffer struct {
-	mu        sync.RWMutex
-	entries   []*specRingEntry // Ring buffer storage
-	capacity  int              // Maximum number of specs to store
-	head      int              // Index of the most recent entry
-	size      int              // Current number of entries in the buffer
-	versionIndex map[string]int // Map from spec hash to index in entries (for O(1) lookup)
+	mu           sync.RWMutex
+	entries      []*specRingEntry // Ring buffer storage
+	capacity     int              // Maximum number of specs to store
+	head         int              // Index of the most recent entry
+	size         int              // Current number of entries in the buffer
+	versionIndex map[string]int   // Map from spec hash to index in entries (for O(1) lookup)
 }
 
 // specRingEntry represents a single spec version in the ring buffer
 type specRingEntry struct {
-	SpecHash      string    // Full SHA256 hash of the spec
-	SpecVersion   string    // Truncated version (first 16 chars)
-	SpecJSON      []byte    // The full OpenAPI spec JSON
-	FirstSeen     time.Time // When this spec version was first observed
-	LastSeen      time.Time // When this spec version was most recently active
-	Routes        []RouteSnapshot // Snapshot of routes at this version
+	SpecHash    string          // Full SHA256 hash of the spec
+	SpecVersion string          // Truncated version (first 16 chars)
+	SpecJSON    []byte          // The full OpenAPI spec JSON
+	FirstSeen   time.Time       // When this spec version was first observed
+	LastSeen    time.Time       // When this spec version was most recently active
+	Routes      []RouteSnapshot // Snapshot of routes at this version
 }
 
 // RouteSnapshot captures the essential route metadata at a point in time
@@ -93,12 +93,12 @@ func (rb *SpecRingBuffer) Add(specHash, specVersion string, specJSON []byte, rou
 	}
 
 	entry := &specRingEntry{
-		SpecHash:      specHash,
-		SpecVersion:   specVersion,
-		SpecJSON:      specJSON,
-		FirstSeen:     now,
-		LastSeen:      now,
-		Routes:        routes,
+		SpecHash:    specHash,
+		SpecVersion: specVersion,
+		SpecJSON:    specJSON,
+		FirstSeen:   now,
+		LastSeen:    now,
+		Routes:      routes,
 	}
 
 	rb.entries[rb.head] = entry
@@ -213,8 +213,8 @@ func (rb *SpecRingBuffer) Stats() map[string]interface{} {
 	defer rb.mu.RUnlock()
 
 	return map[string]interface{}{
-		"capacity": rb.capacity,
-		"size":     rb.size,
+		"capacity":            rb.capacity,
+		"size":                rb.size,
 		"utilization_percent": float64(rb.size) / float64(rb.capacity) * 100,
 	}
 }

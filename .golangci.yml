@@ -1,0 +1,41 @@
+# golangci-lint contract for SEAM.
+#
+# CI (iad-ci seam-ci-workflowtemplate.yml) runs
+#   golangci-lint run --max-issues-per-linter=0 --max-same-issues=0 ./...
+# with no linter selection flags, so this file IS the gate: the v2 defaults
+# (errcheck, govet, staticcheck, unused) all stay enabled, and everything
+# scoped out here is scoped out deliberately, with the reason written down.
+# Nothing is disabled wholesale.
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        # Best-effort writes. An fmt.Fprintf to an http.ResponseWriter or a
+        # diagnostic log has no meaningful error handler -- the write failing
+        # IS the response/log path failing -- so a checked error would be a
+        # dead branch. Writers whose failure matters (file persistence, HTTP
+        # bodies carrying data) are checked in code and are not covered by
+        # this exclusion.
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # Test code may ignore error returns: fixture json.Unmarshal, cleanup
+      # os.RemoveAll, and response writes whose absence the assertion already
+      # catches. Non-test code gets no such pass.
+      - path: _test\.go$
+        linters:
+          - errcheck
+      # internal/spec/lint.go carries an in-flight rewrite on another dispatch
+      # (allowlist key spelling + pinned-port handling, ~lines 1058-1130), so
+      # the dead `hasUnwrap` branch in checkAdapterTransforms (~line 1452)
+      # cannot be fixed here without committing someone else's unfinished
+      # work. staticcheck reports that branch as SA4006 or SA9003 depending
+      # on analysis order, so both IDs are matched. REMOVE this rule once that rewrite lands and the dead branch is
+      # cleaned up.
+      - path: internal/spec/lint\.go$
+        linters:
+          - staticcheck
+        text: "SA4006|SA9003"

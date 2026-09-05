@@ -1094,13 +1094,13 @@ func TestKubernetesInternalDirectoriesSkipped(t *testing.T) {
 			t.Fatalf("Failed to create internal directory %s: %v", internalDir, err)
 		}
 
-		fragmentContent := fmt.Sprintf(`{
+		fragmentContent := `{
 			"openapi": "3.1.0",
 			"info": {"title": "Test", "version": "1.0.0"},
 			"paths": {"/test": {"get": {"summary": "Test"}}},
 			"x-seam-owner": "wrong-owner",
 			"x-api-version": "v1"
-		}`)
+		}`
 		fragmentPath := filepath.Join(internalPath, "fragment.yaml")
 		if err := os.WriteFile(fragmentPath, []byte(fragmentContent), 0644); err != nil {
 			t.Fatalf("Failed to write fragment in internal dir: %v", err)

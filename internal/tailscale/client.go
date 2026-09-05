@@ -28,7 +28,7 @@ type Config struct {
 	Timeout    time.Duration
 
 	// Cache configuration
-	CacheTTL       time.Duration // Default: 5 minutes
+	CacheTTL      time.Duration // Default: 5 minutes
 	CacheHoldDown time.Duration // Default: 30 seconds
 
 	// Logging
@@ -38,7 +38,7 @@ type Config struct {
 // Client is the Tailscale API client
 type Client struct {
 	config     Config
-	apiKey     string   // Cached API key
+	apiKey     string // Cached API key
 	cache      *keyCache
 	httpClient *http.Client
 	logger     *log.Logger
@@ -182,7 +182,7 @@ func (c *Client) createKey(ctx context.Context, req CreateKeyRequest) (*Key, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -255,7 +255,7 @@ func (c *Client) ListKeys(ctx context.Context) ([]Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -290,7 +290,7 @@ func (c *Client) DeleteKey(ctx context.Context, keyID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

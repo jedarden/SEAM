@@ -4,9 +4,9 @@ import "time"
 
 // CreateKeyRequest represents a request to create an API key
 type CreateKeyRequest struct {
-	Capabilities KeyCapabilities `json:"capabilities"`
-	ExpirySeconds int64          `json:"expirySeconds,omitempty"`
-	Description  string          `json:"description,omitempty"`
+	Capabilities  KeyCapabilities `json:"capabilities"`
+	ExpirySeconds int64           `json:"expirySeconds,omitempty"`
+	Description   string          `json:"description,omitempty"`
 }
 
 // KeyCapabilities defines what the key can do
@@ -30,14 +30,14 @@ type DeviceCreateOptions struct {
 // Key represents a Tailscale API key
 type Key struct {
 	ID           string          `json:"id"`
-	Key          string          `json:"key"`           // Only returned on creation
+	Key          string          `json:"key"` // Only returned on creation
 	KeyType      string          `json:"keyType"`
 	Description  string          `json:"description"`
 	Created      time.Time       `json:"created"`
 	Expires      time.Time       `json:"expires"`
 	Revoked      bool            `json:"revoked"`
 	Invalid      bool            `json:"invalid"`
-	Capabilities KeyCapabilities  `json:"capabilities"`
+	Capabilities KeyCapabilities `json:"capabilities"`
 }
 
 // ListKeysResponse represents a response from listing keys

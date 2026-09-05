@@ -76,9 +76,9 @@ func TestScopeVersionCacheBasics(t *testing.T) {
 	cache := NewScopeVersionCache()
 
 	identity := &Identity{
-		NodeKey:     "test-node-1",
+		NodeKey:      "test-node-1",
 		NodeName:     "test-node.example.com",
-		Resolved:    true,
+		Resolved:     true,
 		Capabilities: []string{"seam:read", "seam:write"},
 	}
 
@@ -160,16 +160,16 @@ func TestScopeVersionCacheMultipleIdentities(t *testing.T) {
 	cache := NewScopeVersionCache()
 
 	identity1 := &Identity{
-		NodeKey:  "node-1",
-		NodeName: "node1.example.com",
-		Resolved: true,
+		NodeKey:      "node-1",
+		NodeName:     "node1.example.com",
+		Resolved:     true,
 		Capabilities: []string{"scope-a"},
 	}
 
 	identity2 := &Identity{
-		NodeKey:  "node-2",
-		NodeName: "node2.example.com",
-		Resolved: true,
+		NodeKey:      "node-2",
+		NodeName:     "node2.example.com",
+		Resolved:     true,
 		Capabilities: []string{"scope-b"},
 	}
 
@@ -207,16 +207,16 @@ func TestScopeVersionCacheIdleEviction(t *testing.T) {
 	cache := NewScopeVersionCache()
 
 	identity1 := &Identity{
-		NodeKey:  "stale-node",
-		NodeName: "stale.example.com",
-		Resolved: true,
+		NodeKey:      "stale-node",
+		NodeName:     "stale.example.com",
+		Resolved:     true,
 		Capabilities: []string{"scope-stale"},
 	}
 
 	identity2 := &Identity{
-		NodeKey:  "fresh-node",
-		NodeName: "fresh.example.com",
-		Resolved: true,
+		NodeKey:      "fresh-node",
+		NodeName:     "fresh.example.com",
+		Resolved:     true,
 		Capabilities: []string{"scope-fresh"},
 	}
 
@@ -253,9 +253,9 @@ func TestScopeVersionCacheLRUEviction(t *testing.T) {
 	// We'll create 105 identities to exceed the cap
 	for i := 0; i < 105; i++ {
 		identity := &Identity{
-			NodeKey:  fmt.Sprintf("node-%d", i),
-			NodeName: fmt.Sprintf("node-%d.example.com", i),
-			Resolved: true,
+			NodeKey:      fmt.Sprintf("node-%d", i),
+			NodeName:     fmt.Sprintf("node-%d.example.com", i),
+			Resolved:     true,
 			Capabilities: []string{fmt.Sprintf("scope-%d", i)},
 		}
 		cache.RecordScopeVersion(identity, identity.Capabilities)
@@ -334,9 +334,9 @@ func TestScopeVersionCacheStats(t *testing.T) {
 
 	// Add some data
 	identity := &Identity{
-		NodeKey:  "stats-test",
-		NodeName: "stats.example.com",
-		Resolved: true,
+		NodeKey:      "stats-test",
+		NodeName:     "stats.example.com",
+		Resolved:     true,
 		Capabilities: []string{"scope-a", "scope-b"},
 	}
 	cache.RecordScopeVersion(identity, identity.Capabilities)

@@ -231,8 +231,8 @@ func (s *Server) buildEmptySpec() []byte {
 				"description": "SEAM caller-facing endpoint",
 			},
 		},
-		"paths": map[string]interface{}{},
-		"x-seam-filtered": true,
+		"paths":                map[string]interface{}{},
+		"x-seam-filtered":      true,
 		"x-seam-filter-reason": "Scope-based filtering: no routes visible (no scopes provided)",
 	}
 
@@ -247,4 +247,3 @@ func (s *Server) getBaseURL() string {
 	}
 	return "https://seam.example.com"
 }
-

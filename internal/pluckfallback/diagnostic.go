@@ -69,7 +69,7 @@ func LogDiscrepancy(logFile string, discrepancy string, recoveredBeads []PluckRe
 	if err != nil {
 		return fmt.Errorf("open diagnostic log: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	fmt.Fprintf(f, "%s\n", discrepancy)
 	for _, r := range recoveredBeads {

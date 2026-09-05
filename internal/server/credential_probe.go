@@ -263,9 +263,10 @@ func (r *CredentialProbeRegistry) Set(result CredentialProbeResult) {
 
 	// Preserve consecutive failures if this is a success
 	if existing, ok := r.results[key]; ok {
-		if result.Status == CredentialHealthy {
+		switch result.Status {
+		case CredentialHealthy:
 			result.ConsecutiveFailures = 0
-		} else if result.Status == existing.Status {
+		case existing.Status:
 			result.ConsecutiveFailures = existing.ConsecutiveFailures + 1
 		}
 	}

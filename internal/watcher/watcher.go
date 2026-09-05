@@ -54,7 +54,7 @@ func (mw *MountWatcher) Start() error {
 	// Watch the ..data symlink directly
 	// When ConfigMap updates, Kubernetes atomically swaps this symlink
 	if err := watcher.Add(mw.dataLink); err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		return fmt.Errorf("failed to watch %s: %w", mw.dataLink, err)
 	}
 
@@ -68,7 +68,7 @@ func (mw *MountWatcher) Start() error {
 
 // watchLoop runs the fsnotify watch loop
 func (mw *MountWatcher) watchLoop(watcher *fsnotify.Watcher) {
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	for {
 		select {

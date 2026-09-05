@@ -33,9 +33,9 @@ func (s *Server) scopeVersionMiddleware(next http.Handler) http.Handler {
 
 		// Wrap response writer to add the header
 		wrapped := &scopeVersionResponseWriter{
-			ResponseWriter:   w,
-			scopeVersion:    scopeVersion,
-			headerWritten:   false,
+			ResponseWriter: w,
+			scopeVersion:   scopeVersion,
+			headerWritten:  false,
 		}
 
 		next.ServeHTTP(wrapped, r)

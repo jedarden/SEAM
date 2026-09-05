@@ -190,7 +190,7 @@ func detectGitBase() string {
 	var archive bytes.Buffer
 	cmd.Stdout = &archive
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		return ""
 	}
 
@@ -199,7 +199,7 @@ func detectGitBase() string {
 	cmd = exec.Command("tar", "-x", "-C", tempDir)
 	cmd.Stdin = &archive
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		return ""
 	}
 

@@ -16,9 +16,9 @@ func TestDeprecationHeaders_AddsHeaders(t *testing.T) {
 		Method:       "GET",
 		APIVersion:   "v1",
 		Deprecated: &DeprecationInfo{
-			Since:             "2024-01-01",
-			Sunset:            "2024-12-31",
-			ReplacementPath:   "/new-api",
+			Since:              "2024-01-01",
+			Sunset:             "2024-12-31",
+			ReplacementPath:    "/new-api",
 			ReplacementVersion: "v2",
 		},
 	}
@@ -30,7 +30,7 @@ func TestDeprecationHeaders_AddsHeaders(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "http://example.com/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -117,7 +117,7 @@ func TestDeprecationHeaders_WithoutSunset(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "http://example.com/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -160,7 +160,7 @@ func TestDeprecationHeaders_NoDeprecation(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "http://example.com/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -226,7 +226,7 @@ func TestDeprecationHeaders_WithoutReplacement(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "http://example.com/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -275,7 +275,7 @@ func TestDeprecationHeaders_WithForwardedHeaders(t *testing.T) {
 	req.Header.Set("X-Forwarded-Proto", "https")
 	req.Header.Set("X-Forwarded-Host", "api.example.com")
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()

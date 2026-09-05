@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 )
 
 // authorizationMiddleware implements Stage 5 of the control-plane pipeline.
@@ -88,32 +87,4 @@ func (s *Server) authorizationMiddleware(next http.Handler) http.Handler {
 		// Proceed to next handler
 		next.ServeHTTP(w, r)
 	})
-}
-
-// normalizeScope normalizes a scope string for comparison
-func normalizeScope(scope string) string {
-	return strings.ToLower(strings.TrimSpace(scope))
-}
-
-// hasAnyScope checks if an identity has any of the required scopes
-func hasAnyScope(identity *Identity, requiredScopes []string) bool {
-	if identity == nil || len(requiredScopes) == 0 {
-		return false
-	}
-
-	// If identity has no capabilities, it can't match any scope
-	if len(identity.Capabilities) == 0 {
-		return false
-	}
-
-	for _, required := range requiredScopes {
-		normalizedRequired := normalizeScope(required)
-		for _, capability := range identity.Capabilities {
-			if normalizeScope(capability) == normalizedRequired {
-				return true
-			}
-		}
-	}
-
-	return false
 }

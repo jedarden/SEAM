@@ -17,9 +17,9 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		headers        map[string]string
-		expectedStatus int
+		name            string
+		headers         map[string]string
+		expectedStatus  int
 		expectedDeleted map[string]bool // Headers that should be deleted
 	}{
 		{
@@ -78,7 +78,7 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 			name: "Keep allowed X-SEAM-Spec-Version",
 			headers: map[string]string{
 				"X-SEAM-Spec-Version": "abc123",
-				"X-SEAM-Scopes":      "k8s-ro:get",
+				"X-SEAM-Scopes":       "k8s-ro:get",
 			},
 			expectedStatus: http.StatusOK,
 			expectedDeleted: map[string]bool{
@@ -89,7 +89,7 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 			name: "Keep allowed X-SEAM-API-Version",
 			headers: map[string]string{
 				"X-SEAM-API-Version": "v1",
-				"X-SEAM-Scopes":     "k8s-ro:get",
+				"X-SEAM-Scopes":      "k8s-ro:get",
 			},
 			expectedStatus: http.StatusOK,
 			expectedDeleted: map[string]bool{
@@ -101,7 +101,7 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 			headers: map[string]string{
 				"X-SEAM-Dry-Run": "true",
 			},
-			expectedStatus: http.StatusOK,
+			expectedStatus:  http.StatusOK,
 			expectedDeleted: map[string]bool{
 				// X-SEAM-Dry-Run should be kept (special case)
 			},
@@ -109,9 +109,9 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 		{
 			name: "Delete other X-SEAM-* headers",
 			headers: map[string]string{
-				"X-SEAM-Scopes":    "k8s-ro:get",
-				"X-SEAM-Internal":  "internal-value",
-				"X-SEAM-Custom":    "custom-value",
+				"X-SEAM-Scopes":   "k8s-ro:get",
+				"X-SEAM-Internal": "internal-value",
+				"X-SEAM-Custom":   "custom-value",
 			},
 			expectedStatus: http.StatusOK,
 			expectedDeleted: map[string]bool{
@@ -124,8 +124,8 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 			name: "Keep non-X-SEAM headers",
 			headers: map[string]string{
 				"X-SEAM-Scopes":   "k8s-ro:get",
-				"Authorization":  "Bearer token",
-				"Content-Type":   "application/json",
+				"Authorization":   "Bearer token",
+				"Content-Type":    "application/json",
 				"X-Custom-Header": "custom-value",
 			},
 			expectedStatus: http.StatusOK,
@@ -139,7 +139,7 @@ func TestHeaderStrippingMiddleware_Phase14Rule3(t *testing.T) {
 				"Authorization": "Bearer token",
 				"Content-Type":  "application/json",
 			},
-			expectedStatus: http.StatusOK,
+			expectedStatus:  http.StatusOK,
 			expectedDeleted: map[string]bool{},
 		},
 	}

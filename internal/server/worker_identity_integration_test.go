@@ -86,10 +86,10 @@ func TestConcurrentWorkerIdentityCreation(t *testing.T) {
 func TestIdentityTagging(t *testing.T) {
 	// Create a test identity with tags
 	identity := &Identity{
-		NodeKey:   "test-node-key",
-		NodeName:  "test-worker",
-		Tags:      []string{"tag:needle-worker", "tag:custom"},
-		Resolved:  true,
+		NodeKey:  "test-node-key",
+		NodeName: "test-worker",
+		Tags:     []string{"tag:needle-worker", "tag:custom"},
+		Resolved: true,
 	}
 
 	// Verify the worker has the required tag

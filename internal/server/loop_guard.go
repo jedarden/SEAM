@@ -286,8 +286,8 @@ func (lg *LoopGuard) Snapshot() map[string]interface{} {
 	for hash, track := range lg.hashTracks {
 		tracks[hash] = map[string]interface{}{
 			"failure_count":     track.failureCount,
-			"last_failure_time":  track.lastFailureTime,
-			"last_success_time":  track.lastSuccessTime,
+			"last_failure_time": track.lastFailureTime,
+			"last_success_time": track.lastSuccessTime,
 		}
 	}
 
@@ -356,7 +356,7 @@ func (rh *RequestHasher) ComputeHash(method, pathTemplate string, pathParams map
 	hash.Write([]byte("\x00"))
 
 	// 3. Query params name-then-value sorted, percent-decoded
-	if query != nil && len(query) > 0 {
+	if len(query) > 0 {
 		sortedQueryNames := make([]string, 0, len(query))
 		for name := range query {
 			sortedQueryNames = append(sortedQueryNames, name)

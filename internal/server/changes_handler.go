@@ -87,14 +87,14 @@ func (s *Server) changesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Build response
 	response := map[string]interface{}{
-		"since_spec":    since,
-		"since_known":   sinceKnown,
-		"current_spec":  currentHash,
+		"since_spec":      since,
+		"since_known":     sinceKnown,
+		"current_spec":    currentHash,
 		"current_version": currentVersion,
 		"query": map[string]interface{}{
-			"level":        level,
-			"since":        since,
-			"scope_since":  scopeSince,
+			"level":       level,
+			"since":       since,
+			"scope_since": scopeSince,
 		},
 	}
 
@@ -131,20 +131,20 @@ type RouteChange struct {
 	DocsURL         string   `json:"docs_url"`                   // Link to docs for this route
 
 	// Level 2 only
-	FieldDiff      []FieldDiffEntry `json:"field_diff,omitempty"` // Field-level changes
+	FieldDiff []FieldDiffEntry `json:"field_diff,omitempty"` // Field-level changes
 }
 
 // FieldDiffEntry represents a single field change (Level 2)
 type FieldDiffEntry struct {
-	Field    string `json:"field"`              // Field path (e.g., "parameters[0].description")
+	Field    string `json:"field"`               // Field path (e.g., "parameters[0].description")
 	OldValue string `json:"old_value,omitempty"` // Old value
 	NewValue string `json:"new_value,omitempty"` // New value
-	Change   string `json:"change"`             // added, removed, changed
+	Change   string `json:"change"`              // added, removed, changed
 }
 
 // ScopeChange represents scope changes between versions
 type ScopeChange struct {
-	Scopes     []string `json:"scopes"`     // Scopes that changed
+	Scopes     []string `json:"scopes"`      // Scopes that changed
 	ChangeType string   `json:"change_type"` // granted, revoked
 }
 
@@ -242,12 +242,12 @@ func (s *Server) calculateLevel1Changes(sinceSpec, currentSpec []byte, sinceKnow
 
 			if len(contractKinds) > 0 || len(visibilityKinds) > 0 {
 				changes = append(changes, RouteChange{
-					Path:           path,
-					Verb:           method,
-					ContractKinds:  contractKinds,
+					Path:            path,
+					Verb:            method,
+					ContractKinds:   contractKinds,
 					VisibilityKinds: visibilityKinds,
-					DiffURL:        s.buildDiffURL(path, method),
-					DocsURL:        s.buildDocsURL(path, method),
+					DiffURL:         s.buildDiffURL(path, method),
+					DocsURL:         s.buildDocsURL(path, method),
 				})
 			}
 		}
@@ -416,8 +416,8 @@ func (s *Server) calculateFieldDiff(sincePaths, currentPaths map[string]interfac
 	sincePathItemMap, _ := sincePathItem.(map[string]interface{})
 	currentPathItemMap, _ := currentPathItem.(map[string]interface{})
 
-	sinceOp, _ := sincePathItemMap[method]
-	currentOp, _ := currentPathItemMap[method]
+	sinceOp := sincePathItemMap[method]
+	currentOp := currentPathItemMap[method]
 
 	sinceOpMap, _ := sinceOp.(map[string]interface{})
 	currentOpMap, _ := currentOp.(map[string]interface{})

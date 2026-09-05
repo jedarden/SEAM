@@ -203,7 +203,8 @@ func (s *Server) writeDryRunValidationResponse(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	json.NewEncoder(w).Encode(validation)
+	if err := json.NewEncoder(w).Encode(validation); err != nil {
+		log.Printf("[Quota] failed to write dry-run validation response: %v", err)
+	}
 	log.Printf("[Quota] Dry-run validation passed for %s", route)
 }
-
