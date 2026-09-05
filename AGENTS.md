@@ -78,3 +78,44 @@ Check for a running fleet worker before touching this repo's git state
 (`pgrep -af "clau[d]e --print"` — the bracket avoids matching your own command).
 Workers leave large numbers of untracked files mid-flight; committing over them
 is how work gets lost.
+
+## The seam-ci gate
+
+Every push to `main` runs **seam-ci** on iad-ci, which runs the *whole*
+`scripts/definition-of-done.sh --all` (gofmt, vet, golangci-lint,
+`go test -race`, seam lint, benchmark gate) against a fresh clone. The fleet
+twice landed long stretches of commits on top of a red gate — 25+ commits
+between 2026-08-27 and 08-31 while `verify` was failing — because a red gate
+was treated as someone else's problem. It is not:
+
+**When the gate is red, work on this repo halts.** Do not claim SEAM beads,
+and do not commit, until the tree at `main` passes verify again. A red gate
+means the tree does not satisfy its own Definition of Done; anything built on
+it inherits that.
+
+Mechanically, three layers enforce this:
+
+1. **`scripts/ci-gate.sh`** — is the gate red? Green (`exit 0`), red (`1`),
+   cluster error (`2`), or no completed run yet (`3`). It checks the latest
+   seam-ci run for `origin/main`'s current revision through the
+   credential-free kubectl proxy. Run it before claiming anything.
+2. **`.githooks/pre-commit`** — refuses commits while the gate is red, after
+   the fast-lane DoD passes. Escape hatch:
+   `SEAM_ALLOW_RED_GATE=1 git commit ...` (recorded in
+   `.beads/bypasses.jsonl`, like a `--no-verify`). **This bypass is how the
+   commit that *fixes* a red gate gets in** — that commit cannot wait for a
+   green run it is itself about to cause. Any other use of the bypass is a
+   violation to record and justify.
+3. **`scripts/ci-gate-bead.sh`** — empties the bead claim frontier. It
+   maintains one gate bead (title `GATE: seam-ci is red - do not claim SEAM
+   beads`) wired as a blocker of every ready bead; since `bead list --ready`
+   excludes blocked beads, a red gate leaves nothing to claim:
+   - `open` — while red (idempotent; re-run after creating beads under a red
+     gate so they pick up the blocker edge too)
+   - `close` — only when `ci-gate.sh` reports green; refuses otherwise
+   - `status` — gate phase, gate bead state, what is still claimable
+
+If you find the gate red and the gate bead missing, run `open`. If you find
+it green and the gate bead still open, run `close`. Both take seconds; both
+are the difference between a gate and a dashboard.
+

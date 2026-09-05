@@ -80,7 +80,6 @@ type Dispatcher struct {
 	breakerCheck      CircuitBreakerCheck
 	scopeCheck        ScopeCheck
 	completionOrderCh chan *InstanceCompletion
-	mu                sync.Mutex
 }
 
 // InstanceCompletion represents the completion of a single instance request.
