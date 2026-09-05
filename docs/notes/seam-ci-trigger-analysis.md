@@ -391,3 +391,19 @@ fired once on a production push:
 The docs-only commit carrying this section is the post-fix e2e probe push
 for `seam-d20b2887`; its per-push outcome (workflow name, phase, any failed
 step, duplicate count) is recorded on that bead.
+
+## Second post-fix probe (2026-09-05, bead `seam-d20b2887`)
+
+A further docs-only push — the commit carrying this paragraph — re-probes
+the trigger with fresh evidence. The baseline shape re-confirmed live on
+the `3c943f5` push (12:42:54Z): exactly one accepted `/seam` delivery →
+published eventID `b2838e10992948c5941ce7eefeda68c8` → `seam-ci-sensor`
+filter pass ("Triggering actions after receiving dependency seam-push") →
+`seam-ci-n4lln` created for revision `3c943f5b…`, followed ~3.7s later by
+the usual two `invalid auth header` rejections (12:42:57.762Z,
+12:42:57.775Z) from the GitHub mirror hook, rejected at the auth layer and
+never published. Also re-verified for this probe: the live WorkflowTemplate
+spec is byte-identical to `jedarden/declarative-config` HEAD `31c8b375`
+(manifest clean, `seam-ci-workflowtemplate.yml`), and the `ci` template's
+gate order is unchanged. This commit's per-push outcome (workflow name,
+phase, any failed step, duplicate count) is recorded on the bead.
