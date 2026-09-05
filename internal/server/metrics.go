@@ -46,11 +46,11 @@ type Metrics struct {
 	quotaBypassed  *prometheus.CounterVec
 
 	// Starvation recovery metrics
-	recoveryAttempts    *prometheus.CounterVec
-	recoverySuccesses   *prometheus.CounterVec
-	recoveryStageUsed   *prometheus.CounterVec
-	recoveryDuration    *prometheus.HistogramVec
-	checkpointRebuilds  *prometheus.CounterVec
+	recoveryAttempts   *prometheus.CounterVec
+	recoverySuccesses  *prometheus.CounterVec
+	recoveryStageUsed  *prometheus.CounterVec
+	recoveryDuration   *prometheus.HistogramVec
+	checkpointRebuilds *prometheus.CounterVec
 
 	// Repair queue and daemon metrics
 	repairQueueSize        *prometheus.GaugeVec
@@ -124,65 +124,65 @@ func newMetrics(
 			Name: "seam_route_version_requests_total",
 			Help: "Total requests by OpenAPI route template and spec version hash (Phase 8.4: probe-free, origin-tag matched). A probe-inclusive counter means no probed fragment ever retires.",
 		}, []string{"route", "spec_version"}),
-			recoveryAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
-				Name: "seam_starvation_recovery_attempts_total",
-				Help: "Total starvation recovery attempts by workspace.",
-			}, []string{"workspace"}),
-			recoverySuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
-				Name: "seam_starvation_recovery_successes_total",
-				Help: "Total successful starvation recoveries by workspace and recovery stage.",
-			}, []string{"workspace", "stage"}),
-			recoveryStageUsed: prometheus.NewCounterVec(prometheus.CounterOpts{
-				Name: "seam_starvation_recovery_stage_used_total",
-				Help: "Total usage count of each recovery stage.",
-			}, []string{"stage"}),
-			recoveryDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-				Name:    "seam_starvation_recovery_duration_seconds",
-				Help:    "Starvation recovery operation duration by workspace and result.",
-				Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
-			}, []string{"workspace", "result"}),
-			checkpointRebuilds: prometheus.NewCounterVec(prometheus.CounterOpts{
-				Name: "seam_starvation_checkpoint_rebuilds_total",
-				Help: "Total checkpoint database rebuilds by workspace and result.",
-			}, []string{"workspace", "result"}),
-				repairQueueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-					Name: "seam_repair_queue_size",
-					Help: "Current number of items in the repair queue by workspace.",
-				}, []string{"workspace"}),
-				repairAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
-					Name: "seam_repair_attempts_total",
-					Help: "Total repair attempts by workspace and root cause.",
-				}, []string{"workspace", "root_cause"}),
-				repairSuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
-					Name: "seam_repair_successes_total",
-					Help: "Total successful repairs by workspace and root cause.",
-				}, []string{"workspace", "root_cause"}),
-				repairEscalations: prometheus.NewCounterVec(prometheus.CounterOpts{
-					Name: "seam_repair_escalations_total",
-					Help: "Total repairs escalated to human review by workspace and root cause.",
-				}, []string{"workspace", "root_cause"}),
-				repairDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-					Name:    "seam_repair_duration_seconds",
-					Help:    "Repair operation duration by workspace, root cause, and result.",
-					Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
-				}, []string{"workspace", "root_cause", "result"}),
-				repairQueueByRootCause: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-					Name: "seam_repair_queue_by_root_cause",
-					Help: "Current number of queued items by root cause category.",
-				}, []string{"root_cause"}),
-				diagnosticRuns: prometheus.NewCounterVec(prometheus.CounterOpts{
-					Name: "seam_diagnostic_runs_total",
-					Help: "Total diagnostic runs by workspace and root cause.",
-				}, []string{"workspace", "root_cause"}),
-				diagnosticDurations: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-					Name:    "seam_diagnostic_duration_seconds",
-					Help:    "Diagnostic operation duration by workspace.",
-					Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30},
-				}, []string{"workspace"}),
-				diagnosticRepairable: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-					Name: "seam_diagnostic_repairable",
-					Help: "Whether diagnostic result was auto-repairable by workspace.",
-				}, []string{"workspace"}),
+		recoveryAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_starvation_recovery_attempts_total",
+			Help: "Total starvation recovery attempts by workspace.",
+		}, []string{"workspace"}),
+		recoverySuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_starvation_recovery_successes_total",
+			Help: "Total successful starvation recoveries by workspace and recovery stage.",
+		}, []string{"workspace", "stage"}),
+		recoveryStageUsed: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_starvation_recovery_stage_used_total",
+			Help: "Total usage count of each recovery stage.",
+		}, []string{"stage"}),
+		recoveryDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_starvation_recovery_duration_seconds",
+			Help:    "Starvation recovery operation duration by workspace and result.",
+			Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+		}, []string{"workspace", "result"}),
+		checkpointRebuilds: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_starvation_checkpoint_rebuilds_total",
+			Help: "Total checkpoint database rebuilds by workspace and result.",
+		}, []string{"workspace", "result"}),
+		repairQueueSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "seam_repair_queue_size",
+			Help: "Current number of items in the repair queue by workspace.",
+		}, []string{"workspace"}),
+		repairAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_repair_attempts_total",
+			Help: "Total repair attempts by workspace and root cause.",
+		}, []string{"workspace", "root_cause"}),
+		repairSuccesses: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_repair_successes_total",
+			Help: "Total successful repairs by workspace and root cause.",
+		}, []string{"workspace", "root_cause"}),
+		repairEscalations: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_repair_escalations_total",
+			Help: "Total repairs escalated to human review by workspace and root cause.",
+		}, []string{"workspace", "root_cause"}),
+		repairDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_repair_duration_seconds",
+			Help:    "Repair operation duration by workspace, root cause, and result.",
+			Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+		}, []string{"workspace", "root_cause", "result"}),
+		repairQueueByRootCause: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "seam_repair_queue_by_root_cause",
+			Help: "Current number of queued items by root cause category.",
+		}, []string{"root_cause"}),
+		diagnosticRuns: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_diagnostic_runs_total",
+			Help: "Total diagnostic runs by workspace and root cause.",
+		}, []string{"workspace", "root_cause"}),
+		diagnosticDurations: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_diagnostic_duration_seconds",
+			Help:    "Diagnostic operation duration by workspace.",
+			Buckets: []float64{0.1, 0.5, 1, 2.5, 5, 10, 30},
+		}, []string{"workspace"}),
+		diagnosticRepairable: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "seam_diagnostic_repairable",
+			Help: "Whether diagnostic result was auto-repairable by workspace.",
+		}, []string{"workspace"}),
 	}
 
 	registry.MustRegister(
@@ -452,6 +452,7 @@ func (c *stateMetricsCollector) Collect(metrics chan<- prometheus.Metric) {
 
 // Recovery metric recording methods
 
+//nolint:unused // recovery recorders land with the checkpoint-recovery chain
 func (m *Metrics) recordRecoveryAttempt(workspace string) {
 	if m == nil {
 		return
@@ -459,6 +460,7 @@ func (m *Metrics) recordRecoveryAttempt(workspace string) {
 	m.recoveryAttempts.WithLabelValues(workspace).Inc()
 }
 
+//nolint:unused // recovery recorders land with the checkpoint-recovery chain
 func (m *Metrics) recordRecoverySuccess(workspace, stage string) {
 	if m == nil {
 		return
@@ -466,6 +468,7 @@ func (m *Metrics) recordRecoverySuccess(workspace, stage string) {
 	m.recoverySuccesses.WithLabelValues(workspace, stage).Inc()
 }
 
+//nolint:unused // recovery recorders land with the checkpoint-recovery chain
 func (m *Metrics) recordRecoveryStageUsed(stage string) {
 	if m == nil {
 		return
@@ -473,6 +476,7 @@ func (m *Metrics) recordRecoveryStageUsed(stage string) {
 	m.recoveryStageUsed.WithLabelValues(stage).Inc()
 }
 
+//nolint:unused // recovery recorders land with the checkpoint-recovery chain
 func (m *Metrics) recordRecoveryDuration(workspace string, result string, duration float64) {
 	if m == nil {
 		return
@@ -480,6 +484,7 @@ func (m *Metrics) recordRecoveryDuration(workspace string, result string, durati
 	m.recoveryDuration.WithLabelValues(workspace, result).Observe(duration)
 }
 
+//nolint:unused // recovery recorders land with the checkpoint-recovery chain
 func (m *Metrics) recordCheckpointRebuild(workspace string, result string) {
 	if m == nil {
 		return

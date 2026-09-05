@@ -57,19 +57,19 @@ type Last2xxStatus struct {
 // Last2xxTracker tracks last-2xx state per path and per upstream.
 // All tracking is in-memory and restart-scoped (lost on process restart).
 type Last2xxTracker struct {
-	mu    sync.RWMutex
-	paths  map[string]*last2xxEntry  // Key: path template (e.g., "/api/v1/users")
+	mu      sync.RWMutex
+	paths   map[string]*last2xxEntry // Key: path template (e.g., "/api/v1/users")
 	origins map[string]*last2xxEntry // Key: origin (e.g., "https://api.example.com:443")
 }
 
 // last2xxEntry holds the tracking data for a single path or upstream.
 type last2xxEntry struct {
-	lastAttemptAt           *time.Time
-	lastSuccessAt           *time.Time
+	lastAttemptAt            *time.Time
+	lastSuccessAt            *time.Time
 	attemptsSinceLastSuccess int
-	lastError               string
-	source                  string
-	mu                      sync.RWMutex
+	lastError                string
+	source                   string
+	mu                       sync.RWMutex
 }
 
 // NewLast2xxTracker creates a new tracker for last-2xx state.
@@ -279,7 +279,7 @@ func (s Last2xxStatus) Describe() string {
 
 	switch s.State {
 	case Last2xxNoAttempt:
-		return fmt.Sprintf("no attempt since last restart")
+		return "no attempt since last restart"
 
 	case Last2xxNoSuccess:
 		ago := "never"

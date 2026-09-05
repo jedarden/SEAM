@@ -12,12 +12,12 @@ import (
 
 func main() {
 	var (
-		workspace      = flag.String("workspace", ".", "Path to workspace directory")
-		verbose        = flag.Bool("verbose", false, "Enable verbose logging")
-		jsonOutput     = flag.Bool("json", false, "Output results in JSON format")
-		diagnosticLog  = flag.String("diagnostic-log", "", "Path to diagnostic log file")
-		count          = flag.Int("count", 1, "Number of beads to return")
-		createBead     = flag.Bool("create-diagnostic-bead", false, "Create a diagnostic bead when fallback is triggered")
+		workspace     = flag.String("workspace", ".", "Path to workspace directory")
+		verbose       = flag.Bool("verbose", false, "Enable verbose logging")
+		jsonOutput    = flag.Bool("json", false, "Output results in JSON format")
+		diagnosticLog = flag.String("diagnostic-log", "", "Path to diagnostic log file")
+		count         = flag.Int("count", 1, "Number of beads to return")
+		createBead    = flag.Bool("create-diagnostic-bead", false, "Create a diagnostic bead when fallback is triggered")
 	)
 	flag.Parse()
 
@@ -51,9 +51,9 @@ func main() {
 	if *jsonOutput {
 		output := struct {
 			Candidates     []pluckfallback.PluckResult `json:"candidates"`
-			StrategyUsed   string                        `json:"strategy_used"`
-			Discrepancies  []string                      `json:"discrepancies,omitempty"`
-			TotalAvailable int                           `json:"total_available"`
+			StrategyUsed   string                      `json:"strategy_used"`
+			Discrepancies  []string                    `json:"discrepancies,omitempty"`
+			TotalAvailable int                         `json:"total_available"`
 		}{
 			Candidates:     candidates,
 			StrategyUsed:   strategy,

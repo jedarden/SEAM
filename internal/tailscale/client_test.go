@@ -26,7 +26,7 @@ func TestNewClient(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:    "missing API key",
+			name: "missing API key",
 			config: Config{
 				Tailnet: "test-tailnet",
 			},
@@ -42,8 +42,8 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "invalid expiry - too short",
 			config: Config{
-				APIKey:       "test-api-key",
-				Tailnet:      "test-tailnet",
+				APIKey:        "test-api-key",
+				Tailnet:       "test-tailnet",
 				DefaultExpiry: 1 * time.Hour,
 			},
 			wantErr: ErrInvalidExpiry,
@@ -51,8 +51,8 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "invalid expiry - too long",
 			config: Config{
-				APIKey:       "test-api-key",
-				Tailnet:      "test-tailnet",
+				APIKey:        "test-api-key",
+				Tailnet:       "test-tailnet",
 				DefaultExpiry: 100 * 24 * time.Hour,
 			},
 			wantErr: ErrInvalidExpiry,
@@ -133,8 +133,8 @@ func TestCreateEphemeralKey(t *testing.T) {
 		validateKey    func(*testing.T, *Key)
 	}{
 		{
-			name:     "successful key creation",
-			workerID: "test-worker-1",
+			name:           "successful key creation",
+			workerID:       "test-worker-1",
 			responseStatus: http.StatusOK,
 			responseBody: Key{
 				ID:          "key-123",
@@ -252,10 +252,10 @@ func TestCreateEphemeralKey(t *testing.T) {
 			defer server.Close()
 
 			client, err := New(Config{
-				APIKey:      "test-api-key",
-				Tailnet:     "test-tailnet",
-				BaseURL:     server.URL,
-				CacheTTL:    1 * time.Hour,
+				APIKey:        "test-api-key",
+				Tailnet:       "test-tailnet",
+				BaseURL:       server.URL,
+				CacheTTL:      1 * time.Hour,
 				CacheHoldDown: 1 * time.Hour,
 			})
 			if err != nil {
@@ -297,8 +297,8 @@ func TestCreateEphemeralKeyCaching(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(Key{
-			ID:    "key-123",
-			Key:   "tskey-auth-testkey",
+			ID:      "key-123",
+			Key:     "tskey-auth-testkey",
 			Expires: time.Now().Add(90 * 24 * time.Hour),
 			Capabilities: KeyCapabilities{
 				Devices: DeviceCapabilities{
@@ -626,8 +626,8 @@ func TestCreateEphemeralKeyWithTags(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(Key{
-			ID:    "key-123",
-			Key:   "tskey-auth-testkey",
+			ID:      "key-123",
+			Key:     "tskey-auth-testkey",
 			Expires: time.Now().Add(90 * 24 * time.Hour),
 			Capabilities: KeyCapabilities{
 				Devices: DeviceCapabilities{

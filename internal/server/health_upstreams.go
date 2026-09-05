@@ -57,8 +57,8 @@ func (s *Server) healthUpstreamsHandler(w http.ResponseWriter, r *http.Request) 
 	entries := make([]UpstreamHealthEntry, 0, len(last2xxStatuses))
 	for _, last2xx := range last2xxStatuses {
 		entry := UpstreamHealthEntry{
-			Upstream:      last2xx.Upstream,
-			Last2xx:       last2xx,
+			Upstream:       last2xx.Upstream,
+			Last2xx:        last2xx,
 			CircuitBreaker: upstreamMap[last2xx.Upstream],
 		}
 
@@ -111,8 +111,8 @@ func (s *Server) healthUpstreamsHandler(w http.ResponseWriter, r *http.Request) 
 	})
 
 	response := UpstreamHealthResponse{
-		Timestamp:  time.Now().UTC(),
-		Upstreams:  entries,
+		Timestamp: time.Now().UTC(),
+		Upstreams: entries,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

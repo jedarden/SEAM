@@ -74,7 +74,7 @@ func Example_withConfiguration() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Key expires in: %v\n", key.Expires.Sub(time.Now()))
+	fmt.Printf("Key expires in: %v\n", time.Until(key.Expires))
 }
 
 // Example_errorHandling demonstrates proper error handling

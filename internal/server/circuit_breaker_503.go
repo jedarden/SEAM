@@ -59,5 +59,5 @@ func WriteCircuitBreakerRefused(w http.ResponseWriter, r *http.Request, status C
 	}
 
 	payload = append(payload, '\n')
-	w.Write(payload)
+	_, _ = w.Write(payload)
 }

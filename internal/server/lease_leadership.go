@@ -18,18 +18,18 @@ import (
 // Only the leader runs the credential probe loop; without leadership,
 // the server serves traffic but probes NOTHING (fail closed).
 type LeaseLeader struct {
-	mu              sync.RWMutex
-	leaseName       string
-	leaseNamespace  string
-	identity        string
-	client          *kubernetes.Clientset
-	leaseDuration   time.Duration
-	renewDeadline   time.Duration
-	retryPeriod     time.Duration
-	leaderElected   bool
-	heldLease       *coordinationv1.Lease
-	stopCh          chan struct{}
-	stopped         bool
+	mu               sync.RWMutex
+	leaseName        string
+	leaseNamespace   string
+	identity         string
+	client           *kubernetes.Clientset
+	leaseDuration    time.Duration
+	renewDeadline    time.Duration
+	retryPeriod      time.Duration
+	leaderElected    bool
+	heldLease        *coordinationv1.Lease
+	stopCh           chan struct{}
+	stopped          bool
 	onLeadershipLost func()
 }
 
@@ -83,14 +83,14 @@ func NewLeaseLeader(cfg LeaseConfig) (*LeaseLeader, error) {
 		// Not in cluster - return a leader that immediately succeeds (local dev)
 		if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
 			return &LeaseLeader{
-				leaseName:       cfg.LeaseName,
-				leaseNamespace:  cfg.LeaseNamespace,
-				identity:        identity,
-				leaseDuration:   cfg.LeaseDuration,
-				renewDeadline:   cfg.RenewDeadline,
-				retryPeriod:     cfg.RetryPeriod,
-				leaderElected:   true, // Local dev: always "leader"
-				stopCh:          make(chan struct{}),
+				leaseName:        cfg.LeaseName,
+				leaseNamespace:   cfg.LeaseNamespace,
+				identity:         identity,
+				leaseDuration:    cfg.LeaseDuration,
+				renewDeadline:    cfg.RenewDeadline,
+				retryPeriod:      cfg.RetryPeriod,
+				leaderElected:    true, // Local dev: always "leader"
+				stopCh:           make(chan struct{}),
 				onLeadershipLost: cfg.OnLeadershipLost,
 			}, nil
 		}
@@ -98,14 +98,14 @@ func NewLeaseLeader(cfg LeaseConfig) (*LeaseLeader, error) {
 	}
 
 	return &LeaseLeader{
-		leaseName:       cfg.LeaseName,
-		leaseNamespace:  cfg.LeaseNamespace,
-		identity:        identity,
-		client:          client,
-		leaseDuration:   cfg.LeaseDuration,
-		renewDeadline:   cfg.RenewDeadline,
-		retryPeriod:     cfg.RetryPeriod,
-		stopCh:          make(chan struct{}),
+		leaseName:        cfg.LeaseName,
+		leaseNamespace:   cfg.LeaseNamespace,
+		identity:         identity,
+		client:           client,
+		leaseDuration:    cfg.LeaseDuration,
+		renewDeadline:    cfg.RenewDeadline,
+		retryPeriod:      cfg.RetryPeriod,
+		stopCh:           make(chan struct{}),
 		onLeadershipLost: cfg.OnLeadershipLost,
 	}, nil
 }

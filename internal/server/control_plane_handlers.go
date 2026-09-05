@@ -54,10 +54,10 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 	if identity == nil {
 		// This should not happen if Stage 3 ran, but handle gracefully
 		identity = &Identity{
-			NodeName:   "unknown",
-			Resolved:   false,
-			NodeKey:    "anonymous",
-			Tags:       []string{},
+			NodeName:     "unknown",
+			Resolved:     false,
+			NodeKey:      "anonymous",
+			Tags:         []string{},
 			Capabilities: []string{},
 		}
 	}
@@ -147,10 +147,10 @@ func (s *Server) scopesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Build response
 	response := map[string]interface{}{
-		"scopes":        filteredScopes,
-		"filtered":      !showAll,
-		"total_scopes":  len(scopeMap),
-		"returned":      len(filteredScopes),
+		"scopes":          filteredScopes,
+		"filtered":        !showAll,
+		"total_scopes":    len(scopeMap),
+		"returned":        len(filteredScopes),
 		"effective_count": len(effectiveScopes),
 	}
 
@@ -313,17 +313,19 @@ func effectiveScopesFromIdentity(identity *Identity) []string {
 // - Uses the Tailscale API client to create keys with caching
 //
 // Request JSON:
-//   {
-//     "worker_id": "needle-worker-name"
-//   }
+//
+//	{
+//	  "worker_id": "needle-worker-name"
+//	}
 //
 // Response JSON:
-//   {
-//     "key": "tskey-...",
-//     "id": "key-id",
-//     "expires": "2026-11-26T12:34:56Z",
-//     "description": "NEEDLE worker: needle-worker-name"
-//   }
+//
+//	{
+//	  "key": "tskey-...",
+//	  "id": "key-id",
+//	  "expires": "2026-11-26T12:34:56Z",
+//	  "description": "NEEDLE worker: needle-worker-name"
+//	}
 func (s *Server) tailscaleEphemeralKeyHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		MethodNotAllowed("Only POST method is allowed").Write(w, r)

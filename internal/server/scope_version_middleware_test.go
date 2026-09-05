@@ -12,17 +12,17 @@ func TestScopeVersionMiddleware(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		identity          *Identity
-		expectedHeader    string
-		checkHeaderValue  bool
+		name             string
+		identity         *Identity
+		expectedHeader   string
+		checkHeaderValue bool
 	}{
 		{
 			name: "resolved identity with scopes",
 			identity: &Identity{
-				NodeKey:     "test-node",
-				NodeName:    "test.example.com",
-				Resolved:    true,
+				NodeKey:      "test-node",
+				NodeName:     "test.example.com",
+				Resolved:     true,
 				Capabilities: []string{"seam:read", "seam:write"},
 			},
 			expectedHeader:   "X-SEAM-Scope-Version",
@@ -31,26 +31,26 @@ func TestScopeVersionMiddleware(t *testing.T) {
 		{
 			name: "resolved identity with no scopes",
 			identity: &Identity{
-				NodeKey:     "empty-node",
-				NodeName:    "empty.example.com",
-				Resolved:    true,
+				NodeKey:      "empty-node",
+				NodeName:     "empty.example.com",
+				Resolved:     true,
 				Capabilities: []string{},
 			},
 			expectedHeader:   "X-SEAM-Scope-Version",
 			checkHeaderValue: true,
 		},
 		{
-			name:              "nil identity",
-			identity:          nil,
-			expectedHeader:    "X-SEAM-Scope-Version",
-			checkHeaderValue:  true,
+			name:             "nil identity",
+			identity:         nil,
+			expectedHeader:   "X-SEAM-Scope-Version",
+			checkHeaderValue: true,
 		},
 		{
 			name: "unresolved identity",
 			identity: &Identity{
-				NodeKey:     "anonymous",
-				NodeName:    "unknown",
-				Resolved:    false,
+				NodeKey:      "anonymous",
+				NodeName:     "unknown",
+				Resolved:     false,
 				Capabilities: []string{},
 			},
 			expectedHeader:   "X-SEAM-Scope-Version",
@@ -94,7 +94,7 @@ func TestScopeVersionMiddleware(t *testing.T) {
 				}
 				// Verify it's all hex
 				for _, c := range headerValue {
-					if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+					if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 						t.Errorf("Header value is not valid hex: %s", headerValue)
 						break
 					}
@@ -176,9 +176,9 @@ func TestScopeVersionMiddlewareIdempotence(t *testing.T) {
 	}
 
 	identity := &Identity{
-		NodeKey:     "test-node",
-		NodeName:    "test.example.com",
-		Resolved:    true,
+		NodeKey:      "test-node",
+		NodeName:     "test.example.com",
+		Resolved:     true,
 		Capabilities: []string{"seam:read"},
 	}
 
@@ -214,16 +214,16 @@ func TestScopeVersionMiddlewareDifferentScopes(t *testing.T) {
 	}
 
 	identity1 := &Identity{
-		NodeKey:     "node-1",
-		NodeName:    "node1.example.com",
-		Resolved:    true,
+		NodeKey:      "node-1",
+		NodeName:     "node1.example.com",
+		Resolved:     true,
 		Capabilities: []string{"seam:read"},
 	}
 
 	identity2 := &Identity{
-		NodeKey:     "node-2",
-		NodeName:    "node2.example.com",
-		Resolved:    true,
+		NodeKey:      "node-2",
+		NodeName:     "node2.example.com",
+		Resolved:     true,
 		Capabilities: []string{"seam:write"},
 	}
 

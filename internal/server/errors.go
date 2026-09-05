@@ -14,19 +14,19 @@ type ErrorCode string
 // Error codes taxonomy.
 const (
 	// Client errors (4xx).
-	ErrCodeBadRequest          ErrorCode = "bad_request"
-	ErrCodeUnauthorized        ErrorCode = "unauthorized"
-	ErrCodeForbidden           ErrorCode = "forbidden"
-	ErrCodeNotFound            ErrorCode = "not_found"
-	ErrCodeMethodNotAllowed    ErrorCode = "method_not_allowed"
-	ErrCodeInvalidVersion      ErrorCode = "invalid_version_parameter"
-	ErrCodeMissingParameter    ErrorCode = "missing_required_parameter"
-	ErrCodeInvalidPayload      ErrorCode = "invalid_payload"
-	ErrCodeRouteNotFound       ErrorCode = "route_not_found"
-	ErrCodeValidationFailed    ErrorCode = "validation_failed"
-	ErrCodeQuotaExceeded       ErrorCode = "quota_exceeded"
-	ErrCodeRateLimitExceeded   ErrorCode = "rate_limit_exceeded"
-	ErrCodeLoopGuardExceeded   ErrorCode = "loop_guard_exceeded"
+	ErrCodeBadRequest        ErrorCode = "bad_request"
+	ErrCodeUnauthorized      ErrorCode = "unauthorized"
+	ErrCodeForbidden         ErrorCode = "forbidden"
+	ErrCodeNotFound          ErrorCode = "not_found"
+	ErrCodeMethodNotAllowed  ErrorCode = "method_not_allowed"
+	ErrCodeInvalidVersion    ErrorCode = "invalid_version_parameter"
+	ErrCodeMissingParameter  ErrorCode = "missing_required_parameter"
+	ErrCodeInvalidPayload    ErrorCode = "invalid_payload"
+	ErrCodeRouteNotFound     ErrorCode = "route_not_found"
+	ErrCodeValidationFailed  ErrorCode = "validation_failed"
+	ErrCodeQuotaExceeded     ErrorCode = "quota_exceeded"
+	ErrCodeRateLimitExceeded ErrorCode = "rate_limit_exceeded"
+	ErrCodeLoopGuardExceeded ErrorCode = "loop_guard_exceeded"
 
 	// Dependency and server errors (5xx).
 	ErrCodeInternalServer       ErrorCode = "internal_server_error"
@@ -59,7 +59,7 @@ const (
 	// Credential health sentinel errors (Phase 12).
 	// These errors are returned when credential refresh fails or cannot be retried.
 	ErrCodeCredentialRefreshNotRetried ErrorCode = "credential_refresh_not_retried"
-	ErrCodeSecretStoreUnavailable     ErrorCode = "secret_store_unavailable"
+	ErrCodeSecretStoreUnavailable      ErrorCode = "secret_store_unavailable"
 )
 
 // HTTPStatusMapping is the canonical mapping from public error codes to HTTP
@@ -91,7 +91,7 @@ var HTTPStatusMapping = map[ErrorCode]int{
 
 	// Credential health errors map to their appropriate HTTP status codes.
 	ErrCodeCredentialRefreshNotRetried: http.StatusUnauthorized,
-	ErrCodeSecretStoreUnavailable:     http.StatusServiceUnavailable,
+	ErrCodeSecretStoreUnavailable:      http.StatusServiceUnavailable,
 }
 
 // GetHTTPStatus returns the HTTP status for code. Unknown codes are treated as
@@ -275,12 +275,12 @@ func NewLoopGuardErrorResponse(repeatCount int, retryAfter int, routeID string) 
 		Code:    ErrCodeLoopGuardExceeded,
 		Message: message,
 		Details: map[string]interface{}{
-			"repeat_count":   repeatCount,
-			"max_repeats":    repeatCount, // This indicates we hit the limit
-			"route_id":       routeID,
-			"guard_scope":    "route-wide",
-			"phase_note":     "Phase 7 per-request scoping not yet implemented",
-			"retry_after":    retryAfter,
+			"repeat_count":     repeatCount,
+			"max_repeats":      repeatCount, // This indicates we hit the limit
+			"route_id":         routeID,
+			"guard_scope":      "route-wide",
+			"phase_note":       "Phase 7 per-request scoping not yet implemented",
+			"retry_after":      retryAfter,
 			"retry_after_unit": "seconds",
 		},
 		DocsURL: "/docs/route",

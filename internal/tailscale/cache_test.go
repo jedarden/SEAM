@@ -40,10 +40,10 @@ func TestCacheGetSet(t *testing.T) {
 
 	// Test set and get
 	testKey := &Key{
-		ID:         "key-123",
-		Key:        "tskey-auth-test",
-		Expires:    time.Now().Add(90 * 24 * time.Hour),
-		Revoked:    false,
+		ID:      "key-123",
+		Key:     "tskey-auth-test",
+		Expires: time.Now().Add(90 * 24 * time.Hour),
+		Revoked: false,
 	}
 
 	cache.Set("worker-1", testKey)
@@ -101,8 +101,8 @@ func TestCacheDelete(t *testing.T) {
 	cache := newKeyCache(5*time.Minute, 30*time.Second)
 
 	testKey := &Key{
-		ID:   "key-123",
-		Key:  "tskey-auth-test",
+		ID:  "key-123",
+		Key: "tskey-auth-test",
 	}
 
 	cache.Set("worker-1", testKey)

@@ -51,7 +51,7 @@ func identityFromContext(ctx context.Context) *Identity {
 type IdentityResolver struct {
 	// TODO: Add Tailscale LocalClient for WhoIs calls
 	// For now, this is a placeholder that will be integrated with Tailscale
-	mu     sync.RWMutex
+	mu       sync.RWMutex
 	testMode bool // When true, returns resolved test identities for development
 
 	// resolveOverride, when set, replaces Tailscale resolution entirely and is
@@ -116,9 +116,9 @@ func (ir *IdentityResolver) Resolve(ctx context.Context, remoteAddr string) (*Id
 		// Production mode: return unresolved identity (will be denied by middleware)
 		// Return unresolved identity for now
 		return &Identity{
-			Resolved:     false,
-			NodeName:     host,
-			NodeKey:      host, // Placeholder
+			Resolved: false,
+			NodeName: host,
+			NodeKey:  host, // Placeholder
 		}, nil
 	}
 

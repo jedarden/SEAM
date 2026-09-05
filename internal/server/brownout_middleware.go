@@ -28,7 +28,7 @@ func NewBrownoutScheduler() *BrownoutScheduler {
 func (bs *BrownoutScheduler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract route match from context if available
-		routeMatch, ok := r.Context().Value("routeMatch").(*RouteMatch)
+		routeMatch, ok := r.Context().Value(routeMatchContextKey{}).(*RouteMatch)
 		if !ok || routeMatch.Route.Deprecated == nil {
 			// No deprecation info or no route match - DORMANT (fail-safe)
 			next.ServeHTTP(w, r)
@@ -62,8 +62,8 @@ func (bs *BrownoutScheduler) Middleware(next http.Handler) http.Handler {
 func (bs *BrownoutScheduler) serveBrownoutResponse(w http.ResponseWriter, r *http.Request, route *RouteEntry, window *BrownoutWindow) {
 	// Build error response
 	response := map[string]interface{}{
-		"error": "gone",
-		"message": fmt.Sprintf("This route is deprecated and currently unavailable during a scheduled brownout window"),
+		"error":   "gone",
+		"message": "This route is deprecated and currently unavailable during a scheduled brownout window",
 		"brownout": map[string]interface{}{
 			"start": window.Start,
 			"end":   window.End,

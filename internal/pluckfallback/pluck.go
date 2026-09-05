@@ -185,21 +185,21 @@ func (s *CheckpointQueryStrategy) Execute(ctx context.Context, workspace string)
 
 // PluckFallback coordinates multiple query strategies with fallback logic.
 type PluckFallback struct {
-	strategies        []QueryStrategy
-	verbose           bool
-	diagnosticLog     *os.File
-	exclusionTracker  *ExclusionTracker
+	strategies       []QueryStrategy
+	verbose          bool
+	diagnosticLog    *os.File
+	exclusionTracker *ExclusionTracker
 }
 
 // NewPluckFallback creates a new PluckFallback with default strategies.
 func NewPluckFallback(verbose bool, diagnosticLogPath string, workspaceRoot string) (*PluckFallback, error) {
 	pf := &PluckFallback{
 		strategies: []QueryStrategy{
-			&PrimaryQueryStrategy{},           // 1. Standard ready query
-			&OpenUnassignedQueryStrategy{},     // 2. Fallback to open beads without assignee
-			&OpenStatusQueryStrategy{},         // 3. Fallback to all open beads
-			&DirectDBQueryStrategy{},           // 4. Direct database query
-			&CheckpointQueryStrategy{},         // 5. Read from checkpoint
+			&PrimaryQueryStrategy{},        // 1. Standard ready query
+			&OpenUnassignedQueryStrategy{}, // 2. Fallback to open beads without assignee
+			&OpenStatusQueryStrategy{},     // 3. Fallback to all open beads
+			&DirectDBQueryStrategy{},       // 4. Direct database query
+			&CheckpointQueryStrategy{},     // 5. Read from checkpoint
 		},
 		verbose: verbose,
 	}
@@ -231,9 +231,9 @@ func NewPluckFallback(verbose bool, diagnosticLogPath string, workspaceRoot stri
 
 // StrategyMetrics tracks which strategies succeed.
 type StrategyMetrics struct {
-	StrategyName  string
-	SuccessCount  int
-	LastUsed      time.Time
+	StrategyName string
+	SuccessCount int
+	LastUsed     time.Time
 }
 
 // Pluck attempts to find bead candidates using fallback strategies.
@@ -267,7 +267,7 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 				for _, r := range results {
 					fmt.Fprintf(pf.diagnosticLog, "  - Recovered bead: %s (%s)\n", r.ID, r.Title)
 				}
-				pf.diagnosticLog.Sync()
+				_ = pf.diagnosticLog.Sync()
 			}
 		}
 
@@ -312,7 +312,7 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 		if pf.diagnosticLog != nil {
 			fmt.Fprintf(pf.diagnosticLog, "[%s] Database rebuild failed: %v\n",
 				time.Now().Format(time.RFC3339), rebuildErr)
-			pf.diagnosticLog.Sync()
+			_ = pf.diagnosticLog.Sync()
 		}
 
 		return nil, nil, discrepancies, fmt.Errorf("all strategies failed and database rebuild failed: %w", rebuildErr)
@@ -326,7 +326,7 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 	if pf.diagnosticLog != nil {
 		fmt.Fprintf(pf.diagnosticLog, "[%s] Database rebuild from checkpoint succeeded, retrying pluck\n",
 			time.Now().Format(time.RFC3339))
-		pf.diagnosticLog.Sync()
+		_ = pf.diagnosticLog.Sync()
 	}
 
 	// Retry with all strategies after rebuild
@@ -359,7 +359,7 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 			for _, r := range results {
 				fmt.Fprintf(pf.diagnosticLog, "  - Recovered bead: %s (%s)\n", r.ID, r.Title)
 			}
-			pf.diagnosticLog.Sync()
+			_ = pf.diagnosticLog.Sync()
 		}
 
 		return results, metrics, discrepancies, nil
@@ -372,7 +372,7 @@ func (pf *PluckFallback) Pluck(ctx context.Context, workspace string) ([]PluckRe
 
 	if pf.diagnosticLog != nil {
 		fmt.Fprintf(pf.diagnosticLog, "%s\n", rebuildFailure)
-		pf.diagnosticLog.Sync()
+		_ = pf.diagnosticLog.Sync()
 	}
 
 	return nil, nil, discrepancies, fmt.Errorf("database rebuild succeeded but no candidates found")
@@ -412,7 +412,7 @@ func (pf *PluckFallback) rebuildDatabaseFromCheckpoint(ctx context.Context, work
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Restore backup on failure
 		if _, statErr := os.Stat(backupPath); statErr == nil {
-			os.Rename(backupPath, dbPath)
+			_ = os.Rename(backupPath, dbPath)
 		}
 		return fmt.Errorf("bead init failed: %w: %s", err, string(output))
 	}
@@ -426,7 +426,7 @@ func (pf *PluckFallback) rebuildDatabaseFromCheckpoint(ctx context.Context, work
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Restore backup on failure
 		if _, statErr := os.Stat(backupPath); statErr == nil {
-			os.Rename(backupPath, dbPath)
+			_ = os.Rename(backupPath, dbPath)
 		}
 		return fmt.Errorf("bead sync import-only failed: %w: %s", err, string(output))
 	}
@@ -437,7 +437,7 @@ func (pf *PluckFallback) rebuildDatabaseFromCheckpoint(ctx context.Context, work
 
 	// Step 4: Remove backup on success
 	if _, err := os.Stat(backupPath); err == nil {
-		os.Remove(backupPath)
+		_ = os.Remove(backupPath)
 	}
 
 	return nil
@@ -501,7 +501,7 @@ func parseSQLiteOutput(data []byte, source string) []PluckResult {
 		}
 
 		priority := 0
-		fmt.Sscanf(fields[4], "%d", &priority)
+		_, _ = fmt.Sscanf(fields[4], "%d", &priority)
 
 		results = append(results, PluckResult{
 			ID:          strings.TrimSpace(fields[0]),
@@ -535,6 +535,6 @@ func statusToString(status int) string {
 // intOfString converts string to int.
 func intOfString(s string) int {
 	var i int
-	fmt.Sscanf(s, "%d", &i)
+	_, _ = fmt.Sscanf(s, "%d", &i)
 	return i
 }

@@ -78,11 +78,15 @@ type DispatchState struct {
 }
 
 // contextWithDispatchState stores dispatch state in the context
+//
+//nolint:unused // staged for the cost-governor + dispatch-accounting chain (bead 13.2)
 func contextWithDispatchState(ctx context.Context, state *DispatchState) context.Context {
 	return context.WithValue(ctx, dispatchStateKey, state)
 }
 
 // dispatchStateFromContext extracts the dispatch state from the context
+//
+//nolint:unused // staged for the cost-governor + dispatch-accounting chain (bead 13.2)
 func dispatchStateFromContext(ctx context.Context) *DispatchState {
 	if state, ok := ctx.Value(dispatchStateKey).(*DispatchState); ok {
 		return state
@@ -136,6 +140,8 @@ func contextWithDryRun(ctx context.Context) context.Context {
 }
 
 // isDryRun checks if the request is a dry-run
+//
+//nolint:unused // staged for the cost-governor dry-run path (bead 13.2)
 func isDryRun(ctx context.Context) bool {
 	if dryRun, ok := ctx.Value(dryRunKey).(bool); ok {
 		return dryRun
@@ -693,7 +699,7 @@ func (p *ReverseProxy) scrub401Response(ctx context.Context, resp *http.Response
 	}
 
 	// Read the response body
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)

@@ -21,7 +21,7 @@ func TestBrownoutScheduler_DormantOnNoBrownout(t *testing.T) {
 		APIVersion:   "v1",
 		Deprecated: &DeprecationInfo{
 			Since:  "2024-01-01",
-			Sunset:  "2024-12-31",
+			Sunset: "2024-12-31",
 			// No brownout windows - should be DORMANT
 		},
 	}
@@ -35,7 +35,7 @@ func TestBrownoutScheduler_DormantOnNoBrownout(t *testing.T) {
 	// Create a request with the route match in context
 	req := httptest.NewRequest("GET", "/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	// Create a response recorder
@@ -79,7 +79,7 @@ func TestBrownoutScheduler_ActiveDuringBrownout(t *testing.T) {
 		APIVersion:   "v1",
 		Deprecated: &DeprecationInfo{
 			Since:  "2024-01-01",
-			Sunset:  "2024-12-31",
+			Sunset: "2024-12-31",
 			Brownouts: []BrownoutWindow{
 				{
 					Start: "2024-06-15T00:00:00Z",
@@ -96,7 +96,7 @@ func TestBrownoutScheduler_ActiveDuringBrownout(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -154,7 +154,7 @@ func TestBrownoutScheduler_OutsideBrownout(t *testing.T) {
 		APIVersion:   "v1",
 		Deprecated: &DeprecationInfo{
 			Since:  "2024-01-01",
-			Sunset:  "2024-12-31",
+			Sunset: "2024-12-31",
 			Brownouts: []BrownoutWindow{
 				{
 					Start: "2024-06-15T00:00:00Z",
@@ -171,7 +171,7 @@ func TestBrownoutScheduler_OutsideBrownout(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -236,7 +236,7 @@ func TestBrownoutScheduler_NoDeprecationInfo(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -259,10 +259,10 @@ func TestBrownoutScheduler_NoDeprecationInfo(t *testing.T) {
 // TestBrownoutWindow_IsActiveAt tests the IsActiveAt method
 func TestBrownoutWindow_IsActiveAt(t *testing.T) {
 	tests := []struct {
-		name      string
-		window    BrownoutWindow
-		testTime  string
-		expected  bool
+		name     string
+		window   BrownoutWindow
+		testTime string
+		expected bool
 	}{
 		{
 			name: "Active during window",
@@ -338,9 +338,9 @@ func TestBrownoutScheduler_WithReplacement(t *testing.T) {
 		Method:       "GET",
 		APIVersion:   "v1",
 		Deprecated: &DeprecationInfo{
-			Since:             "2024-01-01",
-			Sunset:            "2024-12-31",
-			ReplacementPath:   "/new-api",
+			Since:              "2024-01-01",
+			Sunset:             "2024-12-31",
+			ReplacementPath:    "/new-api",
 			ReplacementVersion: "v2",
 			Brownouts: []BrownoutWindow{
 				{
@@ -358,7 +358,7 @@ func TestBrownoutScheduler_WithReplacement(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/old-api", nil)
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, "routeMatch", match)
+	ctx = context.WithValue(ctx, routeMatchContextKey{}, match)
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -399,4 +399,3 @@ func TestBrownoutScheduler_WithReplacement(t *testing.T) {
 		t.Error("Expected Link header with rel=alternate to replacement")
 	}
 }
-

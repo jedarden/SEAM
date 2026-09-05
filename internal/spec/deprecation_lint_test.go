@@ -323,11 +323,11 @@ func TestIsValidISODateTime(t *testing.T) {
 // TestIsDateTimeWithinRange tests the range checking helper
 func TestIsDateTimeWithinRange(t *testing.T) {
 	tests := []struct {
-		name       string
-		datetime   string
-		since      string
-		sunset     string
-		expected   bool
+		name     string
+		datetime string
+		since    string
+		sunset   string
+		expected bool
 	}{
 		{"Within range", "2024-06-15T10:00:00Z", "2024-01-01", "2024-12-31", true},
 		{"Before since", "2023-12-31T23:59:59Z", "2024-01-01", "2024-12-31", false},

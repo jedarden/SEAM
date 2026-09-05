@@ -21,9 +21,9 @@ type ScopeVersionCache struct {
 	mu       sync.RWMutex
 	entries  map[string]*identityScopeVersions // identity -> scope versions
 	lruList  []string                          // LRU tracking by identity
-	maxLRU   int                                // Global LRU cap
-	maxPerID int                                // Max versions per identity
-	idleTTL  time.Duration                      // Idle eviction TTL
+	maxLRU   int                               // Global LRU cap
+	maxPerID int                               // Max versions per identity
+	idleTTL  time.Duration                     // Idle eviction TTL
 }
 
 // identityScopeVersions holds the scope versions for a single identity
@@ -45,9 +45,9 @@ func NewScopeVersionCache() *ScopeVersionCache {
 	return &ScopeVersionCache{
 		entries:  make(map[string]*identityScopeVersions),
 		lruList:  make([]string, 0, 100),
-		maxLRU:   100,                        // Global LRU cap
-		maxPerID: 4,                          // Max 4 versions per identity
-		idleTTL:  24 * time.Hour,            // 24 hour idle eviction
+		maxLRU:   100,            // Global LRU cap
+		maxPerID: 4,              // Max 4 versions per identity
+		idleTTL:  24 * time.Hour, // 24 hour idle eviction
 	}
 }
 

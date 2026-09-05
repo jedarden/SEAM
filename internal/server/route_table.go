@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ardenone/seam/internal/version"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/vault"
+	"github.com/ardenone/seam/internal/version"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"go.yaml.in/yaml/v4"
 )
@@ -483,11 +483,11 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
 
-				// Extract deprecation information (Phase 8.3)
-				deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
-				if err != nil {
-					return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
-				}
+			// Extract deprecation information (Phase 8.3)
+			deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 			entry := RouteEntry{
 				PathTemplate:          path,
 				Method:                methodOp.method,
@@ -647,6 +647,7 @@ func extractAcknowledgedExtension(operation *v3.Operation, pathItem *v3.PathItem
 	return true, nil
 }
 
+//nolint:unused // staged for the x-upstream-map wiring (phase 5.2)
 func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (map[string]RouteTarget, error) {
 	node, ok := firstExtension(operation, pathItem, document, "x-upstream-map")
 	if !ok || node == nil {
@@ -684,10 +685,10 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		}
 
 		result[key] = RouteTarget{
-			URL:           strings.TrimSpace(value.URL),
-			VaultPath:     value.VaultPath,
-			InjectAs:      value.InjectAs,
-			BreakerConfig: breakerConfig,
+			URL:            strings.TrimSpace(value.URL),
+			VaultPath:      value.VaultPath,
+			InjectAs:       value.InjectAs,
+			BreakerConfig:  breakerConfig,
 			RequiredScopes: value.RequiredScope,
 		}
 	}

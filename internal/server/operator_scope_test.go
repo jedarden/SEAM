@@ -50,13 +50,13 @@ func TestOperatorScopeMiddleware_ConfigStatus(t *testing.T) {
 			// Create test request with identity context
 			req := httptest.NewRequest(http.MethodGet, "/config/status", nil)
 			identity := &Identity{
-				NodeName:    "test-node",
-				NodeKey:     "test-key",
-				Resolved:    tt.hasScope, // Only resolved if we want the scope check to pass
+				NodeName:     "test-node",
+				NodeKey:      "test-key",
+				Resolved:     tt.hasScope, // Only resolved if we want the scope check to pass
 				Capabilities: []string{},
 			}
 			if tt.hasScope {
-			identity.Capabilities = []string{"seam:ops:read"}
+				identity.Capabilities = []string{"seam:ops:read"}
 			}
 			ctx := contextWithIdentity(req.Context(), identity)
 			req = req.WithContext(ctx)
@@ -187,7 +187,7 @@ func TestOperatorScopeMiddleware_UnresolvedIdentity(t *testing.T) {
 	identity := &Identity{
 		NodeName:     "test-node",
 		NodeKey:      "test-key",
-		Resolved:     false, // Unresolved
+		Resolved:     false,                     // Unresolved
 		Capabilities: []string{"seam:ops:read"}, // Has scope but unresolved
 	}
 	ctx := contextWithIdentity(req.Context(), identity)
@@ -310,10 +310,10 @@ func TestOperatorScopeMiddleware_CaseInsensitive(t *testing.T) {
 	}
 
 	tests := []string{
-		"seam:ops:read",        // Exact match
-		"SEAM:OPS:READ",        // Uppercase
-		"Seam:Ops:Read",        // Mixed case
-		"seam:OPS:read",        // Partial case
+		"seam:ops:read", // Exact match
+		"SEAM:OPS:READ", // Uppercase
+		"Seam:Ops:Read", // Mixed case
+		"seam:OPS:read", // Partial case
 	}
 
 	for _, scope := range tests {

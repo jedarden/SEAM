@@ -19,7 +19,7 @@ func NewDeprecationHeaders() *DeprecationHeaders {
 func (dh *DeprecationHeaders) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract route match from context if available
-		routeMatch, ok := r.Context().Value("routeMatch").(*RouteMatch)
+		routeMatch, ok := r.Context().Value(routeMatchContextKey{}).(*RouteMatch)
 		if !ok || routeMatch.Route.Deprecated == nil {
 			// No deprecation info - proceed normally
 			next.ServeHTTP(w, r)

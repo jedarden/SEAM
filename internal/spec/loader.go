@@ -436,8 +436,8 @@ func (l *Loader) buildEmptySpec() []byte {
 				"description": "SEAM caller-facing endpoint",
 			},
 		},
-		"paths": map[string]interface{}{},
-		"x-seam-filtered": true,
+		"paths":                map[string]interface{}{},
+		"x-seam-filtered":      true,
 		"x-seam-filter-reason": "Scope-based filtering: no routes visible (no scopes provided)",
 	}
 
