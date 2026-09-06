@@ -473,3 +473,34 @@ rejections from GitHub hook 659043016's mirror copy. This bead's criterion is
 the workflow existing and being attributable to the pushed commit; its phase
 is explicitly out of scope for the bead. Per-push outcome (workflow name,
 SHA, timestamps) recorded below and on the bead.
+
+### Probe outcome — trigger confirmed (verified live 2026-09-06 23:41–23:46Z)
+
+The `ae25b4258c0e04ad492d244befef888a0272e0b2` push (7bca881..ae25b42,
+Forgejo origin `main`, push completed 23:41:05Z) fired the whole chain, once,
+with no manual submission — all evidence read-only against
+`http://traefik-iad-ci:8001`:
+
+- **Workflow: `seam-ci-bkqzt`.** Created `2026-09-06T23:41:10Z`, started
+  `23:41:13Z`, `Running` when observed at 23:46:00Z (phase out of scope for
+  this bead). Attribution: argument `revision = ae25b425…` (the pushed SHA),
+  labels `events.argoproj.io/sensor=seam-ci-sensor` +
+  `events.argoproj.io/trigger=seam-ci`, creator
+  `system-serviceaccount-argo-events-default`, ServiceAccount
+  `argo-workflow`. Exactly **one** `seam-ci-*` workflow exists for the push —
+  no duplicate.
+- **Hop timings.** `/seam` accepted the POST at 23:41:07.763Z → published
+  eventID `24e6bd598f634a9595a78146348c3091` at 23:41:07.771Z → sensor filter
+  pass ("Triggering actions after receiving dependency seam-push")
+  23:41:07.900Z → workflow object created 23:41:10Z → "Successfully processed
+  trigger 'seam-ci'" 23:41:10.781Z. Push-to-workflow latency ≈5 s.
+- **Mirror copy — rejected at auth, as designed, but singly.** One
+  `invalid auth header` rejection at 23:41:25.796Z (GitHub hook 659043016's
+  copy), never published. Previous probes saw the rejection arrive as a pair
+  ~1 s and ~3.7 s after the push; this one arrived alone and 18 s late, so
+  the "exactly two rejections" wording earlier in this file is a
+  steady-shape observation, not an invariant — the invariant that matters
+  (zero mirror deliveries published; Forgejo is the only event source)
+  still held.
+- No managed resource was touched and ArgoCD was not involved: the push went
+  to `git.ardenone.com/jedarden/SEAM` as an ordinary commit on `main`.
