@@ -459,3 +459,17 @@ pushed to `main` and synced by ArgoCD. Everything below was verified live on
 
 Still open: the HMAC half of recommendation 5 (argo-events v1.9.10 validates
 the Bearer token but not `X-Forgejo-Signature`). Recommendation 4 is closed.
+
+## Push probe for `seam-14954833` (2026-09-06)
+
+The docs-only commit carrying this section is the probe push for
+`seam-14954833` ("Verify a normal SEAM push creates a seam-ci workflow in
+iad-ci"). It is an ordinary commit to Forgejo `main` — no managed resource
+touched, ArgoCD not involved. Baseline expectation, unchanged from the two
+post-fix probes above: exactly one accepted `/seam` delivery → one published
+eventID → `seam-ci-sensor` filter pass → one `seam-ci-*` workflow created for
+this revision, followed seconds later by the two `invalid auth header`
+rejections from GitHub hook 659043016's mirror copy. This bead's criterion is
+the workflow existing and being attributable to the pushed commit; its phase
+is explicitly out of scope for the bead. Per-push outcome (workflow name,
+SHA, timestamps) recorded below and on the bead.
