@@ -407,3 +407,55 @@ spec is byte-identical to `jedarden/declarative-config` HEAD `31c8b375`
 (manifest clean, `seam-ci-workflowtemplate.yml`), and the `ci` template's
 gate order is unchanged. This commit's per-push outcome (workflow name,
 phase, any failed step, duplicate count) is recorded on the bead.
+
+## Watchdog deployed — recommendation 4 closed (2026-09-06, bead `seam-363d987c`)
+
+`seam-ci-sensor` is no longer the unwatched CI sensor. A third
+`jetstream-watchdog` Deployment landed in `jedarden/declarative-config`
+`717908ca` as `k8s/iad-ci/argo-events/jetstream-watchdog-seam-ci-deployment.yml`,
+pushed to `main` and synced by ArgoCD. Everything below was verified live on
+2026-09-06 ~09:32Z, all `kubectl --server http://traefik-iad-ci:8001` read-only.
+
+- **Kind and image.** `kind: Deployment` (never Job/CronJob) with the
+  scheduling loop in-container — `WATCHDOG_POLL_INTERVAL=15s` — and
+  `ronaldraygun/jetstream-watchdog:0.5.1`, the same pinned semver as both
+  siblings. `replicas: 1` and `strategy: Recreate` so two watchdogs cannot
+  decide to delete the sensor pod in the same window.
+- **Consumer identity.** `seam-ci-sensor` has one trigger (`seam-ci`) on one
+  dependency (`seam-push`), so the pilot's single-value form applies rather
+  than needle-ci's comma-separated `WATCHDOG_CONSUMER_NAME` list:
+  `group-<fnv32a(sensorName-triggerName-depName)>` = `group-3763602931`.
+  Independently re-confirmed from both ends: the sensor's own startup log
+  (`Subscribing to subject default.forgejo-webhooks.seam with durable name
+  group-3763602931`, `triggerName: seam-ci`) and the watchdog's poll logs,
+  which report the same `consumer` with `tracked: 1`.
+- **No new RBAC.** `jetstream-watchdog-rbac.yml` was already namespace-scoped
+  (`Role` granting `pods get/list/delete` in `argo-events`, bound to the
+  `jetstream-watchdog` ServiceAccount), so it covers the new sensor pod
+  without a per-sensor edit. The pod-delete power stays confined to that one
+  ServiceAccount, which only the three watchdog Deployments run as.
+- **Matches the siblings structurally.** Diffing the comment-stripped
+  manifests against `jetstream-watchdog-needle-ci-deployment.yml` and the
+  agentscribe pilot leaves only the resource/label names, the sensor name and
+  the consumer identity — every threshold is byte-identical: poll 15s,
+  stranded 45s × 3 consecutive, ack-stall 120s × 2, queue depth 100 × 2,
+  consumer-series-gone × 3 while the sensor pod stays Ready. Recovery mode is
+  `pod-delete`: delete the wedged sensor pod and let the controller recreate it.
+- **Sequenced after the trigger was proven.** The Deployment rolled only after
+  recommendation 2's end-to-end proof (`seam-ci-mbnvx` @ `96b0634f`,
+  2026-09-06T06:04:49Z), so the watchdog could not mask a wiring defect during
+  verification. That Workflow object has since been TTL-reaped from
+  `argo-workflows` (TTL 30 min–2 h, plus `podGC: OnPodCompletion`) — the
+  durable evidence for it is the closed bead `seam-d20b2887` and the
+  "Post-fix state" section above, not the cluster.
+- **Live state at verification.** `argo-events-ns-iad-ci` **Synced / Healthy**
+  at `ab58ef85`, with `Deployment jetstream-watchdog-seam-ci-sensor` listed
+  Synced. The live Deployment spec matches git field-for-field (all 14 env
+  vars, image, ServiceAccount, Recreate, replicas 1) and
+  `generation == observedGeneration == 1`. Pod
+  `jetstream-watchdog-seam-ci-sensor-5bbf88bb56-98pzj` Running 1/1, 0
+  restarts. Poll logs show `num_pending: 0, num_ack_pending: 0` throughout —
+  the healthy steady state, so no recovery has fired yet.
+
+Still open: the HMAC half of recommendation 5 (argo-events v1.9.10 validates
+the Bearer token but not `X-Forgejo-Signature`). Recommendation 4 is closed.
