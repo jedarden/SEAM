@@ -1,4 +1,16 @@
 {
+  // STATUS 2026-09-06 (bead seam-a2413e9d): this slice is merged into the
+  // live tailnet policy module — jedarden/declarative-config,
+  // terraform/tailscale/policy.hujson — but is deliberately NOT applied
+  // yet, and cannot be: seam-rs-manager still carries tag:k8s, because the
+  // k8s operator's OAuth client was never granted tag:seam, so Tailscale
+  // rejects the proxy's key request (400 "requested tags [tag:seam] are
+  // invalid or not permitted") and the operator falls back to its default
+  // tag. The module now refuses to apply in that state
+  // (terraform/tailscale/scripts/check-seam-tag.sh). Granting the tag,
+  // re-registering the proxy, and the resulting access matrix are written
+  // up in terraform/tailscale/SEAM-TAG-RUNBOOK.md in that repo.
+  //
   // SEAM's tailnet policy slice.
   //
   // Merge these members into the existing tailnet policy file. The explicit

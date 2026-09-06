@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-08-31T06:12:44.367486",
+  "discrepancies": [
+    {
+      "type": "cli_open_zero_sqlite_positive",
+      "cli_open_count": 0,
+      "sqlite_open_count": 10,
+      "sqlite_open_ids": [
+        "seam-f16bd5d4",
+        "seam-fd66858f",
+        "seam-bd9472bb",
+        "seam-2d5e77af",
+        "seam-ef73e5b5",
+        "seam-fa73e4ca",
+        "seam-de25fb5d",
+        "seam-a7807127",
+        "seam-be01404c",
+        "seam-9d393984"
+      ]
+    },
+    {
+      "type": "cli_ready_zero_sqlite_positive",
+      "cli_ready_count": 0,
+      "sqlite_ready_count": 10,
+      "sqlite_ready_ids": [
+        "seam-f16bd5d4",
+        "seam-fd66858f",
+        "seam-bd9472bb",
+        "seam-2d5e77af",
+        "seam-ef73e5b5",
+        "seam-fa73e4ca",
+        "seam-de25fb5d",
+        "seam-a7807127",
+        "seam-be01404c",
+        "seam-9d393984"
+      ]
+    }
+  ],
+  "repairs_attempted": [
+    "checkpoint_flush",
+    "checkpoint_flush"
+  ],
+  "diagnostic_beads_created": []
+}

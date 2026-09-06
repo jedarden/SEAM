@@ -1,0 +1,496 @@
+2026-08-31 03:57:38,450 - bead_visibility - INFO - Starting visibility check at 2026-08-31T03:57:38.450302
+2026-08-31 03:57:38,542 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 03:57:38,546 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-035738.json
+2026-08-31 04:02:38,546 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:02:38.546459
+2026-08-31 04:02:38,577 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 04:02:38,577 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-040238.json
+2026-08-31 04:07:38,578 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:07:38.578107
+2026-08-31 04:07:38,603 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 04:07:38,603 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-040738.json
+2026-08-31 04:12:38,604 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:12:38.603999
+2026-08-31 04:12:38,662 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 04:12:38,663 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-041238.json
+2026-08-31 04:17:38,663 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:17:38.663498
+2026-08-31 04:17:38,676 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1156)
+2026-08-31 04:17:38,681 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1156)
+2026-08-31 04:17:38,701 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 04:17:38,701 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 3
+2026-08-31 04:17:38,701 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:17:38,701 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:17:38,708 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:17:38,737 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1156)
+2026-08-31 04:17:38,737 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:17:38,737 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:17:38
+2026-08-31 04:17:38,866 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:17:38,866 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 3
+2026-08-31 04:17:38,866 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:17:38,866 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:17:38,876 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:17:38,881 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1156)
+2026-08-31 04:17:38,881 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:17:38,882 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-041738.json
+2026-08-31 04:22:38,882 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:22:38.882766
+2026-08-31 04:22:38,892 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:22:38,906 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:22:38,933 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 04:22:38,933 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 5
+2026-08-31 04:22:38,933 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:22:38,933 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:22:38,942 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:22:38,947 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:22:38,947 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:22:38,948 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:22:38
+2026-08-31 04:22:39,133 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:22:39,134 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 5
+2026-08-31 04:22:39,134 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:22:39,134 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:22:39,147 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:22:39,156 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:22:39,157 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:22:39,158 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-042239.json
+2026-08-31 04:27:39,159 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:27:39.159220
+2026-08-31 04:27:39,163 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:27:39,168 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:27:39,190 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 6, 'sqlite_ready_count': 6, 'checkpoint_open_count': 0}
+2026-08-31 04:27:39,190 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 6
+2026-08-31 04:27:39,190 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:27:39,190 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:27:39,198 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:27:39,203 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:27:39,203 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:27:39,203 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:27:39
+2026-08-31 04:27:39,347 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:27:39,347 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 6
+2026-08-31 04:27:39,347 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:27:39,347 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:27:39,356 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:27:39,360 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1097)
+2026-08-31 04:27:39,361 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:27:39,362 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-042739.json
+2026-08-31 04:32:39,362 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:32:39.362191
+2026-08-31 04:32:39,376 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:32:39,394 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:32:39,458 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 04:32:39,458 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 4
+2026-08-31 04:32:39,458 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:32:39,458 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:32:39,465 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:32:39,469 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:32:39,469 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:32:39,469 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:32:39
+2026-08-31 04:32:39,719 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:32:39,720 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 4
+2026-08-31 04:32:39,720 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:32:39,720 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:32:39,727 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:32:39,732 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:32:39,732 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:32:39,733 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-043239.json
+2026-08-31 04:37:39,733 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:37:39.733664
+2026-08-31 04:37:39,747 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:37:39,752 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:37:39,769 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 04:37:39,769 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 5
+2026-08-31 04:37:39,769 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:37:39,769 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:37:39,778 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:37:39,782 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:37:39,782 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:37:39,782 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:37:39
+2026-08-31 04:37:39,966 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:37:39,967 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 5
+2026-08-31 04:37:39,967 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:37:39,967 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:37:39,991 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:37:39,997 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:37:39,997 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:37:40,000 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-043740.json
+2026-08-31 04:42:40,001 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:42:40.001065
+2026-08-31 04:42:40,006 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:42:40,018 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:42:40,046 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 6, 'sqlite_ready_count': 6, 'checkpoint_open_count': 0}
+2026-08-31 04:42:40,046 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 6
+2026-08-31 04:42:40,046 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:42:40,046 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:42:40,053 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:42:40,058 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:42:40,058 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:42:40,058 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:42:40
+2026-08-31 04:42:40,236 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:42:40,237 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 6
+2026-08-31 04:42:40,237 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:42:40,237 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:42:40,258 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:42:40,270 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:42:40,271 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:42:40,273 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-044240.json
+2026-08-31 04:47:40,274 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:47:40.274121
+2026-08-31 04:47:40,278 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:47:40,283 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:47:40,299 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 7, 'sqlite_ready_count': 7, 'checkpoint_open_count': 0}
+2026-08-31 04:47:40,299 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 7
+2026-08-31 04:47:40,299 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:47:40,299 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:47:40,307 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:47:40,312 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:47:40,312 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:47:40,312 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:47:40
+2026-08-31 04:47:40,447 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:47:40,447 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 7
+2026-08-31 04:47:40,447 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:47:40,447 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:47:40,472 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:47:40,480 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:47:40,480 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:47:40,482 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-044740.json
+2026-08-31 04:52:40,483 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:52:40.482951
+2026-08-31 04:52:40,521 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 04:52:40,521 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-045240.json
+2026-08-31 04:57:40,521 - bead_visibility - INFO - Starting visibility check at 2026-08-31T04:57:40.521903
+2026-08-31 04:57:40,531 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:57:40,539 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:57:40,565 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 04:57:40,565 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 2
+2026-08-31 04:57:40,565 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:57:40,565 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:57:40,572 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:57:40,576 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:57:40,576 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 04:57:40,576 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 04:57:40
+2026-08-31 04:57:40,766 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 04:57:40,767 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 2
+2026-08-31 04:57:40,767 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 04:57:40,767 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 04:57:40,800 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 04:57:40,844 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1532)
+2026-08-31 04:57:40,844 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 04:57:40,847 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-045740.json
+2026-08-31 05:02:40,847 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:02:40.847467
+2026-08-31 05:02:40,885 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 05:02:40,886 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-050240.json
+2026-08-31 05:07:40,887 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:07:40.887155
+2026-08-31 05:07:40,918 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 05:07:40,918 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-050740.json
+2026-08-31 05:12:40,919 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:12:40.919071
+2026-08-31 05:12:40,933 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 580)
+2026-08-31 05:12:40,952 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 580)
+2026-08-31 05:12:40,973 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 05:12:40,973 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 5
+2026-08-31 05:12:40,973 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:12:40,973 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:12:40,981 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:12:40,986 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 580)
+2026-08-31 05:12:40,986 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:12:40,986 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:12:40
+2026-08-31 05:12:41,258 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:12:41,258 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 5
+2026-08-31 05:12:41,258 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:12:41,259 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:12:41,280 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:12:41,285 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 580)
+2026-08-31 05:12:41,285 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:12:41,286 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-051241.json
+2026-08-31 05:17:41,286 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:17:41.286573
+2026-08-31 05:17:41,296 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1432)
+2026-08-31 05:17:41,312 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1432)
+2026-08-31 05:17:41,332 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 05:17:41,332 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 3
+2026-08-31 05:17:41,332 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:17:41,332 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:17:41,339 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:17:41,343 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1432)
+2026-08-31 05:17:41,343 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:17:41,343 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:17:41
+2026-08-31 05:17:41,545 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:17:41,545 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 3
+2026-08-31 05:17:41,546 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:17:41,546 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:17:41,574 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:17:41,578 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1432)
+2026-08-31 05:17:41,578 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:17:41,579 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-051741.json
+2026-08-31 05:22:41,579 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:22:41.579762
+2026-08-31 05:22:41,583 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:22:41,586 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:22:41,602 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 05:22:41,602 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 3
+2026-08-31 05:22:41,602 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:22:41,602 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:22:41,610 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:22:41,614 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:22:41,614 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:22:41,615 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:22:41
+2026-08-31 05:22:41,747 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:22:41,747 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 3
+2026-08-31 05:22:41,747 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:22:41,747 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:22:41,755 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:22:41,759 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:22:41,759 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:22:41,760 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-052241.json
+2026-08-31 05:27:41,760 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:27:41.760332
+2026-08-31 05:27:41,775 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:27:41,784 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:27:41,846 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 05:27:41,846 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 4
+2026-08-31 05:27:41,846 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:27:41,846 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:27:41,862 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:27:41,874 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:27:41,874 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:27:41,874 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:27:41
+2026-08-31 05:27:42,132 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:27:42,133 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 4
+2026-08-31 05:27:42,133 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:27:42,133 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:27:42,156 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:27:42,160 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 1539)
+2026-08-31 05:27:42,160 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:27:42,160 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-052742.json
+2026-08-31 05:32:42,161 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:32:42.161091
+2026-08-31 05:32:42,166 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:32:42,175 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:32:42,211 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 05:32:42,211 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 4
+2026-08-31 05:32:42,211 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:32:42,211 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:32:42,253 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:32:42,264 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:32:42,264 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:32:42,264 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:32:42
+2026-08-31 05:32:42,545 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:32:42,545 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 4
+2026-08-31 05:32:42,545 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:32:42,545 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:32:42,559 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:32:42,567 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:32:42,567 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:32:42,568 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-053242.json
+2026-08-31 05:37:42,568 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:37:42.568676
+2026-08-31 05:37:42,584 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:37:42,601 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:37:42,650 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 05:37:42,650 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 5
+2026-08-31 05:37:42,650 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:37:42,650 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:37:42,664 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:37:42,671 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:37:42,671 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:37:42,671 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:37:42
+2026-08-31 05:37:42,913 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:37:42,913 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 5
+2026-08-31 05:37:42,913 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:37:42,913 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:37:42,921 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:37:42,926 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:37:42,926 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:37:42,927 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-053742.json
+2026-08-31 05:42:42,928 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:42:42.928017
+2026-08-31 05:42:42,932 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:42:42,937 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:42:42,954 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 6, 'sqlite_ready_count': 6, 'checkpoint_open_count': 0}
+2026-08-31 05:42:42,954 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 6
+2026-08-31 05:42:42,954 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:42:42,954 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:42:42,964 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:42:42,969 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:42:42,969 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:42:42,969 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:42:42
+2026-08-31 05:42:43,136 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:42:43,136 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 6
+2026-08-31 05:42:43,137 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:42:43,137 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:42:43,150 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:42:43,155 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:42:43,155 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:42:43,156 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-054243.json
+2026-08-31 05:47:43,156 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:47:43.156563
+2026-08-31 05:47:43,161 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:47:43,165 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:47:43,185 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 7, 'sqlite_ready_count': 7, 'checkpoint_open_count': 0}
+2026-08-31 05:47:43,185 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 7
+2026-08-31 05:47:43,185 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:47:43,185 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:47:43,195 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:47:43,199 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:47:43,199 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:47:43,199 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:47:43
+2026-08-31 05:47:43,344 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:47:43,344 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 7
+2026-08-31 05:47:43,345 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:47:43,345 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:47:43,353 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:47:43,356 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:47:43,356 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:47:43,357 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-054743.json
+2026-08-31 05:52:43,357 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:52:43.357319
+2026-08-31 05:52:43,366 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:52:43,374 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:52:43,404 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 8, 'sqlite_ready_count': 8, 'checkpoint_open_count': 0}
+2026-08-31 05:52:43,404 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 8
+2026-08-31 05:52:43,404 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:52:43,404 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:52:43,449 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:52:43,453 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:52:43,453 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:52:43,454 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:52:43
+2026-08-31 05:52:43,618 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:52:43,618 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 8
+2026-08-31 05:52:43,618 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:52:43,619 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:52:43,633 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:52:43,637 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:52:43,638 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:52:43,638 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-055243.json
+2026-08-31 05:57:43,638 - bead_visibility - INFO - Starting visibility check at 2026-08-31T05:57:43.638850
+2026-08-31 05:57:43,643 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:57:43,648 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:57:43,665 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 9, 'sqlite_ready_count': 9, 'checkpoint_open_count': 0}
+2026-08-31 05:57:43,665 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 9
+2026-08-31 05:57:43,665 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:57:43,665 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:57:43,674 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:57:43,678 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:57:43,678 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 05:57:43,679 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 05:57:43
+2026-08-31 05:57:43,846 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 05:57:43,846 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 9
+2026-08-31 05:57:43,846 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 05:57:43,846 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 05:57:43,855 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 05:57:43,860 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 05:57:43,860 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 05:57:43,861 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-055743.json
+2026-08-31 06:02:43,861 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:02:43.861681
+2026-08-31 06:02:43,871 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:02:43,880 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:02:43,911 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 8, 'sqlite_ready_count': 8, 'checkpoint_open_count': 0}
+2026-08-31 06:02:43,911 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 8
+2026-08-31 06:02:43,911 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:02:43,911 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:02:43,954 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:02:43,959 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:02:43,959 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:02:43,959 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:02:43
+2026-08-31 06:02:44,166 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:02:44,166 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 8
+2026-08-31 06:02:44,166 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:02:44,166 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:02:44,181 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:02:44,185 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:02:44,186 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:02:44,187 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-060244.json
+2026-08-31 06:07:44,187 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:07:44.187212
+2026-08-31 06:07:44,192 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:07:44,197 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:07:44,213 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 9, 'sqlite_ready_count': 9, 'checkpoint_open_count': 0}
+2026-08-31 06:07:44,213 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 9
+2026-08-31 06:07:44,213 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:07:44,213 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:07:44,223 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:07:44,227 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:07:44,227 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:07:44,227 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:07:44
+2026-08-31 06:07:44,356 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:07:44,356 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 9
+2026-08-31 06:07:44,356 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:07:44,356 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:07:44,363 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:07:44,366 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:07:44,366 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:07:44,367 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-060744.json
+2026-08-31 06:12:44,367 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:12:44.367486
+2026-08-31 06:12:44,371 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:12:44,375 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:12:44,391 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 10, 'sqlite_ready_count': 10, 'checkpoint_open_count': 0}
+2026-08-31 06:12:44,391 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 10
+2026-08-31 06:12:44,391 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:12:44,391 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:12:44,398 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:12:44,403 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:12:44,403 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:12:44,403 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:12:44
+2026-08-31 06:12:44,538 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:12:44,538 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 10
+2026-08-31 06:12:44,539 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:12:44,539 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:12:44,549 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:12:44,554 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:12:44,554 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:12:44,555 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-061244.json
+2026-08-31 06:17:44,555 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:17:44.555246
+2026-08-31 06:17:44,559 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:17:44,564 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:17:44,587 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 11, 'sqlite_ready_count': 11, 'checkpoint_open_count': 0}
+2026-08-31 06:17:44,587 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 11
+2026-08-31 06:17:44,587 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:17:44,587 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:17:44,598 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:17:44,602 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:17:44,603 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:17:44,603 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:17:44
+2026-08-31 06:17:44,770 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:17:44,770 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 11
+2026-08-31 06:17:44,770 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:17:44,770 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:17:44,779 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:17:44,784 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:17:44,784 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:17:44,785 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-061744.json
+2026-08-31 06:22:44,786 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:22:44.786017
+2026-08-31 06:22:44,789 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:22:44,794 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:22:44,810 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 12, 'sqlite_ready_count': 12, 'checkpoint_open_count': 0}
+2026-08-31 06:22:44,810 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 12
+2026-08-31 06:22:44,810 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:22:44,810 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:22:44,819 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:22:44,823 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:22:44,823 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:22:44,824 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:22:44
+2026-08-31 06:22:44,953 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:22:44,954 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 12
+2026-08-31 06:22:44,954 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:22:44,954 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:22:44,963 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:22:44,967 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:22:44,967 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:22:44,968 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-062244.json
+2026-08-31 06:27:44,968 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:27:44.968399
+2026-08-31 06:27:44,973 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:27:44,976 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:27:44,992 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 12, 'sqlite_ready_count': 12, 'checkpoint_open_count': 0}
+2026-08-31 06:27:44,992 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 12
+2026-08-31 06:27:44,992 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:27:44,992 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:27:44,999 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:27:45,004 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:27:45,004 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:27:45,004 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:27:45
+2026-08-31 06:27:45,146 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:27:45,147 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 12
+2026-08-31 06:27:45,147 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:27:45,147 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:27:45,161 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:27:45,171 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:27:45,171 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:27:45,173 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-062745.json
+2026-08-31 06:32:45,173 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:32:45.173585
+2026-08-31 06:32:45,178 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:32:45,184 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:32:45,201 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 13, 'sqlite_ready_count': 13, 'checkpoint_open_count': 0}
+2026-08-31 06:32:45,201 - bead_visibility - WARNING - DETECTED: CLI open=0 but SQLite has 13
+2026-08-31 06:32:45,201 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:32:45,201 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:32:45,209 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:32:45,213 - bead_visibility - WARNING - CLI open query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:32:45,213 - bead_visibility - ERROR - Repair failed: beads still invisible
+2026-08-31 06:32:45,213 - bead_visibility - INFO - Creating diagnostic bead: [Visibility Bug] CLI open returns zero despite SQLite records detected at 2026-08-31 06:32:45
+2026-08-31 06:32:45,412 - bead_visibility - ERROR - Failed to create diagnostic bead: 
+2026-08-31 06:32:45,412 - bead_visibility - WARNING - DETECTED: CLI ready=0 but SQLite has 13
+2026-08-31 06:32:45,412 - bead_visibility - INFO - Attempting repair: flush checkpoint
+2026-08-31 06:32:45,412 - bead_visibility - INFO - Running: bead sync flush-only
+2026-08-31 06:32:45,420 - bead_visibility - INFO - Checkpoint flushed successfully
+2026-08-31 06:32:45,424 - bead_visibility - WARNING - CLI ready query failed: Extra data: line 2 column 1 (char 398)
+2026-08-31 06:32:45,424 - bead_visibility - ERROR - Repair failed: ready beads still invisible
+2026-08-31 06:32:45,425 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-063245.json

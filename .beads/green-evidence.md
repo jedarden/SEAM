@@ -493,3 +493,121 @@ workers on one bead, the known dispatcher race. Consequences for this file:
   in-flight work.
 - The clean-HEAD measurement is the one thing the live tree could not
   provide, and is this run's whole contribution.
+
+---
+
+# 10. Third live-tree run — the `internal/server` test package executed
+
+Run 4 on this bead (`claude-code-glm-5.3-flash-glm-roam-19`, 2026-09-03
+23:21Z–23:55Z). **Additive only — sections 1–9 untouched.**
+
+## 10.1 What this run adds
+
+Sections 1–9 and the clean-HEAD reproduction in section 9 can only ever report
+that `internal/server` **fails to compile**, because at pinned `b6117fb` it
+does. During this run's window the in-flight fixes to that package were
+momentarily complete, and the package **compiled and ran for the first time
+since 2026-08-30** (`go test ./internal/server`, 93.6 s). That produced a class
+of failure no clean-HEAD measurement can reach: **16 runtime assertion
+failures in production behaviour**, none of which is a compile error.
+
+`go build ./...` was re-verified exit 0 twice (23:26Z, 23:52Z), and
+`git status` confirmed **no non-test `.go` file is dirty anywhere in the
+repository** — so build green does not depend on any worker's uncommitted
+edits.
+
+## 10.2 Runtime failures, mapped to beads
+
+| Test | File:Line | Bead |
+|---|---|---|
+| `TestApplyRequestTransforms_Rename` | `adapter_executor_test.go:71` | `seam-3a0379c9` |
+| `TestApplyRequestTransforms_Default` | `adapter_executor_test.go:138` | `seam-3a0379c9` |
+| `TestApplyResponseTransforms` | `adapter_executor_test.go:537` | `seam-3a0379c9` |
+| `TestApplyResponseTransformsToReader` | `adapter_executor_test.go:727` | `seam-3a0379c9` |
+| `TestArgoCDProxyBaselineOperation` | `capture_baseline_test.go:154` | `seam-d0c31a6e` |
+| `TestArgoCDProxyBaselineResponseTimes` | `capture_baseline_test.go:249` | `seam-d0c31a6e` |
+| `TestArgoCDProxyBaselineCaptureStatusDisabled` | `capture_baseline_test.go:372` | `seam-d0c31a6e` |
+| `TestArgoCDProxyBaselineConsistency` | `capture_baseline_test.go:330` | `seam-63dc8615` |
+| `TestCaptureNonIntrusion` | `capture_comprehensive_test.go:273` | `seam-d0c31a6e` |
+| `TestCaptureCompleteness` | `capture_comprehensive_test.go:737` | `seam-63dc8615` |
+| `TestCaptureFullLifecycleIntegration` | `capture_comprehensive_test.go:937` | `seam-d0c31a6e` |
+| `TestCaptureRedactsRouteInjectableNames` | `capture_redaction_test.go:100` | `seam-63dc8615` |
+| `TestScopeMapIsolation` | `cloudflare_jwt_middleware_test.go:496` | `seam-12385ed9` |
+| `TestCloudflareAccessClaims_JSONUnmarshalling` | `cloudflare_jwt_middleware_test.go:558` | `seam-1ed6663e` |
+| `TestCloudflareAccessClaims_MultipleAudiences` | `cloudflare_jwt_middleware_test.go:623` | `seam-1ed6663e` / `seam-b228fdd2` (panic) |
+
+## 10.3 Root causes confirmed against production source
+
+Three of the runtime clusters were traced to specific product defects, all in
+files that are **clean at `HEAD`** — so these are not artefacts of the moving
+tree:
+
+**`/_seam/healthz` requires a scope and returns 403** (`seam-d0c31a6e`, 5
+tests). `spec/openapi.yaml:352` declares `/_seam/healthz` with **no `security`
+requirement** and documents it as *"Always returns 200 OK"* for Kubernetes
+liveness probes. Both `cloudflare_jwt_middleware.go:432` and `capture.go:135`
+exempt that path explicitly, but the scope/route authorization layer does not:
+it falls through to the 403 `visible_but_not_invocable` writer at
+`server.go:2299`. A live liveness probe against this server would fail and the
+pod would be restarted by the kubelet.
+
+**`CloudflareAccessClaims` unexported claim fields** (`seam-1ed6663e`). This
+run independently confirmed the same root cause section 9 could only see as a
+`go vet` diagnostic: `cloudflare_jwt_middleware.go:85` declares
+`aud/iss/sub/exp/nbf` unexported with `json` tags, so `encoding/json` populates
+none of them. The runtime result is `aud=[]`, `iss=''` — the JWT is parsed and
+the identity is silently empty.
+
+**Rename implemented as copy** (`seam-3a0379c9`).
+`applyRenameTransform` (`adapter_executor.go:227`) resolves the source
+pointer, writes the value to the destination parent, and returns **without
+deleting the source key**. A "renamed" field therefore appears at both paths,
+which is what the four `adapter_executor_test.go` failures assert against.
+
+## 10.4 Duplicate beads — consolidated
+
+Two pairs of beads describing the identical defect in the identical file were
+created ~1 minute apart by concurrent filers. Both members of each pair were
+Open and **unassigned**, so closing the later-created member disrupts no
+in-flight work and removes the duplicate-claim hazard (two workers landing
+competing fixes for one defect).
+
+| Defect | Kept | Closed as duplicate |
+|---|---|---|
+| `CloudflareAccessClaims` unexported fields | `seam-1ed6663e` (linked to gate) | `seam-f67365b7` |
+| rename/default transform semantics | `seam-3a0379c9` (linked to gate) | `seam-b7175b2d` |
+
+The kept member is the one already carrying the gate's `relates_to` edge, so
+the disposition graph loses nothing. `bead reopen` restores either if this
+judgement is wrong.
+
+## 10.5 Graph gaps closed
+
+`seam-63dc8615` (11 capture/ArgoCD baseline failures) and `seam-b228fdd2`
+(panic in `TestCloudflareAccessClaims_MultipleAudiences`) described failures in
+this run's inventory but carried no edge to `seam-d33d0b9c`. Both are now
+linked.
+
+## 10.6 Failures not attributable to `HEAD`
+
+Two failing tests live in **untracked** files — another worker's
+work-in-progress that does not exist at `HEAD`. Recorded for completeness, no
+bead filed:
+
+- `capture_functionality_test.go` — `TestCaptureLatencyIsAcceptable`
+- `capture_latency_test.go` — `TestCaptureLatencyUnderLoad`
+
+## 10.7 Disclosure — this run briefly clobbered this file
+
+While assembling this run's report, sections 1–9 of this file were overwritten
+in the shared working tree and then restored byte-for-byte from `HEAD`
+(`b6406e6`) before anything was staged or committed. `git diff` on this path
+was verified empty immediately after the restore. Section 10 above is appended
+on top of the intact sections 1–9; nothing from runs 1–3 was lost.
+
+## 10.8 Verdict
+
+Unchanged from runs 2 and 3: `go build ./...` **exit 0**; `go vet ./...` and
+`go test ./...` **exit 1**. The tree is not green. Every failure observed
+across all three runs is now filed as its own bead and linked to
+`seam-d33d0b9c`.

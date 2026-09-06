@@ -1,0 +1,189 @@
+{
+  "timestamp": "2026-09-05T21:44:54.714320848Z",
+  "total_open_beads": 22,
+  "exclusion_criteria": {
+    "has_assignee": 0,
+    "manually_blocked": 1,
+    "has_dependencies": 21,
+    "resource_conflicts": 0
+  },
+  "final_candidate_count": 6,
+  "excluded_beads": [
+    {
+      "bead_id": "seam-7358ce50",
+      "title": "Deploy SEAM on the consolidated prefix and prove every route still resolves its credential",
+      "priority": 1,
+      "assignee": null,
+      "manual_blocked": true,
+      "has_blockers": false,
+      "blocker_count": 0,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-4bf77f64",
+      "title": "Update phase checkboxes in plan.md based on evidence",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-c27f3555",
+      "title": "Create evidence-to-checkbox mapping",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-7f22419c",
+      "title": "Update plan.md checkboxes based on evidence",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-46884014",
+      "title": "Create evidence reference documentation and verify",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-80040f8e",
+      "title": "Format and save checkbox state report",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-a882fe8a",
+      "title": "Verify checkbox extraction completeness",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-0e3fbddf",
+      "title": "Fix the seam-ci push trigger wiring in declarative-config",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-14954833",
+      "title": "Verify a normal SEAM push creates a seam-ci workflow in iad-ci",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-363d987c",
+      "title": "Deploy a jetstream-watchdog for seam-ci-sensor to auto-heal wedged subscriptions",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-71ec8a57",
+      "title": "Update the docs and example fragments that encode seam/routes/ as the canonical prefix",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-8c59a4ae",
+      "title": "Update the security and operational runbooks to the retired seam/routes prefix",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-ab455030",
+      "title": "Update plan and notes stragglers and sweep the repo for live seam/routes references",
+      "priority": 2,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-7fdee15d",
+      "title": "Extract checkbox states from plan.md",
+      "priority": 3,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-9c80a071",
+      "title": "Map evidence to checkboxes with verdicts",
+      "priority": 3,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    },
+    {
+      "bead_id": "seam-d7aac6fe",
+      "title": "Write evidence-to-checkbox mapping report",
+      "priority": 3,
+      "assignee": null,
+      "manual_blocked": false,
+      "has_blockers": true,
+      "blocker_count": 1,
+      "has_resource_conflicts": false,
+      "conflict_count": 0
+    }
+  ]
+}

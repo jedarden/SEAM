@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-09-01T01:58:13.419148",
+  "discrepancies": [
+    {
+      "type": "cli_ready_zero_sqlite_positive",
+      "cli_ready_count": 0,
+      "sqlite_ready_count": 18,
+      "sqlite_ready_ids": [
+        "seam-65068432",
+        "seam-5f6f614c",
+        "seam-2f3383c5",
+        "seam-ce937021",
+        "seam-639aa921",
+        "seam-ff3a9c35",
+        "seam-41aa6cc3",
+        "seam-d2611482",
+        "seam-45226dda",
+        "seam-cd1ff70a"
+      ]
+    }
+  ],
+  "repairs_attempted": [
+    "checkpoint_flush"
+  ],
+  "diagnostic_beads_created": []
+}

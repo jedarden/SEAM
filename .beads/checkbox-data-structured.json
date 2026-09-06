@@ -1,0 +1,213 @@
+{
+  "total_checkboxes": 17,
+  "phases": {
+    "10": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "11": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    },
+    "12": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "13": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    },
+    "14": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    },
+    "1a": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "1b": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "2": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "3": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "4": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "5": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "6a": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    },
+    "6b": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "7": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "8": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    },
+    "9a": {
+      "total": 1,
+      "complete": 0,
+      "incomplete": 1
+    },
+    "9b": {
+      "total": 1,
+      "complete": 1,
+      "incomplete": 0
+    }
+  },
+  "complete": 6,
+  "incomplete": 11,
+  "checkboxes": [
+    {
+      "line_number": 868,
+      "phase": "1a",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "HTTP server, configuration (the operator-owned env-var/flag knobs, and the two listener ports \u2014 call..."
+    },
+    {
+      "line_number": 881,
+      "phase": "1b",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "OpenAPI merge from a static local directory, per-fragment schema validation, collision detection on ..."
+    },
+    {
+      "line_number": 882,
+      "phase": "2",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "OpenBao client authenticating via **Kubernetes auth** with the `rs-manager/seam/routes/*` path allow..."
+    },
+    {
+      "line_number": 888,
+      "phase": "3",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "per-service `configMap` volumes (one per service, each mounted whole at `/etc/gateway/routes.d/<svc>..."
+    },
+    {
+      "line_number": 889,
+      "phase": "4",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "no new Tailscale Connector needed). **This is the phase where credential injection is first proved e..."
+    },
+    {
+      "line_number": 890,
+      "phase": "5",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "the fragment declares `/k8s/{cluster}/\u2026` and names `cluster` as the instance parameter, per Data Mod..."
+    },
+    {
+      "line_number": 891,
+      "phase": "6a",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "single replica per Version Migration Strategy \u00a71, **the per-service route `configMap` volumes and th..."
+    },
+    {
+      "line_number": 896,
+      "phase": "6b",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "cut agents over **service by service** (decided 2026-07-16); as each service's fragment goes live, i..."
+    },
+    {
+      "line_number": 897,
+      "phase": "7",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "NEEDLE-side per-worker `tsnet` identity provisioning, `x-required-scope` route tagging, Grant-based ..."
+    },
+    {
+      "line_number": 912,
+      "phase": "8",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "**conditional `Deprecation`/`Sunset` header emission** for fragments marked `x-seam-deprecated` (or ..."
+    },
+    {
+      "line_number": 931,
+      "phase": "9a",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "the gateway's merge/validation engine packaged as a CLI and wired as a declarative-config CI gate. V..."
+    },
+    {
+      "line_number": 949,
+      "phase": "9b",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "`seam diff` (renders the effective merged-spec change a PR would cause) and `seam import --from-url`..."
+    },
+    {
+      "line_number": 950,
+      "phase": "10",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "the **`x-instance-param`** fragment-root field naming the designated instance-selector path paramete..."
+    },
+    {
+      "line_number": 959,
+      "phase": "11",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "per-route last-2xx tracking surfaced in `/docs` **in the three-state rendering** (corrected 2026-07-..."
+    },
+    {
+      "line_number": 960,
+      "phase": "12",
+      "state": "[ ]",
+      "is_complete": false,
+      "description": "`x-credential-probe` background validation loop with per-(fragment, instance) reporting at `/health/..."
+    },
+    {
+      "line_number": 961,
+      "phase": "13",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "`x-loop-guard` loop breaker, `x-cost-per-call`/`x-quota` cost governor with `X-SEAM-Budget-Remaining..."
+    },
+    {
+      "line_number": 962,
+      "phase": "14",
+      "state": "[x]",
+      "is_complete": true,
+      "description": "**the phase number this plan owed Per-Agent Tool Scoping point 7** (assigned 2026-07-20). That mode ..."
+    }
+  ]
+}
