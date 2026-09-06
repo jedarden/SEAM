@@ -1,0 +1,312 @@
+2026-08-31 06:46:08,332 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:46:08.332110
+2026-08-31 06:46:08,476 - bead_visibility - INFO - Query results: {'cli_open_count': 12, 'cli_ready_count': 12, 'sqlite_open_count': 12, 'sqlite_ready_count': 12, 'checkpoint_open_count': 0}
+2026-08-31 06:46:08,476 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-064608.json
+2026-08-31 06:51:08,477 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:51:08.477150
+2026-08-31 06:51:08,501 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 06:51:08,502 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-065108.json
+2026-08-31 06:56:08,502 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:56:08.502191
+2026-08-31 06:56:08,545 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 06:56:08,546 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-065608.json
+2026-08-31 07:01:08,546 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:01:08.546415
+2026-08-31 07:01:08,570 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 07:01:08,571 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-070108.json
+2026-08-31 07:06:08,571 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:06:08.571729
+2026-08-31 07:06:08,620 - bead_visibility - INFO - Query results: {'cli_open_count': 6, 'cli_ready_count': 6, 'sqlite_open_count': 6, 'sqlite_ready_count': 6, 'checkpoint_open_count': 0}
+2026-08-31 07:06:08,620 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-070608.json
+2026-08-31 07:11:08,620 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:11:08.620796
+2026-08-31 07:11:08,652 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:11:08,652 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-071108.json
+2026-08-31 07:16:08,652 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:16:08.652896
+2026-08-31 07:16:08,682 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:16:08,683 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-071608.json
+2026-08-31 07:21:08,683 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:21:08.683533
+2026-08-31 07:21:08,737 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:21:08,738 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-072108.json
+2026-08-31 07:26:08,738 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:26:08.738395
+2026-08-31 07:26:08,764 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:26:08,764 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-072608.json
+2026-08-31 07:31:08,765 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:31:08.765070
+2026-08-31 07:31:08,794 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:31:08,794 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-073108.json
+2026-08-31 07:36:08,795 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:36:08.794968
+2026-08-31 07:36:08,840 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 07:36:08,840 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-073608.json
+2026-08-31 07:41:08,840 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:41:08.840843
+2026-08-31 07:41:08,885 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 07:41:08,886 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-074108.json
+2026-08-31 07:46:08,886 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:46:08.886411
+2026-08-31 07:46:08,908 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 07:46:08,909 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-074608.json
+2026-08-31 07:51:08,909 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:51:08.909335
+2026-08-31 07:51:08,932 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 07:51:08,933 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-075108.json
+2026-08-31 07:56:08,933 - bead_visibility - INFO - Starting visibility check at 2026-08-31T07:56:08.933222
+2026-08-31 07:56:08,956 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 07:56:08,957 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-075608.json
+2026-08-31 08:01:08,957 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:01:08.957679
+2026-08-31 08:01:08,987 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 08:01:08,988 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-080108.json
+2026-08-31 08:06:08,988 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:06:08.988702
+2026-08-31 08:06:09,027 - bead_visibility - INFO - Query results: {'cli_open_count': 6, 'cli_ready_count': 6, 'sqlite_open_count': 6, 'sqlite_ready_count': 6, 'checkpoint_open_count': 0}
+2026-08-31 08:06:09,028 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-080609.json
+2026-08-31 08:11:09,028 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:11:09.028361
+2026-08-31 08:11:09,073 - bead_visibility - INFO - Query results: {'cli_open_count': 5, 'cli_ready_count': 5, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 08:11:09,074 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-081109.json
+2026-08-31 08:16:09,074 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:16:09.074720
+2026-08-31 08:16:09,119 - bead_visibility - INFO - Query results: {'cli_open_count': 4, 'cli_ready_count': 4, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 08:16:09,120 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-081609.json
+2026-08-31 08:21:09,120 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:21:09.120625
+2026-08-31 08:21:09,169 - bead_visibility - INFO - Query results: {'cli_open_count': 4, 'cli_ready_count': 4, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 08:21:09,170 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-082109.json
+2026-08-31 08:26:09,170 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:26:09.170397
+2026-08-31 08:26:09,220 - bead_visibility - INFO - Query results: {'cli_open_count': 4, 'cli_ready_count': 4, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 08:26:09,220 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-082609.json
+2026-08-31 08:31:09,220 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:31:09.220852
+2026-08-31 08:31:09,270 - bead_visibility - INFO - Query results: {'cli_open_count': 4, 'cli_ready_count': 4, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 08:31:09,271 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-083109.json
+2026-08-31 08:36:09,271 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:36:09.271400
+2026-08-31 08:36:09,315 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 08:36:09,316 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-083609.json
+2026-08-31 08:41:09,316 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:41:09.316617
+2026-08-31 08:41:09,382 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 08:41:09,383 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-084109.json
+2026-08-31 08:46:09,383 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:46:09.383575
+2026-08-31 08:46:09,420 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 08:46:09,420 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-084609.json
+2026-08-31 08:51:09,420 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:51:09.420842
+2026-08-31 08:51:09,489 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 08:51:09,490 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-085109.json
+2026-08-31 08:56:09,490 - bead_visibility - INFO - Starting visibility check at 2026-08-31T08:56:09.490635
+2026-08-31 08:56:09,532 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 08:56:09,532 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-085609.json
+2026-08-31 09:01:09,532 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:01:09.532893
+2026-08-31 09:01:09,588 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 09:01:09,589 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-090109.json
+2026-08-31 09:06:09,589 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:06:09.589703
+2026-08-31 09:06:09,624 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 09:06:09,625 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-090609.json
+2026-08-31 09:11:09,625 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:11:09.625764
+2026-08-31 09:11:09,689 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 09:11:09,690 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-091109.json
+2026-08-31 09:16:09,690 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:16:09.690396
+2026-08-31 09:16:09,727 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 09:16:09,727 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-091609.json
+2026-08-31 09:21:09,728 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:21:09.727931
+2026-08-31 09:21:09,799 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 09:21:09,799 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-092109.json
+2026-08-31 09:26:09,800 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:26:09.800046
+2026-08-31 09:26:09,825 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 09:26:09,826 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-092609.json
+2026-08-31 09:31:09,826 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:31:09.826263
+2026-08-31 09:31:09,885 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 09:31:09,886 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-093109.json
+2026-08-31 09:36:09,886 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:36:09.886705
+2026-08-31 09:36:09,920 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 09:36:09,921 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-093609.json
+2026-08-31 09:41:09,921 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:41:09.921487
+2026-08-31 09:41:09,959 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 09:41:09,959 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-094109.json
+2026-08-31 09:46:09,959 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:46:09.959740
+2026-08-31 09:46:09,999 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 09:46:10,000 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-094609.json
+2026-08-31 09:51:10,000 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:51:10.000230
+2026-08-31 09:51:10,048 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 09:51:10,048 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-095110.json
+2026-08-31 09:56:10,048 - bead_visibility - INFO - Starting visibility check at 2026-08-31T09:56:10.048883
+2026-08-31 09:56:10,104 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 09:56:10,104 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-095610.json
+2026-08-31 10:01:10,105 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:01:10.105040
+2026-08-31 10:01:10,197 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 10:01:10,197 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-100110.json
+2026-08-31 10:06:10,198 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:06:10.198057
+2026-08-31 10:06:10,227 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 10:06:10,228 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-100610.json
+2026-08-31 10:11:10,228 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:11:10.228525
+2026-08-31 10:11:10,278 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 10:11:10,278 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-101110.json
+2026-08-31 10:16:10,279 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:16:10.279006
+2026-08-31 10:16:10,320 - bead_visibility - INFO - Query results: {'cli_open_count': 5, 'cli_ready_count': 5, 'sqlite_open_count': 5, 'sqlite_ready_count': 5, 'checkpoint_open_count': 0}
+2026-08-31 10:16:10,321 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-101610.json
+2026-08-31 10:21:10,321 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:21:10.321185
+2026-08-31 10:21:10,382 - bead_visibility - INFO - Query results: {'cli_open_count': 4, 'cli_ready_count': 4, 'sqlite_open_count': 4, 'sqlite_ready_count': 4, 'checkpoint_open_count': 0}
+2026-08-31 10:21:10,382 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-102110.json
+2026-08-31 10:26:10,382 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:26:10.382894
+2026-08-31 10:26:10,421 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:26:10,422 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-102610.json
+2026-08-31 10:31:10,422 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:31:10.422575
+2026-08-31 10:31:10,472 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:31:10,473 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-103110.json
+2026-08-31 10:36:10,473 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:36:10.473743
+2026-08-31 10:36:10,517 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:36:10,518 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-103610.json
+2026-08-31 10:41:10,518 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:41:10.518364
+2026-08-31 10:41:10,570 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:41:10,571 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-104110.json
+2026-08-31 10:46:10,571 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:46:10.571146
+2026-08-31 10:46:10,598 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:46:10,599 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-104610.json
+2026-08-31 10:51:10,599 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:51:10.599181
+2026-08-31 10:51:10,692 - bead_visibility - INFO - Query results: {'cli_open_count': 3, 'cli_ready_count': 3, 'sqlite_open_count': 3, 'sqlite_ready_count': 3, 'checkpoint_open_count': 0}
+2026-08-31 10:51:10,693 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-105110.json
+2026-08-31 10:56:10,693 - bead_visibility - INFO - Starting visibility check at 2026-08-31T10:56:10.693437
+2026-08-31 10:56:10,779 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 10:56:10,782 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-105610.json
+2026-08-31 11:01:10,782 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:01:10.782662
+2026-08-31 11:01:10,827 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 11:01:10,828 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-110110.json
+2026-08-31 11:06:10,828 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:06:10.828625
+2026-08-31 11:06:10,869 - bead_visibility - INFO - Query results: {'cli_open_count': 2, 'cli_ready_count': 2, 'sqlite_open_count': 2, 'sqlite_ready_count': 2, 'checkpoint_open_count': 0}
+2026-08-31 11:06:10,869 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-110610.json
+2026-08-31 11:11:10,869 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:11:10.869732
+2026-08-31 11:11:10,928 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 11:11:10,976 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-111110.json
+2026-08-31 11:16:10,977 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:16:10.977197
+2026-08-31 11:16:11,000 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 11:16:11,000 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-111611.json
+2026-08-31 11:21:11,001 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:21:11.001015
+2026-08-31 11:21:11,027 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 11:21:11,027 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-112111.json
+2026-08-31 11:26:11,028 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:26:11.028137
+2026-08-31 11:26:11,051 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:26:11,052 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-112611.json
+2026-08-31 11:31:11,052 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:31:11.052471
+2026-08-31 11:31:11,105 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:31:11,106 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-113111.json
+2026-08-31 11:36:11,106 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:36:11.106323
+2026-08-31 11:36:11,145 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:36:11,146 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-113611.json
+2026-08-31 11:41:11,146 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:41:11.146752
+2026-08-31 11:41:11,189 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:41:11,190 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-114111.json
+2026-08-31 11:46:11,190 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:46:11.190428
+2026-08-31 11:46:11,231 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:46:11,232 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-114611.json
+2026-08-31 11:51:11,232 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:51:11.232705
+2026-08-31 11:51:11,287 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 11:51:11,288 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-115111.json
+2026-08-31 11:56:11,288 - bead_visibility - INFO - Starting visibility check at 2026-08-31T11:56:11.288184
+2026-08-31 11:56:11,313 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 11:56:11,314 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-115611.json
+2026-08-31 12:01:11,314 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:01:11.314632
+2026-08-31 12:01:11,351 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 12:01:11,351 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-120111.json
+2026-08-31 12:06:11,352 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:06:11.352104
+2026-08-31 12:06:11,400 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:06:11,400 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-120611.json
+2026-08-31 12:11:11,400 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:11:11.400832
+2026-08-31 12:11:11,424 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:11:11,424 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-121111.json
+2026-08-31 12:16:11,425 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:16:11.425108
+2026-08-31 12:16:11,450 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:16:11,451 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-121611.json
+2026-08-31 12:21:11,451 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:21:11.451825
+2026-08-31 12:21:11,493 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:21:11,493 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-122111.json
+2026-08-31 12:26:11,494 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:26:11.494068
+2026-08-31 12:26:11,535 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:26:11,535 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-122611.json
+2026-08-31 12:31:11,535 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:31:11.535953
+2026-08-31 12:31:11,564 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:31:11,565 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-123111.json
+2026-08-31 12:36:11,565 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:36:11.565166
+2026-08-31 12:36:11,609 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 12:36:11,610 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-123611.json
+2026-08-31 12:41:11,610 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:41:11.610513
+2026-08-31 12:41:11,654 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:41:11,655 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-124111.json
+2026-08-31 12:46:11,655 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:46:11.655403
+2026-08-31 12:46:11,710 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:46:11,711 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-124611.json
+2026-08-31 12:51:11,711 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:51:11.711180
+2026-08-31 12:51:11,790 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 12:51:11,791 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-125111.json
+2026-08-31 12:56:11,791 - bead_visibility - INFO - Starting visibility check at 2026-08-31T12:56:11.791474
+2026-08-31 12:56:11,816 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 12:56:11,817 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-125611.json
+2026-08-31 13:01:11,817 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:01:11.817242
+2026-08-31 13:01:11,875 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:01:11,876 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-130111.json
+2026-08-31 13:06:11,876 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:06:11.876256
+2026-08-31 13:06:11,922 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:06:11,923 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-130611.json
+2026-08-31 13:11:11,923 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:11:11.923695
+2026-08-31 13:11:11,987 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 13:11:11,987 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-131111.json
+2026-08-31 13:16:11,988 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:16:11.987975
+2026-08-31 13:16:12,015 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 13:16:12,015 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-131612.json
+2026-08-31 13:21:12,015 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:21:12.015888
+2026-08-31 13:21:12,075 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 13:21:12,076 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-132112.json
+2026-08-31 13:26:12,076 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:26:12.076250
+2026-08-31 13:26:12,100 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:26:12,100 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-132612.json
+2026-08-31 13:31:12,101 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:31:12.101182
+2026-08-31 13:31:12,180 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:31:12,182 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-133112.json
+2026-08-31 13:36:12,182 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:36:12.182235
+2026-08-31 13:36:12,221 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:36:12,222 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-133612.json
+2026-08-31 13:41:12,222 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:41:12.222520
+2026-08-31 13:41:12,270 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:41:12,270 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-134112.json
+2026-08-31 13:46:12,271 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:46:12.271027
+2026-08-31 13:46:12,313 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:46:12,314 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-134612.json
+2026-08-31 13:51:12,314 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:51:12.314328
+2026-08-31 13:51:12,363 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:51:12,363 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-135112.json
+2026-08-31 13:56:12,363 - bead_visibility - INFO - Starting visibility check at 2026-08-31T13:56:12.363871
+2026-08-31 13:56:12,409 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 13:56:12,409 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-135612.json
+2026-08-31 14:01:12,410 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:01:12.410159
+2026-08-31 14:01:12,460 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 14:01:12,461 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-140112.json
+2026-08-31 14:06:12,461 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:06:12.461398
+2026-08-31 14:06:12,513 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:06:12,513 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-140612.json
+2026-08-31 14:11:12,514 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:11:12.514098
+2026-08-31 14:11:12,579 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:11:12,579 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-141112.json
+2026-08-31 14:16:12,580 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:16:12.580036
+2026-08-31 14:16:12,617 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:16:12,618 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-141612.json
+2026-08-31 14:21:12,618 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:21:12.618265
+2026-08-31 14:21:12,683 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:21:12,683 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-142112.json
+2026-08-31 14:26:12,684 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:26:12.684027
+2026-08-31 14:26:12,734 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 14:26:12,775 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-142612.json
+2026-08-31 14:31:12,775 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:31:12.775677
+2026-08-31 14:31:12,888 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:31:12,890 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-143112.json
+2026-08-31 14:36:12,890 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:36:12.890308
+2026-08-31 14:36:12,934 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:36:12,934 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-143612.json
+2026-08-31 14:41:12,934 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:41:12.934924
+2026-08-31 14:41:12,962 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:41:12,963 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-144112.json
+2026-08-31 14:46:12,963 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:46:12.963735
+2026-08-31 14:46:13,019 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:46:13,019 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-144613.json
+2026-08-31 14:51:13,020 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:51:13.020026
+2026-08-31 14:51:13,086 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:51:13,087 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-145113.json
+2026-08-31 14:56:13,087 - bead_visibility - INFO - Starting visibility check at 2026-08-31T14:56:13.087236
+2026-08-31 14:56:13,193 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 14:56:13,194 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-145613.json
+2026-08-31 15:01:13,194 - bead_visibility - INFO - Starting visibility check at 2026-08-31T15:01:13.194601
+2026-08-31 15:01:13,286 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 15:01:13,288 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-150113.json
+2026-08-31 15:06:13,288 - bead_visibility - INFO - Starting visibility check at 2026-08-31T15:06:13.288346
+2026-08-31 15:06:13,339 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 15:06:13,339 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-150613.json
+2026-08-31 15:11:13,340 - bead_visibility - INFO - Starting visibility check at 2026-08-31T15:11:13.340048
+2026-08-31 15:11:13,393 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 15:11:13,394 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-151113.json
+2026-08-31 15:16:13,394 - bead_visibility - INFO - Starting visibility check at 2026-08-31T15:16:13.394740
+2026-08-31 15:16:13,499 - bead_visibility - INFO - Query results: {'cli_open_count': 1, 'cli_ready_count': 1, 'sqlite_open_count': 1, 'sqlite_ready_count': 1, 'checkpoint_open_count': 0}
+2026-08-31 15:16:13,500 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-151613.json
+2026-08-31 15:21:13,500 - bead_visibility - INFO - Starting visibility check at 2026-08-31T15:21:13.500333
+2026-08-31 15:21:13,535 - bead_visibility - INFO - Query results: {'cli_open_count': 0, 'cli_ready_count': 0, 'sqlite_open_count': 0, 'sqlite_ready_count': 0, 'checkpoint_open_count': 0}
+2026-08-31 15:21:13,536 - bead_visibility - INFO - Results saved to /home/coding/SEAM/.beads/diagnostics/check-results-20260831-152113.json

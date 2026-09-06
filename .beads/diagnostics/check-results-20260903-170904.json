@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-09-03T17:09:04.512137",
+  "discrepancies": [
+    {
+      "type": "cli_ready_zero_sqlite_positive",
+      "cli_ready_count": 0,
+      "sqlite_ready_count": 16,
+      "sqlite_ready_ids": [
+        "seam-80040f8e",
+        "seam-0e3fbddf",
+        "seam-639aa921",
+        "seam-7f22419c",
+        "seam-a882fe8a",
+        "seam-7fdee15d",
+        "seam-46884014",
+        "seam-9c80a071",
+        "seam-5d68ac48",
+        "seam-cd1ff70a"
+      ]
+    },
+    {
+      "type": "assigned_but_open",
+      "count": 2,
+      "examples": [
+        {
+          "id": "seam-9a3d5f53",
+          "assignee": "claude-code-glm-4.7-glm-seam"
+        },
+        {
+          "id": "seam-304dcd94",
+          "assignee": "claude-code-glm-4.7-glm-seam"
+        }
+      ]
+    }
+  ],
+  "repairs_attempted": [
+    "checkpoint_flush"
+  ],
+  "diagnostic_beads_created": []
+}

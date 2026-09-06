@@ -1,0 +1,3 @@
+2026-08-31 06:31:32,424 - bead_visibility - INFO - Starting visibility check at 2026-08-31T06:31:32.424106
+2026-08-31 06:31:32,447 - bead_visibility - INFO - Query results: {'cli_open_count': 13, 'cli_ready_count': 13, 'sqlite_open_count': 13, 'sqlite_ready_count': 13, 'checkpoint_open_count': 0}
+2026-08-31 06:31:32,448 - bead_visibility - INFO - Results saved to .beads/diagnostics/check-results-20260831-063132.json

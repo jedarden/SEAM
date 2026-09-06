@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-09-03T15:24:02.072248",
+  "discrepancies": [
+    {
+      "type": "assigned_but_open",
+      "count": 2,
+      "examples": [
+        {
+          "id": "seam-9a3d5f53",
+          "assignee": "claude-code-glm-4.7-glm-seam"
+        },
+        {
+          "id": "seam-304dcd94",
+          "assignee": "claude-code-glm-4.7-glm-seam"
+        }
+      ]
+    }
+  ],
+  "repairs_attempted": [],
+  "diagnostic_beads_created": []
+}
