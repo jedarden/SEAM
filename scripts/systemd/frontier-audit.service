@@ -1,0 +1,34 @@
+[Unit]
+Description=SEAM ready-frontier visibility audit (report-only)
+Documentation=file:///home/coding/SEAM/scripts/README.md
+ConditionPathExists=/home/coding/SEAM/.beads/config.json
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/coding/SEAM
+ExecStart=/home/coding/SEAM/scripts/frontier-audit.sh --quiet
+
+# The audit must not mutate the bead store. The script enforces that itself
+# (every bead call goes through a read-only subcommand whitelist); this
+# sandbox enforces it a second time at the filesystem level. bead-rs's store
+# is a WAL-mode SQLite database, so even a pure read must create beads.db-wal
+# and beads.db-shm next to it — the directory therefore has to be writable,
+# and the database FILE is overlaid read-only on top of it (the later
+# directive wins), so no mutation can reach the store itself. Everything
+# outside the workspace plus the report directory stays read-only.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/coding/SEAM/docs/notes /home/coding/SEAM/.beads
+ReadOnlyPaths=/home/coding/SEAM/.beads/beads.db
+PrivateTmp=true
+NoNewPrivileges=true
+
+# Reads one SQLite database and 1k JSONL rows; it needs neither CPU nor RAM.
+MemoryMax=512M
+CPUQuota=50%
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

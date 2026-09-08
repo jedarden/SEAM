@@ -68,3 +68,70 @@ This script can be:
 - See bead `seam-d267f63b`: "Starvation alert: beads invisible in — Starvation diagnostic and recovery implementation"
 - See bead `seam-efe08209`: "Starvation alert: beads invisible in — Automated bead doctor repair with stale-assignee cleanup" (this implementation)
 - See CLAUDE.md: "NEEDLE Learnings" section on the 583-bead starvation incident
+
+## frontier-audit.sh
+
+Read-only weekly frontier-health check. It replaces the starvation *signal*
+lost when NEEDLE 865484e4 removed the alert emitter, without resurrecting the
+emitter: the old emitter filed malformed alert beads ("Starvation alert: beads
+invisible in  " with a blank workspace and a self-contradicting body — bead
+`seam-a26a360e` and the stale class that accumulated around it), so this tool
+is **report-only**.
+
+### Hard constraint: it never mutates a bead
+
+The script does not create, update, close, claim, or label beads. Every `bead`
+invocation is funnelled through a whitelist that permits only `list` and
+`show`, so the constraint is enforced mechanically rather than by discipline.
+Any action a report implies is taken by a normally dispatched task that reads
+the report. The systemd unit enforces it a second time: the sandbox makes the
+whole filesystem read-only except `docs/notes/` and `.beads/diagnostics/`.
+
+### What it computes
+
+1. Open-vs-ready counts (`bead list --json --limit 999999` bypasses the
+   100-row default cap) and the open-but-unclaimable delta.
+2. A cause for every invisible bead, so the causes sum to the delta:
+   `manually_blocked > has_assignee > has_dependencies >
+   resource_conflicts > unclassified`. `bead show --json` is the live truth
+   per bead; `.beads/diagnostics/pluck-diagnostics.json` (rewritten by the
+   run's own ready query) is the cross-check.
+3. Dependency-graph analysis over non-closed beads: Tarjan SCC for cycles,
+   plus chains rooted at a manually-blocked bead (the structural shape the
+   2026-09-08 audit found — a 9-bead chain starved only by its quarantined
+   root, `seam-80040f8e`).
+
+Verdict: **starved** == (ready == 0 while open > 0) OR unclassified > 0 OR
+cycles > 0. A frontier with claimable work and a recorded cause for every
+invisible bead is *not* starved. The exit code is 0 either way — the report is
+the signal; non-zero means operational failure (missing CLI, wrong backend).
+
+### Usage
+
+```bash
+scripts/frontier-audit.sh [--workspace DIR] [--keep N] [--quiet]
+```
+
+Writes `docs/notes/frontier-audit-<UTC>.md` (retention: newest `--keep`, 52 by
+default; git-tracked reports are never pruned) and overwrites the single
+status line in `docs/notes/frontier-audit-status.txt`, which is also echoed to
+stdout so journald keeps the per-run history.
+
+### Scheduling
+
+`scripts/systemd/frontier-audit.{service,timer}` run it weekly on codinghome.
+The units are enabled by absolute path so the repo stays the single source:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now /home/coding/SEAM/scripts/systemd/frontier-audit.timer
+systemctl --user list-timers frontier-audit.timer
+```
+
+### Related
+
+- Bead `seam-202735dc` (this implementation); original alert `seam-a26a360e`
+- `docs/notes/ready-frontier-audit-2026-09-08.md` — the manual audit whose
+  classification rule this script automates
+- `.beads/diagnostics/SEAM-visibility-audit.json` — the 2026-09-06 audit
+  that proved the frontier can accumulate unclaimable beads silently

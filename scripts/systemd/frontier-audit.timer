@@ -1,0 +1,15 @@
+[Unit]
+Description=Weekly SEAM ready-frontier visibility audit
+
+[Timer]
+# Weekly is sufficient: the frontier moves on dispatch cadence, and the
+# 2026-09-08 audit showed the unclaimable population is stable over hours.
+# Persistent=true catches up a run missed while the box was off.
+OnCalendar=weekly
+AccuracySec=15m
+RandomizedDelaySec=30m
+Persistent=true
+Unit=frontier-audit.service
+
+[Install]
+WantedBy=timers.target
