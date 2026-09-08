@@ -1,0 +1,511 @@
+{
+  "workspace": "SEAM",
+  "workspace_path": "/home/coding/SEAM",
+  "generated_at": "2026-09-08T06:30:37Z",
+  "bead_backend": "bead-rs",
+  "collection": {
+    "row_cap_default": 100,
+    "limit_used": 999999,
+    "total_beads": 1045,
+    "nonclosed_beads": 18,
+    "open_beads": 16,
+    "in_progress_beads": 2,
+    "ready_frontier": 3,
+    "ready_frontier_ids": [
+      "seam-63dc8615",
+      "seam-8c59a4ae",
+      "seam-9afca4bd"
+    ],
+    "open_vs_ready_delta": 13,
+    "command": "bead list --json --limit 999999 / bead list --ready --json --limit 999999"
+  },
+  "exclusion_counts": {
+    "has_assignee": 0,
+    "manually_blocked": 3,
+    "has_dependencies": 10,
+    "resource_conflicts": 0,
+    "unclassified": 0
+  },
+  "dependency_cycles": [],
+  "dependency_chains": {
+    "seam-80040f8e": {
+      "root_status": "open",
+      "members": [
+        "seam-46884014",
+        "seam-4bf77f64",
+        "seam-7f22419c",
+        "seam-7fdee15d",
+        "seam-9c80a071",
+        "seam-a882fe8a",
+        "seam-c27f3555",
+        "seam-d7aac6fe"
+      ],
+      "root_manually_blocked": true,
+      "releases_on_root_close": true,
+      "starved_while_root_blocked": true,
+      "flag_recommended": true
+    },
+    "seam-8c59a4ae": {
+      "root_status": "open",
+      "members": [
+        "seam-71ec8a57",
+        "seam-ab455030"
+      ],
+      "root_manually_blocked": false,
+      "releases_on_root_close": true,
+      "starved_while_root_blocked": false,
+      "flag_recommended": false
+    }
+  },
+  "starvation_verdict": {
+    "starved": false,
+    "all_exclusions_caused": true,
+    "mechanical_fixes_applicable": 0,
+    "mechanical_fixes_applied": [],
+    "flag_actions": [
+      {
+        "bead": "seam-80040f8e",
+        "action": "note_appended",
+        "note": "dependency-root starvation flag: 8 open beads unclaimable solely because this bead is manually blocked",
+        "members": [
+          "seam-46884014",
+          "seam-4bf77f64",
+          "seam-7f22419c",
+          "seam-7fdee15d",
+          "seam-9c80a071",
+          "seam-a882fe8a",
+          "seam-c27f3555",
+          "seam-d7aac6fe"
+        ],
+        "bead_revision_after": 22
+      }
+    ],
+    "statement": "Open: 16, ready: 3, delta: 13. Every invisible bead has a recorded cause (3 manually_blocked, 10 has_dependencies, 0 has_assignee, 0 resource_conflicts, 0 unclassified); dependency cycles: 0. No starvation: the ready frontier holds 3 claimable beads. The alert's mechanical cause class (has_assignee) has zero instances in the open set. Structural finding: the 8-bead chain rooted at manually-blocked/quarantined seam-80040f8e remains unclaimable until that root is closed or unblocked \u2014 flagged on the bead itself. Audit terminal: no alert bead or human escalation warranted."
+  },
+  "beads": {
+    "seam-46884014": {
+      "title": "Create evidence reference documentation and verify",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-7f22419c"
+        ],
+        "open_blockers": [
+          "seam-7f22419c"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 7,
+        "chain": [
+          "seam-46884014",
+          "seam-7f22419c",
+          "seam-c27f3555",
+          "seam-d7aac6fe",
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-4bf77f64": {
+      "title": "Update phase checkboxes in plan.md based on evidence",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-46884014"
+        ],
+        "open_blockers": [
+          "seam-46884014"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 8,
+        "chain": [
+          "seam-4bf77f64",
+          "seam-46884014",
+          "seam-7f22419c",
+          "seam-c27f3555",
+          "seam-d7aac6fe",
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-63dc8615": {
+      "title": "internal/server: 11 capture + ArgoCD baseline integration tests fail (capture records nothing)",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": true,
+      "cause": "ready",
+      "action": "none_required",
+      "details": {
+        "claimable": true
+      }
+    },
+    "seam-71ec8a57": {
+      "title": "Update the docs and example fragments that encode seam/routes/ as the canonical prefix",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-ab455030"
+        ],
+        "open_blockers": [
+          "seam-ab455030"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-8c59a4ae",
+        "root_status": "open",
+        "chain_depth": 2,
+        "chain": [
+          "seam-71ec8a57",
+          "seam-ab455030",
+          "seam-8c59a4ae"
+        ],
+        "legitimately_not_ready": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-7358ce50": {
+      "title": "Deploy SEAM on the consolidated prefix and prove every route still resolves its credential",
+      "priority": 1,
+      "status": "open",
+      "effective_status": "blocked",
+      "in_ready_frontier": false,
+      "cause": "manually_blocked",
+      "action": "recorded",
+      "details": {
+        "quarantine_labels": [],
+        "pluck_seen": true
+      }
+    },
+    "seam-7f22419c": {
+      "title": "Update plan.md checkboxes based on evidence",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-c27f3555"
+        ],
+        "open_blockers": [
+          "seam-c27f3555"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 6,
+        "chain": [
+          "seam-7f22419c",
+          "seam-c27f3555",
+          "seam-d7aac6fe",
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-7fdee15d": {
+      "title": "Extract checkbox states from plan.md",
+      "priority": 3,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-a882fe8a"
+        ],
+        "open_blockers": [
+          "seam-a882fe8a"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 2,
+        "chain": [
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-80040f8e": {
+      "title": "Format and save checkbox state report",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "blocked",
+      "in_ready_frontier": false,
+      "cause": "manually_blocked",
+      "action": "recorded",
+      "details": {
+        "quarantine_labels": [
+          "cycling",
+          "quarantine: false-close-detected-after-8-tries"
+        ],
+        "pluck_seen": true
+      }
+    },
+    "seam-8c59a4ae": {
+      "title": "Update the security and operational runbooks to the retired seam/routes prefix",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": true,
+      "cause": "ready",
+      "action": "none_required",
+      "details": {
+        "claimable": true
+      }
+    },
+    "seam-9afca4bd": {
+      "title": "seam lint: upstream-allowlist loader rejects the deployed seam-upstream-allowlist (unrecognized upstream_hosts key + port-suffixed bare hostnames)",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": true,
+      "cause": "ready",
+      "action": "none_required",
+      "details": {
+        "claimable": true
+      }
+    },
+    "seam-9c80a071": {
+      "title": "Map evidence to checkboxes with verdicts",
+      "priority": 3,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-7fdee15d"
+        ],
+        "open_blockers": [
+          "seam-7fdee15d"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 3,
+        "chain": [
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-a2413e9d": {
+      "title": "SEAM's operator port 8081 is reachable by ex44/lab/codinghome: the tag:seam ACL slice was never applied and the device is tagged tag:k8s",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "blocked",
+      "in_ready_frontier": false,
+      "cause": "manually_blocked",
+      "action": "recorded",
+      "details": {
+        "quarantine_labels": [],
+        "pluck_seen": true
+      }
+    },
+    "seam-a882fe8a": {
+      "title": "Verify checkbox extraction completeness",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-80040f8e"
+        ],
+        "open_blockers": [
+          "seam-80040f8e"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 1,
+        "chain": [
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-ab455030": {
+      "title": "Update plan and notes stragglers and sweep the repo for live seam/routes references",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-8c59a4ae"
+        ],
+        "open_blockers": [
+          "seam-8c59a4ae"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-8c59a4ae",
+        "root_status": "open",
+        "chain_depth": 1,
+        "chain": [
+          "seam-ab455030",
+          "seam-8c59a4ae"
+        ],
+        "legitimately_not_ready": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-c27f3555": {
+      "title": "Create evidence-to-checkbox mapping",
+      "priority": 2,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-d7aac6fe"
+        ],
+        "open_blockers": [
+          "seam-d7aac6fe"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 5,
+        "chain": [
+          "seam-c27f3555",
+          "seam-d7aac6fe",
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    },
+    "seam-d7aac6fe": {
+      "title": "Write evidence-to-checkbox mapping report",
+      "priority": 3,
+      "status": "open",
+      "effective_status": "open",
+      "in_ready_frontier": false,
+      "cause": "has_dependencies",
+      "action": "recorded",
+      "details": {
+        "blockers": [
+          "seam-9c80a071"
+        ],
+        "open_blockers": [
+          "seam-9c80a071"
+        ],
+        "closed_blockers": [],
+        "chain_root": "seam-80040f8e",
+        "root_status": "open",
+        "chain_depth": 4,
+        "chain": [
+          "seam-d7aac6fe",
+          "seam-9c80a071",
+          "seam-7fdee15d",
+          "seam-a882fe8a",
+          "seam-80040f8e"
+        ],
+        "legitimately_not_ready": true,
+        "transitive_root_blocked": true,
+        "pluck_seen": true
+      }
+    }
+  },
+  "in_progress_beads": [
+    {
+      "id": "seam-466ac8ae",
+      "assignee": "claude-code-glm-5.3-flash-glm-cgraph",
+      "title": "[Unravel] Starvation alert: beads invisible in  \u2014 Ready-frontier visibility audit: classify every open-but-unclaimable bead and apply the mechanical fix per cause"
+    },
+    {
+      "id": "seam-f2f4bbf0",
+      "assignee": "claude-code-glm-5.3-glm-roam-16",
+      "title": "[Unravel] Starvation alert: beads invisible in  \u2014 Automated sweep clearing stale assignees on assigned-but-open beads, gated on worker-heartbeat liveness"
+    }
+  ],
+  "cross_check": {
+    "pluck_timestamp": "2026-09-08T06:30:37.975068442Z",
+    "pluck_total_open": 16,
+    "pluck_final_candidates": 3,
+    "pluck_exclusion_criteria": {
+      "has_assignee": 0,
+      "manually_blocked": 3,
+      "has_dependencies": 10,
+      "resource_conflicts": 0
+    },
+    "pluck_beads_matched": [
+      "seam-46884014",
+      "seam-4bf77f64",
+      "seam-71ec8a57",
+      "seam-7358ce50",
+      "seam-7f22419c",
+      "seam-7fdee15d",
+      "seam-80040f8e",
+      "seam-9c80a071",
+      "seam-a2413e9d",
+      "seam-a882fe8a",
+      "seam-ab455030",
+      "seam-c27f3555",
+      "seam-d7aac6fe"
+    ]
+  },
+  "findings": []
+}
