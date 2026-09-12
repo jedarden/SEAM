@@ -135,3 +135,55 @@ systemctl --user list-timers frontier-audit.timer
   classification rule this script automates
 - `.beads/diagnostics/SEAM-visibility-audit.json` — the 2026-09-06 audit
   that proved the frontier can accumulate unclaimable beads silently
+
+## clear-stale-assignees.sh
+
+The action counterpart to `frontier-audit.sh`: clears the assignee on
+assigned-but-open beads whose worker shows no liveness signal, returning them
+to the ready frontier. This is the mechanical remediation for the dominant
+verified starvation cause — an `open` bead with an assignee is skipped by the
+dispatcher whenever a worker with that name is alive, and `--count 1` workers
+relaunch under the same name forever, so the bead is never claimable while
+`bead show` and `bead doctor` both call it healthy.
+
+### Liveness, not `ps`
+
+`bead-starvation-recovery.sh` above decides staleness from `ps aux` on the
+local host, which misses workers running elsewhere and any argv the grep
+doesn't match. This script reads the durable record instead: a worker name is
+**alive** if either `.beads/heartbeats.jsonl` or `.beads/events.jsonl` has an
+entry for it within `--stale-minutes` (default 30); otherwise every open bead
+carrying that name is stale and gets cleared.
+
+### Safety properties
+
+- Only `status==open` beads are candidates — an `in_progress` bead is live
+  work and is never touched.
+- Each candidate is re-read immediately before its mutation; if the status
+  left `open` or the assignee changed since enumeration, the bead is skipped.
+- The clear is guarded: `bead update <id> --clear-assignee --if-revision <rev>`
+  with the revision read in the same pass; on a revision conflict (exit 4) it
+  re-reads and retries once, then skips.
+- The store is re-read after every mutation; the report records what the
+  store says afterwards, not just the command's exit code.
+- `--dry-run` performs every read and liveness check but no mutation.
+
+### Usage
+
+```bash
+scripts/clear-stale-assignees.sh [--workspace DIR] [--stale-minutes N] \
+                                 [--dry-run] [--report FILE] [--quiet]
+```
+
+Emits one row per candidate — bead id, prior assignee, heartbeat age, action —
+plus a summary line. Exit 0 means the sweep ran (the report is the signal, as
+in `frontier-audit.sh`); non-zero means operational failure.
+
+### Related
+
+- Bead `seam-f2f4bbf0` (this implementation), alternative for the
+  starvation-alert bead `seam-d501f51e`
+- `frontier-audit.sh` — the report-only detector whose `has_assignee` cause
+  this script remediates
+- CLAUDE.md "NEEDLE Learnings": the 2026-08-16 fleet sweep (583 beads, 47 of
+  66 workspaces) that established the assigned-but-open failure mode
