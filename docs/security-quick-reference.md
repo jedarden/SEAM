@@ -118,10 +118,16 @@ api[_-]?key['\"]?\s*[:=]\s*['\"]?[A-Za-z0-9]{20,}  # API Keys
 
 ### Safe: Reference-Only Patterns
 ```
-secret/data/seam/routes/*          # OpenBao path references
+secret/data/rs-manager/rs-manager/seam/routes/*  # OpenBao path references
 evaluators/seam-retirement-evaluator/*  # Secret path metadata
-x-vault-path: seam/routes/*        # Fragment configuration
+x-vault-path: rs-manager/rs-manager/seam/routes/*  # Fragment configuration
 ```
+
+The base is SEAM's enforced default (`internal/spec/allowlist.go`
+`DefaultVaultBaseDir`); `SEAM_VAULT_BASE_DIR` overrides it. The earlier
+cluster-agnostic base `seam/routes` is **retired** (consolidated 2026-09-04) —
+with the override unset the runtime enforcer rejects it, so a reference using
+the old base is a bug, not a shortcut.
 
 ## The 2026-08-09 Incident: Lessons Learned
 

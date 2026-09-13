@@ -4,8 +4,28 @@
 
 This document describes the complete security isolation model for SEAM and the seam-retirement-evaluator service. It documents all authentication and authorization paths, OpenBao policies, and the security boundaries that enforce the hostile-fragment threat model.
 
-**Last Updated:** 2026-08-11  
+**Last Updated:** 2026-09-05  
 **Bead:** bf-4oa45
+
+## Vault Base In Force
+
+The prefix SEAM enforces is `rs-manager/rs-manager/seam/routes` — the estate
+convention `secret/<installation>/<cluster>/...`, so
+`rs-manager/rs-manager/seam/routes/<route>/token` is
+`secret/data/rs-manager/rs-manager/seam/routes/<route>/token` in KV v2 terms.
+It is the *default* base (`internal/spec/allowlist.go` `DefaultVaultBaseDir`,
+inlined in `internal/server/server.go`); `SEAM_VAULT_BASE_DIR` overrides it,
+so the base stays deployment configuration rather than part of the schema.
+
+The earlier cluster-agnostic base `seam/routes` is **retired** (consolidated
+2026-09-04): it kept the prefix portable across clusters, but its
+backup/replication coverage rested on a legacy rs-manager OpenBao role already
+scheduled for removal, so the prefix moved under the installation scope the
+replicator already walks. With `SEAM_VAULT_BASE_DIR` unset the runtime
+enforcer now rejects a path under the old base. It appears below only where a
+deployed policy is quoted verbatim (policies carry the legacy grant/deny
+alongside the consolidated one until the legacy paths retire) or where the
+retirement itself is being described.
 
 ## Threat Model: Hostile Fragment
 
@@ -20,7 +40,7 @@ SEAM operates under the hostile-fragment threat model, which assumes:
 
 Under this threat model, the following requirements MUST be satisfied:
 
-1. **SEAM's OpenBao token** can ONLY read `secret/data/seam/routes/*` and NOTHING else
+1. **SEAM's OpenBao token** can ONLY read `secret/data/rs-manager/rs-manager/seam/routes/*` and NOTHING else
 2. **Evaluator's OpenBao token** can ONLY read:
    - `secret/data/evaluators/seam-retirement-evaluator/*` (its own GitHub token)
    - `secret/data/monitoring/victoriametrics/*` (VM credentials)
@@ -31,58 +51,54 @@ Under this threat model, the following requirements MUST be satisfied:
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        OpenBao (rs-manager)                                  │
-│                    http://openbao-rs-manager...:8200                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────────────────────────┐  ┌──────────────────────────────────┐   │
-│  │   SEAM OpenBao Role          │  │   Evaluator OpenBao Role         │   │
-│  │   (seam policy)              │  │   (seam-retirement-evaluator)    │   │
-│  ├──────────────────────────────┤  ├──────────────────────────────────┤   │
-│  │ Bound SA: seam               │  │ Bound SA: seam-retirement-eval  │   │
-│  │ Namespace: seam              │  │ Namespace: seam                 │   │
-│  │ Token TTL: 24h               │  │ Token TTL: 24h                   │   │
-│  ├──────────────────────────────┤  ├──────────────────────────────────┤   │
-│  │ CAN READ:                    │  │ CAN READ:                        │   │
-│  │ • seam/routes/*              │  │ • evaluators/seam-retirement-eval/*│  │
-│  │                              │  │ • monitoring/victoriametrics/*    │   │
-│  │ DENIED:                       │  │                                  │   │
-│  │ • evaluators/*               │  │ DENIED:                           │   │
-│  │ • all other paths            │  │ • seam/routes/*                   │   │
-│  │                              │  │ • all other paths                 │   │
-│  └──────────────────────────────┘  └──────────────────────────────────┘   │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  secret/data/seam/routes/*                                          │   │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
-│  │  • seam/routes/github-alerts/token                                │ │   │
-│  │  • seam/routes/kalshi-tape/token                                   │ │   │
-│  │  • seam/routes/mta-my-way/token                                    │ │   │
-│  │  • ... (one per route that needs external authentication)         │ │   │
-│  └────────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  secret/data/evaluators/seam-retirement-evaluator/github-token       │   │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
-│  │  GitHub PAT for opening PRs in jedarden/declarative-config         │ │   │
-│  │  Scope: repo (full control of private repositories)                │ │   │
-│  │  Expiration: 90 days                                                │ │   │
-│  │  Usage: Open PRs when retiring routes from production              │ │   │
-│  └────────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  secret/data/monitoring/victoriametrics/readonly-credentials         │   │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
-│  │  endpoint: http://victorialogs-single-ardenone-manager...           │ │   │
-│  │  username: (empty - internal Kubernetes auth)                      │ │   │
-│  │  password: (empty - internal Kubernetes auth)                      │ │   │
-│  │  Usage: Query SEAM metrics for retirement evaluation              │ │   │
-│  └────────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                        OpenBao (rs-manager)                                    │
+│          http://openbao-rs-manager.ardenone.com:8444                           │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                │
+│  Vault base SEAM enforces (DefaultVaultBaseDir):                               │
+│    rs-manager/rs-manager/seam/routes                                           │
+│  = secret/data/rs-manager/rs-manager/seam/routes/* in KV v2 terms.             │
+│  The old cluster-agnostic base seam/routes is RETIRED (2026-09-04):            │
+│  with SEAM_VAULT_BASE_DIR unset the runtime enforcer rejects it.               │
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────────┐│
+│  │ SEAM OpenBao Role                                                          ││
+│  │ Policy: seam   |   Bound SA: seam (namespace: seam)                        ││
+│  │ Token TTL: 24h   |   Token Max TTL: 72h                                    ││
+│  │                                                                            ││
+│  │ CAN READ:                                                                  ││
+│  │   secret/data/rs-manager/rs-manager/seam/routes/*                          ││
+│  │                                                                            ││
+│  │ DENIED:                                                                    ││
+│  │   evaluators/*, monitoring/*, and all other paths                          ││
+│  │   (default-deny: secret/data/* is denied)                                  ││
+│  └────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────────┐│
+│  │ Evaluator OpenBao Role                                                     ││
+│  │ Policy: seam-retirement-evaluator-policy                                   ││
+│  │ Bound SA: seam-retirement-evaluator (namespace: seam)                      ││
+│  │ Token TTL: 24h   |   Token Max TTL: 72h                                    ││
+│  │                                                                            ││
+│  │ CAN READ:                                                                  ││
+│  │   secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query   ││
+│  │                                                                            ││
+│  │ DENIED:                                                                    ││
+│  │   secret/data/rs-manager/rs-manager/seam/routes/*  <- SEAM routes          ││
+│  │   secret/data/seam/routes/*                        <- retired base         ││
+│  │   and all other paths (default-deny: secret/data/* is denied)              ││
+│  └────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────────┐│
+│  │ SEAM route secrets                                                         ││
+│  │   secret/data/rs-manager/rs-manager/seam/routes/<route>/token              ││
+│  │     • rs-manager/rs-manager/seam/routes/github-alerts/token                ││
+│  │     • rs-manager/rs-manager/seam/routes/kalshi-tape/token                  ││
+│  │     • rs-manager/rs-manager/seam/routes/mta-my-way/token                   ││
+│  │     ... (one per route that needs external authentication)                 ││
+│  └────────────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Authentication Paths
@@ -120,7 +136,7 @@ Under this threat model, the following requirements MUST be satisfied:
    - Token auto-renews before expiration
 
 **Access Boundaries:**
-- ✅ CAN read: `secret/data/seam/routes/*`
+- ✅ CAN read: `secret/data/rs-manager/rs-manager/seam/routes/*`
 - ❌ CANNOT read: `secret/data/evaluators/*`
 - ❌ CANNOT read: `secret/data/monitoring/*`
 - ❌ CANNOT read: Any other paths
@@ -162,24 +178,39 @@ Under this threat model, the following requirements MUST be satisfied:
 **Access Boundaries:**
 - ✅ CAN read: `secret/data/evaluators/seam-retirement-evaluator/*`
 - ✅ CAN read: `secret/data/monitoring/victoriametrics/*`
-- ❌ CANNOT read: `secret/data/seam/routes/*`
+- ❌ CANNOT read: `secret/data/rs-manager/rs-manager/seam/routes/*`
 - ❌ CANNOT read: Any other paths
 - ❌ CANNOT write: Any secrets
 
 ## OpenBao Policies
 
+Both policies are written every cycle by the rs-manager OpenBao
+hardening-reconciler (`k8s/rs-manager/openbao/hardening-reconciler.yml` in
+declarative-config), so that reconciler — not the reference copies — is the
+source of truth. Both carry a **legacy** rule for the retired base
+`seam/routes` next to the consolidated one: a glob is prefix-exact, so the
+legacy rule stops matching the moment the data sits only under the new base,
+and it is kept only until the legacy paths retire. Do not copy a legacy rule
+into a new policy without also carrying the consolidated one.
+
 ### SEAM Policy
 
-**File:** `declarative-config/infra/seam/seam-openbao-policy.hcl`
+**File:** `declarative-config/k8s/rs-manager/seam/seam-openbao-policy.hcl`
 
 ```hcl
-# Allow reading SEAM route secrets ONLY
+# Allow reading SEAM route secrets ONLY — the consolidated, enforced prefix
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
+  capabilities = ["read"]
+}
+
+# LEGACY grant — retired base, kept until cutover is verified and the old
+# paths are retired
 path "secret/data/seam/routes/*" {
   capabilities = ["read"]
 }
 
 # Deny access to evaluator's secrets (explicit separation)
-path "secret/data/evaluators/*" {
+path "secret/data/seam-retirement-evaluator/*" {
   capabilities = ["deny"]
 }
 
@@ -191,28 +222,28 @@ path "secret/data/*" {
 
 **Policy Properties:**
 - **Read-only:** SEAM can only read, never write secrets
-- **Path-scoped:** Only `seam/routes/*` is accessible
+- **Path-scoped:** Only `rs-manager/rs-manager/seam/routes/*` is accessible
 - **Explicit deny:** All other paths are explicitly denied
 - **Isolation enforced:** Evaluator paths explicitly denied
 
 ### Evaluator Policy
 
-**File:** `declarative-config/infra/seam-retirement-evaluator/openbao-policy.hcl`
+**File:** `declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
 
 ```hcl
-# Allow reading evaluator's own GitHub token
-path "secret/data/evaluators/seam-retirement-evaluator/*" {
+# Allow reading the query-only VictoriaMetrics credential
+path "secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query" {
   capabilities = ["read"]
 }
 
-# Allow reading VictoriaMetrics credentials
-path "secret/data/monitoring/victoriametrics/*" {
-  capabilities = ["read"]
-}
-
-# Explicitly deny access to SEAM's route secrets
-path "secret/data/seam/routes/*" {
+# Explicitly deny access to SEAM's route secrets, at the enforced prefix and
+# at the retired one
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["deny"]
+}
+
+path "secret/data/seam/routes/*" {
+  capabilities = ["deny"]  # LEGACY — retired base
 }
 
 # Deny access to all other secrets
@@ -223,20 +254,21 @@ path "secret/data/*" {
 
 **Policy Properties:**
 - **Read-only:** Evaluator can only read, never write secrets
-- **Dual-path access:** Own token path and VM credentials only
-- **Explicit deny:** SEAM route paths explicitly denied
+- **Narrowly scoped:** The query-only VM credential is the only grant (the
+  evaluator is detection-only and holds no third-party credential)
+- **Explicit deny:** SEAM route paths explicitly denied at both prefixes
 - **Isolation enforced:** Mutual denial with SEAM policy
 
 ## Secret Paths
 
 ### SEAM Route Secrets
 
-**Path Pattern:** `secret/data/seam/routes/<route-name>/token`
+**Path Pattern:** `secret/data/rs-manager/rs-manager/seam/routes/<route-name>/token`
 
 **Examples:**
-- `secret/data/seam/routes/github-alerts/token`
-- `secret/data/seam/routes/kalshi-tape/token`
-- `secret/data/seam/routes/mta-my-way/token`
+- `secret/data/rs-manager/rs-manager/seam/routes/github-alerts/token`
+- `secret/data/rs-manager/rs-manager/seam/routes/kalshi-tape/token`
+- `secret/data/rs-manager/rs-manager/seam/routes/mta-my-way/token`
 
 **Access:**
 - ✅ SEAM CAN read
@@ -371,7 +403,7 @@ Token Max TTL: 72h
 
 ✅ **VERIFIED:**
 - Evaluator token: `secret/data/evaluators/seam-retirement-evaluator/*`
-- SEAM routes: `secret/data/seam/routes/*`
+- SEAM routes: `secret/data/rs-manager/rs-manager/seam/routes/*`
 - VictoriaMetrics: `secret/data/monitoring/victoriametrics/*`
 - No overlap between paths
 
@@ -475,7 +507,7 @@ bao policy read seam
 
 # Check for deny rules
 bao policy read seam | grep 'evaluators'
-bao policy read seam-retirement-evaluator-policy | grep 'seam/routes'
+bao policy read seam-retirement-evaluator-policy | grep 'rs-manager/rs-manager/seam/routes'
 ```
 
 ## Comparison: SEAM vs Evaluator
@@ -488,12 +520,12 @@ bao policy read seam-retirement-evaluator-policy | grep 'seam/routes'
 | **OpenBao Policy** | `seam` | `seam-retirement-evaluator-policy` |
 | **Token TTL** | 24h | 24h |
 | **Token Max TTL** | 72h | 72h |
-| **Primary Secret Access** | `seam/routes/*` | `evaluators/seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
+| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | `evaluators/seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
 | **Can Read Own Secrets** | ✅ Yes | ✅ Yes |
 | **Can Read Other's Secrets** | ❌ No | ❌ No |
 | **Can Write Secrets** | ❌ No | ❌ No |
 | **Setup Method** | Shell script | Argo WorkflowTemplate |
-| **Explicit Deny Rules** | `evaluators/*`, `*` (default) | `seam/routes/*`, `*` (default) |
+| **Explicit Deny Rules** | `evaluators/*`, `*` (default) | `rs-manager/rs-manager/seam/routes/*` (plus the retired `seam/routes/*`), `*` (default) |
 
 ## Security Checklist
 
@@ -509,17 +541,17 @@ bao policy read seam-retirement-evaluator-policy | grep 'seam/routes'
 
 ### Secret Verification
 
-- [ ] At least one SEAM route secret exists at `seam/routes/*/token`
+- [ ] At least one SEAM route secret exists at `rs-manager/rs-manager/seam/routes/*/token`
 - [ ] Evaluator GitHub token exists at `evaluators/seam-retirement-evaluator/github-token`
 - [ ] VictoriaMetrics credentials exist at `monitoring/victoriametrics/readonly-credentials`
 
 ### Isolation Verification
 
-- [ ] SEAM can read `seam/routes/*` secrets
+- [ ] SEAM can read `rs-manager/rs-manager/seam/routes/*` secrets
 - [ ] SEAM cannot read `evaluators/*` secrets (permission denied)
 - [ ] Evaluator can read `evaluators/seam-retirement-evaluator/*` secrets
 - [ ] Evaluator can read `monitoring/victoriametrics/*` secrets
-- [ ] Evaluator cannot read `seam/routes/*` secrets (permission denied)
+- [ ] Evaluator cannot read `rs-manager/rs-manager/seam/routes/*` secrets (permission denied)
 - [ ] Both roles cannot read other paths (armor/, kalshi/, etc.)
 
 ### Test Verification

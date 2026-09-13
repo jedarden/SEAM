@@ -14,6 +14,14 @@
 
 This document specifies the data structure for capturing HTTP request/response pairs from the ArgoCD read-only proxy. The corpus serves as the oracle for differential testing during service migration to SEAM.
 
+> **Secret-reference base:** the `ref` values below are written against SEAM's
+> enforced base `rs-manager/rs-manager/seam/routes` (`internal/spec/allowlist.go`
+> `DefaultVaultBaseDir`; `SEAM_VAULT_BASE_DIR` overrides), matching the
+> `x-vault-path` the fragments now carry. The earlier cluster-agnostic base
+> `seam/routes` is **retired** (consolidated 2026-09-04) — a corpus reference
+> under the old base would resolve outside the enforced prefix and fail
+> validation, so it must not be copied into a new capture.
+
 ## Design Principles
 
 1. **Security-First:** Credentials stored as references only, never literal values
@@ -66,7 +74,7 @@ This document specifies the data structure for capturing HTTP request/response p
   },
   "secrets": [
     {
-      "ref": "vault:seam/routes/argocd/ro-token",
+      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
       "injectAs": {
         "kind": "bearer"
       }
@@ -103,7 +111,7 @@ This document specifies the data structure for capturing HTTP request/response p
 
 ```json
 {
-  "ref": "vault:seam/routes/argocd/ro-token",
+  "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
   "injectAs": {
     "kind": "bearer"
   }
@@ -274,7 +282,7 @@ All ArgoCD API requests require bearer authentication:
 {
   "secrets": [
     {
-      "ref": "vault:seam/routes/argocd/ro-token",
+      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
       "injectAs": {
         "kind": "bearer"
       }
@@ -288,7 +296,7 @@ All ArgoCD API requests require bearer authentication:
 ### Credential Safety
 
 ✅ **Safe:**
-- Secret references (e.g., `vault:seam/routes/argocd/ro-token`)
+- Secret references (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
 - Git-tracked corpus files
 - Shared in pull requests
 
@@ -345,7 +353,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -370,7 +378,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -392,7 +400,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
           "injectAs": {
             "kind": "bearer"
           }

@@ -74,5 +74,7 @@ Before committing a newly captured corpus:
 5. For middleware capture output, verify both request and response bodies,
    status, headers, and content types are present and decode correctly.
 6. Keep credentials as route references such as
-   `vault:seam/routes/<service>/<key>`; never put the resolved value in a
-   corpus, test fixture, log, or report.
+   `vault:rs-manager/rs-manager/seam/routes/<service>/<key>` (SEAM's enforced
+   base; the older cluster-agnostic `seam/routes` base is **retired** as of
+   the 2026-09-04 consolidation and fails validation); never put the resolved
+   value in a corpus, test fixture, log, or report.
