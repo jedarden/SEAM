@@ -1,8 +1,16 @@
 # SEAM Operational Runbook
 
 **Version:** 1.0  
-**Last Updated:** 2026-08-15  
+**Last Updated:** 2026-09-05  
 **Purpose:** Production deployment patterns, failure modes, debugging procedures, and operational guidance for SEAM gateway operators.
+
+> **Vault base in force:** the enforced prefix is
+> `rs-manager/rs-manager/seam/routes`, so route secrets live at
+> `secret/data/rs-manager/rs-manager/seam/routes/<route>`. The earlier
+> cluster-agnostic base `seam/routes` is **retired** (consolidated
+> 2026-09-04): with `SEAM_VAULT_BASE_DIR` unset the runtime enforcer rejects
+> it (`internal/spec/allowlist.go` `DefaultVaultBaseDir`), so a `bao read`
+> against the old base returns a validation failure rather than the secret.
 
 ---
 
@@ -840,7 +848,7 @@ Before debugging OpenBao connectivity, ensure you have:
 3. SEAM authenticates to OpenBao using Kubernetes auth method
 4. OpenBao validates JWT against Kubernetes API
 5. OpenBao returns a client token with policy-based access
-6. SEAM uses client token to access secrets at `secret/data/seam/routes/*`
+6. SEAM uses client token to access secrets at `secret/data/rs-manager/rs-manager/seam/routes/*`
 
 ### Verification Steps
 
@@ -904,7 +912,7 @@ kubectl describe sa seam -n seam
 bao read policy/seam
 
 # Expected policy HCL:
-# path "secret/data/seam/routes/*" {
+# path "secret/data/rs-manager/rs-manager/seam/routes/*" {
 #   capabilities = ["read"]
 # }
 #
@@ -948,7 +956,7 @@ bao write auth/kubernetes/login role=seam jwt=$JWT_TOKEN
 export BAO_CLIENT_TOKEN="hvs.xxx"
 
 # Try to read a route secret
-bao read secret/data/seam/routes/test-route
+bao read secret/data/rs-manager/rs-manager/seam/routes/test-route
 
 # If this fails with "permission denied", policy is misconfigured
 # If this fails with "invalid path", secret doesn't exist
@@ -1009,7 +1017,7 @@ permission denied
 ```bash
 # Create policy file
 cat > seam-policy.hcl <<'EOF'
-path "secret/data/seam/routes/*" {
+path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["read"]
 }
 
@@ -1092,7 +1100,7 @@ bao write auth/kubernetes/login role=seam jwt=$JWT_TOKEN
 
 # 6. Test secret access with client token
 # (using token from step 5)
-bao read secret/data/seam/routes/test-route
+bao read secret/data/rs-manager/rs-manager/seam/routes/test-route
 
 # 7. Check SEAM logs for authentication errors
 kubectl logs -n seam deployment/seam --tail=100 | grep -i openbao
@@ -1137,7 +1145,7 @@ kubectl logs -n seam deployment/seam --tail=100 | grep -i openbao
 2026/08/15 10:35:00.123456 [/docs] Successfully fetched and validated merged spec (5036 bytes)
 2026/08/15 10:35:01.234567 [Cache] Cache hit for /test/get (TTL: 300s)
 2026/08/15 10:35:02.345678 [Quota] Cost deducted: 1.0, remaining: 999.0
-2026/08/15 10:35:03.456789 [OpenBao] Secret retrieved: secret/data/seam/routes/test-route
+2026/08/15 10:35:03.456789 [OpenBao] Secret retrieved: secret/data/rs-manager/rs-manager/seam/routes/test-route
 ```
 
 **Error Logs:**
@@ -1396,7 +1404,7 @@ curl http://seam.example.com/_seam/healthz
         "summary": "Get static data",
         "x-seam-cache-ttl": 3600,
         "x-seam-upstream": "http://test-service:8080/static",
-        "x-seam-secret-path": "secret/data/seam/routes/test-route"
+        "x-seam-secret-path": "secret/data/rs-manager/rs-manager/seam/routes/test-route"
       }
     }
   }
@@ -1651,7 +1659,7 @@ bao read policy/seam
 bao write auth/kubernetes/login role=seam jwt=$JWT_TOKEN
 
 # Read secret
-bao read secret/data/seam/routes/test-route
+bao read secret/data/rs-manager/rs-manager/seam/routes/test-route
 ```
 
 ### Version History

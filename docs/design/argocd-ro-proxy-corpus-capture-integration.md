@@ -124,7 +124,7 @@ The current ArgoCD read-only proxy is accessed via:
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
           "injectAs": {"kind": "bearer"}
         }
       ]
@@ -134,7 +134,7 @@ The current ArgoCD read-only proxy is accessed via:
 ```
 
 **Security Model:**
-- Credentials stored as **references only** (e.g., `vault:seam/routes/argocd/ro-token`)
+- Credentials stored as **references only** (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
 - Never literal values in corpus files
 - Git-tracked corpus files are safe to commit
 - Literal values resolved at replay-time from local secrets source
@@ -318,7 +318,14 @@ return strings.ToLower(strings.ReplaceAll(path, "/", "-")) + "-" + strings.ToLow
 
 **Pattern:** `vault:<path-to-secret>`
 
-**Example:** `vault:seam/routes/argocd/ro-token`
+**Example:** `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`
+
+The path is written against SEAM's enforced base
+`rs-manager/rs-manager/seam/routes` (`internal/spec/allowlist.go`
+`DefaultVaultBaseDir`; `SEAM_VAULT_BASE_DIR` overrides). The earlier
+cluster-agnostic base `seam/routes` is **retired** (consolidated 2026-09-04) —
+a capture referencing it resolves outside the enforced prefix and fails
+validation at replay.
 
 **Injection Kind:** `bearer` for ArgoCD
 

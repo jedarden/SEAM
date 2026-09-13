@@ -4,8 +4,18 @@
 
 This runbook provides step-by-step procedures for testing and verifying the security isolation between SEAM and the seam-retirement-evaluator service. Use this guide to validate that all authentication and authorization paths work correctly.
 
-**Last Updated:** 2026-08-11  
+**Last Updated:** 2026-09-05  
 **Bead:** bf-4oa45
+
+> **Vault base in force:** every SEAM route path below is written against the
+> enforced base `rs-manager/rs-manager/seam/routes`, so `bao kv` commands use
+> `secret/rs-manager/rs-manager/seam/routes/...` and policy greps match
+> `secret/data/rs-manager/rs-manager/seam/routes/*`. The earlier
+> cluster-agnostic base `seam/routes` is **retired** (consolidated
+> 2026-09-04): with `SEAM_VAULT_BASE_DIR` unset the runtime enforcer rejects it
+> (`internal/spec/allowlist.go` `DefaultVaultBaseDir`), and deployed policies
+> carry a legacy rule for it only until the old paths retire. If your
+> deployment sets `SEAM_VAULT_BASE_DIR`, substitute that base throughout.
 
 ## Prerequisites
 
@@ -54,8 +64,8 @@ bao policy read seam-retirement-evaluator-policy
 ```
 
 **Expected Output:**
-- SEAM policy should show `seam/routes/*` allowed, `evaluators/*` denied
-- Evaluator policy should show `evaluators/seam-retirement-evaluator/*` and `monitoring/victoriametrics/*` allowed, `seam/routes/*` denied
+- SEAM policy should show `rs-manager/rs-manager/seam/routes/*` allowed (plus a legacy grant on the retired `seam/routes/*` until cutover is verified), `evaluators/*` denied
+- Evaluator policy should show `evaluators/seam-retirement-evaluator/*` and `monitoring/victoriametrics/*` allowed, `rs-manager/rs-manager/seam/routes/*` denied
 
 ### Step 2: Verify Kubernetes Roles
 
@@ -81,7 +91,7 @@ bao kv get secret/evaluators/seam-retirement-evaluator/github-token
 bao kv get secret/monitoring/victoriametrics/readonly-credentials
 
 # Check at least one SEAM route secret exists
-bao kv list secret/seam/routes/
+bao kv list secret/rs-manager/rs-manager/seam/routes/
 ```
 
 **Expected Output:**
@@ -178,7 +188,7 @@ export EVAL_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=sea
 bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token
 
 # Try to read SEAM routes (should fail)
-bao kv get secret/seam/routes/
+bao kv get secret/rs-manager/rs-manager/seam/routes/
 
 # Exit the pod
 exit
@@ -202,7 +212,7 @@ kubectl --kubeconfig=/home/coding/.kube/rs-manager.kubeconfig run -n seam openba
 bao write -field=client_token auth/kubernetes/login role=seam jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 
 # Try to read SEAM routes (should succeed)
-bao kv get secret/seam/routes/
+bao kv get secret/rs-manager/rs-manager/seam/routes/
 
 # Try to read evaluator token (should fail)
 bao kv get secret/evaluators/seam-retirement-evaluator/github-token
@@ -235,11 +245,11 @@ echo "=== Phase 1: Validating Policy Structure ==="
 echo "Checking SEAM policy..."
 SEAM_POLICY=$(bao policy read seam -format=json)
 
-# Should allow seam/routes/*
-if echo "$SEAM_POLICY" | grep -q '"path":"secret/data/seam/routes/*"'; then
-  echo "✓ SEAM policy allows seam/routes/*"
+# Should allow rs-manager/rs-manager/seam/routes/*
+if echo "$SEAM_POLICY" | grep -q '"path":"secret/data/rs-manager/rs-manager/seam/routes/*"'; then
+  echo "✓ SEAM policy allows rs-manager/rs-manager/seam/routes/*"
 else
-  echo "✗ SEAM policy missing seam/routes/*"
+  echo "✗ SEAM policy missing rs-manager/rs-manager/seam/routes/*"
   exit 1
 fi
 
@@ -271,12 +281,19 @@ else
   exit 1
 fi
 
-# Should deny seam/routes/*
-if echo "$EVAL_POLICY" | grep -q '"path":"secret/data/seam/routes/*"'; then
-  echo "✓ Evaluator policy denies seam/routes/*"
+# Should deny rs-manager/rs-manager/seam/routes/* (the enforced prefix)
+if echo "$EVAL_POLICY" | grep -q '"path":"secret/data/rs-manager/rs-manager/seam/routes/*"'; then
+  echo "✓ Evaluator policy denies rs-manager/rs-manager/seam/routes/*"
 else
-  echo "✗ Evaluator policy missing seam/routes/* deny"
+  echo "✗ Evaluator policy missing rs-manager/rs-manager/seam/routes/* deny"
   exit 1
+fi
+
+# The retired base seam/routes is denied too, until the legacy paths retire
+if echo "$EVAL_POLICY" | grep -q '"path":"secret/data/seam/routes/*"'; then
+  echo "✓ Evaluator policy also denies the retired base seam/routes/*"
+else
+  echo "⚠ Evaluator policy no longer carries the legacy seam/routes/* deny"
 fi
 
 echo "=== Phase 1 Complete: All policies valid ==="
@@ -378,7 +395,7 @@ fi
 
 # Check at least one SEAM route secret
 echo "Checking SEAM route secrets..."
-SEAM_ROUTES=$(bao kv list secret/seam/routes/ 2>/dev/null | wc -l)
+SEAM_ROUTES=$(bao kv list secret/rs-manager/rs-manager/seam/routes/ 2>/dev/null | wc -l)
 if [ "$SEAM_ROUTES" -gt 0 ]; then
   echo "✓ Found $SEAM_ROUTES SEAM route secrets"
 else
@@ -427,7 +444,7 @@ else
 fi
 
 # Test 3: Try to read SEAM routes (should fail)
-if bao kv get secret/seam/routes/ 2>&1 | grep -qi "permission denied\|Invalid"; then
+if bao kv get secret/rs-manager/rs-manager/seam/routes/ 2>&1 | grep -qi "permission denied\|Invalid"; then
   echo "✓ Evaluator correctly denied access to SEAM routes"
 else
   echo "✗ Evaluator can access SEAM routes (SECURITY BREACH)"
@@ -453,7 +470,7 @@ else
 fi
 
 # Test 2: Read own routes (should succeed)
-if bao kv list secret/seam/routes/ >/dev/null 2>&1; then
+if bao kv list secret/rs-manager/rs-manager/seam/routes/ >/dev/null 2>&1; then
   echo "✓ SEAM can read own route secrets"
 else
   echo "✗ SEAM cannot read own route secrets"
@@ -521,7 +538,7 @@ kubectl --kubeconfig=/home/coding/.kube/rs-manager.kubeconfig get sa seam-retire
 ```bash
 # This is a SECURITY BREACH - immediate investigation required
 # Check if deny rule exists in evaluator policy
-bao policy read seam-retirement-evaluator-policy | grep seam/routes
+bao policy read seam-retirement-evaluator-policy | grep rs-manager/rs-manager/seam/routes
 
 # Check if SEAM policy exists and is correct
 bao policy read seam | grep evaluators
@@ -529,7 +546,7 @@ bao policy read seam | grep evaluators
 
 **Resolution:**
 - IMMEDIATE: Revoke all OpenBao tokens: `bao lease revoke -prefix auth/kubernetes/role/seam-retirement-evaluator`
-- IMMEDIATE: Fix policy to add explicit deny for `seam/routes/*`
+- IMMEDIATE: Fix policy to add explicit deny for `rs-manager/rs-manager/seam/routes/*`
 - Verify: Re-run full isolation validation
 - Document: Create incident report
 
@@ -557,11 +574,11 @@ echo $PATH
 
 All of the following MUST be true for isolation to be valid:
 
-1. ✅ SEAM can read `secret/data/seam/routes/*`
+1. ✅ SEAM can read `secret/data/rs-manager/rs-manager/seam/routes/*`
 2. ✅ SEAM cannot read `secret/data/evaluators/*` (permission denied)
 3. ✅ Evaluator can read `secret/data/evaluators/seam-retirement-evaluator/*`
 4. ✅ Evaluator can read `secret/data/monitoring/victoriametrics/*`
-5. ✅ Evaluator cannot read `secret/data/seam/routes/*` (permission denied)
+5. ✅ Evaluator cannot read `secret/data/rs-manager/rs-manager/seam/routes/*` (permission denied)
 6. ✅ Both roles cannot read other paths (armor/, kalshi/, etc.)
 
 ### Failure Interpretation
