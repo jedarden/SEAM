@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -145,6 +146,23 @@ func (ae *AllowlistEnforcer) loadUpstreamAllowlist(allowlistFile string) error {
 			// unstripped quote becomes part of the comparison value and no
 			// real hostname can ever match it again.
 			host = strings.Trim(host, `"'`)
+
+			// A "*." entry ("*.ardenone.com") is a wildcard suffix in the same
+			// vocabulary the deployed seam-upstream-allowlist ConfigMap and the
+			// lint loader use. Classified as a bare hostname it could never
+			// match — no real hostname is literally "*.…" — and validation
+			// would fail closed on every host the operator wildcarded.
+			host = strings.TrimPrefix(host, "*")
+
+			// An entry may pin a port ("traefik-iad-ci:8001"). Validation
+			// compares against parsedURL.Hostname(), which has already dropped
+			// the port, so a pinned port would leave the entry permanently
+			// unmatchable. The port is advisory here — the fragment's own URL
+			// carries the port actually used — so keep only the host half. A
+			// non-numeric colon suffix is not a port and is left untouched.
+			if hostname, port, err := net.SplitHostPort(host); err == nil && isNumericPort(port) {
+				host = hostname
+			}
 
 			// Check if it's a suffix (starts with dot)
 			if strings.HasPrefix(host, ".") {

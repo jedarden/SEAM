@@ -1058,7 +1058,12 @@ func collectAllowlistValues(value any) []string {
 		return values
 	case map[string]any:
 		var values []string
-		for _, key := range []string{"hosts", "allowlist", "allowedHosts", "upstreamHosts", "suffixes", "hostSuffixes", "allowedSuffixes"} {
+		// upstream_hosts is the key the deployed seam-upstream-allowlist
+		// ConfigMap actually uses. Its camelCase siblings are accepted for the
+		// same reason: the loader cannot know which spelling an operator
+		// picked, and an unrecognized key collects nothing, which fails closed
+		// on every host the manifest explicitly allows.
+		for _, key := range []string{"hosts", "allowlist", "allowedHosts", "upstreamHosts", "upstream_hosts", "suffixes", "hostSuffixes", "allowedSuffixes"} {
 			if child, ok := value[key]; ok {
 				values = append(values, collectAllowlistValues(child)...)
 			}
@@ -1098,7 +1103,30 @@ func normalizeHostEntry(value string) (string, bool) {
 		}
 		value = u.Hostname()
 	}
+	// An entry may pin a port ("traefik-iad-ci:8001"). Lint compares against
+	// u.Hostname(), which has already dropped the port, so a pinned port would
+	// leave the entry permanently unmatchable and fail closed on a host the
+	// manifest explicitly allows. The port is advisory here — the fragment's
+	// own URL carries the port actually used — so keep only the host half. A
+	// non-numeric colon suffix is not a port and is left untouched, which also
+	// keeps a bare IPv6 literal intact: net.SplitHostPort rejects it with "too
+	// many colons" rather than misreading the colons as a port separator.
+	if host, port, err := net.SplitHostPort(value); err == nil && isNumericPort(port) {
+		value = host
+	}
 	return strings.ToLower(strings.TrimSuffix(value, ".")), true
+}
+
+func isNumericPort(port string) bool {
+	if port == "" {
+		return false
+	}
+	for _, character := range port {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *hostAllowlist) allowed(host string) bool {

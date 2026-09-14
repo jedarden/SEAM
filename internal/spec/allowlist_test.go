@@ -426,6 +426,89 @@ func TestUpstreamHostSuffixMatching(t *testing.T) {
 	}
 }
 
+// TestUpstreamHostAcceptsDeployedConfigMapEntries feeds the enforcer the
+// entry forms the deployed seam-upstream-allowlist ConfigMap actually ships:
+// wildcard suffixes written with the "*." prefix (not the bare-dot form the
+// suffix classification grew up on) and port-pinned bare hostnames. Both used
+// to be classified as bare hostnames no real hostname could ever equal, so
+// validation failed closed on hosts the operator had explicitly allowed.
+func TestUpstreamHostAcceptsDeployedConfigMapEntries(t *testing.T) {
+	tmpDir := t.TempDir()
+	allowlistFile := filepath.Join(tmpDir, "allowlist.yaml")
+	content := `- "openbao.openbao.svc.cluster.local"
+- "*.ardenone.com"
+- "api.z.ai"
+- "traefik-iad-ci:8001"
+- "kubernetes.default.svc"
+`
+	if err := os.WriteFile(allowlistFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create allowlist file: %v", err)
+	}
+
+	enforcer, err := NewAllowlistEnforcer("seam/routes", allowlistFile)
+	if err != nil {
+		t.Fatalf("Failed to create enforcer: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		upstreamURL string
+		wantErr     bool
+		errMsg      string
+	}{
+		{
+			name:        "wildcard_covers_subdomain",
+			upstreamURL: "https://unifi.ardenone.com/proxy/network/integration",
+			wantErr:     false,
+		},
+		{
+			name:        "wildcard_does_not_cover_apex",
+			upstreamURL: "https://ardenone.com/api",
+			wantErr:     true,
+			errMsg:      "upstream_host_not_in_allowlist",
+		},
+		{
+			name:        "wildcard_is_not_a_prefix_match",
+			upstreamURL: "http://traefik-evil-ci:8001/api",
+			wantErr:     true,
+			errMsg:      "upstream_host_not_in_allowlist",
+		},
+		{
+			name:        "port_pinned_entry_matches_bare_host",
+			upstreamURL: "http://traefik-iad-ci:8001/api/v1/namespaces",
+			wantErr:     false,
+		},
+		{
+			name:        "exact_entry_still_matches",
+			upstreamURL: "https://api.z.ai/v1",
+			wantErr:     false,
+		},
+		{
+			name:        "undeclared_host_rejected",
+			upstreamURL: "https://not-allowed.example/api",
+			wantErr:     true,
+			errMsg:      "upstream_host_not_in_allowlist",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := enforcer.ValidateUpstreamHost(tt.upstreamURL)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ValidateUpstreamHost() expected error containing %q, got nil", tt.errMsg)
+				} else if !containsString(err.Error(), tt.errMsg) {
+					t.Errorf("ValidateUpstreamHost() expected error containing %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ValidateUpstreamHost() unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
 // TestIsFailClosed tests the fail-closed detection
 func TestIsFailClosed(t *testing.T) {
 	t.Run("no_allowlist_fail_closed", func(t *testing.T) {
