@@ -18,12 +18,12 @@ Phase 4 delivers the **first end-to-end injection proof** against a real credent
 
 ### 1. Route Fragment
 
-**File:** `declarative-config/k8s/rs-manager/seam/routes/zai/zai-glm-proxy.yaml`
+**File:** `declarative-config/k8s/rs-manager/seam/routes/zai/zai-glm-proxy.yaml` (the fragment's declarative-config repo path — not an OpenBao prefix)
 
 Fragment declares:
 - `x-seam-owner: zai`
 - `x-upstream: https://api.z.ai`
-- `x-vault-path: seam/routes/zai/api-key` (OpenBao credential location)
+- `x-vault-path: rs-manager/rs-manager/seam/routes/zai/api-key` (OpenBao credential location)
 - `x-inject-as: {kind: bearer}` (Authorization: Bearer <token>)
 - `x-credential-probe: /v1/models` every 10 minutes (credential health check)
 - Cost/quota guards on all metered endpoints (chat completions, embeddings)
@@ -32,7 +32,7 @@ Fragment declares:
 
 **Workflow:** `declarative-config/k8s/iad-ci/argo-workflows/provision-zai-credential.yaml`
 
-Provisions the secret at: `secret/data/seam/routes/zai/api-key`
+Provisions the secret at: `secret/data/rs-manager/rs-manager/seam/routes/zai/api-key`
 
 **Submit the workflow:**
 
@@ -151,7 +151,7 @@ curl http://seam-rs-manager.tail1b1987.ts.net:8081/_seam/health/credentials
 {
   "fragment": "zai",
   "instance": null,
-  "path": "seam/routes/zai/api-key",
+  "path": "rs-manager/rs-manager/seam/routes/zai/api-key",
   "status": "valid",
   "last_probe": "2026-08-27T12:00:00Z",
   "probe_result": {
@@ -185,7 +185,7 @@ X-SEAM-Budget-Remaining: amount=9900,unit=quota,window=1h,resets=2026-08-27T13:0
 Before closing bead seam-9ed3097c:
 
 - [ ] Fragment created: `routes/zai/zai-glm-proxy.yaml`
-- [ ] Fragment has correct x-vault-path: `seam/routes/zai/api-key`
+- [ ] Fragment has correct x-vault-path: `rs-manager/rs-manager/seam/routes/zai/api-key`
 - [ ] Fragment has correct x-inject-as: `{kind: bearer}`
 - [ ] Fragment has x-credential-probe configured
 - [ ] Allowlist includes `api.z.ai`
@@ -200,14 +200,14 @@ Before closing bead seam-9ed3097c:
 
 ## OpenBao Path Ownership
 
-The credential lives at: `secret/data/seam/routes/zai/api-key`
+The credential lives at: `secret/data/rs-manager/rs-manager/seam/routes/zai/api-key`
 
 This path is:
 - **Co-owned** by the zai fragment (x-seam-owner: zai)
-- **Bound** by the allowlist prefix: `seam/routes/`
+- **Bound** by the allowlist prefix: `rs-manager/rs-manager/seam/routes/`
 - **Accessible** to SEAM via its Kubernetes auth role (seam policy)
 
-SEAM's OpenBao policy allows reading from `secret/data/seam/routes/*` and denies all other paths.
+SEAM's OpenBao policy allows reading from `secret/data/rs-manager/rs-manager/seam/routes/*` and denies all other paths.
 
 ## Deployment Sequence (Two-PR Pattern)
 

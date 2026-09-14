@@ -174,7 +174,7 @@ Incomplete: █████████████░░░░░░░ 11/17  
 ### ☐ Phase 2: Secret Injection
 **Line:** 882 | **Status:** [ ] | **Blocker:** Secret injection system not implemented
 
-**Description:** OpenBao client authenticating via **Kubernetes auth** with the `rs-manager/seam/routes/*` path allow-list, per-service co-owner (two secrets owned by different services can only both be injected if the requesting fragment is co-owned by both), upstream-host allowlist validation, the `x-vault-path` and `x-inject-as` extension handling, upstream path computation with the rewrite fields, strip-then-inject inbound hardening, `x-upstream-tls` handling with the CA bundle resolution, the 30-second secret cache with 401 invalidation, request-body tee with `maxReplayableRequestBytes`, secret-echo scrubbing
+**Description:** OpenBao client authenticating via **Kubernetes auth** with the `rs-manager/rs-manager/seam/routes/*` path allow-list, per-service co-owner (two secrets owned by different services can only both be injected if the requesting fragment is co-owned by both), upstream-host allowlist validation, the `x-vault-path` and `x-inject-as` extension handling, upstream path computation with the rewrite fields, strip-then-inject inbound hardening, `x-upstream-tls` handling with the CA bundle resolution, the 30-second secret cache with 401 invalidation, request-body tee with `maxReplayableRequestBytes`, secret-echo scrubbing
 
 ---
 
@@ -387,7 +387,7 @@ TIER 1 — Establish ground truth
   2. Green build via CI (re-verify 10, 12, 6b)            ── unblocks 3 verdicts
 TIER 2 — Small infra fills (each ≤ 1 line / 1 command)
   3. SEAM_HOT_RELOAD_ENABLED in deployment                ── unblocks 3
-  4. Provision OpenBao rs-manager/seam/routes/* secrets   ── unblocks 4
+  4. Provision OpenBao rs-manager/rs-manager/seam/routes/* secrets ── unblocks 4
 TIER 3 — Real builds (independent tracks)
   5. Phase 5 fleet infra (connectors, cluster decision)   ── unblocks 5
   6. Phase 7 NEEDLE tsnet identity                        ── unblocks 7, and 10's
@@ -415,7 +415,9 @@ A blind sync produces a pod stuck in `FailedMount`. **[live]**
 4. **Upstream CA ConfigMap is empty** (`seam-upstream-ca`, 0 data entries) — `x-upstream-tls`
    CA-bundle resolution has nothing to resolve against for any TLS upstream. **[live]**
 5. **Credential paths unprovisioned.** The `rs-manager/seam/routes/*` OpenBao allow-list target
-   has no `seam/` entry under `secret/rs-manager/` (prefix listing). The `secret/seam` prefix
+   (the base as enforced when this audit ran — repointed 2026-09-04 to
+   `rs-manager/rs-manager/seam/routes/*` by the consolidation) has no `seam/` entry under
+   `secret/rs-manager/` (prefix listing). The `secret/seam` prefix
    itself is not listable by the agent read identity (403 — policy working as designed), so
    existence there could not be confirmed either way; either way the exact `x-vault-path` targets
    the Phase 4 fragments declare must be verified, and provisioned via `bao-as
@@ -439,7 +441,7 @@ A blind sync produces a pod stuck in `FailedMount`. **[live]**
    verdict flips.*
 3. **Set `SEAM_HOT_RELOAD_ENABLED: "true"`** in the deployment env. One line. *Unblocks: 3.*
 4. **Verify/provision the OpenBao credential paths** for zai + twitterapi under the
-   `rs-manager/seam/routes/*` allow-list — write-only identity, value piped, verified by
+   `rs-manager/rs-manager/seam/routes/*` allow-list — write-only identity, value piped, verified by
    metadata version (never read back). *Unblocks: 4's end-to-end credential proof.*
 5. **Reconcile foundation checkboxes 1a / 1b / 2** — write evidence against the existing tree
    (ADR-001 is de facto discharged: Go), tick what is genuinely done, and correct the headline
