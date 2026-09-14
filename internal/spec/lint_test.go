@@ -117,6 +117,142 @@ func TestLintDirectoryChecksAllowlistWhenManifestExists(t *testing.T) {
 	assertFindingCodes(t, report.Errors, []string{"upstream.host-not-allowed"})
 }
 
+// deployedUpstreamAllowlist is the shape the seam-upstream-allowlist ConfigMap
+// actually ships: a snake_case upstream_hosts key mixing exact hostnames,
+// port-pinned hosts and wildcard suffixes, next to a vault_paths key the host
+// loader must leave alone.
+const deployedUpstreamAllowlist = `# SEAM Upstream Allowlist Configuration
+upstream_hosts:
+  - "openbao.openbao.svc.cluster.local"
+  - "*.ardenone.com"
+  - "api.z.ai"
+  - "traefik-iad-ci:8001"
+  - "kubernetes.default.svc"
+vault_paths:
+  - "seam/routes/"
+`
+
+func TestLoadUpstreamAllowlistReadsDeployedConfigMapShape(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "allowlist.yaml")
+	if err := os.WriteFile(path, []byte(deployedUpstreamAllowlist), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	allowlist, err := loadUpstreamAllowlist(path)
+	if err != nil {
+		t.Fatalf("loadUpstreamAllowlist returned error: %v", err)
+	}
+	if allowlist == nil {
+		t.Fatal("loadUpstreamAllowlist returned nil for a manifest that exists")
+	}
+
+	seen := make(map[string]bool, len(allowlist.entries))
+	for _, entry := range allowlist.entries {
+		seen[entry] = true
+	}
+	for _, want := range []string{"openbao.openbao.svc.cluster.local", "*.ardenone.com", "api.z.ai", "traefik-iad-ci", "kubernetes.default.svc"} {
+		if !seen[want] {
+			t.Errorf("allowlist entry %q missing from %v", want, allowlist.entries)
+		}
+	}
+	if seen["traefik-iad-ci:8001"] {
+		t.Errorf("port-pinned entry was not reduced to its host half: %v", allowlist.entries)
+	}
+	if seen["seam/routes/"] {
+		t.Errorf("vault_paths was swallowed as a host entry: %v", allowlist.entries)
+	}
+}
+
+func TestDeployedUpstreamAllowlistMatchesDeclaredUpstreams(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "allowlist.yaml")
+	if err := os.WriteFile(path, []byte(deployedUpstreamAllowlist), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	allowlist, err := loadUpstreamAllowlist(path)
+	if err != nil {
+		t.Fatalf("loadUpstreamAllowlist returned error: %v", err)
+	}
+
+	for host, want := range map[string]bool{
+		"unifi.ardenone.com":  true,  // wildcard suffix
+		"traefik-iad-ci":      true,  // port-pinned entry matches on the bare host
+		"api.z.ai":            true,  // exact
+		"ardenone.com":        false, // a wildcard does not cover its own apex domain
+		"traefik-evil-ci":     false, // must not match on a shared prefix
+		"not-allowed.example": false,
+	} {
+		if got := allowlist.allowed(host); got != want {
+			t.Errorf("allowed(%q) = %v, want %v", host, got, want)
+		}
+	}
+}
+
+// TestNormalizeHostEntryReducesPinnedPorts pins the entry-level reduction
+// rules the deployed allowlist depends on: a numeric port is advisory and is
+// dropped, while anything that is not host:port-with-numeric-port survives
+// verbatim — in particular a bare IPv6 literal, whose colons must not be
+// mistaken for a port separator.
+func TestNormalizeHostEntryReducesPinnedPorts(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+		ok    bool
+	}{
+		{name: "bare_host", input: "kubernetes.default.svc", want: "kubernetes.default.svc", ok: true},
+		{name: "pinned_port", input: "traefik-iad-ci:8001", want: "traefik-iad-ci", ok: true},
+		{name: "url_with_port_uses_hostname", input: "https://traefik-iad-ci:8001", want: "traefik-iad-ci", ok: true},
+		{name: "wildcard_survives", input: "*.ardenone.com", want: "*.ardenone.com", ok: true},
+		{name: "wildcard_with_port", input: "*.ardenone.com:443", want: "*.ardenone.com", ok: true},
+		{name: "trailing_dot", input: "api.z.ai.", want: "api.z.ai", ok: true},
+		{name: "uppercase_lowered", input: "API.Z.AI:443", want: "api.z.ai", ok: true},
+		{name: "ipv6_literal_untouched", input: "2001:db8::1", want: "2001:db8::1", ok: true},
+		{name: "non_numeric_colon_untouched", input: "host:spell", want: "host:spell", ok: true},
+		{name: "empty_rejected", input: "   ", want: "", ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := normalizeHostEntry(tt.input)
+			if ok != tt.ok || got != tt.want {
+				t.Errorf("normalizeHostEntry(%q) = (%q, %v), want (%q, %v)", tt.input, got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestLintDirectoryAcceptsUpstreamsDeclaredByDeployedAllowlist(t *testing.T) {
+	root := t.TempDir()
+	// The manifest lives outside the fragments directory: LintDirectory walks
+	// the whole tree and would treat an in-tree YAML file as a fragment.
+	allowlistDir := t.TempDir()
+	allowlist := filepath.Join(allowlistDir, "allowlist.yaml")
+	if err := os.WriteFile(allowlist, []byte(deployedUpstreamAllowlist), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Each host is written exactly as a fragment declares it: a port-pinned
+	// https upstream and one a wildcard entry has to cover.
+	writeLintTestFragment(t, root, "k8s", "route.yaml",
+		strings.ReplaceAll(validLintFragment("k8s", "v1", "https://traefik-iad-ci:8001"), "  /api:\n", "  /k8s:\n"))
+	writeLintTestFragment(t, root, "unifi", "route.yaml",
+		strings.ReplaceAll(validLintFragment("unifi", "v1", "https://unifi.ardenone.com"), "  /api:\n", "  /unifi:\n"))
+	writeLintTestFragment(t, root, "stranger", "route.yaml",
+		strings.ReplaceAll(validLintFragment("stranger", "v1", "https://not-allowed.example.com"), "  /api:\n", "  /stranger:\n"))
+
+	report, err := LintDirectory(LintOptions{
+		FragmentsDir:          root,
+		SchemaPath:            lintTestSchemaPath(t),
+		UpstreamAllowlistPath: allowlist,
+	})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	if len(report.Errors) != 1 {
+		t.Fatalf("expected only the unknown host to fail, got %+v", report.Errors)
+	}
+	assertFindingCodes(t, report.Errors, []string{"upstream.host-not-allowed"})
+}
+
 func TestVaultPathShapeIsBaseAgnostic(t *testing.T) {
 	tests := []struct {
 		name       string
