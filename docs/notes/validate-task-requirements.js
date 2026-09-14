@@ -131,7 +131,7 @@ const completeExample = {
   'x-upstream-map': {
     'us-east': {
       'url': 'https://weather.api.example.com',
-      'vaultPath': 'seam/routes/weather-service/api-token',
+      'vaultPath': 'rs-manager/rs-manager/seam/routes/weather-service/api-token',
       'injectAs': { 'kind': 'bearer' },
       'target_host': 'weather.api.example.com',
       'rewrite_path': '/api/v1/forecast'

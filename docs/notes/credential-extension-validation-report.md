@@ -12,15 +12,16 @@ All four SEAM credential extension field schemas have been successfully defined 
 
 ### 1. x-vault-path (Vault KV Secret Path)
 - **Type:** String
-- **Pattern:** `^seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/`
-- **Description:** Must resolve inside the OpenBao allowlist prefix `seam/routes/*` and be co-owned with the fragment owner
+- **Pattern:** `^rs-manager/rs-manager/seam/routes/[a-z0-9]([a-z0-9-]*[a-z0-9])?/`
+- **Description:** Must resolve inside the OpenBao allowlist prefix `rs-manager/rs-manager/seam/routes/*` and be co-owned with the fragment owner
+- **Note (2026-09-13):** the pattern and examples in this report are shown against the enforced base consolidated 2026-09-04; the original validation (2026-07) ran against the pre-consolidation cluster-agnostic base, since retired.
 - **Validation:** 
   - ✓ Path traversal rejection (no `..` segments)
   - ✓ Glob character rejection (no `*` or `?`)
   - ✓ Template segment rejection (no `{}`)
   - ✓ Co-ownership enforcement (must match `x-seam-owner`)
 
-**Example:** `"seam/routes/user-service/api-key"`
+**Example:** `"rs-manager/rs-manager/seam/routes/user-service/api-key"`
 
 ---
 
@@ -109,7 +110,7 @@ The example fragment at `docs/notes/route-fragment-credential-example.json` succ
   "x-seam-owner": "user-service",
   "x-api-version": "v1",
   "x-upstream": "https://user-service.internal:8443",
-  "x-vault-path": "seam/routes/user-service/api-key",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/user-service/api-key",
   "x-inject-as": {
     "kind": "cookie",
     "name": "session_token"

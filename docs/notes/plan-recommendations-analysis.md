@@ -125,7 +125,7 @@ Everything else (5's connectors, 12's on-cluster proof, the cutover itself) hang
 
 **OpenBao**:
 
-- The Phase-4 credential paths under `secret/rs-manager/seam/routes/*` do not exist yet; provision
+- The Phase-4 credential paths under `secret/rs-manager/rs-manager/seam/routes/*` do not exist yet; provision
   via `bao-as rs-manager-provision` with `-cas`, value by pipe — never as an argument. The
   Kubernetes-auth **role and policy are a Phase 2 precondition, not a 6a deliverable**
   (`plan.md:885`) — verify they exist rather than assuming it from 6a's login success.
@@ -178,7 +178,7 @@ Everything else (5's connectors, 12's on-cluster proof, the cutover itself) hang
    the dev-token auth-mode checks for 2. Retires the entire NO-EVIDENCE column.
 6. **Enable hot reload and mount the route ConfigMaps** in SEAM's Deployment via declarative-config,
    and let ArgoCD sync (Phase 3), then mount the z.ai/GLM and twitterapi.io fragments (Phase 4).
-7. **Provision the Phase-4 OpenBao secrets** under `secret/rs-manager/seam/routes/*` (provisioning
+7. **Provision the Phase-4 OpenBao secrets** under `secret/rs-manager/rs-manager/seam/routes/*` (provisioning
    identity, `-cas`, value by pipe; verify by metadata version, never by reading back), then prove
    `x-vault-path` → `x-inject-as` end-to-end against a real upstream (Phase 4).
 8. **Complete Phase 5's infrastructure** — add `iad-native-ads` to map and allowlist, one allowlist
