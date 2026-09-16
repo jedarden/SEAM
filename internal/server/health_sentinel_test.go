@@ -120,6 +120,125 @@ func TestCredentialHealthSentinelCacheBypassIsFresh(t *testing.T) {
 	}
 }
 
+func TestCredentialHealthSentinelReportsDegradedForHalfOpenBreaker(t *testing.T) {
+	s := newHealthSentinelTestServer(t)
+	// Origins are ordered so the half-open record sorts before the open one:
+	// the status walk must still report unhealthy once it reaches the open
+	// breaker instead of stopping at the degraded it already recorded.
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:              "https://a-half-open.example",
+		State:               CircuitBreakerHalfOpen,
+		Enabled:             true,
+		ConsecutiveFailures: 2,
+	})
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:              "https://z-open.example",
+		State:               CircuitBreakerOpen,
+		Enabled:             true,
+		ConsecutiveFailures: 7,
+	})
+
+	resp := httptest.NewRecorder()
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(resp,
+		httptest.NewRequest(http.MethodGet, "/health/credentials", nil))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected health status 200, got %d", resp.Code)
+	}
+	var health CredentialHealthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	if health.Status != "unhealthy" {
+		t.Fatalf("expected open breaker to outrank half-open as unhealthy, got %q", health.Status)
+	}
+	if health.CircuitBreaker.State != CircuitBreakerOpen {
+		t.Fatalf("expected aggregate breaker state %q, got %q", CircuitBreakerOpen, health.CircuitBreaker.State)
+	}
+
+	// Without the open breaker the same half-open record degrades the status
+	// rather than leaving the endpoint healthy.
+	s.CircuitBreakerStates().Remove("https://z-open.example")
+	degraded := httptest.NewRecorder()
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(degraded,
+		httptest.NewRequest(http.MethodGet, "/health/credentials", nil))
+	if degraded.Code != http.StatusOK {
+		t.Fatalf("expected health status 200, got %d", degraded.Code)
+	}
+	var halfOpen CredentialHealthResponse
+	if err := json.NewDecoder(degraded.Body).Decode(&halfOpen); err != nil {
+		t.Fatalf("decode half-open health response: %v", err)
+	}
+	if halfOpen.Status != "degraded" {
+		t.Fatalf("expected half-open breaker to make credential health degraded, got %q", halfOpen.Status)
+	}
+	if halfOpen.CircuitBreaker.State != CircuitBreakerHalfOpen {
+		t.Fatalf("expected aggregate breaker state %q, got %q", CircuitBreakerHalfOpen, halfOpen.CircuitBreaker.State)
+	}
+}
+
+func TestCredentialHealthSentinelResponseCarriesNoCredentialValues(t *testing.T) {
+	s := newHealthSentinelTestServer(t)
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:              "https://upstream.example",
+		State:               CircuitBreakerOpen,
+		Enabled:             true,
+		ConsecutiveFailures: 4,
+		LastError:           "upstream request timed out",
+		RetryAfterSeconds:   30,
+		Source:              "caller",
+	})
+
+	resp := httptest.NewRecorder()
+	s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(resp,
+		httptest.NewRequest(http.MethodGet, "/health/credentials", nil))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected health status 200, got %d", resp.Code)
+	}
+
+	// The sentinel's only input is breaker state, so the response schema is
+	// closed: every object key the body contains must come from the
+	// documented set. A field added for a credential value, its vault path or
+	// any other secret-bearing metadata fails this pin.
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	allowed := map[string]bool{
+		"status": true, "timestamp": true, "credentials": true, "available": true,
+		"last_refresh": true, "circuit_breaker": true, "circuit_breakers": true,
+		"enabled": true, "state": true, "consecutive_failures": true,
+		"opened_at": true, "last_error": true, "retry_after_seconds": true,
+		"origin": true, "source": true,
+	}
+	var seen []string
+	var walk func(prefix string, value map[string]any)
+	walk = func(prefix string, value map[string]any) {
+		for key, child := range value {
+			seen = append(seen, prefix+key)
+			if !allowed[key] {
+				t.Errorf("unexpected key %q in credential health response (only documented fields may appear)", prefix+key)
+			}
+			if nested, ok := child.(map[string]any); ok {
+				walk(prefix+key+".", nested)
+			}
+		}
+	}
+	walk("", body)
+
+	credentials, ok := body["credentials"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected credentials object, got %T", body["credentials"])
+	}
+	for key := range credentials {
+		if key != "available" && key != "last_refresh" {
+			t.Errorf("credentials object carries %q; only availability metadata is permitted", key)
+		}
+	}
+	if _, leaked := credentials["value"]; leaked {
+		t.Error("credentials object must never carry a credential value")
+	}
+}
+
 func TestCredentialHealthSentinelRejectsNonGet(t *testing.T) {
 	s := newHealthSentinelTestServer(t)
 	resp := httptest.NewRecorder()
