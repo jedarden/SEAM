@@ -326,6 +326,140 @@ func TestBrownoutWindow_IsActiveAt(t *testing.T) {
 	}
 }
 
+// TestBrownoutScheduler_OverlappingWindowsUnion pins union semantics across
+// multiple windows: if ANY window is active the route serves 410. Lint
+// rejects overlapping windows, so overlapping fixtures here are the
+// belt-and-braces behavior for a fragment that reached the gateway without
+// linting — an overlap can only extend an outage, never narrow one.
+func TestBrownoutScheduler_OverlappingWindowsUnion(t *testing.T) {
+	bs := NewBrownoutScheduler()
+
+	// Clock is inside the SECOND window only.
+	testTime, _ := time.Parse(time.RFC3339, "2024-07-01T12:00:00Z")
+	bs.SetClock(func() time.Time { return testTime })
+
+	route := RouteEntry{
+		PathTemplate: "/old-api",
+		Method:       "GET",
+		APIVersion:   "v1",
+		Deprecated: &DeprecationInfo{
+			Since:  "2024-01-01",
+			Sunset: "2024-12-31",
+			Brownouts: []BrownoutWindow{
+				{Start: "2024-06-15T00:00:00Z", End: "2024-06-15T12:00:00Z"},
+				{Start: "2024-06-15T11:00:00Z", End: "2024-07-02T00:00:00Z"}, // Overlaps the first
+			},
+		},
+	}
+
+	w := httptest.NewRecorder()
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("GET", "/old-api", nil)
+	ctx := context.WithValue(req.Context(), routeMatchContextKey{}, &RouteMatch{Route: route})
+	req = req.WithContext(ctx)
+
+	bs.Middleware(next).ServeHTTP(w, req)
+
+	if nextCalled {
+		t.Error("Expected next NOT to be called when the second window is active")
+	}
+	if w.Code != http.StatusGone {
+		t.Errorf("Expected 410 under union semantics, got %d", w.Code)
+	}
+}
+
+// TestBrownoutScheduler_ResponseHeadersContract pins the full header surface
+// of a brownout 410.
+func TestBrownoutScheduler_ResponseHeadersContract(t *testing.T) {
+	bs := NewBrownoutScheduler()
+
+	testTime, _ := time.Parse(time.RFC3339, "2024-06-15T10:30:00Z")
+	bs.SetClock(func() time.Time { return testTime })
+
+	route := RouteEntry{
+		PathTemplate: "/old-api",
+		Method:       "GET",
+		APIVersion:   "v1",
+		Deprecated: &DeprecationInfo{
+			Since:              "2024-01-01",
+			Sunset:             "2024-12-31",
+			ReplacementPath:    "/new-api",
+			ReplacementVersion: "v2",
+			Brownouts: []BrownoutWindow{
+				{Start: "2024-06-15T00:00:00Z", End: "2024-06-15T23:59:59Z"},
+			},
+		},
+	}
+
+	w := httptest.NewRecorder()
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("next must not run inside a window")
+	})
+
+	req := httptest.NewRequest("GET", "/old-api", nil)
+	ctx := context.WithValue(req.Context(), routeMatchContextKey{}, &RouteMatch{Route: route})
+	req = req.WithContext(ctx)
+
+	bs.Middleware(next).ServeHTTP(w, req)
+
+	if w.Code != http.StatusGone {
+		t.Errorf("Expected 410, got %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %q", ct)
+	}
+	if w.Header().Get("X-SEAM-Brownout") != "active" {
+		t.Error("Expected X-SEAM-Brownout: active")
+	}
+	if dep := w.Header().Get("Deprecation"); dep != "since=2024-01-01" {
+		t.Errorf("Expected Deprecation: since=2024-01-01, got %q", dep)
+	}
+	if sun := w.Header().Get("Sunset"); sun != "2024-12-31" {
+		t.Errorf("Expected Sunset: 2024-12-31, got %q", sun)
+	}
+
+	links := w.Header()["Link"]
+	var sawDeprecationLink, sawAlternateLink bool
+	for _, l := range links {
+		if containsString(l, `rel="deprecation"`) && containsString(l, "/changes") {
+			sawDeprecationLink = true
+		}
+		if containsString(l, `rel="alternate"`) && containsString(l, "/new-api") {
+			sawAlternateLink = true
+		}
+	}
+	if !sawDeprecationLink {
+		t.Errorf("Expected a Link rel=deprecation to /changes among %v", links)
+	}
+	if !sawAlternateLink {
+		t.Errorf("Expected a Link rel=alternate to the replacement among %v", links)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("Failed to parse response JSON: %v", err)
+	}
+	if body["error"] != "gone" {
+		t.Errorf("Expected error 'gone', got %v", body["error"])
+	}
+	if msg, _ := body["message"].(string); msg == "" {
+		t.Error("Expected a non-empty message field")
+	}
+	brownout, _ := body["brownout"].(map[string]interface{})
+	if brownout["start"] != "2024-06-15T00:00:00Z" || brownout["end"] != "2024-06-15T23:59:59Z" {
+		t.Errorf("Expected brownout bounds echoed verbatim, got %v", brownout)
+	}
+	deprecation, _ := body["deprecation"].(map[string]interface{})
+	if deprecation["since"] != "2024-01-01" || deprecation["sunset"] != "2024-12-31" {
+		t.Errorf("Expected deprecation since/sunset in body, got %v", deprecation)
+	}
+}
+
 // TestBrownoutScheduler_WithReplacement tests that replacement info is included
 func TestBrownoutScheduler_WithReplacement(t *testing.T) {
 	bs := NewBrownoutScheduler()

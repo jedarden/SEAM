@@ -164,6 +164,7 @@ type Server struct {
 	wg                     sync.WaitGroup
 	specLoader             *spec.Loader
 	routeTableHolder       *ThreadSafeTableHolder   // Thread-safe holder for route table (stage 4)
+	brownoutScheduler      *BrownoutScheduler       // x-seam-deprecated brownout window enforcement
 	proxyMap               map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
 	proxyMapMu             sync.RWMutex             // Protects proxyMap
 	upstreamClientMap      map[string]*http.Client  // Map of TLS identity -> connection-pooled client
@@ -268,6 +269,7 @@ func New(cfg *Config) *Server {
 		operatorMux:       http.NewServeMux(),
 		specLoader:        specLoader,
 		routeTableHolder:  NewThreadSafeTableHolder(NewRouteTable(specLoader)),
+		brownoutScheduler: NewBrownoutScheduler(),
 		proxyMap:          make(map[string]*ReverseProxy),
 		upstreamClientMap: make(map[string]*http.Client),
 		cache:             NewResponseCache(),
@@ -1533,9 +1535,17 @@ func (s *Server) Start(ctx context.Context) error {
 	callerHandler := s.quotaMiddleware(s.callerMux)
 	log.Printf("Quota middleware active on caller-facing port")
 
-	// Wrap with cache middleware (outer layer - checks cache first, bypasses quota on hits)
+	// Wrap with cache middleware (checks cache first, bypasses quota on hits)
 	callerHandler = s.cacheMiddleware(callerHandler)
 	log.Printf("Cache middleware active on caller-facing port")
+
+	// Wrap with brownout middleware — 410s deprecated routes inside their
+	// scheduled x-seam-deprecated windows. Outermost of the cache/quota/brownout
+	// trio, so a window 410 precedes caching and metering: browned-out traffic
+	// consumes no quota, the 410 itself is never cached, and a cached
+	// pre-window response cannot mask an active window.
+	callerHandler = s.brownoutMiddleware(callerHandler)
+	log.Printf("Brownout middleware active on caller-facing port (x-seam-deprecated windows)")
 
 	// Wrap with header-stripping middleware (stage 2 - strips X-SEAM-* headers)
 	callerHandler = s.headerStrippingMiddleware(callerHandler)

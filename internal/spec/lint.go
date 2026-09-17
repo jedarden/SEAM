@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v3"
@@ -1745,27 +1746,83 @@ func isDateAfter(date1, date2 string) bool {
 	return date1 > date2
 }
 
-// isDateTimeAfter checks if datetime1 is after datetime2 (both RFC 3339)
+// parseBrownoutInstant parses an RFC 3339 date-time the way brownout windows
+// are compared: as absolute instants, so a window written with a non-UTC
+// offset is exactly equal to its UTC rendering. isValidISODateTime accepts
+// the RFC 3339 leniencies Go's parser rejects on its own (a space or lower-
+// case 't' separator, a lower-case 'z' zone), so those are normalised first.
+// The bool is false for anything unparseable; callers treat that as the
+// fail-safe direction (flag the window) rather than guessing.
+func parseBrownoutInstant(datetime string) (time.Time, bool) {
+	normalized := datetime
+	if len(normalized) >= 11 && (normalized[10] == ' ' || normalized[10] == 't') {
+		normalized = normalized[:10] + "T" + normalized[11:]
+	}
+	if strings.HasSuffix(normalized, "z") {
+		normalized = normalized[:len(normalized)-1] + "Z"
+	}
+	t, err := time.Parse(time.RFC3339, normalized)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+// isDateTimeAfter checks if datetime1 is after datetime2 (both RFC 3339) as
+// absolute instants. Lexicographic comparison of the strings would order
+// `23:30+02:00` after `22:00Z` when it is an hour earlier; brownout windows
+// carrying different offsets therefore must be parsed before comparing.
 func isDateTimeAfter(datetime1, datetime2 string) bool {
-	return datetime1 > datetime2
+	t1, ok1 := parseBrownoutInstant(datetime1)
+	t2, ok2 := parseBrownoutInstant(datetime2)
+	if !ok1 || !ok2 {
+		return false
+	}
+	return t1.After(t2)
 }
 
 // isDateTimeAfterOrEqual checks if datetime1 is after or equal to datetime2
+// (both RFC 3339) as absolute instants.
 func isDateTimeAfterOrEqual(datetime1, datetime2 string) bool {
-	return datetime1 >= datetime2
-}
-
-// isDateTimeWithinRange checks if a datetime is within [sinceDate, sunsetDate]
-// Assumes since and sunset are ISO dates (YYYY-MM-DD) and datetime is RFC 3339
-func isDateTimeWithinRange(datetime, sinceDate, sunsetDate string) bool {
-	// Extract date part from datetime (first 10 characters)
-	if len(datetime) < 10 {
+	t1, ok1 := parseBrownoutInstant(datetime1)
+	t2, ok2 := parseBrownoutInstant(datetime2)
+	if !ok1 || !ok2 {
 		return false
 	}
-	dateOnly := datetime[:10]
+	return !t1.Before(t2)
+}
 
-	// Must be >= since and <= sunset
-	return dateOnly >= sinceDate && dateOnly <= sunsetDate
+// isDateTimeWithinRange checks if a datetime (RFC 3339, any offset) falls
+// within the deprecation interval bounded by sinceDate and sunsetDate (both
+// ISO dates YYYY-MM-DD, interpreted as UTC days). The interval is inclusive
+// of both bounding days: [sinceDate 00:00:00Z, day after sunsetDate 00:00:00Z).
+// Comparing the timestamp's written date part instead of the parsed instant
+// would let `2024-12-31T23:00:00-05:00` — already 2025-01-01 in UTC — pass a
+// sunset of 2024-12-31.
+func isDateTimeWithinRange(datetime, sinceDate, sunsetDate string) bool {
+	t, ok := parseBrownoutInstant(datetime)
+	if !ok {
+		return false
+	}
+	sinceStart, ok := utcMidnight(sinceDate)
+	if !ok {
+		return false
+	}
+	sunsetEnd, ok := utcMidnight(sunsetDate)
+	if !ok {
+		return false
+	}
+	sunsetEnd = sunsetEnd.AddDate(0, 0, 1)
+	return !t.Before(sinceStart) && t.Before(sunsetEnd)
+}
+
+// utcMidnight parses an ISO date (YYYY-MM-DD) as midnight UTC.
+func utcMidnight(date string) (time.Time, bool) {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
 }
 
 func sortLintFindings(report *LintReport) {

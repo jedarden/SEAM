@@ -1,0 +1,153 @@
+# Deprecated-Route Brownout: Runtime Semantics
+
+Status: implemented 2026-09-17. This document is the authority on how
+`x-seam-deprecated` brownout windows behave at runtime. The code comments in
+`internal/server/brownout_middleware.go` summarize the same contract; the
+tests named at the bottom pin it.
+
+## What a brownout window is
+
+A deprecated route fragment may declare scheduled outage windows:
+
+```yaml
+x-seam-deprecated:
+  since: 2024-01-01          # required, ISO date
+  sunset: 2024-12-31         # required when brownout is present, ISO date
+  brownout:
+    - start: 2024-06-15T02:00:00+02:00   # RFC 3339, any offset
+      end:   2024-06-15T04:00:00+02:00
+    - start: 2024-07-01T00:00:00Z
+      end:   2024-07-01T02:00:00Z
+```
+
+While a window is active the gateway serves a structured `410 Gone` instead
+of proxying the route. Between windows the route serves normally. The intent
+(Phase 8.3 / plan AP-08) is scheduled, visible breakage: callers are forced
+onto the replacement before the route disappears for good.
+
+## Where enforcement runs
+
+`Server.brownoutMiddleware` is wired into the caller-facing chain as the
+outermost of the cache/quota/brownout trio (quota innermost, then cache,
+then brownout — see `Server.Start`), so a request only reaches cache and
+quota after the brownout check passed:
+
+- a window 410 consumes **no quota**,
+- the 410 itself is **never cached** (it is generated outside the cache
+  middleware), and
+- a cached pre-window response **cannot mask** an active window — the
+  window check runs before the cache is consulted.
+
+Dispatch publishes the authoritative route match into the request context
+only inside the caller mux (stage 4, `withRouteMatch`) — after every
+middleware has run — so the middleware resolves the route itself with a
+read-only lookup (`ThreadSafeTableHolder.MatchForBrownout`, the same
+no-side-effects contract as the loop guard's). The lookup publishes nothing;
+stage 4 still re-matches and republishes with the credential resolver before
+anything can inject a secret.
+
+Two classes of request bypass the check entirely:
+
+- **Reserved paths** (`/health`, control plane) — never proxied routes.
+- **Credential probes** (`X-SEAM-Probe: true`) — a probe must not observe a
+  gateway-side 410 as an upstream failure, or a brownout window would mark
+  healthy credentials unhealthy for a decision the gateway itself made. In
+  practice probes target upstreams directly (`route.UpstreamTarget` +
+  probe path), so they never traverse the caller chain at all; the header
+  check is defense-in-depth, and it cannot be forged past it by an external
+  caller because stage 2 (`headerStrippingMiddleware`, outside the brownout
+  check) deletes `X-SEAM-*` request headers before the window check runs.
+
+## Window semantics
+
+- **Absolute instants.** Windows are compared as instants, never as written
+  strings. A window written with a non-UTC offset is exactly equal to its
+  UTC rendering, and the gateway's own local timezone never participates:
+  `[2024-06-15T02:00:00+02:00, 2024-06-15T04:00:00+02:00]` is exactly
+  `[00:00Z, 02:00Z]`, so a request at `2024-06-15T01:30:00Z` is inside it.
+  The lenient RFC 3339 spellings lint accepts (space or lower-case `t`
+  separator, lower-case `z` zone) are normalized at parse time, so every
+  window lint passes is also honored at runtime.
+- **Inclusive boundaries.** `[start, end]`: the start instant and the end
+  instant are both inside the window.
+- **Union across windows.** If ANY window is active, the route serves 410.
+  Lint rejects unordered or overlapping windows at fragment validation, so
+  union semantics is the belt-and-braces behavior for a fragment that
+  reached the gateway without linting — an overlap can only extend an
+  outage, never narrow one.
+- **First active window names the bounds.** When more than one window is
+  active at the same instant (adjacent inclusive boundaries, or an
+  unlinted overlap), the FIRST window in array order is the one echoed in
+  the response body.
+- **Unparseable windows are inert.** A window whose start or end does not
+  parse is never active — the fail-safe direction. Lint is the up-front
+  gate that rejects malformed windows before they reach the gateway, so an
+  inert window at runtime is a defect that should already have been caught.
+
+## Response contract
+
+During an active window the response is:
+
+- **Status:** `410 Gone`.
+- **Headers:**
+
+  | Header | Value |
+  |---|---|
+  | `Content-Type` | `application/json` |
+  | `X-SEAM-Brownout` | `active` |
+  | `Deprecation` | `since=<since>` |
+  | `Sunset` | `<sunset>` (only when set) |
+  | `Link` | `<base>/changes>; rel="deprecation"`, plus `<replacement>?version=<v>; rel="alternate"` when a replacement is declared |
+
+- **Body:** structured JSON — `error: "gone"`, a human-readable `message`,
+  `brownout: {start, end}` echoing the active window's written values
+  verbatim, `deprecation: {since, sunset?}`, and `replacement:
+  {path, version?}` when declared.
+- Every 410 served is logged (`[brownout] served 410 for route … window …`)
+  as the operator-facing record that live traffic appeared inside a window.
+
+## Sunset behavior
+
+Sunset is **advisory** and never removes a route by itself. Past the last
+window — and a fortiori past sunset — the route serves normally until a
+human merges the removal PR. Nothing in the gateway deletes or refuses a
+route because a date on the fragment passed.
+
+## Lint gate (up front, not runtime)
+
+`internal/spec/lint.go` (`checkDeprecation`) rejects, at fragment
+validation:
+
+- `brownout` without `sunset`, an empty `brownout` array, or non-object
+  windows;
+- unparseable `start`/`end`, `end <= start`;
+- windows outside `[since, sunset]` — judged on absolute instants, so an
+  end written on the sunset calendar day in a westward offset
+  (`2024-12-31T23:00:00-05:00` = `2025-01-01T04:00Z`) is correctly flagged;
+- unordered or overlapping windows — also judged on absolute instants, so
+  mixed-offset pairs are ordered correctly (`22:00Z` starts after
+  `23:30+02:00` ends, despite sorting earlier as a string).
+
+Lint's date-time comparisons were deliberately moved from lexicographic
+string comparison to instant comparison for exactly these two mixed-offset
+cases; the old code both false-flagged legal adjacency and missed real
+overlaps across offsets.
+
+## Test map
+
+| Contract | Pinned by |
+|---|---|
+| Wiring resolves the route itself (no context match needed) | `TestServerBrownoutMiddleware_ResolvesRouteWithoutContextMatch` |
+| Pass-through outside windows, no brownout marker | `TestServerBrownoutMiddleware_OutsideWindowProceeds` |
+| Non-UTC offset windows honored as UTC instants, inclusive end | `TestServerBrownoutMiddleware_NonUTCOffsetWindowHonoredInUTC` |
+| Probe bypass | `TestServerBrownoutMiddleware_ProbeRequestsBypass` |
+| Sunset advisory — serves past sunset | `TestServerBrownoutMiddleware_PastSunsetServesNormally` |
+| Unparseable window inert | `TestServerBrownoutMiddleware_UnparseableWindowIsInert` |
+| First active window names bounds | `TestServerBrownoutMiddleware_410NamesFirstActiveWindow` |
+| Union across overlapping windows | `TestBrownoutScheduler_OverlappingWindowsUnion` |
+| Full 410 header/body contract | `TestBrownoutScheduler_ResponseHeadersContract` |
+| DORMANT / basic 410 / boundaries / replacement | existing `brownout_middleware_test.go` tests |
+| Mixed-offset adjacency accepted (no false positive) | `TestCheckDeprecation_MixedOffsetAdjacentWindowsAccepted` |
+| Mixed-offset overlap detected (no false negative) | `TestCheckDeprecation_MixedOffsetOverlapDetected` |
+| End instant past sunset detected | `TestCheckDeprecation_WindowPastSunsetOffsetDetected` |
+| Shared instant parse incl. lenient separators | `TestParseBrownoutInstant` |

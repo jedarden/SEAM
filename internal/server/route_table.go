@@ -190,14 +190,40 @@ type BrownoutWindow struct {
 	End string
 }
 
-// IsActiveAt reports whether the brownout window is active at the given time.
-func (w BrownoutWindow) IsActiveAt(t time.Time) bool {
-	start, err := time.Parse(time.RFC3339, w.Start)
+// parseWindowInstant parses an RFC 3339 instant the way brownout windows are
+// compared: as an absolute instant, so a window written with a non-UTC offset
+// is exactly equal to its UTC rendering and the gateway's own local timezone
+// never participates. The lenient separators the lint side accepts
+// (spec.isValidISODateTime: a space or lower-case 't' separator, a lower-case
+// 'z' zone) are normalised first, so every window lint passes is also
+// parseable here. The bool is false for anything unparseable; callers treat
+// that as inert (never active) — the fail-safe direction.
+func parseWindowInstant(datetime string) (time.Time, bool) {
+	normalized := datetime
+	if len(normalized) >= 11 && (normalized[10] == ' ' || normalized[10] == 't') {
+		normalized = normalized[:10] + "T" + normalized[11:]
+	}
+	if strings.HasSuffix(normalized, "z") {
+		normalized = normalized[:len(normalized)-1] + "Z"
+	}
+	t, err := time.Parse(time.RFC3339, normalized)
 	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+// IsActiveAt reports whether the brownout window is active at the given time.
+// Both boundaries are inclusive: [start, end]. A window that does not parse
+// is never active — the fail-safe direction; lint is the up-front gate that
+// rejects malformed windows before they reach the gateway.
+func (w BrownoutWindow) IsActiveAt(t time.Time) bool {
+	start, ok := parseWindowInstant(w.Start)
+	if !ok {
 		return false
 	}
-	end, err := time.Parse(time.RFC3339, w.End)
-	if err != nil {
+	end, ok := parseWindowInstant(w.End)
+	if !ok {
 		return false
 	}
 	return (t.Equal(start) || t.After(start)) && (t.Before(end) || t.Equal(end))
@@ -299,6 +325,16 @@ func (h *ThreadSafeTableHolder) MatchForLoopGuard(req *http.Request) *RouteMatch
 	defer h.mu.RUnlock()
 
 	return h.current.loopGuardMatch(req)
+}
+
+// MatchForBrownout resolves the route a brownout-window check applies to,
+// with the same no-side-effects contract as MatchForLoopGuard: no request
+// sanitisation and no publication into the request context, so the
+// authoritative stage-4 match is left untouched. The brownout middleware
+// shares the loop guard's constraint — it runs on the caller chain before
+// dispatch has published a match it could read.
+func (h *ThreadSafeTableHolder) MatchForBrownout(req *http.Request) *RouteMatch {
+	return h.MatchForLoopGuard(req)
 }
 
 // Snapshot returns a copy of the current route table's routes for inspection.
