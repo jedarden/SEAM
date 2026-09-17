@@ -46,14 +46,59 @@ response bodies, status, content types, headers, paths, and timestamps with
 the values that were sent and returned. Repeating the focused suite five times
 guards against intermittent capture or save corruption.
 
+## Durability triggers
+
+The capture design promises two persistence triggers — an autosave every ten
+entries and a corpus save on graceful shutdown — plus lossless readability of
+the saved corpus after a restart. The durability tests in
+`internal/server/capture_durability_test.go` pin each trigger deterministically
+(saves run synchronously inside the middleware and `Shutdown`, so no test
+polls the filesystem or sleeps):
+
+- `TestCaptureAutoSaveFiresOnlyOnThreshold` — with autosave enabled, a write
+  lands exactly on the 10th and 20th entries and never between thresholds;
+  nine entries leave no file on disk.
+- `TestCaptureAutoSaveDisabledNeverWrites` — with autosave disabled, entries
+  are captured in memory across multiple threshold windows but nothing is
+  persisted until `Save` is called explicitly.
+- `TestShutdownFlushesCorpusBelowAutoSaveThreshold` — `Server.Shutdown`
+  persists a corpus that never crossed the autosave threshold, with schema,
+  service, incumbent, and capture order intact.
+- `TestShutdownFlushRespectsCaptureToggle` — shutdown writes nothing while
+  capture is disabled (including not clobbering an existing corpus file) and
+  tolerates a server built without a capture middleware.
+- `TestShutdownSaveFailureIsContained` — a corpus write failure during
+  shutdown neither fails the shutdown nor loses the retained entries; the
+  error is logged and the process can still exit.
+- `TestCaptureCorpusReadableAfterRestart` — a first process crosses the
+  autosave threshold and is flushed on shutdown, a fresh middleware loads the
+  corpus through the production `Load` path, every persisted entry round-trips
+  with request/response bodies, query, status, and order intact, and the
+  restarted instance continues the autosave cadence with the loaded history
+  included.
+
+Run the durability suite with:
+
+```sh
+go test ./internal/server -run '^(TestCaptureAutoSaveFiresOnlyOnThreshold|TestCaptureAutoSaveDisabledNeverWrites|TestShutdownFlushesCorpusBelowAutoSaveThreshold|TestShutdownFlushRespectsCaptureToggle|TestShutdownSaveFailureIsContained|TestCaptureCorpusReadableAfterRestart)$' -count=1
+```
+
+Save *failures* around these triggers are covered separately by the focused
+failure tests (`TestCaptureDiskWriteFailuresAreNonBlocking`,
+`TestCaptureRecoversAfterTransientAutoSaveFailure`,
+`TestCaptureJsonMarshalFailure`), which verify an autosave that cannot write
+still answers every request, retains all entries, and recovers on the next
+threshold.
+
 ## Results
 
-Last verified: 2026-08-19.
+Last verified: 2026-09-16.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
 | `go test ./corpus` | PASS | All checked-in corpus JSON documents, differential request records, and the complete ArgoCD capture |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
+| Capture durability suite, `-count=1` | PASS | Autosave threshold boundary, shutdown flush below threshold, toggle-respect and shutdown-failure containment, corpus readability after restart |
 
 The full `internal/server` package contains broader infrastructure and
 performance tests that are outside this integrity check. Run that package
