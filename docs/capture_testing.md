@@ -46,6 +46,13 @@ response bodies, status, content types, headers, paths, and timestamps with
 the values that were sent and returned. Repeating the focused suite five times
 guards against intermittent capture or save corruption.
 
+Both checks are enforced automatically, not left as manual steps: the
+`seam-ci` verify step runs them on every push to `main` (ahead of the full
+`go test -race ./...` sweep), and `scripts/definition-of-done.sh --slow`
+-- included in `--all` -- gates them as the named checks `corpus integrity`
+and `capture corpus round-trip`. A malformed, incomplete, or mismatched
+corpus or response snapshot fails the build.
+
 ## Durability triggers
 
 The capture design promises two persistence triggers — an autosave every ten

@@ -9,7 +9,8 @@
 #
 # Lanes:
 #   - Fast: gofmt, go vet, golangci-lint (seconds, run locally)
-#   - Slow: go test -race, seam lint, benchmark gate (requires more time)
+#   - Slow: go test -race, corpus integrity, capture round-trip, seam
+#     lint, benchmark gate (requires more time)
 #
 # Behavior: Aggregates all failures rather than aborting on first.
 # Returns non-zero if ANY check fails, with all failures reported.
@@ -131,6 +132,19 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
 
   # go test -race
   run_check "go test -race" timeout 600 go test -race ./...
+
+  # Corpus integrity (docs/capture_testing.md, "Automated checks") as a
+  # gate: every checked-in corpus JSON document, differential request
+  # record, and the complete ArgoCD capture. Malformed, empty, or
+  # schema-violating data fails here, as does a response snapshot that no
+  # longer matches its captured pair.
+  run_check "corpus integrity" go test ./corpus
+
+  # Capture round-trip and response-pair preservation, five repetitions
+  # per the doc -- a single pass can miss intermittent capture/save
+  # corruption. seam-ci runs this same pair of checks in its verify step.
+  run_check "capture corpus round-trip" \
+    go test ./internal/server -run '^(TestCaptureCorpusDataIntegrity|TestProxyCaptureEnabledPreservesSuccessfulResponsePair|TestProxyCaptureEnabledPreservesErrorResponsePair)$' -count=5
 
   # seam lint (fragment validation)
   run_check "seam lint" bash -c '
