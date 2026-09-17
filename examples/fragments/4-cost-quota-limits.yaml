@@ -6,7 +6,7 @@ x-seam-schema: v1
 x-seam-owner: premium-api
 x-api-version: v1
 x-upstream: https://api.premium-provider.com
-x-vault-path: seam/routes/premium-api/subscription-key
+x-vault-path: rs-manager/rs-manager/seam/routes/premium-api/subscription-key
 x-inject-as:
   kind: header
   name: X-Subscription-Key

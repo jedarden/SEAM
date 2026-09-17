@@ -9,7 +9,7 @@ x-api-version: v1
 x-upstream-map:
   us-east:
     url: https://geo-service.us-east.ardenone.internal
-    vaultPath: seam/routes/geo-service/us-east-key
+    vaultPath: rs-manager/rs-manager/seam/routes/geo-service/us-east-key
     injectAs:
       kind: header
       name: X-Region-Key
@@ -20,7 +20,7 @@ x-upstream-map:
     requiredScope: geo-service:us-east
   us-west:
     url: https://geo-service.us-west.ardenone.internal
-    vaultPath: seam/routes/geo-service/us-west-key
+    vaultPath: rs-manager/rs-manager/seam/routes/geo-service/us-west-key
     injectAs:
       kind: header
       name: X-Region-Key
@@ -31,7 +31,7 @@ x-upstream-map:
     requiredScope: geo-service:us-west
   eu-central:
     url: https://geo-service.eu-central.ardenone.internal
-    vaultPath: seam/routes/geo-service/eu-central-key
+    vaultPath: rs-manager/rs-manager/seam/routes/geo-service/eu-central-key
     injectAs:
       kind: header
       name: X-Region-Key
@@ -45,7 +45,7 @@ x-upstream-map:
     requiredScope: geo-service:eu-central
   _default:
     url: https://geo-service.us-east.ardenone.internal
-    vaultPath: seam/routes/geo-service/us-east-key
+    vaultPath: rs-manager/rs-manager/seam/routes/geo-service/us-east-key
     injectAs:
       kind: header
       name: X-Region-Key

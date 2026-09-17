@@ -8,7 +8,7 @@
   "x-upstream-map": {
     "us-east": {
       "url": "https://api.example.com",
-      "vaultPath": "seam/routes/test-service/token",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/test-service/token",
       "injectAs": { "kind": "bearer" }
     }
   },

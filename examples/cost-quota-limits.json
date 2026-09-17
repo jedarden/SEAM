@@ -5,7 +5,7 @@
   "x-seam-owner": "data-enrichment",
   "x-api-version": "v1",
   "x-upstream": "https://api.data-enrichment.example.com",
-  "x-vault-path": "seam/routes/data-enrichment/api-key",
+  "x-vault-path": "rs-manager/rs-manager/seam/routes/data-enrichment/api-key",
   "x-inject-as": {
     "kind": "header",
     "name": "x-api-key"

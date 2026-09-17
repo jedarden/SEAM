@@ -8,7 +8,7 @@
   "x-upstream-map": {
     "us-east": {
       "url": "https://api.us-east.example.com",
-      "vaultPath": "seam/routes/external-api/api-key-us-east",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/external-api/api-key-us-east",
       "injectAs": {
         "kind": "header",
         "name": "x-api-key"
@@ -25,7 +25,7 @@
     },
     "eu-west": {
       "url": "https://api.eu-west.example.com",
-      "vaultPath": "seam/routes/external-api/api-key-eu-west",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/external-api/api-key-eu-west",
       "injectAs": {
         "kind": "header",
         "name": "x-api-key"
@@ -42,7 +42,7 @@
     },
     "ap-southeast": {
       "url": "https://api.ap-southeast.example.com",
-      "vaultPath": "seam/routes/external-api/api-key-ap-southeast",
+      "vaultPath": "rs-manager/rs-manager/seam/routes/external-api/api-key-ap-southeast",
       "injectAs": {
         "kind": "header",
         "name": "x-api-key"
