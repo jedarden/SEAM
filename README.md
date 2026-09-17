@@ -32,14 +32,43 @@ seam serve [flags]
 
 ### Environment Variables
 
-All configuration flags can be set via environment variables with the `SEAM_` prefix:
+Every `serve` configuration flag can also be set via an environment variable with the `SEAM_` prefix:
 
-- `SEAM_CALLER_PORT` - Caller-facing port
-- `SEAM_OPERATOR_PORT` - Operator-only port
-- `SEAM_BASE_URL` - Base URL for caller interface
-- `SEAM_SPEC_DIR` - OpenAPI spec directory
-- `SEAM_CAPTURE_ENABLED` - Enable/disable corpus capture (`true`/`false` or `1`/`0`)
-- `SEAM_CORPUS_DIR` - Corpus storage directory
+| Variable | Flag | Default |
+|---|---|---|
+| `SEAM_CALLER_PORT` | `--caller-port` | `8080` |
+| `SEAM_OPERATOR_PORT` | `--operator-port` | `8081` |
+| `SEAM_BASE_URL` | `--base-url` | `http://localhost:8080` |
+| `SEAM_SPEC_DIR` | `--spec-dir` | `./spec` |
+| `SEAM_FRAGMENT_MODE` | `--fragment-mode` | `false` |
+| `SEAM_SCHEMA_PATH` | `--schema-path` | `./spec/route-fragment-schema.json` |
+| `SEAM_CAPTURE_ENABLED` | `--capture-enabled` | `false` |
+| `SEAM_CORPUS_DIR` | `--corpus-dir` | `corpus` |
+| `SEAM_FRAGMENTS_DIR` | `--fragments-dir` | `./fragments` |
+| `SEAM_UPSTREAM_CA_DIR` | `--upstream-ca-dir` | built-in CA directory (refused in-cluster) |
+| `SEAM_UPSTREAM_ALLOWLIST` | `--allowlist-file` | none (refused in-cluster) |
+| `SEAM_VAULT_BASE_DIR` | `--vault-base-dir` | `rs-manager/rs-manager/seam/routes` |
+| `SEAM_MAX_REPLAYABLE_REQUEST_BYTES` | `--max-replayable-request-bytes` | `1048576` |
+| `SEAM_MAX_BUFFERED_RESPONSE_BYTES` | `--max-buffered-response-bytes` | `1048576` |
+| `SEAM_HOT_RELOAD_ENABLED` | `--enable-hot-reload` | `false` |
+
+#### Precedence (serve)
+
+**The environment wins over flags.** A `SEAM_*` variable set to a non-empty value always overrides the corresponding command-line flag; flags, then their defaults, fill everything the environment leaves unset. This is deliberate: the Kubernetes Deployment is the operator's configuration surface, and an environment override must not be defeatable by flags baked into the container entrypoint. `seam healthcheck` honours the same rule for `SEAM_CALLER_PORT`, so it always probes the listener serve actually bound.
+
+A variable set to the **empty string counts as unset**: the flag value survives.
+
+#### Invalid values
+
+- **Integer variables** (`*_PORT`, `*_BYTES`) parse as an optional sign followed by digits. Leading whitespace is skipped and anything after the integer prefix is ignored: `SEAM_CALLER_PORT=8080abc` configures `8080`, and `0x10` configures `0`. A value with **no leading integer** is rejected — the previous value (flag or default) is kept and a warning is logged. There is no range validation at configuration time: an out-of-range port such as `-5` or `99999` is applied and fails later, when the listener binds.
+- **Boolean variables** (`SEAM_FRAGMENT_MODE`, `SEAM_CAPTURE_ENABLED`, `SEAM_HOT_RELOAD_ENABLED`) recognize exactly `true` and `1`, lowercase. Any other non-empty value — including `TRUE`, `yes`, `0` and `false` — means **false**, and for `SEAM_FRAGMENT_MODE` and `SEAM_CAPTURE_ENABLED` that false wins even over an explicit enabling flag. `SEAM_HOT_RELOAD_ENABLED` is deliberately asymmetric: only `true`/`1` changes anything, so the environment can switch hot reload on but never off.
+- **`SEAM_VAULT_BASE_DIR`** is whitespace-trimmed, wins over the flag, and falls back to the shared default when neither names a prefix.
+
+#### lint / diff precedence differs
+
+`seam lint` and `seam diff` apply `SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST` only while the corresponding flag is **still at its default** — an explicitly passed flag wins over the environment. (Corollary: passing the default value explicitly, e.g. `--fragments-dir ./fragments`, is indistinguishable from omitting the flag.) `seam import` reads no `SEAM_*` configuration.
+
+Other `SEAM_*` variables (`SEAM_OPENBAO_ADDR`, `SEAM_OPENBAO_SA_TOKEN_PATH`, `SEAM_TEST_IDENTITY_MODE`, …) are server-runtime knobs, not CLI configuration.
 
 ### Examples
 

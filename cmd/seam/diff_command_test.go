@@ -198,3 +198,82 @@ func newDirWithEmptyOwnerDir(t *testing.T) string {
 	}
 	return dir
 }
+
+// diff applies SEAM_FRAGMENTS_DIR with the same flag-over-environment
+// precedence as lint: the environment only fills --fragments-dir while it is
+// still at its default, and an explicit flag wins. Precedence is read off the
+// exit code — 1 when the diff has changes, 0 when the compared directories
+// are identical.
+func TestDiffEnvSuppliesDefaultFragmentsDir(t *testing.T) {
+	t.Setenv("SEAM_FRAGMENTS_DIR", "")
+	t.Setenv("SEAM_SCHEMA_PATH", "")
+	t.Setenv("SEAM_UPSTREAM_ALLOWLIST", "")
+
+	baseDir, changedDir := diffPrecedenceFixture(t)
+
+	t.Setenv("SEAM_FRAGMENTS_DIR", changedDir)
+	var stdout, stderr bytes.Buffer
+	code := runDiffCommand([]string{"--base", baseDir, "--json"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("diff with env fragments dir returned %d, want 1 (changes detected): stdout=%s stderr=%s",
+			code, stdout.String(), stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"paths_added"`)) {
+		t.Fatalf("diff did not report the env dir's change: %s", stdout.String())
+	}
+}
+
+func TestDiffExplicitFlagBeatsEnvFragmentsDir(t *testing.T) {
+	t.Setenv("SEAM_FRAGMENTS_DIR", "")
+	t.Setenv("SEAM_SCHEMA_PATH", "")
+	t.Setenv("SEAM_UPSTREAM_ALLOWLIST", "")
+
+	baseDir, changedDir := diffPrecedenceFixture(t)
+
+	t.Setenv("SEAM_FRAGMENTS_DIR", changedDir)
+	var stdout, stderr bytes.Buffer
+	code := runDiffCommand([]string{"--fragments-dir", baseDir, "--base", baseDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("flagged fragments dir lost to the environment: code=%d stdout=%s stderr=%s",
+			code, stdout.String(), stderr.String())
+	}
+}
+
+// diffPrecedenceFixture builds a base directory and a changed copy of it: the
+// owner's route gains a second path, so diffing changed against base reports
+// changes and diffing base against base reports none.
+func diffPrecedenceFixture(t *testing.T) (baseDir, changedDir string) {
+	t.Helper()
+	writeFragment := func(dir, fragment string) {
+		t.Helper()
+		ownerDir := filepath.Join(dir, "owner")
+		if err := os.MkdirAll(ownerDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(ownerDir, "route.yaml"), []byte(fragment), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	baseDir = t.TempDir()
+	writeFragment(baseDir, `x-seam-schema: v1
+x-seam-owner: owner
+paths:
+  /api/test:
+    get:
+      summary: Test endpoint
+`)
+
+	changedDir = t.TempDir()
+	writeFragment(changedDir, `x-seam-schema: v1
+x-seam-owner: owner
+paths:
+  /api/test:
+    get:
+      summary: Modified test endpoint
+  /api/new:
+    get:
+      summary: New endpoint
+`)
+	return baseDir, changedDir
+}
