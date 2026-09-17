@@ -357,16 +357,29 @@ The aggregate `circuit_breaker` field is accompanied by per-origin
   "status": "healthy",
   "timestamp": "2026-08-15T10:30:00Z",
   "credentials": {
-    "available": true,
-    "last_refresh": "2026-08-15T00:00:00Z"
+    "available": true
   },
   "circuit_breaker": {
-    "enabled": false,
+    "enabled": true,
     "state": "closed",
-    "note": "Per-origin circuit breaker implementation pending (bead seam-b8d97cbb)"
-  }
+    "consecutive_failures": 0
+  },
+  "circuit_breakers": [
+    {
+      "origin": "https://upstream.example",
+      "state": "closed",
+      "enabled": true,
+      "consecutive_failures": 0,
+      "source": "caller"
+    }
+  ]
 }
 ```
+
+The `circuit_breakers` array is omitted when no breaker has published state.
+An aggregate that tripped also carries `opened_at` (RFC 3339), `last_error`
+and `retry_after_seconds` when known. No credential values, vault paths or
+other secret-bearing metadata appear in any field.
 
 **Field Meanings:**
 

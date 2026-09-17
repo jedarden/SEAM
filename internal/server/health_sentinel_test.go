@@ -239,6 +239,102 @@ func TestCredentialHealthSentinelResponseCarriesNoCredentialValues(t *testing.T)
 	}
 }
 
+// TestCredentialHealthSentinelStatusMappingOverBreakerLifecycle pins the
+// documented status mapping across every breaker state in one live sequence:
+// a closed (or absent) breaker is healthy, an open breaker is unhealthy, and
+// a breaker that recovers back to closed returns the endpoint to healthy. The
+// endpoint stays HTTP 200 with Cache-Control: no-store at every observation,
+// so a monitor can alert on the JSON status alone and never polls a stale
+// cached verdict.
+func TestCredentialHealthSentinelStatusMappingOverBreakerLifecycle(t *testing.T) {
+	s := newHealthSentinelTestServer(t)
+	observe := func() CredentialHealthResponse {
+		t.Helper()
+		resp := httptest.NewRecorder()
+		s.identityResolutionMiddleware(s.operatorMux).ServeHTTP(resp,
+			httptest.NewRequest(http.MethodGet, "/health/credentials", nil))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected health status 200, got %d", resp.Code)
+		}
+		if got := resp.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("expected no-store cache directive, got %q", got)
+		}
+		var health CredentialHealthResponse
+		if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+			t.Fatalf("decode health response: %v", err)
+		}
+		return health
+	}
+
+	// A fresh registry has published nothing: the sentinel reports the
+	// default healthy shape rather than an error, and omits the per-origin
+	// list entirely.
+	empty := observe()
+	if empty.Status != "healthy" {
+		t.Fatalf("expected empty registry to be healthy, got %q", empty.Status)
+	}
+	if !empty.Credentials.Available {
+		t.Error("expected credentials.available true on the default healthy shape")
+	}
+	if empty.CircuitBreaker.Enabled {
+		t.Error("expected circuit_breaker.enabled false when no breaker published state")
+	}
+	if empty.CircuitBreaker.State != CircuitBreakerClosed {
+		t.Fatalf("expected aggregate state closed when no breaker published state, got %q", empty.CircuitBreaker.State)
+	}
+	if len(empty.CircuitBreakers) != 0 {
+		t.Fatalf("expected no per-origin entries when no breaker published state, got %d", len(empty.CircuitBreakers))
+	}
+
+	// A closed breaker is the documented "normal operation" state: healthy.
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:  "https://upstream.example",
+		State:   CircuitBreakerClosed,
+		Enabled: true,
+	})
+	closed := observe()
+	if closed.Status != "healthy" {
+		t.Fatalf("expected closed breaker to leave credential health healthy, got %q", closed.Status)
+	}
+	if closed.CircuitBreaker.State != CircuitBreakerClosed {
+		t.Fatalf("expected aggregate breaker state %q, got %q", CircuitBreakerClosed, closed.CircuitBreaker.State)
+	}
+	if !closed.CircuitBreaker.Enabled {
+		t.Error("expected circuit_breaker.enabled true once a breaker published state")
+	}
+
+	// The same origin tripping open flips the sentinel to unhealthy...
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:              "https://upstream.example",
+		State:               CircuitBreakerOpen,
+		Enabled:             true,
+		ConsecutiveFailures: 3,
+	})
+	open := observe()
+	if open.Status != "unhealthy" {
+		t.Fatalf("expected open breaker to make credential health unhealthy, got %q", open.Status)
+	}
+
+	// ...and its recovery back to closed restores healthy, so the endpoint
+	// tracks the live registry in both directions instead of latching the
+	// first failure it saw.
+	s.CircuitBreakerStates().Set(CircuitBreakerStatus{
+		Origin:  "https://upstream.example",
+		State:   CircuitBreakerClosed,
+		Enabled: true,
+	})
+	recovered := observe()
+	if recovered.Status != "healthy" {
+		t.Fatalf("expected recovered breaker to restore credential health to healthy, got %q", recovered.Status)
+	}
+	if recovered.CircuitBreaker.State != CircuitBreakerClosed {
+		t.Fatalf("expected aggregate breaker state %q after recovery, got %q", CircuitBreakerClosed, recovered.CircuitBreaker.State)
+	}
+	if recovered.CircuitBreaker.ConsecutiveFailures != 0 {
+		t.Fatalf("expected recovered breaker to report zero consecutive failures, got %d", recovered.CircuitBreaker.ConsecutiveFailures)
+	}
+}
+
 func TestCredentialHealthSentinelRejectsNonGet(t *testing.T) {
 	s := newHealthSentinelTestServer(t)
 	resp := httptest.NewRecorder()
