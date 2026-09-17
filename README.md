@@ -54,19 +54,19 @@ Every `serve` configuration flag can also be set via an environment variable wit
 
 #### Precedence (serve)
 
-**The environment wins over flags.** A `SEAM_*` variable set to a non-empty value always overrides the corresponding command-line flag; flags, then their defaults, fill everything the environment leaves unset. This is deliberate: the Kubernetes Deployment is the operator's configuration surface, and an environment override must not be defeatable by flags baked into the container entrypoint. `seam healthcheck` honours the same rule for `SEAM_CALLER_PORT`, so it always probes the listener serve actually bound.
+**Flags win over the environment.** An explicitly passed command-line flag takes precedence over a non-empty corresponding `SEAM_*` variable. Environment values fill flags that were not passed, and built-in defaults fill everything left unset. This gives operators an environment-based deployment default while preserving an explicit CLI override. `seam healthcheck` follows the same rule for `SEAM_CALLER_PORT`, so an explicit probe flag wins while an environment-only port override is still honoured.
 
 A variable set to the **empty string counts as unset**: the flag value survives.
 
 #### Invalid values
 
-- **Integer variables** (`*_PORT`, `*_BYTES`) parse as an optional sign followed by digits. Leading whitespace is skipped and anything after the integer prefix is ignored: `SEAM_CALLER_PORT=8080abc` configures `8080`, and `0x10` configures `0`. A value with **no leading integer** is rejected — the previous value (flag or default) is kept and a warning is logged. There is no range validation at configuration time: an out-of-range port such as `-5` or `99999` is applied and fails later, when the listener binds.
-- **Boolean variables** (`SEAM_FRAGMENT_MODE`, `SEAM_CAPTURE_ENABLED`, `SEAM_HOT_RELOAD_ENABLED`) recognize exactly `true` and `1`, lowercase. Any other non-empty value — including `TRUE`, `yes`, `0` and `false` — means **false**, and for `SEAM_FRAGMENT_MODE` and `SEAM_CAPTURE_ENABLED` that false wins even over an explicit enabling flag. `SEAM_HOT_RELOAD_ENABLED` is deliberately asymmetric: only `true`/`1` changes anything, so the environment can switch hot reload on but never off.
-- **`SEAM_VAULT_BASE_DIR`** is whitespace-trimmed, wins over the flag, and falls back to the shared default when neither names a prefix.
+- **Integer variables** (`*_PORT`, `*_BYTES`) parse as an optional sign followed by digits. Leading whitespace is skipped and anything after the integer prefix is ignored: `SEAM_CALLER_PORT=8080abc` configures `8080`, and `0x10` configures `0`. A value with **no leading integer** is rejected — the previous environment/default value is kept and a warning is logged. An explicit flag still wins without parsing the environment value. There is no range validation at configuration time: an out-of-range port such as `-5` or `99999` is applied and fails later, when the listener binds.
+- **Boolean variables** (`SEAM_FRAGMENT_MODE`, `SEAM_CAPTURE_ENABLED`, `SEAM_HOT_RELOAD_ENABLED`) recognize exactly `true` and `1`, lowercase. Any other non-empty value — including `TRUE`, `yes`, `0` and `false` — means **false** when the environment supplies the setting; an explicit flag still wins. `SEAM_HOT_RELOAD_ENABLED` is deliberately asymmetric: only `true`/`1` changes an unset flag, so an environment value can enable hot reload but cannot override an explicit flag.
+- **`SEAM_VAULT_BASE_DIR`** is whitespace-trimmed, fills an omitted flag, and falls back to the shared default when neither names a prefix.
 
-#### lint / diff precedence differs
+#### lint / diff explicit-flag tracking
 
-`seam lint` and `seam diff` apply `SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST` only while the corresponding flag is **still at its default** — an explicitly passed flag wins over the environment. (Corollary: passing the default value explicitly, e.g. `--fragments-dir ./fragments`, is indistinguishable from omitting the flag.) `seam import` reads no `SEAM_*` configuration.
+`seam lint` and `seam diff` follow the same flag-over-environment rule for `SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST`: the environment fills the corresponding flag only while it is **still at its default**. (Corollary: passing the default value explicitly, e.g. `--fragments-dir ./fragments`, is indistinguishable from omitting the flag.) `seam import` reads no `SEAM_*` configuration.
 
 Other `SEAM_*` variables (`SEAM_OPENBAO_ADDR`, `SEAM_OPENBAO_SA_TOKEN_PATH`, `SEAM_TEST_IDENTITY_MODE`, …) are server-runtime knobs, not CLI configuration.
 

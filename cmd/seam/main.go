@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -81,8 +82,10 @@ func healthcheckCommand(args []string) {
 	}
 
 	// Honour the same env var serve does, so a port override configured on the
-	// Deployment cannot leave the healthcheck probing the wrong listener.
-	*callerPort = resolveHealthcheckCallerPort(*callerPort, os.Getenv)
+	// Deployment fills the default without overriding an explicit flag.
+	if !flagWasSet(fs, "caller-port") {
+		*callerPort = resolveHealthcheckCallerPort(*callerPort, os.Getenv)
+	}
 
 	url := fmt.Sprintf("http://127.0.0.1:%d/_seam/healthz", *callerPort)
 	if err := runHealthcheck(url, *timeout); err != nil {
@@ -91,10 +94,21 @@ func healthcheckCommand(args []string) {
 	}
 }
 
+func flagWasSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(flag *flag.Flag) {
+		if flag.Name == name {
+			set = true
+		}
+	})
+	return set
+}
+
 // resolveHealthcheckCallerPort applies SEAM_CALLER_PORT on top of the parsed
-// --caller-port value with the same precedence serve applies it: the
-// environment wins, an empty value counts as unset, and a value with no
-// leading integer is rejected with a warning while the flag value is kept.
+// default port. The caller checks flagWasSet first, so an explicit
+// --caller-port remains the highest-precedence value. An empty value counts as
+// unset, and a value with no leading integer is rejected with a warning while
+// the prior value is kept.
 // Split from healthcheckCommand for the same reason as runHealthcheck: the
 // keep-them-in-sync contract with serve is pinned by tests, and the tests
 // cannot reach it while the logic lives behind os.Exit.
@@ -150,13 +164,12 @@ func registerServeFlags(fs *flag.FlagSet) *serveFlags {
 	}
 }
 
-// applyEnvOverrides applies SEAM_* configuration on top of the parsed flag
-// values. This is the whole serve precedence contract, in one place:
+// applyEnvOverrides applies SEAM_* configuration to the parsed flag values.
+// Explicit flags are left untouched, so the whole serve precedence contract
+// is enforced here:
 //
-//   - The environment wins over flags. A Deployment-level SEAM_* setting must
-//     not be defeatable by flags baked into the image's entrypoint, and the
-//     healthcheck subcommand honours the same rule for SEAM_CALLER_PORT.
-//   - An empty value counts as unset: the flag value survives.
+//   - Explicit flags win over non-empty environment values.
+//   - An empty value counts as unset: the parsed flag or default survives.
 //   - Integer variables (ports, byte limits) parse with fmt.Sscanf %d: an
 //     optional sign and digits, leading whitespace skipped, and anything
 //     after the integer prefix ignored ("8080abc" configures 8080). A value
@@ -165,75 +178,74 @@ func registerServeFlags(fs *flag.FlagSet) *serveFlags {
 //     "-5" or "99999" is applied and fails later, when the listener binds.
 //   - Boolean variables recognise exactly "true" and "1" (lowercase). Every
 //     other non-empty value — including "TRUE", "yes" and "0" — means false,
-//     for fragment-mode and capture-enabled even when the flag enabled them.
+//     for fragment-mode and capture-enabled when no explicit flag was passed.
 //     SEAM_HOT_RELOAD_ENABLED is deliberately asymmetric: only "true"/"1"
-//     changes anything, so the environment can turn hot reload on but never
-//     off.
-//   - SEAM_VAULT_BASE_DIR is not read through getenv: it is delegated to
-//     spec.ResolveVaultBaseDir (via resolveVaultBaseDir), which trims
-//     whitespace, wins over the flag, and falls back to the shared default.
+//     changes anything when no explicit flag was passed.
+//   - SEAM_VAULT_BASE_DIR is delegated to resolveVaultBaseDirWithGetenv,
+//     which trims whitespace and falls back to the shared default.
 //     Its contract is pinned separately, in TestResolveVaultBaseDir.
-func (f *serveFlags) applyEnvOverrides(getenv func(string) string) {
-	if val := getenv("SEAM_CALLER_PORT"); val != "" {
+func (f *serveFlags) applyEnvOverrides(getenv func(string) string, fs *flag.FlagSet) {
+	if val := getenv("SEAM_CALLER_PORT"); val != "" && !flagWasSet(fs, "caller-port") {
 		if _, err := fmt.Sscanf(val, "%d", f.callerPort); err != nil {
 			log.Printf("[config] invalid SEAM_CALLER_PORT %q, keeping %d: %v", val, *f.callerPort, err)
 		}
 	}
-	if val := getenv("SEAM_FRAGMENTS_DIR"); val != "" {
+	if val := getenv("SEAM_FRAGMENTS_DIR"); val != "" && !flagWasSet(fs, "fragments-dir") {
 		*f.fragmentsDir = val
 	}
-	if val := getenv("SEAM_OPERATOR_PORT"); val != "" {
+	if val := getenv("SEAM_OPERATOR_PORT"); val != "" && !flagWasSet(fs, "operator-port") {
 		if _, err := fmt.Sscanf(val, "%d", f.operatorPort); err != nil {
 			log.Printf("[config] invalid SEAM_OPERATOR_PORT %q, keeping %d: %v", val, *f.operatorPort, err)
 		}
 	}
-	if val := getenv("SEAM_BASE_URL"); val != "" {
+	if val := getenv("SEAM_BASE_URL"); val != "" && !flagWasSet(fs, "base-url") {
 		*f.baseURL = val
 	}
-	if val := getenv("SEAM_SPEC_DIR"); val != "" {
+	if val := getenv("SEAM_SPEC_DIR"); val != "" && !flagWasSet(fs, "spec-dir") {
 		*f.specDir = val
 	}
-	if val := getenv("SEAM_FRAGMENT_MODE"); val != "" {
+	if val := getenv("SEAM_FRAGMENT_MODE"); val != "" && !flagWasSet(fs, "fragment-mode") {
 		*f.fragmentMode = val == "true" || val == "1"
 	}
-	if val := getenv("SEAM_SCHEMA_PATH"); val != "" {
+	if val := getenv("SEAM_SCHEMA_PATH"); val != "" && !flagWasSet(fs, "schema-path") {
 		*f.schemaPath = val
 	}
-	if val := getenv("SEAM_CAPTURE_ENABLED"); val != "" {
+	if val := getenv("SEAM_CAPTURE_ENABLED"); val != "" && !flagWasSet(fs, "capture-enabled") {
 		*f.captureEnabled = val == "true" || val == "1"
 	}
-	if val := getenv("SEAM_CORPUS_DIR"); val != "" {
+	if val := getenv("SEAM_CORPUS_DIR"); val != "" && !flagWasSet(fs, "corpus-dir") {
 		*f.corpusDir = val
 	}
-	if val := getenv("SEAM_UPSTREAM_CA_DIR"); val != "" {
+	if val := getenv("SEAM_UPSTREAM_CA_DIR"); val != "" && !flagWasSet(fs, "upstream-ca-dir") {
 		*f.upstreamCADir = val
 	}
-	if val := getenv("SEAM_UPSTREAM_ALLOWLIST"); val != "" {
+	if val := getenv("SEAM_UPSTREAM_ALLOWLIST"); val != "" && !flagWasSet(fs, "allowlist-file") {
 		*f.allowlistFile = val
 	}
 	// The vault base directory is a Deployment-level knob: it moves the prefix
 	// AllowlistEnforcer.ValidateVaultPath enforces, so it has to be settable
 	// without a rebuild. An unset variable falls through to the in-code default
 	// applied by server.New.
-	if resolved := resolveVaultBaseDir(*f.vaultBaseDir); resolved != *f.vaultBaseDir {
+	if !flagWasSet(fs, "vault-base-dir") {
+		resolved := resolveVaultBaseDirWithGetenv(*f.vaultBaseDir, getenv)
 		log.Printf("[config] SEAM_VAULT_BASE_DIR=%s", resolved)
 		*f.vaultBaseDir = resolved
 	}
-	if val := getenv("SEAM_MAX_REPLAYABLE_REQUEST_BYTES"); val != "" {
+	if val := getenv("SEAM_MAX_REPLAYABLE_REQUEST_BYTES"); val != "" && !flagWasSet(fs, "max-replayable-request-bytes") {
 		if parsed, err := fmt.Sscanf(val, "%d", f.maxReplayableRequestBytes); err == nil && parsed == 1 {
 			log.Printf("[config] SEAM_MAX_REPLAYABLE_REQUEST_BYTES=%s", val)
 		} else {
 			log.Printf("[config] invalid SEAM_MAX_REPLAYABLE_REQUEST_BYTES %q, keeping %d: %v", val, *f.maxReplayableRequestBytes, err)
 		}
 	}
-	if val := getenv("SEAM_MAX_BUFFERED_RESPONSE_BYTES"); val != "" {
+	if val := getenv("SEAM_MAX_BUFFERED_RESPONSE_BYTES"); val != "" && !flagWasSet(fs, "max-buffered-response-bytes") {
 		if parsed, err := fmt.Sscanf(val, "%d", f.maxBufferedResponseBytes); err == nil && parsed == 1 {
 			log.Printf("[config] SEAM_MAX_BUFFERED_RESPONSE_BYTES=%s", val)
 		} else {
 			log.Printf("[config] invalid SEAM_MAX_BUFFERED_RESPONSE_BYTES %q, keeping %d: %v", val, *f.maxBufferedResponseBytes, err)
 		}
 	}
-	if val := getenv("SEAM_HOT_RELOAD_ENABLED"); val != "" {
+	if val := getenv("SEAM_HOT_RELOAD_ENABLED"); val != "" && !flagWasSet(fs, "enable-hot-reload") {
 		if val == "true" || val == "1" {
 			*f.hotReloadEnabled = true
 			log.Printf("[config] SEAM_HOT_RELOAD_ENABLED=%s", val)
@@ -249,7 +261,7 @@ func serveCommand(args []string) {
 		os.Exit(1)
 	}
 
-	f.applyEnvOverrides(os.Getenv)
+	f.applyEnvOverrides(os.Getenv, fs)
 
 	// Shorthand for the rest of the command body; these alias the flag
 	// storage, so everything applyEnvOverrides resolved above is visible.
@@ -376,14 +388,21 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 	return requested
 }
 
-// resolveVaultBaseDir applies the SEAM_VAULT_BASE_DIR override on top of the
-// --vault-base-dir flag value. The environment wins over the flag, matching
-// SEAM_BASE_URL: the Deployment is the operator's configuration surface. An
-// absent or blank variable returns the flag value untouched — which is ""
-// in the normal case, leaving server.New to apply spec.DefaultVaultBaseDir, so
-// an unset variable is exactly the pre-existing behaviour. It is a thin wrapper
-// on spec.ResolveVaultBaseDir so the tests that derive fixture paths and ACL
-// grants from the variable resolve it the same way the binary does.
+// resolveVaultBaseDir applies the CLI precedence rule to the
+// SEAM_VAULT_BASE_DIR override: a non-empty flag wins, then a trimmed
+// environment value, then the shared default. It is kept separate from
+// spec.ResolveVaultBaseDir because that package helper is also used by tests
+// and server-only code that have no CLI flag to layer over the environment.
 func resolveVaultBaseDir(flagValue string) string {
-	return spec.ResolveVaultBaseDir(flagValue)
+	return resolveVaultBaseDirWithGetenv(flagValue, os.Getenv)
+}
+
+func resolveVaultBaseDirWithGetenv(flagValue string, getenv func(string) string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	if val := strings.TrimSpace(getenv(spec.VaultBaseDirEnvVar)); val != "" {
+		return val
+	}
+	return spec.DefaultVaultBaseDir
 }
