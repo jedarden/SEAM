@@ -15,6 +15,13 @@
 #   2  error   -- kubectl missing, cluster unreachable, or unparsable output
 #   3  pending -- no completed run for <revision> yet (push not tested, or in flight)
 #
+# Every verdict is one line of the same shape, so callers can quote or grep
+# it without case-by-case parsing:
+#   GATE <green|red|pending|error> revision=<sha9> workflow=<name> (<detail>)
+# A verdict with no workflow to name -- no run for the revision, or the
+# failure happened before any run was fetched -- says workflow=none. Pinned
+# by internal/gatewatch.
+#
 # A red gate is a stop signal, not a nuisance: it means the tree at main does
 # not build or fails its own Definition of Done, so any work started now
 # builds on sand. Fix the gate (or revert what broke it) before claiming more
@@ -46,12 +53,12 @@ if [[ -z "$REVISION" ]]; then
   fi
 fi
 if [[ -z "$REVISION" ]]; then
-  echo "GATE error revision=unknown (cannot resolve origin/main)"
+  echo "GATE error revision=unknown workflow=none (cannot resolve origin/main)"
   exit 2
 fi
 
 if ! command -v kubectl >/dev/null 2>&1; then
-  echo "GATE error revision=${REVISION:0:9} (kubectl not installed)"
+  echo "GATE error revision=${REVISION:0:9} workflow=none (kubectl not installed)"
   exit 2
 fi
 
@@ -60,7 +67,7 @@ fi
 # the webhook payload's revision, recorded in the workflow's arguments.
 runs_json="$(kubectl --server="$KUBECTL_SERVER" get workflows -n "$NAMESPACE" \
   -l events.argoproj.io/trigger=seam-ci -o json 2>/dev/null)" || {
-  echo "GATE error revision=${REVISION:0:9} (iad-ci unreachable via $KUBECTL_SERVER)"
+  echo "GATE error revision=${REVISION:0:9} workflow=none (iad-ci unreachable via $KUBECTL_SERVER)"
   exit 2
 }
 
