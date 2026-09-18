@@ -114,3 +114,6 @@ generated/
 .beads/*.temp
 .beads/*.journal
 .br_recovery/
+corpus/
+logs/
+scratch/
