@@ -58,6 +58,13 @@ seam-replay \
 
 **Schema Version:** `seam-diff-corpus/v1`
 
+> **Ref base note (2026-09-04 consolidation):** the example refs in this
+> document (`vault:seam/routes/...`) use the pre-consolidation base, matching
+> the checked-in corpus and testdata that were captured under it — they are
+> historical, not the live prefix. SEAM's enforced vault base dir is now
+> `rs-manager/rs-manager/seam/routes`; a secref written for a new capture
+> must use that base. The ref→env-var mapping is mechanical for any base.
+
 **Structure:**
 ```json
 {

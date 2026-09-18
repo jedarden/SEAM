@@ -80,6 +80,10 @@ Utilities for managing a local OpenBao development instance for testing SEAM's s
 
 #### Usage Example
 
+Secret paths in the examples below nest under the enforced vault base dir
+(`rs-manager/rs-manager/seam/routes` by default — `internal/spec/allowlist.go`
+`DefaultVaultBaseDir`), so they model what a real route secret path looks like.
+
 ```go
 import "github.com/ardenone/seam/internal/testutil/openbao"
 
@@ -90,7 +94,7 @@ func TestSecretInjection(t *testing.T) {
 
     // Use the client to write/read secrets
     ctx := context.Background()
-    err := client.WriteSecret(ctx, "seam/routes/test/token", map[string]interface{}{
+    err := client.WriteSecret(ctx, "rs-manager/rs-manager/seam/routes/test/token", map[string]interface{}{
         "token": "test-secret",
     })
     // Server is automatically stopped when test completes
@@ -111,7 +115,7 @@ func TestCredentialRotation(t *testing.T) {
     client := server.Client()
 
     // Rotate a credential to test 401 handling
-    newSecret, err := server.RotateCredential(ctx, "seam/routes/test/token", "token")
+    newSecret, err := server.RotateCredential(ctx, "rs-manager/rs-manager/seam/routes/test/token", "token")
     // ...
 }
 

@@ -24,7 +24,11 @@ seam-retirement-evaluator (Deployment)
 ├── OpenBao Role: seam-retirement-evaluator-policy
 │   ├── Reads: secret/evaluators/seam-retirement-evaluator/*
 │   ├── Reads: secret/monitoring/victoriametrics/*
-│   └── Explicitly DENIED: secret/seam/routes/* (isolation from SEAM)
+│   └── Explicitly DENIED: secret/rs-manager/rs-manager/seam/routes/*
+│       (isolation from SEAM at the enforced vault base dir; the legacy
+│       secret/seam/routes/* deny is retained only until the
+│       pre-consolidation paths retire — a glob is prefix-exact, so the
+│       legacy deny alone stops matching once the data consolidates)
 └── VictoriaMetrics endpoint (read-only query, no credential)
 ```
 

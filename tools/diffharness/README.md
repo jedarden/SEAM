@@ -48,6 +48,13 @@ seam-replay \
 
 A corpus is a JSON file containing captured request/response pairs:
 
+> **Ref base note (2026-09-04 consolidation):** the refs shown in this README
+> (`vault:seam/routes/...`) use the pre-consolidation base, matching the
+> checked-in corpus and testdata that were captured under it. SEAM's enforced
+> vault base dir is now `rs-manager/rs-manager/seam/routes`; a secref written
+> for a new capture must use that base. The ref→env-var mapping — derived by
+> `internal/secref` from the ref string alone — is mechanical for any base.
+
 ```json
 {
   "schema": "seam-diff-corpus/v1",
