@@ -1,532 +1,216 @@
 # SEAM Phase-to-Checkbox Mapping Document
 
-**Generated:** 2026-09-02  
-**Task:** seam-f3e0a9dd  
-**Purpose:** Comprehensive mapping of phase evidence findings to plan.md checkbox states  
+**Version:** 2.0
+**Generated:** 2026-09-18
+**Task:** seam-d7aac6fe (final consolidation)
+**Draft source:** `.beads/evidence-checkbox-draft.md` (seam-9c80a071, closed 2026-09-18)
+**Anchor commit:** `be68251` (= `origin/main` tip at generation time; every anchor below re-verified live against `docs/plan/plan.md` at this commit)
+**Supersedes:** v1.0 (2026-09-02, seam-f3e0a9dd), which predates the 2026-09-01 verdict incorporation, the 2026-09-18 checkbox extraction supersession, and the Phase 6a ACL resolution
+**Purpose:** The canonical evidence-to-checkbox mapping for all 17 `docs/plan/plan.md` Implementation-Phases checkboxes — mapping table, per-phase rationale, and change recommendations in one reference.
+
+---
 
 ## Executive Summary
 
-This document consolidates three separate analysis efforts into a single reference:
-- **Phase Inventory**: Catalog of all evidence files and completion verdicts
-- **Evidence-to-Checkbox Cross-Reference**: Mapping of verification criteria to specific plan.md line numbers
-- **Checkbox State Analysis**: Current plan.md checkbox states vs. actual completion status
+**Result: zero discrepancies.** The expected checkbox state derived from the 2026-09-01 verdict data (seam-7e2bcb06) equals the actual state in `docs/plan/plan.md` for **all 17 phases**. No checkbox in plan.md requires a change on this evidence, and this bead modified none.
 
-### Key Findings
-
-**Critical Disconnect:** 6 phases marked complete (`[x]`) in plan.md are demonstrably incomplete based on evidence:
-- Phase 3: Hot reload NOT enabled in deployment.yaml
-- Phase 4: Fragments not mounted, OpenBao secrets missing
-- Phase 5: Missing cluster, schema bugs, YAML parsing bugs
-- Phase 6b: YAML fragments cannot load
-- Phase 7: Placeholder code, no runtime verification
-- Phase 10: Server crashes on startup
-
-**Systematic Verification Gap:** Multiple phases closed 2026-08-27/28 without runtime verification:
-- No running binary tests
-- Compilation errors began 2026-08-30 (99 errors)
-- Acceptance criteria never demonstrated
-
-**Infrastructure Shortfalls:**
-- 6 of 9 clusters missing Tailscale Connectors
-- OpenBao secrets don't exist (twitterapi, zai)
-- ConfigMap volumes not added to SEAM deployment
-- No YAML fragment support in loader
-
-### Summary Statistics
-
-| Metric | Count | Percentage |
-|--------|-------|------------|
-| **Total Phases in Plan** | 17 | 100% |
-| **Evidence Files Found** | 13 | 76% |
-| **Evidence Files Missing** | 4 | 24% |
-| **Plan.md Checkboxes Checked [x]** | 6 | 35% |
-| **Plan.md Checkboxes Unchecked [ ]** | 11 | 65% |
-| **Actually Complete (Evidence-Based)** | 6 | 35% |
-| **Actually Incomplete (Evidence-Based)** | 7 | 41% |
-| **Cannot Verify (No Evidence)** | 4 | 24% |
-
-### Completion Status Breakdown
-
-**✅ Actually Complete (6 phases):**
-- Phase 6a: Deployment infrastructure operational
-- Phase 8: API versioning and spec management
-- Phase 9b: CLI tooling (diff, import)
-- Phase 11: Passive route health
-- Phase 13: Per-route guards
-- Phase 14: Non-tailnet authentication
-
-**❌ Actually Incomplete (7 phases):**
-- Phase 3: ConfigMap-mounted fragments (hot reload not enabled)
-- Phase 4: z.ai/GLM and twitterapi.io proxies (not mounted, secrets missing)
-- Phase 5: kubectl-proxy multi-instance (critical blockers)
-- Phase 6b: Agent cutover (YAML fragments blocked)
-- Phase 7: Per-agent tool scoping (placeholder code)
-- Phase 10: Multi-instance routes (server crash)
-- Phase 12: Credential health sentinel (compilation errors)
-
-**❓ Cannot Verify (4 phases - No Evidence):**
-- Phase 1a: Gateway scaffold
-- Phase 1b: Fragment merge
-- Phase 2: Secret injection
-- Phase 9a: seam lint CI gate
+- **Join:** phase identity — `phase<ID>-evidence.md` ↔ the unique `Phase <ID>:` checkbox line. 1:1 across all 17 checkboxes and all 13 evidence files, plus 4 explicit absence rows. Corroborated two ways: each evidence file's own H1 names its phase (13/13 match its filename), and 13 of the 17 checkbox texts cite exactly the mapped `.beads/phase*-evidence.md` path — the citation set and the evidence-file set are bijective.
+- **State partition (6 / 7 / 4):** 6 verified complete and ticked `[x]` (6a, 8, 9b, 11, 13, 14); 7 incomplete and unticked `[ ]` (3, 4, 5, 6b, 7, 10, 12); 4 with no evidence and unticked `[ ]` (1a, 1b, 2, 9a).
+- **Fourth leg:** plan.md's own `**Status:**` header (line 5) states the identical partition, quoted from the same 2026-09-01 verification pass.
+- **What changed since v1.0 (2026-09-02):** verdict data is now incorporated directly (v1.0 only cross-referenced it); `.beads/plan-checkbox-state.md` was superseded on 2026-09-18 by a pure extraction (seam-7fdee15d); Phase 6a's two pending ACL criteria were resolved post-verdict by the `tag:seam` tailnet slice (applied and verified 2026-09-18, commit `aeefe43`); and v1.0's stale "Critical Disconnect" key finding — which described six wrongly-ticked checkboxes as still checked, contradicting v1.0's own alignment table — is corrected here (see §10).
 
 ---
 
-## Phase-by-Phase Mapping Table
-
-| Phase | plan.md Line | Checkbox State | Evidence File | Evidence Status | Actual Status | Alignment |
-|-------|--------------|----------------|---------------|-----------------|---------------|------------|
-| Phase 1a | 868 | `[ ]` | *MISSING* | ❓ No Evidence | ❓ Unknown | ✅ Aligned |
-| Phase 1b | 881 | `[ ]` | *MISSING* | ❓ No Evidence | ❓ Unknown | ✅ Aligned |
-| Phase 2 | 882 | `[ ]` | *MISSING* | ❓ No Evidence | ❓ Unknown | ✅ Aligned |
-| Phase 3 | 888 | `[ ]` | `.beads/phase3-evidence.md` | ❌ NOT COMPLETE | ❌ Incomplete | ✅ Aligned |
-| Phase 4 | 889 | `[ ]` | `.beads/phase4-evidence.md` | ❌ INCOMPLETE | ❌ Incomplete | ✅ Aligned |
-| Phase 5 | 890 | `[ ]` | `.beads/phase5-evidence.md` | ❌ CRITICAL FAILURE | ❌ Incomplete | ✅ Aligned |
-| Phase 6a | 891 | `[x]` | `.beads/phase6a-evidence.md` | ✅ SUBSTANTIALLY COMPLETE | ✅ Complete | ✅ Aligned |
-| Phase 6b | 896 | `[ ]` | `.beads/phase6b-evidence.md` | ❌ BLOCKED | ❌ Incomplete | ✅ Aligned |
-| Phase 7 | 897 | `[ ]` | `.beads/phase7-evidence.md` | ❌ INCOMPLETE | ❌ Incomplete | ✅ Aligned |
-| Phase 8 | 912 | `[x]` | `.beads/phase8-evidence.md` | ✅ PASSING | ✅ Complete | ✅ Aligned |
-| Phase 9a | 931 | `[ ]` | *MISSING* | ❓ No Evidence | ❓ Unknown | ✅ Aligned |
-| Phase 9b | 949 | `[x]` | `.beads/phase9b-evidence.md` | ✅ COMPLETE | ✅ Complete | ✅ Aligned |
-| Phase 10 | 950 | `[ ]` | `.beads/phase10-evidence.md` | ❌ CRITICAL FAILURE | ❌ Incomplete | ✅ Aligned |
-| Phase 11 | 959 | `[x]` | `.beads/phase11-evidence.md` | ✅ VERIFIED COMPLETE | ✅ Complete | ✅ Aligned |
-| Phase 12 | 960 | `[ ]` | `.beads/phase12-evidence.md` | ❌ CANNOT VERIFY | ❌ Incomplete | ✅ Aligned |
-| Phase 13 | 961 | `[x]` | `.beads/phase13-evidence.md` | ✅ PASS | ✅ Complete | ✅ Aligned |
-| Phase 14 | 962 | `[x]` | `.beads/phase14-evidence.md` | ✅ COMPLETE | ✅ Complete | ✅ Aligned |
-
-**Alignment Analysis:** ✅ All 17 phases show correct alignment between checkbox state and actual completion status. No false positives (checkboxes checked but incomplete) found.
-
----
-
-## Detailed Phase Mappings
-
-### ✅ Phase 6a: Deploy SEAM to rs-manager
-
-**plan.md Location:** Line 891  
-**Checkbox State:** `[x]` (complete)  
-**Evidence File:** `.beads/phase6a-evidence.md`  
-**Overall Verdict:** ✅ SUBSTANTIALLY COMPLETE (8/10 pass, 2 require manual verification)
-
-#### Checkbox Requirements → Evidence Mapping
-
-| plan.md Requirement | Evidence Criterion | Verdict | Details |
-|-------------------|-------------------|---------|---------|
-| Single replica deployment | Criterion 1 | ✅ PASS | replicas: 1 configured |
-| Per-service ConfigMap volumes | Criterion 2 | ✅ PASS | All services have volumes |
-| ServiceAccount + SA-token | Criterion 3 | ✅ PASS | Token volume projected |
-| OpenBao Kubernetes auth | Criterion 4 | ✅ PASS | Login successful |
-| Tailscale node | Criterion 5 | ✅ PASS | Integration working |
-| Liveness/readiness probes | Criterion 6 | ✅ PASS | Probes configured |
-| Metrics scrape config | Criterion 7 | ✅ PASS | VictoriaMetrics pointing |
-| Listener ports + base URL | Criterion 8 | ✅ PASS | 8080/8081 configured |
-| Tag-restricted ACL grant | Criterion 9 | ⚠️ MANUAL | Requires verification |
-| Two-listener ACL split | Criterion 10 | ⚠️ MANUAL | Requires verification |
-
-**File References:**
-- Evidence: `.beads/phase6a-evidence.md`
-- Plan: `docs/plan/plan.md:891`
-- Deployment: `declarative-config/k8s/rs-manager/seam/deployment.yaml`
-
----
-
-### ✅ Phase 8: Version migration tooling
-
-**plan.md Location:** Line 912  
-**Checkbox State:** `[x]` (complete)  
-**Evidence File:** `.beads/phase8-evidence.md`  
-**Overall Verdict:** ✅ PASSING (all 7 criteria)
-
-#### Checkbox Requirements → Evidence Mapping
-
-| plan.md Requirement | Evidence Criterion | Verdict | Code Location |
-|-------------------|-------------------|---------|---------------|
-| Deprecation/Sunset headers | Criterion 8.1 | ✅ PASS | `internal/server/deprecation_middleware.go:9` |
-| x-Adapter schema | Criterion 8.2 | ✅ PASS | `spec/route-fragment-schema.json:49` |
-| X-SEAM-API-Version selection | Criterion 8.3 | ✅ PASS | `internal/server/route_table.go:1060` |
-| Version-aware /docs/route | Criterion 8.4 | ✅ PASS | `internal/server/server.go:402` |
-| Per-version request metric | Criterion 8.5 | ✅ PASS | `internal/server/metrics.go:124` |
-| /changes diff endpoint | Criterion 8.6 | ✅ PASS | `internal/server/spec_ring_buffer.go:14` |
-| Retirement evaluator | Criterion 8.7 | ✅ PASS | `/tools/seam-retirement-evaluator/main.go` |
-
-**File References:**
-- Evidence: `.beads/phase8-evidence.md`
-- Plan: `docs/plan/plan.md:912`
-
----
-
-### ❌ Phase 3: ConfigMap-mounted route fragments
-
-**plan.md Location:** Line 888  
-**Checkbox State:** `[ ]` (incomplete)  
-**Evidence File:** `.beads/phase3-evidence.md`  
-**Overall Verdict:** ❌ NOT COMPLETE (3/6 pass, 2/6 fail, 1/6 blocked)
-
-#### Checkbox Requirements → Evidence Mapping
-
-| plan.md Requirement | Evidence Criterion | Verdict | Details |
-|-------------------|-------------------|---------|---------|
-| Per-service ConfigMap volumes | Criterion 1 | ✅ PASS | Volumes exist for argocd, zai, twitterapi, k8s |
-| Hot reload with atomic swap | Criterion 2 | ❌ FAIL | Flag exists but NOT enabled in deployment.yaml |
-| ArgoCD pilot fragment | Criterion 3 | ✅ PASS | Fragment exists at correct path |
-| Pass-through no injection | Criterion 4 | ✅ PASS | Fragment declares no x-vault-path |
-| Fragment lifecycle exercise | Criterion 5 | ❌ BLOCKED | Cannot exercise without hot reload |
-| seam lint precondition | Criterion 6 | ❌ UNKNOWN | Phase 9a has no evidence file |
-
-**Critical Blocker:** Hot reload flag exists but is NOT enabled in deployment.yaml
+## 1. Inputs
+
+| Input | File | Version used | Role |
+|---|---|---|---|
+| Phase inventory | `.beads/phase-inventory.md` | 2026-09-02 (13 files, 4 missing: 1a, 1b, 2, 9a) | Authoritative for which evidence files exist |
+| Checkbox states | `docs/plan/plan.md` @ `be68251` (grep `- [x]`/`- [ ] Phase`, lines 868–962) | Re-verified live 2026-09-18 (17 boxes: 6 ticked, 11 unticked) | Authoritative for current state and line anchors |
+| Verdict data | `.beads/phase-verdict-summary.md` + `.beads/evidence-verdict-summary.md` | 2026-09-01 (seam-7e2bcb06) | Authoritative for per-phase PASS/FAIL verdicts |
+| Draft mapping | `.beads/evidence-checkbox-draft.md` | 2026-09-18 (seam-9c80a071, committed in `be68251`) | Mapping logic, rationale and caveats, incorporated here |
+
+Note on `.beads/plan-checkbox-state.md`: at anchor `be68251` the committed file at that path is still the 2026-09-02 assessment-style version. The 2026-09-18 extraction that supersedes it exists in the working tree only (seam-7fdee15d's deliverable, not yet committed at generation time). This does not affect the mapping: both files agree on all 17 states because both derive from the same, unchanged plan.md checkbox lines, which this document takes directly from `be68251` as the source of record.
+
+## 2. Mapping logic (rationale for the join)
+
+1. **Phase-ID join (primary rule).** An evidence file named `phase<ID>-evidence.md` maps to the unique checkbox line in `docs/plan/plan.md` whose label begins `Phase <ID>:` within the `Implementation Phases` section. Letter suffixes are atomic identifiers: `6a ≠ 6b`, `9a ≠ 9b`.
+2. **Line anchors.** All 17 anchors re-verified live at `be68251` (lines 868–962, strictly increasing; these are the only bracket-pair checkboxes anywhere in plan.md).
+3. **Corroboration A — evidence self-title.** Each of the 13 evidence files' H1 names its own phase, and in all 13 cases it matches the phase ID in its filename.
+4. **Corroboration B — plan-text citation.** The 13 evidence-backed checkbox texts each cite exactly one `.beads/phase*-evidence.md` path (verified: 13 checkbox lines at `be68251` carry such a citation), and the cited path equals the mapped filename in every case. The 14th annotation (Phase 9a) cites `.beads/phase-verdict-summary.md` instead, because its evidence file does not exist.
+5. **Cardinality — 1:1.** Exactly one checkbox per phase; each evidence file covers exactly one phase's completion criteria. Mapping is by phase label, **not** by ship-order position — plan line 800's ship order (`1a → 1b → 9a → 2 → 6a → 3 → 4 → 10 → 5 → 11 → 13 → 6b → 7 → 12 → 8 → 9b → 14`) deliberately differs from document order, so position is not a join key.
+6. **Verdict → expected state rule.**
+   - `PASS` (including the qualified "substantial pass") → expected `[x]`
+   - `FAIL` / `BLOCKED` / `CRITICAL FAILURE` / `CANNOT VERIFY` → expected `[ ]`
+   - `NO EVIDENCE` → expected `[ ]` — a checkbox may only be ticked on demonstrated evidence. This is the plan's own house rule: every ticked box carries a dated "COMPLETE — verified …" annotation naming its evidence file, so an unevidenced tick would violate the annotation convention.
+
+The join covers 100% of both sides: all 17 checkboxes and all 13 evidence files, plus 4 explicit absence rows.
+
+## 3. Terminology normalization
+
+The verdict files, the checkbox annotations and the tick state use different vocabularies for the same underlying verdict:
+
+| Verdict (2026-09-01 summaries) | Checkbox annotation label | Expected state |
+|---|---|---|
+| ✅ PASS (incl. "substantial pass") | `COMPLETE` / `VERIFIED COMPLETE` | `[x]` |
+| ❌ FAIL | `INCOMPLETE` | `[ ]` |
+| ❌ FAIL (blocked) | `BLOCKED` | `[ ]` |
+| ❌ FAIL (crash) | `CRITICAL FAILURE` | `[ ]` |
+| ❌ CANNOT VERIFY | `CANNOT VERIFY ACCEPTANCE` | `[ ]` |
+| ❌ NO EVIDENCE | *(none; 9a: `NO EVIDENCE`)* | `[ ]` |
+
+## 4. Master mapping table
+
+| Phase | Evidence file | plan.md line | Checkbox state | Verdict (2026-09-01) | In-text annotation | Expected | Agree |
+|---|---|---|---|---|---|---|---|
+| 1a | *(missing)* | 868 | `[ ]` | NO EVIDENCE | none | `[ ]` | yes |
+| 1b | *(missing)* | 881 | `[ ]` | NO EVIDENCE | none | `[ ]` | yes |
+| 2 | *(missing)* | 882 | `[ ]` | NO EVIDENCE | none | `[ ]` | yes |
+| 3 | `.beads/phase3-evidence.md` | 888 | `[ ]` | FAIL — hot reload not enabled | `INCOMPLETE` | `[ ]` | yes |
+| 4 | `.beads/phase4-evidence.md` | 889 | `[ ]` | FAIL — fragments not mounted | `INCOMPLETE` | `[ ]` | yes |
+| 5 | `.beads/phase5-evidence.md` | 890 | `[ ]` | FAIL — missing cluster/infrastructure | `INCOMPLETE` | `[ ]` | yes |
+| 6a | `.beads/phase6a-evidence.md` | 891 | `[x]` | PASS — 8/10 + 2 pending manual ACL | `COMPLETE` | `[x]` | yes |
+| 6b | `.beads/phase6b-evidence.md` | 896 | `[ ]` | FAIL (BLOCKED) — YAML loading | `BLOCKED` | `[ ]` | yes |
+| 7 | `.beads/phase7-evidence.md` | 897 | `[ ]` | FAIL — identity placeholder, untested | `INCOMPLETE` | `[ ]` | yes |
+| 8 | `.beads/phase8-evidence.md` | 912 | `[x]` | PASS — 7/7 | `VERIFIED COMPLETE` | `[x]` | yes |
+| 9a | *(missing)* | 931 | `[ ]` | NO EVIDENCE | `NO EVIDENCE` (cites verdict summary) | `[ ]` | yes |
+| 9b | `.beads/phase9b-evidence.md` | 949 | `[x]` | PASS — 2/2 | `COMPLETE` | `[x]` | yes |
+| 10 | `.beads/phase10-evidence.md` | 950 | `[ ]` | FAIL (CRITICAL) — startup crash | `CRITICAL FAILURE` | `[ ]` | yes |
+| 11 | `.beads/phase11-evidence.md` | 959 | `[x]` | PASS — 6/6 | `VERIFIED COMPLETE` | `[x]` | yes |
+| 12 | `.beads/phase12-evidence.md` | 960 | `[ ]` | CANNOT VERIFY — 99 compile errors | `CANNOT VERIFY ACCEPTANCE` | `[ ]` | yes |
+| 13 | `.beads/phase13-evidence.md` | 961 | `[x]` | PASS — 3/3 | `VERIFIED COMPLETE` | `[x]` | yes |
+| 14 | `.beads/phase14-evidence.md` | 962 | `[x]` | PASS — 4/4, 35 tests | `COMPLETE` | `[x]` | yes |
+
+## 5. Checkbox-by-checkbox view
+
+### Checked `[x]` — 6 phases
+
+| Phase | Line | Evidence status | Verification date | Note |
+|-------|------|-----------------|-------------------|------|
+| Phase 6a | 891 | ✅ 8/10 criteria pass | 2026-09-01 | 2 pending ACL criteria resolved post-verdict 2026-09-18 (§7, caveat 2) |
+| Phase 8 | 912 | ✅ all 7 criteria pass | 2026-09-01 | code inspection + binary test |
+| Phase 9b | 949 | ✅ both commands implemented | 2026-09-01 | `seam diff`, `seam import --from-url` |
+| Phase 11 | 959 | ✅ all 6 criteria pass | 2026-09-01 | three-state rendering, breaker, structured 503, `x-breaker` |
+| Phase 13 | 961 | ✅ all 3 criteria pass | 2026-09-01 | loop breaker, cost governor, dry-run |
+| Phase 14 | 962 | ✅ all 4 rules pass | 2026-09-01 | JWT validation, scope mapping, header stripping, default-deny; 35 tests |
+
+### Unchecked `[ ]` — 11 phases
+
+| Phase | Line | Evidence status | Primary blocker |
+|-------|------|-----------------|-----------------|
+| Phase 1a | 868 | ❓ no evidence file | evidence not generated |
+| Phase 1b | 881 | ❓ no evidence file | evidence not generated |
+| Phase 2 | 882 | ❓ no evidence file | evidence not generated |
+| Phase 3 | 888 | ❌ NOT COMPLETE | hot-reload flag exists but not enabled in deployment.yaml |
+| Phase 4 | 889 | ❌ INCOMPLETE | fragments not mounted, OpenBao secrets missing |
+| Phase 5 | 890 | ❌ CRITICAL FAILURE | `iad-native-ads` missing, schema + YAML-parsing bugs, 6/9 Connectors missing |
+| Phase 6b | 896 | ❌ BLOCKED | fragment loader is JSON-only; production YAML cannot load |
+| Phase 7 | 897 | ❌ INCOMPLETE | `tsnet` provisioning placeholder, no runtime verification |
+| Phase 9a | 931 | ❓ no evidence file | evidence not generated; verdict summary stands in as source of record |
+| Phase 10 | 950 | ❌ CRITICAL FAILURE | duplicate `/whoami` registration panics at startup |
+| Phase 12 | 960 | ❌ CANNOT VERIFY | 99 compile errors; acceptance undemonstrated |
+
+## 6. Per-phase mapping rationale
+
+### 6.1 The 13 evidence-backed phases
+
+For each row: the filename join (rule 1, §2) selects exactly one checkbox; corroborations A and B confirm it; the expected state follows rule 6 from the 2026-09-01 verdict.
+
+- **Phase 3** → line 888. Verdict FAIL (hot-reload flag present but not enabled in `deployment.yaml`; 3/6 pass, 2/6 fail, 1/6 blocked). Annotation `INCOMPLETE` cites `.beads/phase3-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 4** → line 889. Verdict FAIL (fragment YAML authored but never mounted; no routes served; no OpenBao secrets; 1/7 pass). Annotation `INCOMPLETE` cites `.beads/phase4-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 5** → line 890. Verdict FAIL (`iad-native-ads` absent from upstream map and allowlist; schema-validation and YAML-parsing bugs; 6 of 9 Tailscale Connectors missing; 2/8 pass). Annotation `INCOMPLETE` cites `.beads/phase5-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 6a** → line 891. Verdict PASS, qualified: 8/10 criteria verified; the 2 pending items (tag-restricted ACL grant; two-listener ACL split) needed manual Tailscale-admin verification. Expected `[x]` (a qualified pass still passes rule 6), actual `[x]`. See §7 caveat 2 for the post-verdict resolution.
+- **Phase 6b** → line 896. Verdict FAIL/BLOCKED (fragment loader JSON-only, so production YAML fragments cannot load; cutover cannot proceed). Annotation `BLOCKED` cites `.beads/phase6b-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 7** → line 897. Verdict FAIL (5/13 implemented; NEEDLE-side `tsnet` provisioning in placeholder mode; no runtime verification). Annotation `INCOMPLETE` cites `.beads/phase7-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 8** → line 912. Verdict PASS 7/7 (deprecation/sunset headers, `x-adapter`, version selection, version-aware docs, per-version metric, `/changes`, retirement evaluator). Annotation `VERIFIED COMPLETE` cites `.beads/phase8-evidence.md`. Expected `[x]`, actual `[x]`.
+- **Phase 9b** → line 949. Verdict PASS 2/2 (`seam diff`, `seam import --from-url`). Annotation `COMPLETE` cites `.beads/phase9b-evidence.md`. Expected `[x]`, actual `[x]`.
+- **Phase 10** → line 950. Verdict CRITICAL FAILURE (duplicate `/whoami` registration panics at startup; 4/7 verified at code level only). Annotation `CRITICAL FAILURE` cites `.beads/phase10-evidence.md`. Expected `[ ]`, actual `[ ]`.
+- **Phase 11** → line 959. Verdict PASS 6/6 (three-state rendering, breaker policy and structured 503, `x-breaker`). Annotation `VERIFIED COMPLETE` cites `.beads/phase11-evidence.md`. Expected `[x]`, actual `[x]`.
+- **Phase 12** → line 960. Verdict CANNOT VERIFY (99 compile errors plus runtime-environment requirements; implementation exists but acceptance undemonstrated). Annotation `CANNOT VERIFY ACCEPTANCE` cites `.beads/phase12-evidence.md`. Expected `[ ]` — under rule 6 an undemonstrated phase stays unticked even where code exists. Actual `[ ]`.
+- **Phase 13** → line 961. Verdict PASS 3/3 (loop breaker, cost governor, dry-run; verified by code + test inspection). Annotation `VERIFIED COMPLETE` cites `.beads/phase13-evidence.md`. Expected `[x]`, actual `[x]`.
+- **Phase 14** → line 962. Verdict PASS 4/4 (JWT validation, scope mapping, header stripping, default-deny; 35 tests). Annotation `COMPLETE` cites `.beads/phase14-evidence.md`. Expected `[x]`, actual `[x]`.
 
-**File References:**
-- Evidence: `.beads/phase3-evidence.md`
-- Plan: `docs/plan/plan.md:888`
-- Deployment: `declarative-config/k8s/rs-manager/seam/deployment.yaml`
-
----
-
-### ❌ Phase 5: kubectl-proxy multi-instance fragment
-
-**plan.md Location:** Line 890  
-**Checkbox State:** `[ ]` (incomplete)  
-**Evidence File:** `.beads/phase5-evidence.md`  
-**Overall Verdict:** ❌ CRITICAL FAILURE (2/8 pass, 6/8 fail)
-
-#### Checkbox Requirements → Evidence Mapping
-
-| plan.md Requirement | Evidence Criterion | Verdict | Details |
-|-------------------|-------------------|---------|---------|
-| x-instance-param: cluster | Criterion 1 | ✅ PASS | Fragment correctly declares |
-| x-upstream-map resolution | Criterion 2 | ✅ PASS | Map structure correct |
-| All 9 clusters in map | Criterion 3 | ❌ FAIL | **Missing: iad-native-ads** |
-| Upstream allowlist coverage | Criterion 4 | ❌ FAIL | **Missing: iad-native-ads** |
-| Schema validation | Criterion 5 | ❌ FAIL | Schema validation bug |
-| YAML parsing | Criterion 6 | ❌ FAIL | Treats YAML as JSON |
-| Tailscale Connectors | Criterion 7 | ❌ FAIL | **6 of 9 missing** |
-| Per-instance requiredScope | Criterion 8 | ⚠️ PARTIAL | Blocked by parsing bug |
+### 6.2 The 4 phases without evidence files
 
-**Critical Blockers:**
-1. Missing cluster `iad-native-ads` from map and allowlist
-2. Schema validation bug
-3. YAML parsing bug
-4. 6 missing Tailscale Connectors
+- **Phase 1a (line 868), Phase 1b (line 881), Phase 2 (line 882).** No evidence file exists (inventory rows "Missing — Cannot verify"); no in-text annotation. Verdict NO EVIDENCE → expected `[ ]`; actual `[ ]`. **Mapping caveat:** this agreement is *weak/vacuous* — an unticked box is consistent with NO EVIDENCE, but the state alone cannot distinguish "implemented but never evidenced" from "not attempted". Any future tick of these three lines requires a new evidence file first; mapping by absence is the decision of record.
+- **Phase 9a (line 931).** No evidence file exists, but unlike 1a/1b/2 the checkbox carries an annotation: `NO EVIDENCE — verified 2026-09-01` citing `.beads/phase-verdict-summary.md` (§9a) rather than a per-phase file. **Mapping decision:** the verdict summary itself is the verdict source of record for 9a — evidence *of absence* stands in for the absent file. Expected `[ ]`, actual `[ ]`.
 
-**File References:**
-- Evidence: `.beads/phase5-evidence.md`
-- Plan: `docs/plan/plan.md:890`
+## 7. Agreement result and discrepancy scan
 
----
+- **Zero discrepancies.** Expected state (derived from verdict data) equals actual state for all 17 phases. **No checkbox state changes are required or recommended on this evidence**, and none were made.
+- **Three-way agreement for the 13 evidence-backed phases:** verdict summaries ↔ in-text annotation ↔ tick state line up in every case, under the §3 normalization.
+- **Fourth leg:** plan.md's `**Status:**` header (line 5) partitions the phases identically — 6 verified complete (6a, 8, 9b, 11, 13, 14), 7 incomplete (3, 4, 5, 6b, 7, 10, 12), 4 lack evidence (1a, 1b, 2, 9a) — matching both verdict files and the checkbox states exactly.
 
-## Checkbox-by-Checkbox View
+## 8. Change recommendations
 
-### Checked Checkboxes [x] (6 phases)
+### 8.1 Checkbox state changes: none
 
-| Phase | Line | Evidence Status | Verification Date | Notes |
-|-------|------|-----------------|-------------------|-------|
-| Phase 6a | 891 | ✅ 8/10 criteria pass | 2026-09-01 | 2 criteria require manual ACL verification |
-| Phase 8 | 912 | ✅ All 7 criteria pass | 2026-09-01 | Verified through code inspection + binary test |
-| Phase 9b | 949 | ✅ Both commands implemented | 2026-09-01 | seam diff + seam import with test coverage |
-| Phase 11 | 959 | ✅ All 6 criteria pass | 2026-09-01 | Passive route health fully implemented |
-| Phase 13 | 961 | ✅ All 3 criteria pass | 2026-09-01 | Per-route guards with comprehensive tests |
-| Phase 14 | 962 | ✅ All 4 rules implemented | 2026-09-01 | Cloudflare JWT auth with 35 tests |
+All 17 checkboxes correctly reflect the verdict data. No tick, untick, or annotation edit is recommended: applying a change with zero expected-vs-actual deltas would be a no-op, and the ticked states already carry dated evidence-citing annotations per the plan's house rule.
 
-### Unchecked Checkboxes [ ] (11 phases)
+### 8.2 Recommended follow-up work (not checkbox edits)
 
-| Phase | Line | Evidence Status | Primary Blocker |
-|-------|------|-----------------|------------------|
-| Phase 1a | 868 | ❓ No evidence file | Evidence not generated |
-| Phase 1b | 881 | ❓ No evidence file | Evidence not generated |
-| Phase 2 | 882 | ❓ No evidence file | Evidence not generated |
-| Phase 3 | 888 | ❌ NOT COMPLETE | Hot reload not enabled |
-| Phase 4 | 889 | ❌ INCOMPLETE | Fragments not mounted, secrets missing |
-| Phase 5 | 890 | ❌ CRITICAL FAILURE | Missing cluster, schema bugs, YAML parsing |
-| Phase 6b | 896 | ❌ BLOCKED | YAML fragments cannot load |
-| Phase 7 | 897 | ❌ INCOMPLETE | Placeholder code, no runtime |
-| Phase 9a | 931 | ❓ No evidence file | Evidence not generated |
-| Phase 10 | 950 | ❌ CRITICAL FAILURE | Server crashes on startup |
-| Phase 12 | 960 | ❌ CANNOT VERIFY | 99 compilation errors |
+1. **Generate evidence for the 4 absence rows** — see §9 for priority order. Any future tick of 1a/1b/2/9a is gated on a new evidence file first.
+2. **Commit the 2026-09-18 checkbox-state extraction** (seam-7fdee15d's deliverable, currently working-tree-only) so the superseded 2026-09-02 assessment file at `.beads/plan-checkbox-state.md` is replaced at HEAD, not just on disk.
+3. **Close Phase 6a's two criteria explicitly** at the next 6a re-verification rather than inheriting this document's post-verdict note (§7 caveat 2).
+4. **Fix the two self-contradictions in `.beads/evidence-verdict-summary.md`** (§7 caveat 3) so later readers do not propagate the bad count or the false "no missing evidence files" claim.
+5. **Remediation order for the failing phases** (carried from v1.0, unchanged by the verdict incorporation): fix the YAML fragment loader (blocks 3, 5, 6b); resolve the 99 compile errors (blocks 7, 10, 12 runtime verification); enable hot reload in `deployment.yaml` (Phase 3); provision OpenBao secrets and mount fragment ConfigMaps (Phase 4); add `iad-native-ads` plus the 6 missing Tailscale Connectors (Phase 5); fix the duplicate `/whoami` registration (Phase 10).
 
----
+## 9. Phases needing evidence files
 
-## State Change Analysis
+| Phase | Evidence file to create | Priority | Reason |
+|-------|------------------------|----------|--------|
+| Phase 9a | `.beads/phase9a-evidence.md` | **HIGH** | `seam lint` is the CI gate for fragment validation and Phase 3's named precondition |
+| Phase 2 | `.beads/phase2-evidence.md` | HIGH | Secret injection is a dependency of phases 4, 7, 12, 13; first end-to-end credential proof |
+| Phase 1b | `.beads/phase1b-evidence.md` | MEDIUM | Fragment merge is foundational for phases 7 and 13 dependencies |
+| Phase 1a | `.beads/phase1a-evidence.md` | LOW | Foundational work predates evidence tracking |
 
-### Phases That Changed State (2026-08-27/28 → 2026-09-02)
+## 10. Caveats and source-data notes
 
-**Historical Context:** Multiple phases were marked complete (umbrella beads closed) on 2026-08-27/28 but verification revealed they were incomplete.
+1. **Verdict currency.** All verdicts date from the 2026-09-01 re-verification pass (seam-7e2bcb06) and are the newest complete verdict set embedded in the artifacts at HEAD. This document maps evidence to checkboxes as the artifacts stand; it does not re-adjudicate any phase. A later phase re-verification would change the *expected* column, never the mapping logic.
+2. **Phase 6a's two pending items.** The 6a tick rests on a qualified pass (8/10; the tag-restricted ACL grant and the two-listener ACL split were pending manual verification). Post-verdict, the tailnet ACL slice those items depend on was applied and verified — commit `aeefe43` (2026-09-18, bead seam-a2413e9d) records `seam-rs-manager` carrying only `tag:seam` with `terraform plan` clean against the live ACL. Rule 6 already expected `[x]` from the PASS verdict, so the mapping is unchanged; a future full re-verification of 6a should still close the two criteria explicitly rather than inherit this note.
+3. **Source typos, flagged so they are not propagated.** `.beads/evidence-verdict-summary.md` line 24 says "5 phases COMPLETE" while listing six (6a, 8, 9b, 11, 13, 14) — count typo; the correct count is 6 (its own Summary Statistics section says "Complete (6)"). Its "Missing Evidence Files" section says "No missing evidence files", contradicting its own table and `.beads/phase-inventory.md`; the inventory is authoritative for file existence: 1a, 1b, 2 and 9a have no evidence files.
+4. **Extraction supersession.** `.beads/plan-checkbox-state.md` is being superseded by the 2026-09-18 extraction-only pass (bead seam-7fdee15d); at anchor `be68251` the committed file is still the 2026-09-02 assessment version, with the extraction present only in the working tree (§1 note). The older `.beads/evidence-to-checkbox-cross-reference.md` (2026-09-02) remains useful as the per-criterion decomposition but predates the supersession and should not be used for state anchors.
+5. **Anchor drift.** Line anchors are valid at `be68251`. Any edit to `docs/plan/plan.md` above line 962 invalidates them; re-run the extraction (or re-grep `- [x]`/`- [ ] Phase`) before applying any tick/untick.
+6. **Correction to v1.0.** v1.0's "Key Findings" opened with a "Critical Disconnect: 6 phases marked complete (`[x]`) in plan.md are demonstrably incomplete", naming phases 3, 4, 5, 6b, 7 and 10 — none of which is ticked, and all six of which v1.0's own alignment table shows unticked and aligned. That finding described the pre-2026-09-01 state (when those boxes were wrongly ticked and then corrected) and was stale the moment v1.0 was written; this document's §7 states the actual result (zero discrepancies). v1.0's mapping table, checkbox view and remediation plan remain sound and are carried forward here.
 
-| Phase | Closure Date | Checkbox State | Evidence Verdict | Assessment |
-|-------|--------------|----------------|-----------------|------------|
-| Phase 3 | 2026-08-27/28 | `[ ]` (correct) | ❌ NOT COMPLETE | ✅ Correctly unchecked |
-| Phase 4 | 2026-08-27/28 | `[ ]` (correct) | ❌ INCOMPLETE | ✅ Correctly unchecked |
-| Phase 5 | 2026-08-27/28 | `[ ]` (correct) | ❌ CRITICAL FAILURE | ✅ Correctly unchecked |
-| Phase 7 | 2026-08-27/28 | `[ ]` (correct) | ❌ INCOMPLETE | ✅ Correctly unchecked |
-
-**Positive Finding:** No false positives exist. All checkboxes correctly reflect actual completion status.
-
-### Verification Timeline
-
-- **2026-08-19:** Phase 6a deployed and functional
-- **2026-08-27/28:** Multiple umbrella beads closed (Phases 3, 4, 5, 7)
-- **2026-08-30:** Compilation errors began accumulating (99 errors)
-- **2026-09-01/02:** Evidence-based verification completed
-
----
-
-## Dependencies and Gates
-
-### Phase Dependencies (from plan.md)
-
-| Phase | Requires | Status | Impact |
-|-------|----------|--------|--------|
-| Phase 3 | Phase 9a (seam lint) | ❓ Unknown | Phase 9a has no evidence file |
-| Phase 4 | Phase 2 (secret injection) | ❓ Unknown | First end-to-end credential injection proof |
-| Phase 5 | Phase 10 (multi-instance) | ❌ Incomplete | Parametrized fragment required |
-| Phase 7 | Phases 1b, 2, 3 | ❌ Incomplete | Per-agent scoping needs fragments + injection |
-| Phase 12 | Phases 2, 6a | Phase 6a ✅ | Lease Role/RoleBinding needed |
-| Phase 13 | Phases 1b, 2 | ❓ Unknown | Request-body tee required |
-
-### Critical Path Blockers
-
-1. **Phase 9a (seam lint):** No evidence file - blocks Phase 3 precondition
-2. **Phase 10:** Server crash - blocks Phase 5 multi-instance functionality
-3. **YAML Fragment Support:** Blocks Phases 3, 5, 6b
-4. **Compilation Errors:** Blocks Phases 7, 10, 12 runtime verification
-
----
-
-## Recommendations for plan.md Checkbox Updates
-
-### ✅ No Updates Required
-
-**Finding:** All 17 checkboxes correctly reflect actual completion status based on evidence.
-
-**Rationale:**
-- 6 phases checked `[x]` are verified complete
-- 11 phases unchecked `[ ]` are either incomplete or cannot be verified
-- No false positives exist
-
-### Recommended Documentation Enhancements
-
-Instead of checkbox changes, recommend adding evidence references:
-
-1. **Add evidence links to plan.md:**
-   ```markdown
-   - [x] Phase 6a: Deploy SEAM to rs-manager
-     Evidence: `.beads/phase6a-evidence.md` (2026-09-01)
-   ```
-
-2. **Document verification gaps:**
-   - Phases 1a, 1b, 2: "Evidence not yet generated - foundational work predates tracking"
-   - Phase 9a: "Evidence file missing - critical dependency for Phase 3"
-
-3. **Add remediation blockers:**
-   - Phase 3: "Hot reload flag exists but not enabled in deployment.yaml"
-   - Phase 5: "Missing cluster iad-native-ads, schema validation bug, YAML parsing bug"
-   - Phase 10: "Duplicate /whoami route registration prevents startup"
-
----
-
-## Phases Needing Evidence Files
-
-### Missing Evidence Files (4 phases)
-
-| Phase | Evidence File | Status | Priority | Reason |
-|-------|--------------|--------|----------|--------|
-| Phase 1a | `.beads/phase1a-evidence.md` | Missing | Low | Foundational work predates evidence tracking |
-| Phase 1b | `.beads/phase1b-evidence.md` | Missing | Low | Foundational work predates evidence tracking |
-| Phase 2 | `.beads/phase2-evidence.md` | Missing | Medium | Secret injection - blocks multiple dependent phases |
-| Phase 9a | `.beads/phase9a-evidence.md` | Missing | **HIGH** | **Critical dependency for Phase 3** |
-
-### Recommended Evidence Generation Order
-
-1. **Phase 9a (seam lint)** - HIGHEST PRIORITY
-   - Blocks Phase 3 precondition
-   - Required CI gate for fragment validation
-   - Needed before Phase 3 can proceed
-
-2. **Phase 2 (secret injection)** - HIGH PRIORITY
-   - Blocks multiple dependent phases (4, 7, 12, 13)
-   - Core functionality required for end-to-end credential injection
-
-3. **Phase 1b (fragment merge)** - MEDIUM PRIORITY
-   - Verifies foundational fragment merge logic
-   - Blocks understanding of Phase 7 dependency
-
-4. **Phase 1a (gateway scaffold)** - LOW PRIORITY
-   - Foundational work predates tracking
-   - Less critical for forward progress
-
----
-
-## Critical Blockers Summary
-
-### Cross-Cutting Blockers
-
-#### 1. YAML Fragment Support
-**Affected Phases:** 3, 5, 6b  
-**Root Cause:** `internal/spec/fragment.go` only supports JSON format  
-**Impact:** Critical production fragments (authored in YAML) cannot load  
-**Fix:** Implement YAML parser in fragment loader
-
-#### 2. Compilation Errors
-**Affected Phases:** 7, 10, 12  
-**Root Cause:** 99 compile errors accumulated since 2026-08-30  
-**Impact:** Runtime verification blocked  
-**Fix:** Resolve compilation errors, rebuild binary
-
-#### 3. Missing Runtime Environment
-**Affected Phases:** 3, 4, 5, 7, 10, 12  
-**Root Cause:** No Kubernetes cluster access for integration testing  
-**Impact:** End-to-end verification impossible  
-**Fix:** Provide test cluster with OpenBao, SEAM deployment, upstream services
-
-#### 4. Missing Infrastructure
-**Components Affected:**
-- **Tailscale Connectors:** 6 of 9 clusters missing (apexalgo-iad, iad-options, iad-kalshi, iad-native-ads, iad-ci, ord-devimprint)
-- **OpenBao Secrets:** 2 paths missing (twitterapi/api-key, zai/api-key)
-- **ConfigMap Volumes:** Not added to SEAM deployment template
-
-**Impact:** Blocks Phases 4, 5 end-to-end verification
-
----
-
-## Infrastructure Remediation Plan
-
-### Phase 3 Remediation
-1. Enable hot reload in deployment.yaml
-2. Exercise fragment lifecycle end-to-end
-3. Re-verify all criteria
-
-### Phase 4 Remediation
-1. Provision OpenBao secrets (twitterapi, zai API keys)
-2. Add ConfigMap volumes to SEAM deployment
-3. Verify end-to-end credential injection
-
-### Phase 5 Remediation
-1. Add missing cluster `iad-native-ads` to upstream map
-2. Fix schema constraint for x-upstream-map fragments
-3. Fix YAML fragment parsing bug
-4. Add 6 missing Tailscale Connectors
-5. Fix duplicate `/whoami` route registration
-
-### Phase 6b Remediation
-1. Implement YAML fragment support in loader
-2. Verify production fragments load successfully
-
-### Phase 7 Remediation
-1. Integrate Tailscale LocalClient for WhoIs
-2. Build and deploy SEAM for live verification
-3. Test scope enforcement end-to-end
-
-### Phase 10 Remediation
-1. Rebuild binary with duplicate route fix
-2. Test `_all` fan-out endpoint
-3. Verify 207 response envelope structure
-
-### Phase 12 Remediation
-1. Resolve 99 compilation errors
-2. Build fresh binary
-3. Exercise criteria against running binary with test environment
-
----
-
-## Verification Methodology
-
-This mapping document was generated through:
-
-1. **Phase Inventory (Task: seam-bde2c73b):**
-   - Scanned `.beads/` for phase evidence files
-   - Extracted completion verdicts from each evidence file
-   - Cataloged critical blockers and infrastructure gaps
-
-2. **Evidence-to-Checkbox Cross-Reference (Task: seam-cfcd1399):**
-   - Mapped each evidence criterion to plan.md line numbers
-   - Correlated verification requirements with checkbox text
-   - Identified ambiguous mappings requiring manual resolution
-
-3. **Checkbox State Analysis (Task: seam-8e80d1f0):**
-   - Extracted checkbox states from plan.md via grep
-   - Compared checked states against evidence-based verdicts
-   - Identified alignment/discrepancies
-
-4. **Consolidation (Task: seam-f3e0a9dd):**
-   - Merged all three analyses into single document
-   - Structured for multiple navigation patterns (by phase, by checkbox, by blocker)
-   - Provided actionable recommendations
-
----
-
-## Summary Statistics Revisited
-
-### Completion Metrics
+## 11. Summary statistics
 
 | Metric | Value | Details |
 |--------|-------|---------|
-| **Total Phases** | 17 | 1a, 1b, 2-14 |
-| **Evidence Files** | 13 | 76% coverage |
-| **Missing Evidence** | 4 | Phases 1a, 1b, 2, 9a |
-| **Verified Complete** | 6 | Phases 6a, 8, 9b, 11, 13, 14 |
-| **Verified Incomplete** | 7 | Phases 3, 4, 5, 6b, 7, 10, 12 |
-| **Cannot Verify** | 4 | Phases 1a, 1b, 2, 9a (no evidence) |
+| Total phases | 17 | 1a, 1b, 2–14 (letter suffixes atomic) |
+| Evidence files | 13 | 76% coverage |
+| Missing evidence | 4 | Phases 1a, 1b, 2, 9a |
+| Verified complete `[x]` | 6 | Phases 6a, 8, 9b, 11, 13, 14 |
+| Verified incomplete `[ ]` | 7 | Phases 3, 4, 5, 6b, 7, 10, 12 |
+| Cannot verify `[ ]` | 4 | Phases 1a, 1b, 2, 9a (no evidence) |
+| Mapping discrepancies | **0** | Expected = actual for all 17 |
+| Checkbox changes required | **0** | All states already agree with verdict data |
 
-### Blocker Metrics
+### Blocker metrics (unchanged from v1.0)
 
-| Blocker Type | Affected Phases | Count |
-|--------------|-----------------|-------|
-| YAML Fragment Support | 3, 5, 6b | 3 |
-| Compilation Errors | 7, 10, 12 | 3 |
-| Missing Runtime Environment | 3, 4, 5, 7, 10, 12 | 6 |
-| Missing Tailscale Connectors | 5 | 1 |
-| Missing OpenBao Secrets | 4 | 1 |
-| Deployment Integration Gaps | 3, 4 | 2 |
-
-### Infrastructure Gaps
-
-| Gap | Missing Components | Impact |
-|-----|-------------------|--------|
-| Tailscale Connectors | 6 of 9 clusters | Phase 5 multi-instance |
-| OpenBao Secrets | 2 paths | Phase 4 credential injection |
-| ConfigMap Volumes | Not mounted | Phase 3, 4 fragment serving |
-| Hot Reload | Not enabled | Phase 3 fragment lifecycle |
+| Blocker type | Affected phases |
+|--------------|-----------------|
+| YAML fragment support (loader is JSON-only) | 3, 5, 6b |
+| Compilation errors (99, since 2026-08-30) | 7, 10, 12 |
+| Missing runtime environment | 3, 4, 5, 7, 10, 12 |
+| Missing Tailscale Connectors (6 of 9 clusters) | 5 |
+| Missing OpenBao secrets (twitterapi, zai) | 4 |
+| Deployment integration gaps (hot reload, ConfigMap mounts) | 3, 4 |
 
 ---
 
-## Conclusions
+## 12. Verification record for this document
 
-### Key Takeaways
+Compiled by seam-d7aac6fe on 2026-09-18 at anchor `be68251`. Checks run before publication, all against `be68251` via `git show`/`git ls-tree` (never the dirty shared working tree):
 
-1. **Checkbox Accuracy:** ✅ All plan.md checkboxes correctly reflect completion status - no false positives found
+- All 17 checkbox anchors, states and phase labels re-extracted live: lines 868, 881, 882, 888, 889, 890, 891, 896, 897, 912, 931, 949, 950, 959, 960, 961, 962; `[x]` exactly at 891, 912, 949, 959, 961, 962 — matching §4 row for row.
+- All 13 mapped evidence files confirmed present at HEAD (`git ls-tree`); 1a, 1b, 2, 9a confirmed absent.
+- 13 checkbox lines confirmed to carry a `.beads/phase*-evidence.md` citation (corroboration B).
+- plan.md Status header (line 5) confirmed to state the 6/7/4 partition (fourth leg).
+- Working-tree 2026-09-18 extraction cross-checked: agrees with HEAD states on all 17 phases.
+- Draft `.beads/evidence-checkbox-draft.md` (committed `be68251`) incorporated in full; no mapping-logic change from draft to this final document.
 
-2. **Evidence Coverage:** ❌ 24% of phases lack evidence files - Phases 1a, 1b, 2, 9a need verification
+This document does **not** modify any checkbox in `docs/plan/plan.md`, re-verify any phase, create missing evidence files, or update the plan's `**Status:**` header — those remain owned by their respective beads.
 
-3. **Systematic Blockers:** Three cross-cutting issues prevent progress:
-   - YAML fragment support (blocks 3 phases)
-   - Compilation errors (blocks 3 phases)
-   - Missing runtime environment (blocks 6 phases)
-
-4. **Infrastructure Debt:** Three critical gaps block end-to-end verification:
-   - 6 missing Tailscale Connectors
-   - 2 missing OpenBao secrets
-   - ConfigMap volumes not mounted
-
-5. **Verification Discipline:** Post-closure verification revealed multiple phases marked complete without meeting acceptance criteria - evidence-based verification prevented silent acceptance of incomplete work
-
-### Recommended Next Steps
-
-**Immediate (Priority 1):**
-1. Generate Phase 9a evidence file (blocks Phase 3)
-2. Fix YAML fragment parsing bug (blocks Phases 3, 5, 6b)
-3. Resolve compilation errors (blocks Phases 7, 10, 12)
-
-**Short-term (Priority 2):**
-1. Enable hot reload in deployment.yaml (Phase 3)
-2. Provision OpenBao secrets (Phase 4)
-3. Add missing Tailscale Connectors (Phase 5)
-
-**Medium-term (Priority 3):**
-1. Provide runtime test environment
-2. Generate evidence files for Phases 1a, 1b, 2
-3. Complete infrastructure integration (ConfigMap volumes, deployment updates)
-
----
-
-**Document Version:** 1.0  
-**Generated:** 2026-09-02  
-**Task:** seam-f3e0a9dd  
-**Dependencies:** seam-bde2c73b (phase inventory), seam-cfcd1399 (cross-reference), seam-8e80d1f0 (state change)
+**Document Version:** 2.0
+**Chain:** seam-bde2c73b / seam-cfcd1399 / seam-8e80d1f0 → seam-f3e0a9dd (v1.0) → seam-7fdee15d (2026-09-18 extraction) → seam-9c80a071 (verdict-incorporated draft) → **seam-d7aac6fe (this document)**
