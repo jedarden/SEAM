@@ -15,11 +15,21 @@
 // kubectl is a PATH shim replaying a fixture workflow list, and
 // SEAM_CI_KUBECTL_SERVER points at a host nothing serves, so no cluster is
 // ever contacted. --revision keeps the script off `git ls-remote`; the one
-// case that exercises revision resolution runs in a directory that is not a
-// repo. Every run cwd's into a throwaway directory with GIT_* stripped, so
-// neither the tests nor a developer's checkout contribute state.
+// case that exercises revision resolution builds a throwaway repo with a
+// local bare origin inside the temp dir. Every run cwd's into a throwaway
+// directory with GIT_* stripped, so neither the tests nor a developer's
+// checkout contribute state.
 //
-// See bead seam-8b2a75e6.
+// The same harness drives scripts/ci-gate-bead.sh and
+// scripts/ci-gate-watch.sh, which act on the bead store rather than the
+// cluster: there `bead` itself is the PATH shim, replaying per-subcommand
+// fixture responses and recording every argv, so a test can pin exactly
+// which store mutation a red or green gate performs. The real bead binary
+// is never exec'd, and the runs redirect HOME and SEAM_CI_GATE_STATE_DIR
+// into the temp dir too, so no live bead store or watch state is reachable
+// from the suite.
+//
+// See beads seam-8b2a75e6 (kubectl shim) and seam-a7c2f29f (bead shim).
 package gatewatch
 
 import (
@@ -46,6 +56,12 @@ const (
 	// reserved host nothing serves, so any reach for a real cluster fails
 	// loudly instead of succeeding quietly.
 	fakeServer = "http://gatewatch.invalid:8001"
+	// gateBeadTitle is the exact title scripts/ci-gate-bead.sh gives its
+	// gate bead. The fixtures must spell it identically: gate_id() matches
+	// on title equality, so a drift here reads as "no gate bead".
+	gateBeadTitle = "GATE: seam-ci is red - do not claim SEAM beads"
+	// gateBeadRef is the --unique-ref the script creates the bead with.
+	gateBeadRef = "seam:ci-red-gate"
 )
 
 // kubectlShim stands in for kubectl. It appends its argv to the file named
@@ -76,6 +92,62 @@ case "${GATEWATCH_KUBECTL_MODE:-replay}" in
     exit 91
     ;;
 esac
+`
+
+// beadShim stands in for bead, for the scripts that act on the bead store
+// rather than the cluster (ci-gate-bead.sh, and ci-gate-watch.sh through
+// it). Like kubectlShim it appends its argv, one line per call, to the file
+// named by GATEWATCH_BEAD_CALLS -- which is how a test pins exactly which
+// subcommand, id and flag the gate scripts issued -- and replays one
+// fixture file per subcommand from the directory named by
+// GATEWATCH_BEAD_FIXTURES:
+//
+//	list ...          -> list.jsonl       one JSON object per line: every bead
+//	list --ready ...  -> list-ready.jsonl the ready frontier
+//	show <id> --json  -> show.json        one-element JSON array
+//	create            -> create.out       stdout: the new bead id
+//	update/reopen/close/dep -> <sub>.out  mutators: empty output, exit 0
+//
+// A missing or unreadable fixture dies loudly (exit 91, like the kubectl
+// shim) rather than quietly reading as an empty store or a successful
+// mutation: a misconfigured fixture must never masquerade as store state,
+// and with pipefail upstream a loud exit is what turns into a visible
+// script failure instead of a silent no-op. An unknown subcommand is a
+// fixture-shape bug and dies the same way -- so a future script subcommand
+// can never fall through to the real binary. The real bead is never exec'd.
+const beadShim = `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$GATEWATCH_BEAD_CALLS"
+if [[ $# -lt 1 ]]; then
+  echo "gatewatch bead shim: no subcommand given" >&2
+  exit 91
+fi
+case "$1" in
+  list)
+    fixture=list.jsonl
+    for arg in "$@"; do
+      if [[ "$arg" == "--ready" ]]; then
+        fixture=list-ready.jsonl
+      fi
+    done
+    ;;
+  show)   fixture=show.json ;;
+  create) fixture=create.out ;;
+  update) fixture=update.out ;;
+  reopen) fixture=reopen.out ;;
+  close)  fixture=close.out ;;
+  dep)    fixture=dep.out ;;
+  *)
+    echo "gatewatch bead shim: unknown subcommand $1" >&2
+    exit 91
+    ;;
+esac
+file="$GATEWATCH_BEAD_FIXTURES/$fixture"
+if [[ ! -r "$file" ]]; then
+  echo "gatewatch bead shim: fixture $file is not readable" >&2
+  exit 91
+fi
+cat "$file"
 `
 
 // The fixture shapes mirror what `kubectl get workflows -o json` returns
@@ -135,16 +207,22 @@ var (
 	verdicts = []verdict{green, red, gateErr, pending}
 )
 
-// gateFixture is one throwaway run environment: the checked-in script, a
-// non-repo cwd, and a bin dir whose only resident is the kubectl shim.
+// gateFixture is one throwaway run environment: the checked-in scripts, a
+// non-repo cwd, and a bin dir whose only residents are the kubectl and bead
+// shims.
 type gateFixture struct {
-	gate     string // the checked-in script under test
-	scratch  string // cwd for every run: a temp dir outside any repo
-	bin      string // holds the kubectl shim; prepended to PATH
-	emptyBin string // PATH for the kubectl-missing case: a dir with nothing in it
-	payload  string // file the shim replays
-	calls    string // file the shim appends its argv to
-	mode     string // shim mode: replay (default) or unreachable
+	gate         string // the checked-in ci-gate.sh under test
+	beadGate     string // the checked-in ci-gate-bead.sh
+	watch        string // the checked-in ci-gate-watch.sh
+	scratch      string // cwd for every run: a temp dir outside any repo
+	bin          string // holds the kubectl and bead shims; prepended to PATH
+	emptyBin     string // PATH for the kubectl-missing case: a dir with nothing in it
+	state        string // SEAM_CI_GATE_STATE_DIR for every bead-gate/watch run
+	payload      string // file the kubectl shim replays
+	calls        string // file the kubectl shim appends its argv to
+	mode         string // kubectl shim mode: replay (default) or unreachable
+	beadFixtures string // dir the bead shim replays per-subcommand files from
+	beadLog      string // file the bead shim appends its argv to
 }
 
 // repoRoot anchors on this file's location so the checked-in script is found
@@ -160,18 +238,28 @@ func repoRoot(t *testing.T) string {
 
 func newFixture(t *testing.T) gateFixture {
 	t.Helper()
-	gate := filepath.Join(repoRoot(t), "scripts", "ci-gate.sh")
-	if _, err := os.Stat(gate); err != nil {
-		t.Fatalf("stat checked-in gate (the tests run it, not a copy in this package): %v", err)
+	root := repoRoot(t)
+	gate := filepath.Join(root, "scripts", "ci-gate.sh")
+	beadGate := filepath.Join(root, "scripts", "ci-gate-bead.sh")
+	watch := filepath.Join(root, "scripts", "ci-gate-watch.sh")
+	for _, script := range []string{gate, beadGate, watch} {
+		if _, err := os.Stat(script); err != nil {
+			t.Fatalf("stat checked-in script (the tests run it, not a copy in this package): %v", err)
+		}
 	}
 	scratch := t.TempDir()
 	f := gateFixture{
-		gate:     gate,
-		scratch:  scratch,
-		bin:      filepath.Join(scratch, "bin"),
-		emptyBin: filepath.Join(scratch, "empty-bin"),
-		payload:  filepath.Join(scratch, "kubectl-payload.json"),
-		calls:    filepath.Join(scratch, "kubectl-calls.log"),
+		gate:         gate,
+		beadGate:     beadGate,
+		watch:        watch,
+		scratch:      scratch,
+		bin:          filepath.Join(scratch, "bin"),
+		emptyBin:     filepath.Join(scratch, "empty-bin"),
+		state:        filepath.Join(scratch, "state"),
+		payload:      filepath.Join(scratch, "kubectl-payload.json"),
+		calls:        filepath.Join(scratch, "kubectl-calls.log"),
+		beadFixtures: filepath.Join(scratch, "bead-fixtures"),
+		beadLog:      filepath.Join(scratch, "bead-calls.log"),
 	}
 	if err := os.MkdirAll(f.bin, 0o755); err != nil {
 		t.Fatalf("mkdir shim dir: %v", err)
@@ -179,8 +267,14 @@ func newFixture(t *testing.T) gateFixture {
 	if err := os.MkdirAll(f.emptyBin, 0o755); err != nil {
 		t.Fatalf("mkdir empty dir: %v", err)
 	}
+	if err := os.MkdirAll(f.beadFixtures, 0o755); err != nil {
+		t.Fatalf("mkdir bead fixture dir: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(f.bin, "kubectl"), []byte(kubectlShim), 0o755); err != nil {
 		t.Fatalf("write kubectl shim: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(f.bin, "bead"), []byte(beadShim), 0o755); err != nil {
+		t.Fatalf("write bead shim: %v", err)
 	}
 	return f
 }
@@ -234,17 +328,79 @@ func (f *gateFixture) runWithoutKubectl(t *testing.T, args ...string) gateResult
 	return f.exec(t, f.emptyBin, args...)
 }
 
+// runBeadGate runs scripts/ci-gate-bead.sh from the throwaway cwd.
+func (f *gateFixture) runBeadGate(t *testing.T, args ...string) gateResult {
+	t.Helper()
+	return f.runBeadGateIn(t, f.scratch, args...)
+}
+
+// runBeadGateIn is runBeadGate with an explicit cwd: the close path and the
+// watch loop resolve the revision from the cwd's repository, so those runs
+// happen inside the throwaway repo instead of the bare scratch dir.
+func (f *gateFixture) runBeadGateIn(t *testing.T, dir string, args ...string) gateResult {
+	t.Helper()
+	return f.runScript(t, f.beadGate, dir, f.shimPath(), args...)
+}
+
+// runWatch runs one pass of scripts/ci-gate-watch.sh: it consults
+// ci-gate.sh, then acts on the bead store through the same shim, writing
+// its log under the redirected state dir.
+func (f *gateFixture) runWatch(t *testing.T, dir string) gateResult {
+	t.Helper()
+	return f.runScript(t, f.watch, dir, f.shimPath())
+}
+
+// shimPath is the PATH with both shim dirs first: the scripts resolve
+// kubectl and bead to the shims and everything else (bash, python3, git) to
+// the system.
+func (f *gateFixture) shimPath() string {
+	return f.bin + string(os.PathListSeparator) + os.Getenv("PATH")
+}
+
 func (f *gateFixture) exec(t *testing.T, path string, args ...string) gateResult {
 	t.Helper()
-	cmd := exec.Command("bash", append([]string{f.gate}, args...)...)
-	cmd.Dir = f.scratch
-	cmd.Env = append(envWithoutGit(),
+	return f.runScript(t, f.gate, f.scratch, path, args...)
+}
+
+// scriptEnv is the hermetic environment every script run gets: no GIT_* from
+// an outer session, no XDG_* redirecting config or cache elsewhere, HOME and
+// SEAM_CI_GATE_STATE_DIR pointed into the temp dir, the shims' PATH, the
+// kubectl half pointed at the fake server, and both shims' replay/recording
+// variables wired. ci-gate.sh ignores the bead half and ci-gate-bead.sh
+// reads the kubectl half only through ci-gate.sh; carrying both lets one
+// runner serve every script.
+func (f *gateFixture) scriptEnv(path string) []string {
+	env := make([]string, 0, len(os.Environ())+10)
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GIT_") || strings.HasPrefix(kv, "XDG_") ||
+			strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "SEAM_CI_GATE_STATE_DIR=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env,
+		"HOME="+f.scratch,
+		"SEAM_CI_GATE_STATE_DIR="+f.state,
 		"PATH="+path,
 		"SEAM_CI_KUBECTL_SERVER="+fakeServer,
 		"GATEWATCH_KUBECTL_PAYLOAD="+f.payload,
 		"GATEWATCH_KUBECTL_CALLS="+f.calls,
 		"GATEWATCH_KUBECTL_MODE="+f.mode,
+		"GATEWATCH_BEAD_FIXTURES="+f.beadFixtures,
+		"GATEWATCH_BEAD_CALLS="+f.beadLog,
 	)
+}
+
+// runScript executes one of the checked-in scripts under scriptEnv's
+// hermetic environment. It never fails on a nonzero exit -- verdicts and
+// refusals ARE exit codes -- so each assertion decides what its case
+// allows.
+func (f *gateFixture) runScript(t *testing.T, script, dir, path string, args ...string) gateResult {
+	t.Helper()
+	env := f.scriptEnv(path)
+	cmd := exec.Command("bash", append([]string{script}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = env
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
@@ -252,24 +408,11 @@ func (f *gateFixture) exec(t *testing.T, path string, args ...string) gateResult
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)
 		if !ok {
-			t.Fatalf("run gate: %v\nstdout: %s\nstderr: %s", err, res.stdout, res.stderr)
+			t.Fatalf("run %s: %v\nstdout: %s\nstderr: %s", filepath.Base(script), err, res.stdout, res.stderr)
 		}
 		res.exit = exitErr.ExitCode()
 	}
 	return res
-}
-
-// envWithoutGit drops GIT_* from the environment: the harness's throwaway
-// cwd must stay a non-repo even if an outer session exports GIT_DIR.
-func envWithoutGit() []string {
-	env := make([]string, 0, len(os.Environ()))
-	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "GIT_") {
-			continue
-		}
-		env = append(env, kv)
-	}
-	return env
 }
 
 // kubectlCalls returns one line per shim invocation: the argv kubectl was
@@ -284,6 +427,144 @@ func (f *gateFixture) kubectlCalls(t *testing.T) []string {
 		t.Fatalf("read kubectl call log: %v", err)
 	}
 	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+}
+
+// beadRec is the sliver of a bead record the gate scripts' python parsers
+// read: id everywhere, title to recognize the gate bead, status on `show`.
+// Everything else a real bead record carries is noise to these scripts and
+// stays unrepresented.
+type beadRec struct {
+	ID     string `json:"id"`
+	Title  string `json:"title,omitempty"`
+	Status string `json:"status,omitempty"`
+}
+
+// gateBead is the gate bead itself as the fixtures see it.
+func gateBead(id, status string) beadRec {
+	return beadRec{ID: id, Title: gateBeadTitle, Status: status}
+}
+
+// readyBead is an ordinary claimable bead: any title but the gate title,
+// so the scripts count it against the frontier and wire a blocker onto it.
+func readyBead(id string) beadRec {
+	return beadRec{ID: id, Title: "ready work item " + id}
+}
+
+// writeBeadFixture drops one shim fixture file into place.
+func (f *gateFixture) writeBeadFixture(t *testing.T, name string, data []byte) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.beadFixtures, name), data, 0o644); err != nil {
+		t.Fatalf("write bead fixture %s: %v", name, err)
+	}
+}
+
+// beadJSONL marshals beads as the JSONL `bead list --json` prints.
+func beadJSONL(t *testing.T, beads []beadRec) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	for _, b := range beads {
+		data, err := json.Marshal(b)
+		if err != nil {
+			t.Fatalf("marshal bead %s: %v", b.ID, err)
+		}
+		buf.Write(data)
+		buf.WriteByte('\n')
+	}
+	return buf.Bytes()
+}
+
+// beadListAll fills the fixture every plain `bead list --json` replays: the
+// whole store, the list gate_id() scans for the gate bead.
+func (f *gateFixture) beadListAll(t *testing.T, beads []beadRec) {
+	t.Helper()
+	f.writeBeadFixture(t, "list.jsonl", beadJSONL(t, beads))
+}
+
+// beadListReady fills the fixture every `bead list --ready --json` replays:
+// the frontier the open path wires blockers onto.
+func (f *gateFixture) beadListReady(t *testing.T, beads []beadRec) {
+	t.Helper()
+	f.writeBeadFixture(t, "list-ready.jsonl", beadJSONL(t, beads))
+}
+
+// beadShow fills the fixture every `bead show <id> --json` replays: a
+// one-element array, the shape gate_status_value() parses.
+func (f *gateFixture) beadShow(t *testing.T, b beadRec) {
+	t.Helper()
+	data, err := json.Marshal([]beadRec{b})
+	if err != nil {
+		t.Fatalf("marshal show fixture: %v", err)
+	}
+	f.writeBeadFixture(t, "show.json", data)
+}
+
+// beadMutations arms every mutator subcommand -- create's stdout (the new
+// id) plus the four whose output the scripts discard -- so any of them can
+// fire without the shim dying on a missing fixture. Whether they SHOULD
+// fire is exactly what the recorded calls decide.
+func (f *gateFixture) beadMutations(t *testing.T, newID string) {
+	t.Helper()
+	f.writeBeadFixture(t, "create.out", []byte(newID+"\n"))
+	for _, name := range []string{"update.out", "reopen.out", "close.out", "dep.out"} {
+		f.writeBeadFixture(t, name, nil)
+	}
+}
+
+// beadCalls returns one line per shim invocation: the full argv the gate
+// scripts handed to bead, which is how the store mutation itself is pinned.
+func (f *gateFixture) beadCalls(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(f.beadLog)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatalf("read bead call log: %v", err)
+	}
+	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+}
+
+// noLiveStore fails the test if anything created a bead store in the
+// throwaway cwd. With `bead` shimmed the store is unreachable by
+// construction; this is the tripwire that keeps the construction honest --
+// if the real binary ever ran, it is the first thing it would leave behind.
+func (f *gateFixture) noLiveStore(t *testing.T) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(f.scratch, ".beads")); err == nil {
+		t.Errorf("a .beads store appeared in the throwaway cwd: the real bead binary ran")
+	}
+}
+
+// originRepo builds a throwaway git repository with a local bare origin and
+// returns the repo dir plus main's sha: the minimum a `git ls-remote
+// origin` inside ci-gate.sh needs to resolve the revision offline. Both
+// live in the fixture's temp dir, and the commit carries its own identity,
+// so no developer git config or remote is consulted.
+func (f *gateFixture) originRepo(t *testing.T) (dir, revision string) {
+	t.Helper()
+	dir = filepath.Join(f.scratch, "repo")
+	origin := filepath.Join(f.scratch, "origin.git")
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "HOME="+f.scratch)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	run(f.scratch, "init", "--bare", "-q", "-b", "main", origin)
+	run(f.scratch, "init", "-q", "-b", "main", dir)
+	run(dir, "remote", "add", "origin", origin)
+	if err := os.WriteFile(filepath.Join(dir, "seed.txt"), []byte("gatewatch revision anchor\n"), 0o644); err != nil {
+		t.Fatalf("seed repo file: %v", err)
+	}
+	run(dir, "add", "seed.txt")
+	run(dir, "-c", "user.name=gatewatch", "-c", "user.email=gatewatch@invalid", "commit", "-q", "-m", "seed")
+	run(dir, "push", "-q", "origin", "main")
+	return dir, run(dir, "rev-parse", "HEAD")
 }
 
 // want asserts the full verdict contract on one run: the exit code, a first
@@ -533,4 +814,401 @@ func TestGateAsksKubectlForExactlyTheSeamCiRuns(t *testing.T) {
 			t.Errorf("kubectl query does not contain %q: %s", want, argv)
 		}
 	}
+}
+
+// containsCall reports whether calls includes want as either an exact argv
+// line or a prefix of one -- "update gate-01 --status open" matching
+// "update gate-01 --status open" but not "update gate-011 ...".
+func containsCall(calls []string, want string) bool {
+	for _, c := range calls {
+		if c == want || strings.HasPrefix(c, want+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+// mustRead returns a file's contents, failing the test if it is not there.
+func mustRead(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(data)
+}
+
+// TestCiGateBeadStatusThroughBeadShim is the smoke test for the bead half
+// of the harness: the real scripts/ci-gate-bead.sh status, end to end,
+// against a fake store. A status is read-only, so the recorded calls are
+// the pin -- exactly one store probe to find the gate bead, a probe plus a
+// show for its status, and the ready list -- with every mutator armed in
+// the fixtures so that a stray mutation would be visible in the log rather
+// than fatal to the run.
+func TestCiGateBeadStatusThroughBeadShim(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, []beadRec{gateBead("gate-01", "deferred")})
+	f.beadListReady(t, []beadRec{gateBead("gate-01", "deferred"), readyBead("ready-01")})
+	f.beadShow(t, gateBead("gate-01", "deferred"))
+	f.beadMutations(t, "gate-01")
+
+	res := f.runBeadGate(t, "status")
+	if res.exit != 0 {
+		t.Fatalf("status exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+	}
+	for _, want := range []string{
+		// ci-gate.sh ran first through the kubectl shim and, in a non-repo
+		// cwd, could not resolve a revision; status reports anyway.
+		"GATE error revision=unknown",
+		"gate bead: gate-01 status=deferred",
+		"ready frontier: 1 non-gate bead(s)",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("status output does not contain %q:\n%s", want, res.stdout)
+		}
+	}
+
+	want := []string{
+		"list --limit 999999 --json", // find the gate bead
+		"list --limit 999999 --json", // find it again for its status
+		"show gate-01 --json",
+		"list --ready --limit 999999 --json", // the frontier
+	}
+	got := f.beadCalls(t)
+	if len(got) != len(want) {
+		t.Fatalf("bead invoked %d times, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("bead call %d = %q, want %q", i+1, got[i], want[i])
+		}
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadOpenWiresTheFrontier pins what a red gate does to the store:
+// create the gate bead with the exact title the frontier recognizes and the
+// unique ref that makes re-runs idempotent, defer it out of the claimable
+// frontier, and wire a blocker edge from every ready bead to it.
+func TestCiGateBeadOpenWiresTheFrontier(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, nil) // no gate bead yet
+	f.beadListReady(t, []beadRec{readyBead("ready-a"), readyBead("ready-b")})
+	f.beadMutations(t, "gate-01")
+
+	res := f.runBeadGate(t, "open")
+	if res.exit != 0 {
+		t.Fatalf("open exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+	}
+	for _, want := range []string{
+		"created gate bead gate-01",
+		"  blocked ready-a",
+		"  blocked ready-b",
+		"gate bead gate-01 open; 2 ready bead(s) newly blocked; 2 non-gate bead(s) still ready",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("open output does not contain %q:\n%s", want, res.stdout)
+		}
+	}
+
+	calls := f.beadCalls(t)
+	var created bool
+	for _, c := range calls {
+		if !strings.HasPrefix(c, "create ") {
+			continue
+		}
+		created = true
+		for _, part := range []string{
+			"--title " + gateBeadTitle,
+			"--unique-ref " + gateBeadRef, // the ref is what makes re-opens idempotent
+			"--priority 0",
+		} {
+			if !strings.Contains(c, part) {
+				t.Errorf("create call does not contain %q: %s", part, c)
+			}
+		}
+	}
+	if !created {
+		t.Fatalf("open never created the gate bead:\n%s", strings.Join(calls, "\n"))
+	}
+	if !containsCall(calls, "update gate-01 --status deferred --notes") {
+		t.Errorf("the gate bead was not deferred out of the frontier:\n%s", strings.Join(calls, "\n"))
+	}
+	for _, id := range []string{"ready-a", "ready-b"} {
+		// Edge direction is the script's contract: dep add <blocked> <blocker>.
+		if !containsCall(calls, "dep add "+id+" gate-01") {
+			t.Errorf("no blocker edge wired onto %s:\n%s", id, strings.Join(calls, "\n"))
+		}
+	}
+	if len(calls) != 10 {
+		// list, create, then three status probes (the missing-status echo
+		// and the defer check each re-run gate_id), update, list-ready,
+		// dep x2, list-ready.
+		t.Errorf("bead invoked %d times, want 10:\n%s", len(calls), strings.Join(calls, "\n"))
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadOpenReopensAClosedGate pins the re-open half of open: an
+// existing gate bead that a previous green cycle closed is reopened and
+// re-deferred, with no second bead created and the edges re-checked.
+func TestCiGateBeadOpenReopensAClosedGate(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, []beadRec{gateBead("gate-01", "closed")})
+	f.beadListReady(t, []beadRec{gateBead("gate-01", "closed")}) // only the gate bead itself
+	f.beadShow(t, gateBead("gate-01", "closed"))
+	f.beadMutations(t, "gate-01")
+
+	res := f.runBeadGate(t, "open")
+	if res.exit != 0 {
+		t.Fatalf("open exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+	}
+	for _, want := range []string{
+		"reopened gate bead gate-01",
+		"gate bead gate-01 open; 0 ready bead(s) newly blocked; 0 non-gate bead(s) still ready",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("open output does not contain %q:\n%s", want, res.stdout)
+		}
+	}
+
+	calls := f.beadCalls(t)
+	if !containsCall(calls, "reopen gate-01") {
+		t.Errorf("closed gate bead was not reopened:\n%s", strings.Join(calls, "\n"))
+	}
+	if !containsCall(calls, "update gate-01 --status deferred --notes") {
+		t.Errorf("reopened gate bead was not re-deferred:\n%s", strings.Join(calls, "\n"))
+	}
+	for _, banned := range []string{"create", "close"} {
+		if containsCall(calls, banned) {
+			t.Errorf("open of an existing gate bead also issued %q:\n%s", banned, strings.Join(calls, "\n"))
+		}
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadClose pins the green half of the cycle. close first
+// re-checks ci-gate.sh itself -- the frontier is never released by hand on
+// a gate the cluster does not vouch for -- then walks a deferred gate bead
+// back to open (the only status close is reachable from) and closes it.
+func TestCiGateBeadClose(t *testing.T) {
+	t.Run("green closes a deferred gate bead", func(t *testing.T) {
+		f := newFixture(t)
+		repo, rev := f.originRepo(t)
+		f.replay(t, gateWorkflowList{Items: []gateWorkflow{
+			seamRun("seam-ci-close01", "2026-09-18T10:00:00Z", rev, "Succeeded"),
+		}})
+		f.beadListAll(t, []beadRec{gateBead("gate-01", "deferred")})
+		f.beadShow(t, gateBead("gate-01", "deferred"))
+		f.beadMutations(t, "gate-01")
+
+		res := f.runBeadGateIn(t, repo, "close")
+		if res.exit != 0 {
+			t.Fatalf("close exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		for _, want := range []string{
+			"GATE green revision=" + rev[:9], // ci-gate.sh's own green, not assumed
+			"closed gate bead gate-01",
+		} {
+			if !strings.Contains(res.stdout, want) {
+				t.Errorf("close output does not contain %q:\n%s", want, res.stdout)
+			}
+		}
+		calls := f.beadCalls(t)
+		if !containsCall(calls, "update gate-01 --status open") {
+			t.Errorf("deferred gate bead was not walked back to open before close:\n%s", strings.Join(calls, "\n"))
+		}
+		if !containsCall(calls, "close gate-01 --reason") {
+			t.Errorf("gate bead was not closed with a reason:\n%s", strings.Join(calls, "\n"))
+		}
+		if len(calls) != 7 {
+			// list, then two status probes (closed-check and deferred-check,
+			// each a list plus a show), update, close.
+			t.Errorf("bead invoked %d times, want 7:\n%s", len(calls), strings.Join(calls, "\n"))
+		}
+		f.noLiveStore(t)
+	})
+
+	t.Run("refuses to close while the gate is not green", func(t *testing.T) {
+		f := newFixture(t)
+		// Mutators armed and a store that says the gate is open -- but the
+		// cwd is a non-repo, so ci-gate.sh cannot resolve a revision and
+		// holds. A hold is not a green: the store must be untouched.
+		f.beadListAll(t, []beadRec{gateBead("gate-01", "open")})
+		f.beadShow(t, gateBead("gate-01", "open"))
+		f.beadMutations(t, "gate-01")
+
+		res := f.runBeadGate(t, "close")
+		if res.exit != 1 {
+			t.Fatalf("close exited %d, want 1\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		if !strings.Contains(res.stderr, "refusing to close the gate bead") {
+			t.Errorf("refusal not explained on stderr:\n%s", res.stderr)
+		}
+		if calls := f.beadCalls(t); len(calls) != 0 {
+			t.Errorf("a refused close still touched the store:\n%s", strings.Join(calls, "\n"))
+		}
+	})
+
+	t.Run("already closed is a no-op", func(t *testing.T) {
+		f := newFixture(t)
+		repo, rev := f.originRepo(t)
+		f.replay(t, gateWorkflowList{Items: []gateWorkflow{
+			seamRun("seam-ci-close02", "2026-09-18T10:00:00Z", rev, "Succeeded"),
+		}})
+		f.beadListAll(t, []beadRec{gateBead("gate-01", "closed")})
+		f.beadShow(t, gateBead("gate-01", "closed"))
+		f.beadMutations(t, "gate-01")
+
+		res := f.runBeadGateIn(t, repo, "close")
+		if res.exit != 0 {
+			t.Fatalf("close exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		if !strings.Contains(res.stdout, "gate bead gate-01 already closed") {
+			t.Errorf("idempotent close not reported:\n%s", res.stdout)
+		}
+		calls := f.beadCalls(t)
+		if containsCall(calls, "close") || containsCall(calls, "update") {
+			t.Errorf("an already-closed gate bead was mutated anyway:\n%s", strings.Join(calls, "\n"))
+		}
+	})
+}
+
+// TestBeadShimFailsLoudlyOnMisconfiguredFixture pins the shim's own
+// contract, against the shim directly: a missing fixture is a harness bug
+// and must exit 91 with the offending path on stderr -- never read as an
+// empty store or a successful mutation -- and the failed call is still
+// recorded, so the test that triggered it can be found.
+func TestBeadShimFailsLoudlyOnMisconfiguredFixture(t *testing.T) {
+	f := newFixture(t)
+	runShim := func(args ...string) gateResult {
+		t.Helper()
+		cmd := exec.Command(filepath.Join(f.bin, "bead"), args...)
+		cmd.Env = f.scriptEnv(f.shimPath())
+		var out, errOut bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &out, &errOut
+		res := gateResult{}
+		if err := cmd.Run(); err != nil {
+			exitErr, ok := err.(*exec.ExitError)
+			if !ok {
+				t.Fatalf("run bead shim: %v", err)
+			}
+			res.exit = exitErr.ExitCode()
+		}
+		res.stdout, res.stderr = out.String(), errOut.String()
+		return res
+	}
+
+	t.Run("missing list fixture", func(t *testing.T) {
+		res := runShim("list", "--limit", "1", "--json")
+		if res.exit != 91 {
+			t.Fatalf("missing fixture exited %d, want 91\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		if !strings.Contains(res.stderr, "list.jsonl") || !strings.Contains(res.stderr, "not readable") {
+			t.Errorf("stderr does not name the missing fixture:\n%s", res.stderr)
+		}
+		if res.stdout != "" {
+			t.Errorf("a misconfigured fixture produced output:\n%s", res.stdout)
+		}
+		// The failure is on the record too: the call log is how a test
+		// explains which invocation hit the missing fixture.
+		if calls := f.beadCalls(t); len(calls) != 1 || calls[0] != "list --limit 1 --json" {
+			t.Errorf("failed call not recorded:\n%v", calls)
+		}
+	})
+
+	t.Run("missing show fixture", func(t *testing.T) {
+		res := runShim("show", "gate-01", "--json")
+		if res.exit != 91 || !strings.Contains(res.stderr, "show.json") {
+			t.Fatalf("missing show fixture: exit %d, stderr:\n%s", res.exit, res.stderr)
+		}
+	})
+
+	t.Run("unknown subcommand", func(t *testing.T) {
+		res := runShim("rebless", "gate-01")
+		if res.exit != 91 {
+			t.Fatalf("unknown subcommand exited %d, want 91\nstderr: %s", res.exit, res.stderr)
+		}
+		if !strings.Contains(res.stderr, "unknown subcommand rebless") {
+			t.Errorf("stderr does not name the subcommand:\n%s", res.stderr)
+		}
+	})
+
+	t.Run("configured fixture replays and records", func(t *testing.T) {
+		// The positive control for the loud failures above.
+		f.beadListAll(t, []beadRec{readyBead("ready-01")})
+		res := runShim("list", "--json")
+		if res.exit != 0 {
+			t.Fatalf("configured fixture exited %d\nstderr: %s", res.exit, res.stderr)
+		}
+		if !strings.Contains(res.stdout, `"id":"ready-01"`) {
+			t.Errorf("fixture payload not replayed:\n%s", res.stdout)
+		}
+		if calls := f.beadCalls(t); len(calls) != 4 || calls[3] != "list --json" {
+			t.Errorf("replayed call not recorded (want 3 prior + this one):\n%v", calls)
+		}
+	})
+}
+
+// TestGateWatchActsOnTheBeadStore drives one full pass of
+// scripts/ci-gate-watch.sh -- the unattended loop that turns a verdict into
+// a store action -- with the state dir redirected into the temp dir.
+func TestGateWatchActsOnTheBeadStore(t *testing.T) {
+	t.Run("red gate opens the frontier through the same shim", func(t *testing.T) {
+		f := newFixture(t)
+		repo, rev := f.originRepo(t)
+		f.replay(t, gateWorkflowList{Items: []gateWorkflow{
+			seamRun("seam-ci-watchred", "2026-09-18T10:00:00Z", rev, "Failed"),
+		}})
+		f.beadListAll(t, nil)
+		f.beadListReady(t, []beadRec{readyBead("ready-a"), readyBead("ready-b")})
+		f.beadMutations(t, "gate-01")
+
+		res := f.runWatch(t, repo)
+		if res.exit != 0 {
+			t.Fatalf("watch exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		// The watch wrote its log under the redirected state dir -- the
+		// default ($HOME/.local/state/seam-ci-gate) was pointed into the
+		// temp dir with HOME.
+		check := mustRead(t, filepath.Join(f.state, "last-check.txt"))
+		if !strings.HasPrefix(check, "GATE red revision="+rev[:9]) {
+			t.Errorf("last-check.txt does not carry the red verdict:\n%s", check)
+		}
+		log := mustRead(t, filepath.Join(f.state, "watch.log"))
+		if !strings.Contains(log, "red: frontier blocked") {
+			t.Errorf("watch.log does not record the frontier block:\n%s", log)
+		}
+		calls := f.beadCalls(t)
+		for _, want := range []string{
+			"create", // opens the gate bead...
+			"update gate-01 --status deferred --notes",
+			"dep add ready-a gate-01", // ...and empties the frontier
+			"dep add ready-b gate-01",
+		} {
+			if !containsCall(calls, want) {
+				t.Errorf("red-gate watch pass did not issue %q:\n%s", want, strings.Join(calls, "\n"))
+			}
+		}
+		f.noLiveStore(t)
+	})
+
+	t.Run("hold on error leaves the store alone", func(t *testing.T) {
+		f := newFixture(t)
+		f.beadMutations(t, "gate-01")
+
+		// Non-repo cwd: ci-gate.sh cannot resolve a revision and exits 2,
+		// which the watch maps to hold -- no open, no close, no bead calls.
+		res := f.runWatch(t, f.scratch)
+		if res.exit != 0 {
+			t.Fatalf("watch exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		log := mustRead(t, filepath.Join(f.state, "watch.log"))
+		if !strings.Contains(log, "hold: ci-gate.sh exit 2") {
+			t.Errorf("watch.log does not record the hold:\n%s", log)
+		}
+		if calls := f.beadCalls(t); len(calls) != 0 {
+			t.Errorf("a held pass still touched the bead store:\n%s", strings.Join(calls, "\n"))
+		}
+	})
 }
