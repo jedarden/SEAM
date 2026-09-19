@@ -138,7 +138,16 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
   # record, and the complete ArgoCD capture. Malformed, empty, or
   # schema-violating data fails here, as does a response snapshot that no
   # longer matches its captured pair.
-  run_check "corpus integrity" go test ./corpus
+  #
+  # The 2026-09-18 history purge (9984a5b) removed every checked-in corpus
+  # and gitignored the directory, so gate on the directory being present --
+  # `go test ./corpus` fails with "directory not found" otherwise. Same
+  # shape as the benchmark gate's baseline guard below.
+  if [ -d corpus ]; then
+    run_check "corpus integrity" go test ./corpus
+  else
+    echo "Skipping corpus integrity - no corpus directory present"
+  fi
 
   # Capture round-trip and response-pair preservation, five repetitions
   # per the doc -- a single pass can miss intermittent capture/save
