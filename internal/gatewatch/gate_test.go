@@ -828,6 +828,19 @@ func containsCall(calls []string, want string) bool {
 	return false
 }
 
+// countCalls counts the recorded calls that are exactly want or start with
+// it -- the counting half of containsCall, for pins like "exactly one create
+// across two runs".
+func countCalls(calls []string, want string) int {
+	n := 0
+	for _, c := range calls {
+		if c == want || strings.HasPrefix(c, want+" ") {
+			n++
+		}
+	}
+	return n
+}
+
 // mustRead returns a file's contents, failing the test if it is not there.
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
@@ -983,6 +996,174 @@ func TestCiGateBeadOpenReopensAClosedGate(t *testing.T) {
 		if containsCall(calls, banned) {
 			t.Errorf("open of an existing gate bead also issued %q:\n%s", banned, strings.Join(calls, "\n"))
 		}
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadOpenDefersAnExistingOpenGateBead pins the dangerous middle
+// state: a gate bead that already exists and is still plain open. That is
+// exactly the shape the defer exists to prevent -- the script's own comment
+// records a plain open P0 being claimed by a fleet worker within seconds of
+// creation -- so open must defer it on sight and wire the frontier, and
+// above all must not create a second gate bead beside it. The gate bead also
+// sits in the ready fixture here, because an open bead is by definition
+// claimable: the run must skip it while wiring edges, never block itself.
+func TestCiGateBeadOpenDefersAnExistingOpenGateBead(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, []beadRec{gateBead("gate-01", "open")})
+	f.beadListReady(t, []beadRec{gateBead("gate-01", "open"), readyBead("ready-a"), readyBead("ready-b")})
+	f.beadShow(t, gateBead("gate-01", "open"))
+	f.beadMutations(t, "gate-01")
+
+	res := f.runBeadGate(t, "open")
+	if res.exit != 0 {
+		t.Fatalf("open exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+	}
+	for _, banned := range []string{"created gate bead", "reopened gate bead"} {
+		if strings.Contains(res.stdout, banned) {
+			t.Errorf("open of an existing open gate bead reported %q:\n%s", banned, res.stdout)
+		}
+	}
+	for _, want := range []string{
+		"  blocked ready-a",
+		"  blocked ready-b",
+		"gate bead gate-01 open; 2 ready bead(s) newly blocked; 2 non-gate bead(s) still ready",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("open output does not contain %q:\n%s", want, res.stdout)
+		}
+	}
+
+	want := []string{
+		"list --limit 999999 --json", // gate_id: the bead is already there
+		"list --limit 999999 --json", // status read for the case
+		"show gate-01 --json",
+		"list --limit 999999 --json", // status read for the defer check
+		"show gate-01 --json",
+		"update gate-01 --status deferred --notes", // the claimable P0 leaves the frontier
+		"list --ready --limit 999999 --json",
+		"dep add ready-a gate-01",
+		"dep add ready-b gate-01",
+		"list --ready --limit 999999 --json",
+	}
+	got := f.beadCalls(t)
+	if len(got) != len(want) {
+		t.Fatalf("bead invoked %d times, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
+	}
+	for i := range want {
+		if !strings.HasPrefix(got[i], want[i]) {
+			t.Errorf("bead call %d = %q, want prefix %q", i+1, got[i], want[i])
+		}
+	}
+	if containsCall(got, "dep add gate-01 gate-01") {
+		t.Errorf("the gate bead was wired to block itself:\n%s", strings.Join(got, "\n"))
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadOpenLeavesADeferredGateBeadAlone pins the steady state a red
+// gate spends most of its life in: the gate bead already deferred, doing its
+// job. A re-run of open must then touch the bead's status not at all -- no
+// update, no reopen, no close -- while still wiring blocker edges onto the
+// beads created while the gate was red; that re-run is the header's own
+// promise. "Left alone" is about the gate bead; wiring the frontier is the
+// point of the run.
+func TestCiGateBeadOpenLeavesADeferredGateBeadAlone(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, []beadRec{gateBead("gate-01", "deferred")})
+	// Deferred keeps the gate bead out of the ready frontier; the beads here
+	// are work items created after the gate opened, edge-less until now.
+	f.beadListReady(t, []beadRec{readyBead("ready-c"), readyBead("ready-d")})
+	f.beadShow(t, gateBead("gate-01", "deferred"))
+	f.beadMutations(t, "gate-01")
+
+	res := f.runBeadGate(t, "open")
+	if res.exit != 0 {
+		t.Fatalf("open exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+	}
+	if !strings.Contains(res.stdout, "gate bead gate-01 is deferred -- leaving status alone") {
+		t.Errorf("the leave-alone decision is not reported:\n%s", res.stdout)
+	}
+	for _, want := range []string{
+		"  blocked ready-c",
+		"  blocked ready-d",
+		"gate bead gate-01 open; 2 ready bead(s) newly blocked; 2 non-gate bead(s) still ready",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("open output does not contain %q:\n%s", want, res.stdout)
+		}
+	}
+
+	calls := f.beadCalls(t)
+	for _, banned := range []string{"create", "update", "reopen", "close"} {
+		if containsCall(calls, banned) {
+			t.Errorf("open of an already-deferred gate bead issued %q -- the bead was not left alone:\n%s",
+				banned, strings.Join(calls, "\n"))
+		}
+	}
+	if !containsCall(calls, "dep add ready-c gate-01") || !containsCall(calls, "dep add ready-d gate-01") {
+		t.Errorf("beads created while the gate was red did not pick up the blocker edge:\n%s", strings.Join(calls, "\n"))
+	}
+	if len(calls) != 11 {
+		// list, then three status reads (the case, the leave-alone echo, the
+		// defer check -- each a list plus a show), list-ready, dep x2,
+		// list-ready.
+		t.Errorf("bead invoked %d times, want 11:\n%s", len(calls), strings.Join(calls, "\n"))
+	}
+	f.noLiveStore(t)
+}
+
+// TestCiGateBeadOpenReRunCreatesNoSecondBead pins idempotence across
+// invocations, which is how the script is actually used: open fires when the
+// gate goes red and again whenever someone notices new beads need edges. The
+// first run creates the gate bead; the second -- against a store that now
+// contains it -- must create nothing, so a long red spell can never
+// accumulate duplicate gate beads. The shim's static fixtures stand in for
+// the store's after-state: the list fixture gains the bead the first run
+// created, and a second ready bead appears to give the re-run something to
+// wire.
+func TestCiGateBeadOpenReRunCreatesNoSecondBead(t *testing.T) {
+	f := newFixture(t)
+	f.beadListAll(t, nil)
+	f.beadListReady(t, []beadRec{readyBead("ready-a")})
+	f.beadMutations(t, "gate-01")
+
+	first := f.runBeadGate(t, "open")
+	if first.exit != 0 {
+		t.Fatalf("first open exited %d\nstdout: %s\nstderr: %s", first.exit, first.stdout, first.stderr)
+	}
+
+	// The store as the first open left it: gate bead present and deferred,
+	// plus ready-b created by a worker who missed the gate going red.
+	f.beadListAll(t, []beadRec{gateBead("gate-01", "deferred")})
+	f.beadShow(t, gateBead("gate-01", "deferred"))
+	f.beadListReady(t, []beadRec{readyBead("ready-a"), readyBead("ready-b")})
+
+	second := f.runBeadGate(t, "open")
+	if second.exit != 0 {
+		t.Fatalf("second open exited %d\nstdout: %s\nstderr: %s", second.exit, second.stdout, second.stderr)
+	}
+
+	if got := strings.Count(first.stdout+second.stdout, "created gate bead"); got != 1 {
+		t.Errorf("two opens reported %d creations, want exactly one:\n%s---\n%s", got, first.stdout, second.stdout)
+	}
+	calls := f.beadCalls(t)
+	if n := countCalls(calls, "create"); n != 1 {
+		t.Errorf("two opens issued %d create calls, want exactly 1:\n%s", n, strings.Join(calls, "\n"))
+	}
+	if n := countCalls(calls, "update gate-01"); n != 1 {
+		// The first run's defer; a second would mean the re-run re-deferred
+		// a bead that was already deferred.
+		t.Errorf("two opens issued %d update calls, want exactly the first run's 1:\n%s", n, strings.Join(calls, "\n"))
+	}
+	for _, banned := range []string{"reopen", "close"} {
+		if containsCall(calls, banned) {
+			t.Errorf("two opens issued %q:\n%s", banned, strings.Join(calls, "\n"))
+		}
+	}
+	if !containsCall(calls, "dep add ready-b gate-01") {
+		t.Errorf("the bead created while the gate was red did not pick up the edge on the re-run:\n%s",
+			strings.Join(calls, "\n"))
 	}
 	f.noLiveStore(t)
 }
