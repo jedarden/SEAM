@@ -62,6 +62,12 @@ const (
 	gateBeadTitle = "GATE: seam-ci is red - do not claim SEAM beads"
 	// gateBeadRef is the --unique-ref the script creates the bead with.
 	gateBeadRef = "seam:ci-red-gate"
+	// gateCloseReason is the exact --reason scripts/ci-gate-bead.sh close is
+	// documented to leave on the gate bead. The close-path tests pin it
+	// verbatim: a reader of `bead show` must be able to tell an automatic
+	// frontier release from a hand-close, and a silently reworded reason
+	// would break exactly that.
+	gateCloseReason = "seam-ci Succeeded for the tree at main; frontier released by scripts/ci-gate-bead.sh close"
 )
 
 // kubectlShim stands in for kubectl. It appends its argv to the file named
@@ -1170,8 +1176,13 @@ func TestCiGateBeadOpenReRunCreatesNoSecondBead(t *testing.T) {
 
 // TestCiGateBeadClose pins the green half of the cycle. close first
 // re-checks ci-gate.sh itself -- the frontier is never released by hand on
-// a gate the cluster does not vouch for -- then walks a deferred gate bead
-// back to open (the only status close is reachable from) and closes it.
+// a gate the cluster does not vouch for -- then walks the gate bead through
+// its idempotent close paths: a deferred bead is walked back to open (the
+// only status close is reachable from) before closing, a plain open bead
+// closes with no walk at all, an already-closed one is a reported no-op,
+// and a store with no gate bead gets the same. Every path is pinned on the
+// recorded call sequence -- which subcommands fired, in what order, with
+// the documented release reason -- never just on the run's exit code.
 func TestCiGateBeadClose(t *testing.T) {
 	t.Run("green closes a deferred gate bead", func(t *testing.T) {
 		f := newFixture(t)
@@ -1195,17 +1206,68 @@ func TestCiGateBeadClose(t *testing.T) {
 				t.Errorf("close output does not contain %q:\n%s", want, res.stdout)
 			}
 		}
-		calls := f.beadCalls(t)
-		if !containsCall(calls, "update gate-01 --status open") {
-			t.Errorf("deferred gate bead was not walked back to open before close:\n%s", strings.Join(calls, "\n"))
+		// The walk itself, on the recorded sequence: find, then the
+		// closed-check and the deferred-check (each a list plus a show),
+		// then open-then-close -- the update strictly before the close, and
+		// the close carrying the documented release reason verbatim.
+		want := []string{
+			"list --limit 999999 --json",   // gate_id: find the bead
+			"list --limit 999999 --json",   // status probe for the closed-check...
+			"show gate-01 --json",          // ...deferred, so close is not reachable yet
+			"list --limit 999999 --json",   // status probe for the deferred-check...
+			"show gate-01 --json",          // ...confirmed
+			"update gate-01 --status open", // the walk back to the closeable status
+			"close gate-01 --reason " + gateCloseReason,
 		}
-		if !containsCall(calls, "close gate-01 --reason") {
-			t.Errorf("gate bead was not closed with a reason:\n%s", strings.Join(calls, "\n"))
+		got := f.beadCalls(t)
+		if len(got) != len(want) {
+			t.Fatalf("bead invoked %d times, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
 		}
-		if len(calls) != 7 {
-			// list, then two status probes (closed-check and deferred-check,
-			// each a list plus a show), update, close.
-			t.Errorf("bead invoked %d times, want 7:\n%s", len(calls), strings.Join(calls, "\n"))
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("bead call %d = %q, want %q", i+1, got[i], want[i])
+			}
+		}
+		f.noLiveStore(t)
+	})
+
+	t.Run("green closes an open gate bead directly", func(t *testing.T) {
+		// The idempotent matrix's other middle state: plain open is already
+		// closeable, so close must go straight there -- pinning that no
+		// update fires is what keeps the walk a deferred-only detour
+		// instead of a habit.
+		f := newFixture(t)
+		repo, rev := f.originRepo(t)
+		f.replay(t, gateWorkflowList{Items: []gateWorkflow{
+			seamRun("seam-ci-close03", "2026-09-18T10:00:00Z", rev, "Succeeded"),
+		}})
+		f.beadListAll(t, []beadRec{gateBead("gate-01", "open")})
+		f.beadShow(t, gateBead("gate-01", "open"))
+		f.beadMutations(t, "gate-01")
+
+		res := f.runBeadGateIn(t, repo, "close")
+		if res.exit != 0 {
+			t.Fatalf("close exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		if !strings.Contains(res.stdout, "closed gate bead gate-01") {
+			t.Errorf("close output does not report the close:\n%s", res.stdout)
+		}
+		want := []string{
+			"list --limit 999999 --json", // gate_id: find the bead
+			"list --limit 999999 --json", // status probe for the closed-check...
+			"show gate-01 --json",        // ...open, so not closed
+			"list --limit 999999 --json", // status probe for the deferred-check...
+			"show gate-01 --json",        // ...open again: no walk needed
+			"close gate-01 --reason " + gateCloseReason,
+		}
+		got := f.beadCalls(t)
+		if len(got) != len(want) {
+			t.Fatalf("bead invoked %d times, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("bead call %d = %q, want %q", i+1, got[i], want[i])
+			}
 		}
 		f.noLiveStore(t)
 	})
@@ -1248,10 +1310,54 @@ func TestCiGateBeadClose(t *testing.T) {
 		if !strings.Contains(res.stdout, "gate bead gate-01 already closed") {
 			t.Errorf("idempotent close not reported:\n%s", res.stdout)
 		}
-		calls := f.beadCalls(t)
-		if containsCall(calls, "close") || containsCall(calls, "update") {
-			t.Errorf("an already-closed gate bead was mutated anyway:\n%s", strings.Join(calls, "\n"))
+		// The closed-check short-circuits: find the bead, read its status
+		// once, report -- and nothing past the read. The recorded sequence
+		// is the pin: no close, no update, not even a second status probe.
+		want := []string{
+			"list --limit 999999 --json", // gate_id: find the bead
+			"list --limit 999999 --json", // status probe for the closed-check...
+			"show gate-01 --json",        // ...closed: stop here
 		}
+		got := f.beadCalls(t)
+		if len(got) != len(want) {
+			t.Fatalf("bead invoked %d times, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("bead call %d = %q, want %q", i+1, got[i], want[i])
+			}
+		}
+		if containsCall(got, "close") || containsCall(got, "update") {
+			t.Errorf("an already-closed gate bead was mutated anyway:\n%s", strings.Join(got, "\n"))
+		}
+		f.noLiveStore(t)
+	})
+
+	t.Run("no gate bead in the store is a no-op", func(t *testing.T) {
+		// Green with nothing to release: close must not invent work. The
+		// mutators are armed so a stray create or close would show in the
+		// log, and the show fixture is deliberately left unset -- any reach
+		// past the one list dies loudly on it instead of reading as success.
+		f := newFixture(t)
+		repo, rev := f.originRepo(t)
+		f.replay(t, gateWorkflowList{Items: []gateWorkflow{
+			seamRun("seam-ci-close04", "2026-09-18T10:00:00Z", rev, "Succeeded"),
+		}})
+		f.beadListAll(t, nil)
+		f.beadMutations(t, "gate-01")
+
+		res := f.runBeadGateIn(t, repo, "close")
+		if res.exit != 0 {
+			t.Fatalf("close exited %d\nstdout: %s\nstderr: %s", res.exit, res.stdout, res.stderr)
+		}
+		if !strings.Contains(res.stdout, "no gate bead to close") {
+			t.Errorf("close output does not report the empty store:\n%s", res.stdout)
+		}
+		calls := f.beadCalls(t)
+		if len(calls) != 1 || calls[0] != "list --limit 999999 --json" {
+			t.Errorf("a close with no gate bead did more than look:\n%s", strings.Join(calls, "\n"))
+		}
+		f.noLiveStore(t)
 	})
 }
 
