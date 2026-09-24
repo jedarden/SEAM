@@ -29,7 +29,7 @@ seam serve [flags]
 - `--spec-dir` (default: `./spec`) - Directory containing local OpenAPI spec files
 
 #### Fragments & Schema
-- `--fragment-mode` (default: `false`) - Enable fragment merge mode (reads from `spec-dir/fragments.d`)
+- `--fragment-mode` (default: `false`) - Enable fragment merge mode (routes are read from `--fragments-dir`; see [Fragment directory and hot-reload scope](#fragment-directory-and-hot-reload-scope))
 - `--schema-path` (default: `./spec/route-fragment-schema.json`) - Path to the route-fragment JSON schema for validation
 - `--fragments-dir` (default: `./fragments`) - Directory containing OpenAPI fragment files
 - `--enable-hot-reload` (default: `false`) - Enable file-watch hot reload of route fragments
@@ -48,6 +48,18 @@ seam serve [flags]
 - `--max-buffered-response-bytes` (default: `1048576`) - Maximum decoded response body size held for whole-response scrubbing, in bytes (see the note below)
 
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path.
+
+#### Fragment directory and hot-reload scope
+
+In fragment mode (`--fragment-mode` / `SEAM_FRAGMENT_MODE`) every route SEAM serves is merged from one directory, resolved once at startup:
+
+1. an explicitly passed `--fragments-dir`,
+2. otherwise a non-empty `SEAM_FRAGMENTS_DIR` (an empty value counts as unset),
+3. otherwise the built-in default `./fragments`.
+
+That resolved directory is authoritative. `--spec-dir` never influences which fragments are loaded — it only selects the static-spec location in non-fragment mode. `<spec-dir>/fragments.d` is **not** the fragment location by default: it survives only as a legacy fallback applied when the resolved directory is empty, which the serve path cannot reach (the flag default is non-empty) — it exists for an explicitly passed `--fragments-dir=` and for direct loader-API callers. `seam lint` and `seam diff` resolve `--fragments-dir` with their own flag-over-environment rule (see [lint / diff explicit-flag tracking](#lint--diff-explicit-flag-tracking)) and never consult `--spec-dir`.
+
+When `--enable-hot-reload` / `SEAM_HOT_RELOAD_ENABLED` is on, the watcher roots at that same resolved directory: it watches the directory itself plus each immediate subdirectory (the per-service mounts a ConfigMap projection creates), together with the allowlist file's directory and the upstream CA directory when configured. A missing fragments directory is logged and simply means nothing is watched — not a startup error — and a directory created after startup is picked up only on restart. A watch event re-reads the directory captured at startup: changing `SEAM_FRAGMENTS_DIR` in a running process's environment never redirects a reload. Each reload re-walks the tree, re-merges, and atomically swaps the route table (in-flight requests finish on the old table); a re-merge whose hash matches the current spec is a no-op. Schema validation runs at startup only — a reload does not re-validate fragments against `--schema-path`, so `seam lint` remains the gate for fragment structure.
 
 ### Environment Variables
 

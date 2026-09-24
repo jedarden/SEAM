@@ -64,7 +64,7 @@ func (fl *FragmentLoader) SetAllowlistEnforcer(enforcer *AllowlistEnforcer) {
 }
 
 // LoadDirectory loads all fragments from a directory tree
-// Expected layout: fragments.d/<service>/<fragment-name>.yaml
+// Expected layout: <fragments-dir>/<service>/<fragment-name>.yaml
 func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 	log.Printf("[Fragment] Loading fragments from directory: %s", fragmentsDir)
 

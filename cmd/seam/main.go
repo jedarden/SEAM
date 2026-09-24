@@ -150,7 +150,7 @@ func registerServeFlags(fs *flag.FlagSet) *serveFlags {
 		operatorPort:              fs.Int("operator-port", 8081, "Port for the operator-only listener"),
 		baseURL:                   fs.String("base-url", "http://localhost:8080", "Base URL for the caller-facing interface"),
 		specDir:                   fs.String("spec-dir", "./spec", "Directory containing local OpenAPI spec files"),
-		fragmentMode:              fs.Bool("fragment-mode", false, "Enable fragment merge mode (reads from spec-dir/fragments.d)"),
+		fragmentMode:              fs.Bool("fragment-mode", false, "Enable fragment merge mode (routes are read from the --fragments-dir directory)"),
 		schemaPath:                fs.String("schema-path", "./spec/route-fragment-schema.json", "Path to route-fragment JSON schema for validation"),
 		captureEnabled:            fs.Bool("capture-enabled", false, "Enable HTTP request/response capture"),
 		corpusDir:                 fs.String("corpus-dir", "corpus", "Directory to store captured corpus files"),

@@ -37,6 +37,18 @@ func NewHotReloadManager(server *Server) *HotReloadManager {
 	}
 }
 
+// routesMountDir resolves the directory the hot-reload watcher roots at: the
+// resolved fragments directory (--fragments-dir / SEAM_FRAGMENTS_DIR) when one
+// is configured, otherwise the legacy <spec-dir>/fragments.d layout. The
+// fallback must mirror the one in spec.NewWithFragments so a watch event
+// reloads the same tree the server merged at startup.
+func routesMountDir(cfg *Config) string {
+	if cfg.FragmentsDir != "" {
+		return cfg.FragmentsDir
+	}
+	return filepath.Join(cfg.SpecDir, "fragments.d")
+}
+
 // Enable sets up watchers for all mount points and starts the hot reload manager
 func (hrm *HotReloadManager) Enable() error {
 	hrm.reloadMu.Lock()
@@ -51,32 +63,27 @@ func (hrm *HotReloadManager) Enable() error {
 		return fmt.Errorf("hot reload only supported in fragment mode")
 	}
 
-	// Determine the routes mount directory
-	// This could be /spec/fragments.d (legacy) or /etc/gateway/routes.d/ (new structure)
-	routesMountDir := hrm.server.config.FragmentsDir
-	if routesMountDir == "" {
-		routesMountDir = filepath.Join(hrm.server.config.SpecDir, "fragments.d")
-	}
+	mountDir := routesMountDir(hrm.server.config)
 
-	log.Printf("[HotReload] Setting up watchers for routes mount: %s", routesMountDir)
+	log.Printf("[HotReload] Setting up watchers for routes mount: %s", mountDir)
 
 	// If the routes mount directory exists and is a directory, discover and watch subdirectories
 	// Each subdirectory represents a service mount with its own ..data symlink
-	if info, err := os.Stat(routesMountDir); err == nil && info.IsDir() {
+	if info, err := os.Stat(mountDir); err == nil && info.IsDir() {
 		// Watch the parent directory itself for backward compatibility with single-directory setups
-		if err := hrm.coordinator.AddMount(routesMountDir); err != nil {
+		if err := hrm.coordinator.AddMount(mountDir); err != nil {
 			log.Printf("[HotReload] Warning: failed to watch routes mount directory: %v", err)
 		}
 
 		// Discover and watch each service subdirectory
-		entries, err := os.ReadDir(routesMountDir)
+		entries, err := os.ReadDir(mountDir)
 		if err != nil {
 			log.Printf("[HotReload] Warning: failed to read routes mount directory: %v", err)
 		} else {
 			serviceCount := 0
 			for _, entry := range entries {
 				if entry.IsDir() {
-					servicePath := filepath.Join(routesMountDir, entry.Name())
+					servicePath := filepath.Join(mountDir, entry.Name())
 					log.Printf("[HotReload] Adding watcher for service mount: %s", servicePath)
 					if err := hrm.coordinator.AddMount(servicePath); err != nil {
 						log.Printf("[HotReload] Warning: failed to watch service mount %s: %v", servicePath, err)
@@ -85,10 +92,10 @@ func (hrm *HotReloadManager) Enable() error {
 					}
 				}
 			}
-			log.Printf("[HotReload] Watching %d service mounts under %s", serviceCount, routesMountDir)
+			log.Printf("[HotReload] Watching %d service mounts under %s", serviceCount, mountDir)
 		}
 	} else {
-		log.Printf("[HotReload] Routes mount directory does not exist: %s", routesMountDir)
+		log.Printf("[HotReload] Routes mount directory does not exist: %s", mountDir)
 	}
 
 	// Watch the allowlist mount if configured

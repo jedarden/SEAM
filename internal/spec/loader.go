@@ -117,7 +117,11 @@ func NewWithFragments(specDir, baseURL, schemaPath, fragmentsDir string) (*Loade
 		return nil, fmt.Errorf("failed to create fragment loader: %w", err)
 	}
 
-	// Use default fragments directory if not specified
+	// Legacy fallback: an empty fragments directory resolves to the pre-flag
+	// <spec-dir>/fragments.d layout. The serve path never hits this — its flag
+	// default is ./fragments — so <spec-dir>/fragments.d is not the fragment
+	// location by default; see README.md "Fragment directory and hot-reload
+	// scope".
 	if fragmentsDir == "" {
 		fragmentsDir = filepath.Join(specDir, "fragments.d")
 		log.Printf("[Loader] Using default fragments directory: %s", fragmentsDir)
