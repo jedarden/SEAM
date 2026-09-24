@@ -658,6 +658,9 @@ OK
 1. **`TestQuotaEnforcement_ReservedPaths`** - Verifies reserved paths bypass quota
 2. **`TestCacheMiddleware_Integration_ReservedPathsBypass`** - Verifies reserved paths bypass cache
 3. **`TestQuotaEnforcement_CacheMissIntegration`** - Verifies cache hits bypass quota deduction
+4. **`TestSeamHealthAliasServesSameBodyAsHealthz`** - Pins the served alias: `/_seam/health` is registered on the same handler as `/_seam/healthz` and answers 200 `"OK"` (and refuses non-GET) identically
+5. **`TestSeamHealthAliasReceivesReservedPathTreatment`** - Pins the reserved-path treatment of both health names (cache and quota bypass despite a configured TTL and cost) and their deliberate absence from the `reservedPaths` exact enumeration
+6. **`TestHealthzAndAliasAnswerWhileReadyzIs503`** - Pins liveness/readiness separation: a quarantined-everything route table 503s `/_seam/readyz` while both health names keep answering
 
 ### Manual Testing
 
