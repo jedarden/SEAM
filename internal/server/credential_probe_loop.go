@@ -288,6 +288,7 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		FragmentID: target.FragmentID,
 		InstanceID: target.InstanceID,
 		Status:     CredentialUnknown,
+		Interval:   target.Interval,
 	}
 
 	key := target.FragmentID + ":" + target.InstanceID

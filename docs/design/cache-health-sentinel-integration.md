@@ -41,7 +41,7 @@ SEAM provides several health sentinel endpoints:
 |----------|---------|----------|
 | `/_seam/health` | Liveness probe | `200 OK` with body `"OK"` |
 | `/_seam/healthz` | Liveness probe (alias) | `200 OK` with body `"OK"` |
-| `/_seam/readyz` | Readiness probe | `200 OK` (future: dependency checks) |
+| `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body |
 | `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
 | `/health/upstreams` | Upstream health | `200 OK` (future: route table health) |
 
@@ -52,6 +52,22 @@ is configured for the path. An open breaker is reported as `status: "unhealthy"`
 a half-open breaker as `"degraded"`, and the endpoint remains
 HTTP 200 so operators can inspect the structured response. No credential
 values are returned.
+
+### Readiness Dependencies (`/_seam/readyz`)
+
+`/_seam/readyz` evaluates a defined dependency set on every request and
+answers `503` while any dependency is unmet. The body is a flat JSON map of
+booleans — the aggregate `ready` flag plus one key per dependency — so a
+probe consumer reading a 503 from Deployment events can tell which dependency
+failed without querying further endpoints. Every value is a boolean, keeping
+the historical response shape decodable as `map[string]bool`.
+
+| Key | Dependency | Satisfied when |
+|-----|------------|----------------|
+| `route_table` | Route table loaded | The current route table carries at least one route — at least one valid fragment loaded and merged. A reload that quarantines every fragment takes the pod out of the Service while `/_seam/health` keeps answering. |
+| `openbao` | OpenBao login state | The asynchronous startup Kubernetes-auth login has completed. The login runs in the background so an OpenBao outage degrades readiness instead of crash-looping the container — the gate behind the seam-a155e900 503 regressions, kept gating on purpose: a pod that cannot read credentials must not receive traffic. |
+| `credential_probe` | Credential-probe freshness | No credential probe is configured, or every tracked probe carries a successful verification no older than twice its configured cadence plus a 5-minute grace. An attached registry with no results yet counts as fresh — probe-loop cold start must not recreate the startup-503 class of regressions. Readiness gates on the freshness of the verification signal, not on any single credential's health; an unhealthy credential is reported at `/health/credentials` and does not by itself remove the pod from the Service. |
+| `allowlist` | Allowlist enforcement | Vault-path and upstream-host allowlist enforcement is not fail-closed (no hosts permitted). |
 
 ### Traffic Pattern
 

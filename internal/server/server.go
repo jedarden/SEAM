@@ -190,6 +190,7 @@ type Server struct {
 	specRingBuffer         *SpecRingBuffer                 // Phase 8.4: Ring buffer for spec version history
 	cloudflareJWTValidator *CloudflareJWTValidator         // Phase 14: Cloudflare Access JWT validator
 	exclusionTracker       *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
+	credentialProbes       *CredentialProbeRegistry        // Credential-probe results the readyz gate evaluates (nil = no probes configured)
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -582,31 +583,6 @@ func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
-}
-
-// readyzHandler returns readiness status
-// Returns ready=false when allowlist is in fail-closed state (no hosts permitted)
-// Phase 2.2: Allowlist enforcement gating
-func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		MethodNotAllowed("Only GET method is allowed").Write(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-
-	// Check allowlist status
-	ready := s.allowlistEnforcer == nil || !s.allowlistEnforcer.IsFailClosed()
-	if !s.isOpenBaoReady() {
-		ready = false
-	}
-
-	statusCode := http.StatusOK
-	if !ready {
-		statusCode = http.StatusServiceUnavailable
-	}
-
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(map[string]bool{"ready": ready})
 }
 
 // metricsHandler exposes the server-scoped Prometheus registry on the

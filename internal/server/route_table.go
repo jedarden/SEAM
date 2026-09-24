@@ -354,6 +354,23 @@ func (h *ThreadSafeTableHolder) Snapshot() []RouteEntry {
 	return h.current.GetRoutes()
 }
 
+// RouteCount returns the number of routes in the current route table. A nil
+// holder or an uninitialized table reports zero, which is the readiness
+// gate's not-ready signal for a server that has no valid fragments.
+func (h *ThreadSafeTableHolder) RouteCount() int {
+	if h == nil {
+		return 0
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.current == nil {
+		return 0
+	}
+	return h.current.RouteCount()
+}
+
 // OpenBaoCacheStats returns the OpenBao cache statistics from the current route table.
 func (h *ThreadSafeTableHolder) OpenBaoCacheStats() vault.CacheStats {
 	if h == nil {

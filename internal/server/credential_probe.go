@@ -24,11 +24,17 @@ type CredentialProbeConfig struct {
 	Interval string `yaml:"interval" json:"interval"`
 }
 
+// defaultCredentialProbeInterval is the cadence used when a fragment does not
+// configure x-credential-probe.interval. It backs both ParseInterval and the
+// readyz freshness window's fallback for results recorded without an
+// interval.
+const defaultCredentialProbeInterval = time.Hour
+
 // ParseInterval parses the interval string into a duration.
 // Supports: "30s", "5m", "1h", "2h", etc.
 func (c *CredentialProbeConfig) ParseInterval() (time.Duration, error) {
 	if c.Interval == "" {
-		return 1 * time.Hour, nil // Default 1 hour
+		return defaultCredentialProbeInterval, nil
 	}
 	return parseDurationString(c.Interval)
 }
@@ -210,6 +216,12 @@ type CredentialProbeResult struct {
 
 	// Status is the current credential health status
 	Status CredentialHealthStatus `json:"status"`
+
+	// Interval is the probe cadence configured for this (fragment, instance)
+	// pair. Consumers computing freshness from LastVerified scale their
+	// staleness window with it, because fragment intervals legitimately range
+	// from minutes to a day.
+	Interval time.Duration `json:"probe_interval,omitempty"`
 
 	// KnownExpiry is when the credential is known to expire (if available)
 	KnownExpiry *time.Time `json:"known_expiry,omitempty"`
