@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -469,6 +472,7 @@ func TestServePortEnvParsing(t *testing.T) {
 		{name: "plain value applies", env: "9100", applied: true, value: 9100},
 		{name: "signed value applies", env: "-1", applied: true, value: -1},
 		{name: "out-of-range value applies unchecked", env: "99999", applied: true, value: 99999},
+		{name: "leading whitespace: integer prefix applies", env: " 9100", applied: true, value: 9100},
 		{name: "leading whitespace and trailing junk: integer prefix applies", env: " 8080abc", applied: true, value: 8080},
 		{name: "hex-looking value takes the decimal prefix", env: "0x10", applied: true, value: 0},
 		{name: "non-numeric value is rejected and keeps the flag", env: "abc"},
@@ -542,6 +546,57 @@ func TestServeByteLimitEnvParsing(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// README ("Invalid values") says a rejected integer variable keeps the
+// previous value AND logs a warning. TestServePortEnvParsing and
+// TestServeByteLimitEnvParsing pin the kept value; this pins the warning
+// itself, on both Printf sites that emit it (ports and byte limits).
+func TestServeInvalidIntegerEnvLogsWarning(t *testing.T) {
+	tests := []struct {
+		name        string
+		envVar      string
+		env         string
+		flagName    string
+		field       func(f *serveFlags) int
+		keptDefault int
+	}{
+		{
+			name: "SEAM_CALLER_PORT", envVar: "SEAM_CALLER_PORT", env: "abc",
+			flagName: "caller-port", field: func(f *serveFlags) int { return *f.callerPort },
+			keptDefault: 8080,
+		},
+		{
+			name: "SEAM_OPERATOR_PORT", envVar: "SEAM_OPERATOR_PORT", env: "not-a-port",
+			flagName: "operator-port", field: func(f *serveFlags) int { return *f.operatorPort },
+			keptDefault: 8081,
+		},
+		{
+			name: "SEAM_MAX_REPLAYABLE_REQUEST_BYTES", envVar: "SEAM_MAX_REPLAYABLE_REQUEST_BYTES", env: "lots",
+			flagName: "max-replayable-request-bytes", field: func(f *serveFlags) int { return int(*f.maxReplayableRequestBytes) },
+			keptDefault: 1024 * 1024,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			log.SetOutput(&buf)
+			t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+			f := resolveServeConfig(t, nil, map[string]string{tc.envVar: tc.env})
+
+			if got := tc.field(f); got != tc.keptDefault {
+				t.Errorf("%s=%q resolved %s = %d, want the default %d kept", tc.envVar, tc.env, tc.flagName, got, tc.keptDefault)
+			}
+			warning := buf.String()
+			for _, want := range []string{"invalid", tc.envVar, `"` + tc.env + `"`, fmt.Sprint(tc.keptDefault)} {
+				if !strings.Contains(warning, want) {
+					t.Errorf("warning %q does not mention %q", warning, want)
+				}
+			}
+		})
 	}
 }
 
@@ -623,8 +678,13 @@ func TestResolveHealthcheckCallerPort(t *testing.T) {
 		{name: "explicit flag beats environment", args: []string{"--caller-port", "9000"}, env: map[string]string{"SEAM_CALLER_PORT": "9100"}, want: 9000},
 		{name: "unset environment keeps the flag", args: []string{"--caller-port", "9000"}, want: 9000},
 		{name: "empty environment keeps the flag", args: []string{"--caller-port", "9000"}, env: map[string]string{"SEAM_CALLER_PORT": ""}, want: 9000},
+		{name: "empty environment keeps the default", env: map[string]string{"SEAM_CALLER_PORT": ""}, want: 8080},
 		{name: "non-numeric environment keeps the flag", args: []string{"--caller-port", "9000"}, env: map[string]string{"SEAM_CALLER_PORT": "abc"}, want: 9000},
+		{name: "non-numeric environment keeps the default", env: map[string]string{"SEAM_CALLER_PORT": "abc"}, want: 8080},
+		{name: "leading whitespace: integer prefix applies", env: map[string]string{"SEAM_CALLER_PORT": " 9100"}, want: 9100},
 		{name: "trailing junk takes the integer prefix when flag is omitted", env: map[string]string{"SEAM_CALLER_PORT": "8080abc"}, want: 8080},
+		{name: "hex-looking value takes the decimal prefix", env: map[string]string{"SEAM_CALLER_PORT": "0x10"}, want: 0},
+		{name: "out-of-range value applies unchecked", env: map[string]string{"SEAM_CALLER_PORT": "99999"}, want: 99999},
 	}
 
 	for _, tc := range tests {
