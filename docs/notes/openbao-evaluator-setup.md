@@ -1,5 +1,32 @@
 # OpenBao Setup for seam-retirement-evaluator
 
+> **GITHUB-TOKEN MODEL WITHDRAWN — 2026-09-05** (`declarat-b818338b`). The
+> evaluator is **detection-only**: it has no GitHub client, opens no PRs, and
+> holds no third-party credential. Its whole output is one structured log
+> record and one Prometheus counter per deprecation candidate; the proposed
+> `x-seam-deprecated` edit is landed by a human as an ordinary commit to
+> `main`. The GitHub-token provisioning workflow, the token requirements, and
+> the completion criteria that required a token below are **historical** —
+> they can no longer be satisfied and must not be "finished". The live policy
+> (`~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`,
+> written every cycle by the rs-manager hardening-reconciler) grants read on
+> exactly one path: the query-only VictoriaMetrics credential
+> `rs-manager/seam-retirement-evaluator/victoriametrics-query`. The retired
+> GitHub credential path must stay **denied** — the verify script and
+> `seam-evaluator-credential-boundary-canary` assert a 403 on it
+> (`seam-retirement-evaluator/github/token` for the `seam` identity, and the
+> evaluator identity on its own retired path). Do not restore the grant to
+> make an old verify step pass; it had no caller.
+>
+> **VictoriaMetrics credential, settled:** the evaluator **binary** performs
+> unauthenticated VM queries (no Authorization header in
+> `tools/seam-retirement-evaluator/victoriametrics.go`; config is two env
+> vars). The credentialled path exists for the estate's boundary proof: a
+> vmauth-scoped, read-only bearer token at the path above, exercised by
+> `seam-retirement-evaluator-access-canary`. The old
+> `monitoring/victoriametrics/readonly-credentials` path is not in the live
+> policy and no longer exists as a grant.
+>
 > **ROUTE BOUNDARY REPOINTED — 2026-09-04.** SEAM's enforced vault base dir is
 > now `rs-manager/rs-manager/seam/routes`
 > (`internal/spec/allowlist.go` `DefaultVaultBaseDir`, overridable via
@@ -26,7 +53,7 @@
 
 **Bead:** `bf-38lwm`
 
-This document describes the OpenBao role and policy for the seam-retirement-evaluator service, which requires its own dedicated GitHub token and VictoriaMetrics credentials while maintaining strict isolation from SEAM's route secrets.
+This document describes the OpenBao role and policy for the seam-retirement-evaluator service, which maintains strict isolation from SEAM's route secrets. Everything below about a dedicated GitHub token is historical (see the withdrawal banner above) — the evaluator is detection-only and its policy's single grant is the query-only VictoriaMetrics credential.
 
 ## What Was Created
 
@@ -34,7 +61,8 @@ This document describes the OpenBao role and policy for the seam-retirement-eval
 
 **Location:** `/home/coding/SEAM/declarative-config/infra/seam-retirement-evaluator/openbao-policy.hcl` *(stale in-repo snapshot — live copy at `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`)*
 
-**Policy:**
+**Policy (as originally created 2026-08 — historical; the live policy's
+single grant is `rs-manager/seam-retirement-evaluator/victoriametrics-query`):**
 ```hcl
 # Allow reading evaluator's own GitHub token
 path "secret/data/seam-retirement-evaluator/*" {
@@ -102,25 +130,28 @@ token_max_ttl = "72h"
 
 The evaluator uses an **Argo WorkflowTemplate** for setup (unlike SEAM's shell script), which provides:
 - Automated setup via CI/CD
-- Parameterizable GitHub token injection
+- Parameterizable GitHub token injection *(historical — no consumer since 2026-09-05)*
 - Better reproducibility
 
 **WorkflowTemplate:** `seam-retirement-evaluator-openbao-setup`
 
-**Location:** `/home/coding/SEAM/declarative-config/infra/seam-retirement-evaluator/openbao-setup-job.yaml`
+**Location:** `/home/coding/SEAM/declarative-config/infra/seam-retirement-evaluator/openbao-setup-job.yaml` *(stale in-repo snapshot — the live home is `~/declarative-config/k8s/rs-manager/seam-retirement-evaluator/`)*
 
-**What the workflow does:**
+**What the workflow does** *(historical description; the rs-manager
+hardening-reconciler now writes `seam-retirement-evaluator-policy` every
+cycle and the setup workflow no longer writes the policy)*:
 1. Creates policy `seam-retirement-evaluator-policy` in OpenBao
 2. Creates Kubernetes auth role `seam-retirement-evaluator`
-3. Creates GitHub token path at `secret/seam-retirement-evaluator/github-token`
-4. Creates VictoriaMetrics credentials path
+3. Creates GitHub token path at `secret/seam-retirement-evaluator/github-token` *(historical — path retired, now denied)*
+4. Creates VictoriaMetrics credentials path *(today: `rs-manager/seam-retirement-evaluator/victoriametrics-query`)*
 5. Verifies SEAM policy isolation (ensures SEAM cannot read evaluator paths)
 
 ## How to Apply
 
 ### Option 1: Using Argo Workflow (Recommended)
 
-**With GitHub Token:**
+**With GitHub Token (HISTORICAL — the token parameter no longer has a
+consumer; the evaluator is detection-only):**
 ```bash
 kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig create -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
@@ -153,6 +184,10 @@ EOF
 ```
 
 ### Option 2: Manual OpenBao API
+
+*(The GitHub-token and `readonly-credentials` puts below are historical —
+the token path is retired and must stay denied; the live credential is
+`rs-manager/seam-retirement-evaluator/victoriametrics-query`.)*
 
 ```bash
 # Set environment variables
@@ -239,16 +274,21 @@ spec:
 EOF
 ```
 
-**Verification checks:**
+**Verification checks** (inverted where noted, 2026-09-05):
 1. ✓ Evaluator ServiceAccount can authenticate to OpenBao via Kubernetes auth
-2. ✓ Evaluator can read own GitHub token at `seam-retirement-evaluator/github-token`
+2. ✓ Evaluator is **denied (403)** on the retired GitHub credential path `seam-retirement-evaluator/github/token` — inverted from the old read check when the grant was removed
 3. ✓ Evaluator cannot read SEAM route secrets (`rs-manager/rs-manager/seam/routes/*`, the base in force)
 4. ✓ Evaluator cannot read SEAM route secrets on the legacy base (`seam/routes/*`, retired — kept only until the old paths are gone)
-5. ✓ Evaluator can read VictoriaMetrics credentials (`monitoring/victoriametrics/*`)
+5. ✓ Evaluator can read the query-only VictoriaMetrics credential (`rs-manager/seam-retirement-evaluator/victoriametrics-query`) — and its token cannot reach the metrics write or delete APIs
 6. ✓ Evaluator policy correctly bounded (default-deny enforced)
-7. ✓ SEAM cannot access evaluator's GitHub token (isolation verified)
+7. ✓ SEAM cannot access the evaluator credential path (isolation verified — `seam-evaluator-credential-boundary-canary` asserts the 403 every 5 minutes)
 
 ## Architecture Overview
+
+The two lower credential boxes below are **historical** (withdrawn
+2026-09-05): the live estate's only evaluator credential is the query-only
+VictoriaMetrics token at
+`secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -299,11 +339,13 @@ The evaluator's OpenBao access is deliberately isolated from SEAM:
 ### Security Boundaries
 
 **Allowed for Evaluator:**
-- ✅ Read `secret/data/seam-retirement-evaluator/*` (GitHub token for PRs)
-- ✅ Read `secret/data/monitoring/victoriametrics/*` (metrics query credentials)
+- ✅ Read `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query` (the query-only VictoriaMetrics credential — the single grant)
+- ~~Read `secret/data/seam-retirement-evaluator/*` (GitHub token for PRs)~~ — withdrawn 2026-09-05
+- ~~Read `secret/data/monitoring/victoriametrics/*`~~ — never in the live policy
 
 **Denied for Evaluator:**
 - ❌ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM's route secrets)
+- ❌ Read the retired GitHub credential path `seam-retirement-evaluator/github/token` (must 403)
 - ❌ Read any other secrets (default-deny)
 - ❌ Write any secrets (read-only)
 
@@ -311,7 +353,7 @@ The evaluator's OpenBao access is deliberately isolated from SEAM:
 - ✅ Read `secret/data/rs-manager/rs-manager/seam/routes/*` (SEAM route secrets)
 
 **Denied for SEAM:**
-- ❌ Read `secret/data/seam-retirement-evaluator/*` (evaluator's GitHub token)
+- ❌ Read `secret/data/seam-retirement-evaluator/*` (evaluator credential path — explicit deny)
 - ❌ Read any other secrets (default-deny)
 
 ### Mutual Isolation
@@ -322,7 +364,7 @@ This isolation is enforced at **two levels**:
 2. **Verification steps** – runtime testing of permissions
 
 The mutual denial ensures:
-- SEAM cannot read the evaluator's GitHub token (security boundary)
+- SEAM cannot read the evaluator credential path (security boundary — canaried every 5 minutes)
 - Evaluator cannot read SEAM route secrets (security boundary)
 - Both have read-only access to their respective resources
 - No cross-contamination of credentials
@@ -345,31 +387,40 @@ The hostile-fragment threat model requires that:
 | **Token TTL** | 24h | 24h |
 | **Token Max TTL** | 72h | 72h |
 | **Setup Method** | Shell script | Argo WorkflowTemplate |
-| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | `seam-retirement-evaluator/*`, `monitoring/victoriametrics/*` |
-| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `rs-manager/rs-manager/seam/routes/*`, `*` (default) |
+| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | `rs-manager/seam-retirement-evaluator/victoriametrics-query` (query-only VM credential; no GitHub token) |
+| **Explicit Deny Rules** | `seam-retirement-evaluator/*`, `*` (default) | `rs-manager/rs-manager/seam/routes/*` + retired `seam/routes/*` |
 
 ## GitHub Token Requirements
 
-The evaluator needs a GitHub Personal Access Token that can:
-- **Target:** `jedarden/declarative-config` on GitHub (not Forgejo)
-- **Capability:** Open pull requests only
-- **Scopes:** `repo` (Full control of private repositories)
-- **Expiration:** 90 days recommended
+**Withdrawn 2026-09-05** (`declarat-b818338b`). The evaluator no longer
+holds, reads, or needs a GitHub token: it is detection-only, and the
+`x-seam-deprecated` edit it proposes is landed by a human as an ordinary
+commit to `main` in declarative-config. The requirements below are kept only
+to explain what the historical setup created — do not provision a token
+against them.
 
-### Security Consideration
+- **Target (historical):** `jedarden/declarative-config` on GitHub (not Forgejo)
+- **Capability (historical):** Open pull requests only
+- **Scopes (historical):** `repo` (Full control of private repositories)
+- **Expiration (historical):** 90 days recommended
 
-While the token's capability is bounded (can only open PRs), it can technically open PRs against ANY path in declarative-config. **Human reviewers must reject any evaluator PR that touches paths outside `routes/<service>/`.**
+### Security Consideration (current)
+
+The evaluator's write-path blast radius is now **zero**: there is no git-host
+credential and no PR path. The remaining boundary to watch is VictoriaMetrics
+— the `victoriametrics-query` token is vmauth-scoped to read endpoints only,
+and the access canary asserts the write and delete APIs reject it.
 
 ## Completion Criteria
 
 The setup is complete when:
 
-1. ✓ OpenBao policy `seam-retirement-evaluator-policy` exists
+1. ✓ OpenBao policy `seam-retirement-evaluator-policy` exists (as written every cycle by the rs-manager hardening-reconciler: single read grant on `rs-manager/seam-retirement-evaluator/victoriametrics-query`, explicit denies on both SEAM route prefixes)
 2. ✓ Kubernetes auth role `seam-retirement-evaluator` exists
-3. ✓ GitHub token exists at `secret/data/seam-retirement-evaluator/github-token` (not placeholder)
-4. ✓ VictoriaMetrics credentials path exists at `secret/data/monitoring/victoriametrics/readonly-credentials`
-5. ✓ Verification workflow passes all tests
-6. ✓ SEAM provably cannot access evaluator's token path
+3. ✓ The query-only VictoriaMetrics credential exists at `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query` (with `endpoint` and `token` fields)
+4. ✓ No GitHub token exists for the evaluator — the retired path stays absent **and denied** (403 for both the evaluator and `seam` identities)
+5. ✓ Verification passes: both canary Deployments READY 1/1 in namespace `seam` on rs-manager
+6. ✓ SEAM provably cannot access the evaluator credential path
 
 ## Notes
 
@@ -377,7 +428,7 @@ The setup is complete when:
 - Kubernetes auth method must already be enabled in OpenBao (`auth/kubernetes/`)
 - The ServiceAccount `seam-retirement-evaluator` is created in the `seam` namespace
 - This setup creates **server-side** resources only – no cluster resources beyond the ServiceAccount
-- The evaluation service uses this GitHub token to open PRs against `jedarden/declarative-config` when retiring routes
+- The evaluator is detection-only: it emits deprecation candidates and lands nothing itself — a human commits the proposed `x-seam-deprecated` edit to `main` in declarative-config
 
 ## Related Documentation
 

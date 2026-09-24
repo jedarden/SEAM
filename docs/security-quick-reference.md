@@ -18,8 +18,10 @@ curl -X POST http://localhost:8080/github-alerts/issues -d '{"invalid":"data"}' 
 
 ### 3. OpenBao Policy Check
 ```bash
-# Verify SEAM cannot read evaluator paths
-bao kv get evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -i "permission denied"
+# Verify SEAM cannot read the evaluator's credential path (the evaluator's
+# single grant is the query-only VM credential; the old github-token path is
+# retired and must stay denied — probed live by seam-evaluator-credential-boundary-canary)
+bao kv get rs-manager/seam-retirement-evaluator/victoriametrics-query 2>&1 | grep -i "permission denied"
 # Expected: "permission denied" error
 ```
 
@@ -69,8 +71,8 @@ if sudo grep -rE "(ghp_|gho_[A-Za-z0-9]{36})" /var/log/seam/; then
   exit 1
 fi
 
-# Policy check  
-if ! bao kv get evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -i "permission denied"; then
+# Policy check
+if ! bao kv get rs-manager/seam-retirement-evaluator/victoriametrics-query 2>&1 | grep -i "permission denied"; then
   echo "CRITICAL: OpenBao policy violation"
   exit 1
 fi
@@ -119,7 +121,7 @@ api[_-]?key['\"]?\s*[:=]\s*['\"]?[A-Za-z0-9]{20,}  # API Keys
 ### Safe: Reference-Only Patterns
 ```
 secret/data/rs-manager/rs-manager/seam/routes/*  # OpenBao path references
-evaluators/seam-retirement-evaluator/*  # Secret path metadata
+rs-manager/seam-retirement-evaluator/*  # Evaluator credential path metadata
 x-vault-path: rs-manager/rs-manager/seam/routes/*  # Fragment configuration
 ```
 
@@ -144,7 +146,7 @@ Treating "document the token" and "document how to obtain the token" as the same
 
 ### Your Responsibility
 **NEVER write a credential value.** Write the retrieval path instead:
-- ✅ `secret/evaluators/seam-retirement-evaluator/github-token`
+- ✅ `secret/rs-manager/rs-manager/seam/routes/<route>/token`
 - ❌ `gho_1234567890abcdef...`
 
 ## When to Sound the Alarm
