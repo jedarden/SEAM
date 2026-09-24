@@ -39,11 +39,20 @@ SEAM provides several health sentinel endpoints:
 
 | Endpoint | Purpose | Response |
 |----------|---------|----------|
-| `/_seam/health` | Liveness probe | `200 OK` with body `"OK"` |
-| `/_seam/healthz` | Liveness probe (alias) | `200 OK` with body `"OK"` |
+| `/_seam/healthz` | Liveness probe | `200 OK` with body `"OK"` |
+| `/_seam/health` | Liveness probe (served alias) | `200 OK` with body `"OK"` |
 | `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body |
 | `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
 | `/health/upstreams` | Upstream health | `200 OK` (future: route table health) |
+
+`/_seam/healthz` is the liveness name the control-plane design enumerates:
+the plan's reserved-namespace decision (2026-07-20) names `/_seam/healthz`,
+`/_seam/readyz` and `/_seam/metrics` as the first `/_seam/` users and its
+closed grandfathered enumeration contains no `/_seam/health`. The server
+additionally registers `/_seam/health` on the same handler as a served
+alias, and neither path is a `reservedPaths` exact entry — both ride the
+already-reserved `/_seam/` prefix, so neither required (or got) its own
+reservation.
 
 `/health/credentials` is an operator-only, read-only sentinel. It renders a
 fresh snapshot of breaker state and sends `Cache-Control: no-store`; it is
@@ -68,6 +77,23 @@ the historical response shape decodable as `map[string]bool`.
 | `openbao` | OpenBao login state | The asynchronous startup Kubernetes-auth login has completed. The login runs in the background so an OpenBao outage degrades readiness instead of crash-looping the container — the gate behind the seam-a155e900 503 regressions, kept gating on purpose: a pod that cannot read credentials must not receive traffic. |
 | `credential_probe` | Credential-probe freshness | No credential probe is configured, or every tracked probe carries a successful verification no older than twice its configured cadence plus a 5-minute grace. An attached registry with no results yet counts as fresh — probe-loop cold start must not recreate the startup-503 class of regressions. Readiness gates on the freshness of the verification signal, not on any single credential's health; an unhealthy credential is reported at `/health/credentials` and does not by itself remove the pod from the Service. |
 | `allowlist` | Allowlist enforcement | Vault-path and upstream-host allowlist enforcement is not fail-closed (no hosts permitted). |
+
+**Deliberately not dependencies.** Per-route circuit-breaker state does not
+gate readiness, and neither does any single credential's health. An open
+breaker is the definition of a partial degradation: one dead upstream among
+many serving routes. Flipping the pod not-ready for it would pull the whole
+gateway — pass-through routes and every healthy route included — out of the
+Service because one dependency of *some* routes is down, converting a
+partial degradation into a total one, the exact outcome the control-plane
+design forbids for readiness (`docs/plan/plan.md`: "`/_seam/readyz` is
+unaffected by a mid-life outage"). Breaker state surfaces where partial
+conditions already live: `/health/credentials` renders per-origin breaker
+state, `/health/upstreams` aggregates it per upstream with three-state
+last-2xx tracking, and an all-breaker-refused fan-out still collapses to a
+503 on the request path. A liveness probe never fails on any of this —
+`/_seam/healthz` reports only that the process is alive and its listeners
+are bound, since restarting the pod fixes neither a dead upstream nor an
+open breaker.
 
 ### Traffic Pattern
 
@@ -275,7 +301,7 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 
 ### 1. Reserved Path Detection
 
-**Location:** `internal/server/server.go:44`
+**Location:** `internal/server/server.go` (`reservedPaths`, `isReservedPath`)
 
 ```go
 // isReservedPath checks if a given path is in the reserved control-plane set.
@@ -294,28 +320,51 @@ func isReservedPath(path string) bool {
 }
 ```
 
-**Reserved paths structure:**
+**Reserved paths structure** (mirroring `internal/server/server.go`; the
+illustration is abridged but every entry shown is real):
+
 ```go
 var reservedPaths = struct {
     exact    map[string]bool
     prefixes []string
 }{
     exact: map[string]bool{
-        "/_seam/health":     true,  // Health sentinel
-        "/_seam/healthz":   true,  // Health sentinel (alias)
-        "/_seam/readyz":    true,  // Readiness probe
-        "/openapi.json":    true,
-        "/docs":            true,
-        // ... more exact paths
+        "/docs":               true,
+        "/docs/route":         true,
+        "/docs/paths":         true,
+        "/openapi.json":       true,
+        "/whoami":             true,
+        "/scopes":             true,
+        "/changes":            true,
+        "/health/credentials": true, // Health sentinel: credential status check
+        "/health/upstreams":   true, // Health sentinel: upstream connectivity check
+        "/config/status":      true,
+        // ... plus the exact /api/v1/ control-plane endpoints
     },
     prefixes: []string{
-        "/health/",         // All health endpoints
-        "/config/",         // All config endpoints
-        "/_seam/",          // All internal endpoints
-        // ... more prefixes
+        "/docs/",      // Documentation endpoints (reserved namespace)
+        "/health/",    // Health sentinel: all health check endpoints
+        "/config/",    // Configuration management endpoints
+        "/approvals/", // Approval workflow endpoints (reserved, not served)
+        "/_seam/",     // Internal SEAM endpoints (healthz, readyz, metrics, ...)
+        // No "/api/v1/" prefix: fragment routes legitimately live there, so
+        // the /api/v1/ control-plane endpoints are reserved by exact path.
     },
 }
 ```
+
+Note what is *not* here: `/_seam/health`, `/_seam/healthz` and
+`/_seam/readyz` are **not** exact entries. They predate none of the closed
+grandfathered enumeration — the plan's reserved-namespace decision
+(2026-07-20) fixed that set at `/docs`, `/docs/{route}`, `/openapi.json`,
+`/whoami`, `/scopes`, `/changes`, `/health/credentials`,
+`/health/upstreams` and `/config/status`, and everything conceived after it
+takes the already-reserved `/_seam/` prefix, which is why the healthz,
+readyz and metrics endpoints need (and have) no reservation of their own.
+This matches the control-plane reserved-path enumeration in
+`docs/plan/plan.md`; earlier revisions of this document showed the three
+paths as exact entries, which no shipped `reservedPaths` map has ever
+contained.
 
 ### 2. Cache Middleware Integration
 
