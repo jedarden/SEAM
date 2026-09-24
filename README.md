@@ -18,6 +18,8 @@ seam serve [flags]
 
 ### Configuration Flags
 
+`seam serve` takes fifteen configuration flags. All fifteen are listed here and all fifteen have a `SEAM_*` environment counterpart (see [Environment Variables](#environment-variables)); the two lists describe the same set.
+
 #### Server Ports
 - `--caller-port` (default: `8080`) - Port for the caller-facing listener
 - `--operator-port` (default: `8081`) - Port for the operator-only listener
@@ -26,13 +28,30 @@ seam serve [flags]
 - `--base-url` (default: `http://localhost:8080`) - Base URL for the caller-facing interface
 - `--spec-dir` (default: `./spec`) - Directory containing local OpenAPI spec files
 
+#### Fragments & Schema
+- `--fragment-mode` (default: `false`) - Enable fragment merge mode (reads from `spec-dir/fragments.d`)
+- `--schema-path` (default: `./spec/route-fragment-schema.json`) - Path to the route-fragment JSON schema for validation
+- `--fragments-dir` (default: `./fragments`) - Directory containing OpenAPI fragment files
+- `--enable-hot-reload` (default: `false`) - Enable file-watch hot reload of route fragments
+
 #### Corpus Capture
 - `--capture-enabled` (default: `false`) - Enable HTTP request/response capture for corpus collection
 - `--corpus-dir` (default: `corpus`) - Directory to store captured corpus files
 
+#### Upstream Trust
+- `--upstream-ca-dir` (default: `/etc/gateway/upstream-ca`) - Directory for upstream CA bundles
+- `--allowlist-file` (default: none) - Path to the upstream host allowlist
+
+#### Vault Path & Body Limits
+- `--vault-base-dir` (default: `rs-manager/rs-manager/seam/routes`) - Base directory that `x-vault-path` must nest `x-seam-owner` under
+- `--max-replayable-request-bytes` (default: `1048576`) - Maximum request body size buffered for replay, in bytes
+- `--max-buffered-response-bytes` (default: `1048576`) - Maximum decoded response body size held for whole-response scrubbing, in bytes (see the note below)
+
+**In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path.
+
 ### Environment Variables
 
-Every `serve` configuration flag can also be set via an environment variable with the `SEAM_` prefix:
+Every `serve` configuration flag can also be set via an environment variable with the `SEAM_` prefix — the table covers all fifteen flags above:
 
 | Variable | Flag | Default |
 |---|---|---|
@@ -45,12 +64,14 @@ Every `serve` configuration flag can also be set via an environment variable wit
 | `SEAM_CAPTURE_ENABLED` | `--capture-enabled` | `false` |
 | `SEAM_CORPUS_DIR` | `--corpus-dir` | `corpus` |
 | `SEAM_FRAGMENTS_DIR` | `--fragments-dir` | `./fragments` |
-| `SEAM_UPSTREAM_CA_DIR` | `--upstream-ca-dir` | built-in CA directory (refused in-cluster) |
-| `SEAM_UPSTREAM_ALLOWLIST` | `--allowlist-file` | none (refused in-cluster) |
+| `SEAM_UPSTREAM_CA_DIR` | `--upstream-ca-dir` | `/etc/gateway/upstream-ca` (override refused in-cluster) |
+| `SEAM_UPSTREAM_ALLOWLIST` | `--allowlist-file` | none (override refused in-cluster) |
 | `SEAM_VAULT_BASE_DIR` | `--vault-base-dir` | `rs-manager/rs-manager/seam/routes` |
 | `SEAM_MAX_REPLAYABLE_REQUEST_BYTES` | `--max-replayable-request-bytes` | `1048576` |
 | `SEAM_MAX_BUFFERED_RESPONSE_BYTES` | `--max-buffered-response-bytes` | `1048576` |
 | `SEAM_HOT_RELOAD_ENABLED` | `--enable-hot-reload` | `false` |
+
+The pairing rule is mechanical — `SEAM_` plus the flag name upper-cased with dashes as underscores — and thirteen of the fifteen variables follow it. Two are paired by meaning instead and break the derivation: `SEAM_UPSTREAM_ALLOWLIST` maps to `--allowlist-file` (not `SEAM_ALLOWLIST_FILE`, keeping the allowlist's *upstream* identity in the variable name), and `SEAM_HOT_RELOAD_ENABLED` maps to `--enable-hot-reload` (not `SEAM_ENABLE_HOT_RELOAD`). Where the rule and the table disagree, the table is authoritative.
 
 `--max-buffered-response-bytes` bounds only how much of a response SEAM may hold in memory for whole-body secret scrubbing; it is never a scrubbability limit and never rejects a response. A response whose declared `Content-Length` is at or under the cap is scrubbed whole and returned with its (recomputed) `Content-Length`. A response over the cap — or with no declared length, or whose *decoded* size exceeds the cap even when its encoded size does not — is scrubbed incrementally with bounded memory and streamed to the caller chunked (`Content-Length` removed) with the same status, headers, trailers, and content-encoding; nothing is truncated. A non-positive value falls back to the default. The two size caps are independent knobs: this one governs responses only, `--max-replayable-request-bytes` governs request replay only, and tuning one never moves the other.
 
