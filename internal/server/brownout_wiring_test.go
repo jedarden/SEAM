@@ -130,6 +130,64 @@ func TestServerBrownoutMiddleware_OutsideWindowProceeds(t *testing.T) {
 	}
 }
 
+// TestServerBrownoutMiddleware_BetweenWindowsServesNormally pins the gap
+// case of the doc's "between windows the route serves normally": with two
+// disjoint windows, an instant after the first has closed and before the
+// second opens proceeds to the caller. The gap's closing edge doubles as a
+// boundary check — the gap ends exactly where the next window's inclusive
+// start begins.
+func TestServerBrownoutMiddleware_BetweenWindowsServesNormally(t *testing.T) {
+	windows := []BrownoutWindow{
+		{Start: "2024-06-15T00:00:00Z", End: "2024-06-15T02:00:00Z"},
+		{Start: "2024-06-15T04:00:00Z", End: "2024-06-15T06:00:00Z"},
+	}
+
+	tests := []struct {
+		name      string
+		clockUTC  string
+		wantBrown bool
+	}{
+		{"one second past the first window's end", "2024-06-15T02:00:01Z", false},
+		{"middle of the gap between the windows", "2024-06-15T03:00:00Z", false},
+		{"one second before the second window's start", "2024-06-15T03:59:59Z", false},
+		{"exactly at the second window's start", "2024-06-15T04:00:00Z", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler, nextCalled := newBrownoutWiringServer(t,
+				func() time.Time { return mustClock(t, tt.clockUTC) },
+				&DeprecationInfo{
+					Since:     "2024-01-01",
+					Sunset:    "2024-12-31",
+					Brownouts: windows,
+				},
+			)
+
+			w := serveThroughBrownoutMiddleware(handler, nil)
+
+			if tt.wantBrown {
+				if w.Code != http.StatusGone {
+					t.Errorf("clock %s: expected 410 at the next window's start, got %d", tt.clockUTC, w.Code)
+				}
+				if *nextCalled {
+					t.Errorf("clock %s: expected next NOT to be called", tt.clockUTC)
+				}
+				return
+			}
+			if !*nextCalled {
+				t.Errorf("clock %s: expected next handler to be called in the gap between windows", tt.clockUTC)
+			}
+			if w.Code != http.StatusOK {
+				t.Errorf("clock %s: expected status 200 between windows, got %d", tt.clockUTC, w.Code)
+			}
+			if w.Header().Get("X-SEAM-Brownout") != "" {
+				t.Errorf("clock %s: expected no X-SEAM-Brownout header between windows", tt.clockUTC)
+			}
+		})
+	}
+}
+
 // TestServerBrownoutMiddleware_NonUTCOffsetWindowHonoredInUTC pins timezone
 // handling: a window written with a +02:00 offset is exactly its UTC
 // rendering, compared as absolute instants — the gateway's local timezone

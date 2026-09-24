@@ -139,6 +139,7 @@ overlaps across offsets.
 |---|---|
 | Wiring resolves the route itself (no context match needed) | `TestServerBrownoutMiddleware_ResolvesRouteWithoutContextMatch` |
 | Pass-through outside windows, no brownout marker | `TestServerBrownoutMiddleware_OutsideWindowProceeds` |
+| Between disjoint windows serves normally (gap edges incl. next start) | `TestServerBrownoutMiddleware_BetweenWindowsServesNormally` |
 | Non-UTC offset windows honored as UTC instants, inclusive end | `TestServerBrownoutMiddleware_NonUTCOffsetWindowHonoredInUTC` |
 | Probe bypass | `TestServerBrownoutMiddleware_ProbeRequestsBypass` |
 | Sunset advisory — serves past sunset | `TestServerBrownoutMiddleware_PastSunsetServesNormally` |
