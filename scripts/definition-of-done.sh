@@ -149,11 +149,13 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
     echo "Skipping corpus integrity - no corpus directory present"
   fi
 
-  # Capture round-trip and response-pair preservation, five repetitions
-  # per the doc -- a single pass can miss intermittent capture/save
-  # corruption. seam-ci runs this same pair of checks in its verify step.
+  # Capture round-trip, response-pair preservation, and lossless corpus
+  # readability across a server restart (docs/capture_testing.md), five
+  # repetitions per the doc -- a single pass can miss intermittent
+  # capture/save corruption. seam-ci's verify-corpus lane pins the
+  # integrity and response-pair tests separately from this script.
   run_check "capture corpus round-trip" \
-    go test ./internal/server -run '^(TestCaptureCorpusDataIntegrity|TestProxyCaptureEnabledPreservesSuccessfulResponsePair|TestProxyCaptureEnabledPreservesErrorResponsePair)$' -count=5
+    go test ./internal/server -run '^(TestCaptureCorpusDataIntegrity|TestProxyCaptureEnabledPreservesSuccessfulResponsePair|TestProxyCaptureEnabledPreservesErrorResponsePair|TestCaptureCorpusReadableAfterRestart)$' -count=5
 
   # seam lint (fragment validation)
   run_check "seam lint" bash -c '

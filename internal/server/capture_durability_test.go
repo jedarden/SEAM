@@ -301,9 +301,10 @@ func TestShutdownSaveFailureIsContained(t *testing.T) {
 // TestCaptureCorpusReadableAfterRestart drives the production restart path:
 // a first process crosses the autosave threshold and is flushed on shutdown, a
 // fresh middleware loads the corpus the way New does at startup, and every
-// persisted entry round-trips with request and response bodies intact. The
-// restarted instance then continues the autosave cadence with the loaded
-// history included.
+// persisted entry round-trips with IDs, capture order, and request and
+// response bodies intact, under the corpus schema/service/incumbent header.
+// The restarted instance then continues the autosave cadence with the loaded
+// history included, appending without clobbering what it loaded.
 func TestCaptureCorpusReadableAfterRestart(t *testing.T) {
 	corpusDir := t.TempDir()
 
@@ -315,6 +316,25 @@ func TestCaptureCorpusReadableAfterRestart(t *testing.T) {
 	s1 := &Server{captureMiddleware: cm1}
 	if err := s1.Shutdown(context.Background()); err != nil {
 		t.Fatalf("first process shutdown: %v", err)
+	}
+
+	// The shutdown flush is what the restart reads: record the persisted IDs
+	// so the restarted instance's next save can be proven to carry them
+	// through unchanged instead of regenerating them.
+	flushed, err := os.ReadFile(filepath.Join(corpusDir, "corpus.json"))
+	if err != nil {
+		t.Fatalf("read corpus after first shutdown: %v", err)
+	}
+	var flushedCorpus CorpusFile
+	if err := json.Unmarshal(flushed, &flushedCorpus); err != nil {
+		t.Fatalf("decode corpus after first shutdown: %v", err)
+	}
+	if len(flushedCorpus.Entries) != 12 {
+		t.Fatalf("shutdown-flushed entries = %d, want 12", len(flushedCorpus.Entries))
+	}
+	flushedIDs := make([]string, 0, len(flushedCorpus.Entries))
+	for _, entry := range flushedCorpus.Entries {
+		flushedIDs = append(flushedIDs, entry.ID)
 	}
 
 	// Restart: load through the production startup path.
@@ -360,6 +380,15 @@ func TestCaptureCorpusReadableAfterRestart(t *testing.T) {
 	if len(corpus.Entries) != 22 {
 		t.Fatalf("persisted entries after restart = %d, want 22", len(corpus.Entries))
 	}
+	// The restarted save must still be a complete corpus document for the
+	// same service and incumbent.
+	if corpus.Schema != "seam-diff-corpus/v1" {
+		t.Errorf("restarted corpus schema = %q, want seam-diff-corpus/v1", corpus.Schema)
+	}
+	if corpus.Service != "restart-service" || corpus.Incumbent != "https://incumbent.example.test" {
+		t.Errorf("restarted corpus service/incumbent = %q/%q, want restart-service/https://incumbent.example.test",
+			corpus.Service, corpus.Incumbent)
+	}
 	for i, entry := range corpus.Entries {
 		var prefix string
 		var seq int
@@ -370,6 +399,15 @@ func TestCaptureCorpusReadableAfterRestart(t *testing.T) {
 		}
 		if want := fmt.Sprintf("%s/%d", prefix, seq); entry.Request.Path != want {
 			t.Errorf("entry %d path = %q, want %q", i, entry.Request.Path, want)
+		}
+		// Loaded entries keep the IDs the first process generated; new
+		// entries get fresh IDs in the same path-method shape.
+		if want := fmt.Sprintf("%s-%d-post", strings.Trim(prefix, "/"), seq); entry.ID != want {
+			t.Errorf("entry %d id = %q, want %q", i, entry.ID, want)
+		}
+		if i < 12 && entry.ID != flushedIDs[i] {
+			t.Errorf("entry %d id = %q, does not match the id persisted before restart %q",
+				i, entry.ID, flushedIDs[i])
 		}
 		gotRequest, err := base64.StdEncoding.DecodeString(entry.Request.BodyB64)
 		if err != nil {
