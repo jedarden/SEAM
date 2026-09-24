@@ -72,6 +72,104 @@ A variable set to the **empty string counts as unset**: the flag value survives.
 
 Other `SEAM_*` variables (`SEAM_OPENBAO_ADDR`, `SEAM_OPENBAO_SA_TOKEN_PATH`, `SEAM_TEST_IDENTITY_MODE`, …) are server-runtime knobs, not CLI configuration.
 
+### `seam healthcheck`
+
+Probe the caller-facing liveness endpoint. This is what the container image's `HEALTHCHECK` invokes — the runtime image is `FROM scratch` and has no shell, so the probe must be a real subcommand.
+
+```bash
+seam healthcheck [--caller-port <port>] [--timeout <duration>]
+```
+
+- `--caller-port` (default: `8080`) - Port of the caller-facing listener to probe
+- `--timeout` (default: `2s`) - Probe timeout
+
+Issues `GET http://127.0.0.1:<port>/_seam/healthz` and requires HTTP `200`. `SEAM_CALLER_PORT` fills the port only when `--caller-port` was **not** passed explicitly — the same flag-over-environment rule as `serve` (see [Precedence (serve)](#precedence-serve)) — so a port override configured on the Deployment is honoured without beating an explicit flag.
+
+Exit codes: `0` the gateway answered `200`; `1` the probe failed or timed out; `2` invalid usage.
+
+### `seam lint`
+
+Validate route fragments against `route-fragment-schema.json` plus SEAM's structural checks: the `x-seam-owner` chain (owner must match the fragment's parent directory and be nested by `x-vault-path`), authored `x-api-version` shape and placement, reserved control-plane paths, upstream URLs (well-formed absolute http(s), no IP-literal hosts, membership of the operator allowlist when one is supplied), transport acknowledgements (plaintext upstreams, `insecureSkipVerify`, unscrubbable responses), and route guards (quota unit mismatches, breaker disagreements across same-origin routes). Spec and structural violations are **errors**; acknowledgement items that need human review are **warnings**.
+
+```bash
+seam lint [flags] [path ...]
+```
+
+- `--fragments-dir`, `--fragments` (default: `./fragments`) - Directory containing route fragments
+- `--schema-path`, `--schema` (default: `./spec/route-fragment-schema.json`) - Path to `route-fragment-schema.json`
+- `--upstream-allowlist`, `--upstream-allowlist-path`, `--allowlist-path`, `--allowlist` (default: none) - Operator-owned upstream-host allowlist; absent is inert
+- `--json` - Emit a machine-readable JSON report (`LintReport`) instead of text
+
+Positional arguments select what is linted: none means the `--fragments-dir` directory, a single directory means that directory, and one or more file paths means exactly those files. Flags may also appear *after* positional paths, so shell-expanded globs behave as expected:
+
+```bash
+seam lint                                    # lint ./fragments
+seam lint fragments/github-api               # lint one fragment directory
+seam lint fragments/*/fragment.yaml --json   # lint explicit files, JSON report
+```
+
+`SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST` fill the corresponding flag only while it is still at its default (see [lint / diff explicit-flag tracking](#lint--diff-explicit-flag-tracking)).
+
+Exit codes: `0` lint passed (warnings allowed); `1` at least one error finding; `2` usage or setup failure — unknown flag, unreadable path, a schema that does not compile, or an unwritable report.
+
+### `seam diff`
+
+Merge the current route fragments into a spec and compare it against a base version — by default the fragments at git `HEAD`, extracted with `git archive`. Use it to see which routes a fragment change adds, removes, or modifies before pushing.
+
+```bash
+seam diff [flags]
+```
+
+- `--fragments-dir`, `-f` (default: `./fragments`) - Directory containing route fragments
+- `--base`, `-b` (default: git `HEAD`'s `fragments/`) - Base directory to compare against
+- `--json`, `-j` - Emit the machine-readable `DiffResult` (`paths_added`, `paths_removed`, `paths_modified`, `summary.has_changes`) instead of the text report
+- `--output`, `-o` - Additionally write the merged **current** spec to this file
+- `--unified` (default: `true`), `--side-by-side` - Presentation switches; the current writer emits the same structured change report for either
+
+Behaviour worth knowing:
+
+- Positional path arguments are rejected — pass `--fragments-dir` instead.
+- Outside a git repository (or if `git archive` fails) there is no implicit base: pass `--base` explicitly or the command exits `2`.
+- A `--fragments-dir` that is mistyped or holds no fragments is refused (`2`) — "no fragments loaded" is not the same as "no changes". An empty **base** is allowed, with a warning that every current path will be reported as added.
+- `SEAM_FRAGMENTS_DIR` fills `--fragments-dir` only while it is still at its default.
+
+Exit codes: `0` the merged specs are identical; `1` changes detected; `2` setup failure — usage error, no resolvable base, no current fragments, or a load/merge/compare/write failure.
+
+### `seam import`
+
+Fetch an OpenAPI 3.x (or Swagger 2.0) spec over HTTP(S) and generate a *curatable bootstrap* fragment. The generated file carries `x-seam-schema: v1`, `x-seam-owner`, `x-upstream` (derived from the spec URL as `scheme://host[:port]` — the path that located the spec document is not part of the upstream) and the imported paths. The credential and access decisions are deliberately left to the curator: the output reminds you to add `x-vault-path`, `x-inject-as`, `x-required-scope` and any TLS/cache knobs by hand. An `http://` upstream emits `x-upstream-plaintext: acknowledged` with a loud note. Swagger 2.0 sources are accepted; their top-level `definitions`/`parameters` are carried across as `components.schemas`/`components.parameters` so `$ref`s inside imported operations keep resolving. The command reads no `SEAM_*` configuration.
+
+```bash
+seam import --from-url <url> [flags]
+```
+
+- `--from-url`, `-u` (required) - URL of the OpenAPI spec to import; must be `http` or `https`
+- `--owner`, `-o` (default: derived from the URL host) - Owner/service name for the fragment
+- `--output`, `-f` (default: `<owner>/fragment.yaml`) - Output fragment file path
+- `--paths`, `-p` - Comma-separated list of paths to import (default: all)
+- `--methods`, `-m` - Comma-separated list of HTTP methods to import, case-insensitive (default: all)
+- `--filter-prefix` - Only import paths with this prefix
+- `--strip-prefix` - Strip this prefix from imported paths
+- `--add-prefix` - Add this prefix to all imported paths
+- `--timeout` (default: `30s`) - HTTP timeout for fetching the spec
+
+```bash
+# Whole spec: owner and output path are derived from the URL
+seam import --from-url https://api.example.com/openapi.json
+#   -> owner api-example-com, written to api-example-com/fragment.yaml
+
+# Curated import into the fragments tree
+seam import -u https://internal.example.com/swagger.json \
+  --owner github-api --output fragments/github-api/fragment.yaml \
+  --filter-prefix /api/v1/ --strip-prefix /api/v1 --methods get,post
+
+# Then validate — seam lint checks x-seam-owner against the parent directory name,
+# so keep the fragment in a directory named after the owner
+seam lint fragments/github-api/fragment.yaml
+```
+
+Exit codes: `0` fragment written; `1` no paths matched the filter criteria; `2` failure — missing or invalid `--from-url`, a non-http(s) scheme, a fetch/HTTP error, a spec that parses as neither JSON nor YAML, or an unwritable output path.
+
 ### Examples
 
 #### Basic Usage (capture disabled)
@@ -124,6 +222,7 @@ Response:
   "status": "saved",
   "entry_count": 42
 }
+```
 
 ## Running Benchmarks
 
