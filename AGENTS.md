@@ -50,8 +50,23 @@ bodies, `example`, `REPLACE`) pass unblocked.
 The SEAM **binary** lives here. Its **configuration** — route fragments, OpenBao
 policies, Kubernetes manifests — belongs in `jedarden/declarative-config` under
 `k8s/rs-manager/{seam,seam-retirement-evaluator}/`. That split is load-bearing:
-the retirement evaluator opens PRs against declarative-config to remove retired
-route fragments, so config has to be reviewable there.
+fragments and the evaluator's own manifests are GitOps-managed there, so every
+change to them is reviewable and revertible as an ordinary commit to `main`.
+
+The retirement evaluator (`tools/seam-retirement-evaluator/`) is
+**detection-only** (since 2026-09-05, bead `seam-d1120e75`): it holds no
+git-host credential, opens no PR, and cannot write anywhere. Its entire output
+is one structured log record and one Prometheus counter per deprecation
+candidate, carrying the fragment-shaped `x-seam-deprecated` block it proposes.
+
+**Handoff for a detected retirement:** the finding is a proposal, not a
+change. A human lands it as an ordinary commit to `declarative-config` `main`
+— adding the proposed `x-seam-deprecated` block to the route fragment named in
+the record — and reverts the same way if a caller appears. SEAM hot-reloads
+the fragment, so no deployment and no review gate are involved; reversibility
+is the gate. Do not re-add a write path (git-host client, forge token, PR
+opener, git exec) to the evaluator: its module's write-contract test fails
+the build if one appears.
 
 `declarative-config/infra/` in this repo is a retirement pointer only. Do not
 restore manifests there. New infrastructure configuration goes directly to the
