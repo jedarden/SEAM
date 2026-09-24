@@ -54,6 +54,9 @@ A corpus is a JSON file containing captured request/response pairs:
 > vault base dir is now `rs-manager/rs-manager/seam/routes`; a secref written
 > for a new capture must use that base. The ref→env-var mapping — derived by
 > `internal/secref` from the ref string alone — is mechanical for any base.
+> The full reference syntax — scheme handling, base containment, the
+> fragment `x-vault-path` boundary, serialization rules — is defined in
+> [docs/notes/credential-reference-syntax.md](../notes/credential-reference-syntax.md).
 
 ```json
 {
@@ -136,8 +139,11 @@ Secrets are resolved at replay time from a local file or environment:
 If a ref isn't in the secrets file, it's resolved from environment:
 
 ```
-vault:seam/routes/argocd/ro-token → SEAM_DIFF_SECRET_vault_seam_routes_argocd_ro_token
+vault:seam/routes/argocd/ro-token → SEAM_DIFF_SECRET_VAULT_SEAM_ROUTES_ARGOCD_RO_TOKEN
 ```
+
+The whole ref is upper-cased — scheme included — and every run of
+non-`[A-Z0-9_]` characters collapses to a single `_`.
 
 ## Differential Comparison Rules
 

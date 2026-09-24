@@ -190,7 +190,11 @@ func (ae *AllowlistEnforcer) loadUpstreamAllowlist(allowlistFile string) error {
 }
 
 // ValidateVaultPath validates that x-vault-path resolves inside seam/routes/<x-seam-owner>/*
-// with co-ownership verification against the mounted parent directory
+// with co-ownership verification against the mounted parent directory.
+// The fragment surface names a credential with a bare path; the vault:-schemed
+// form is the differential corpus's Secret.Ref shape and is refused here as an
+// ambiguous reference rather than stripped and retried — see
+// docs/notes/credential-reference-syntax.md for the two-surface boundary.
 func (ae *AllowlistEnforcer) ValidateVaultPath(vaultPath string, owner string) error {
 	if vaultPath == "" {
 		// No vault path specified, nothing to validate
@@ -198,6 +202,13 @@ func (ae *AllowlistEnforcer) ValidateVaultPath(vaultPath string, owner string) e
 	}
 
 	log.Printf("[Allowlist] Validating vault path: %s for owner: %s", vaultPath, owner)
+
+	// A vault:-prefixed path is a corpus Secret.Ref pasted into a fragment.
+	// Refuse it outright instead of letting it fail later as an unrelated
+	// owner-directory miss: the shape, not the location, is what is wrong.
+	if strings.HasPrefix(vaultPath, "vault:") {
+		return fmt.Errorf("vault_path_carries_scheme: x-vault-path is a bare path; the vault: scheme belongs to a corpus secret ref: %s", vaultPath)
+	}
 
 	// Reject traversal attempts outright
 	if strings.Contains(vaultPath, "..") || strings.Contains(vaultPath, "\\") {

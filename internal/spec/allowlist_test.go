@@ -237,6 +237,66 @@ func TestVaultPathOwnership(t *testing.T) {
 	}
 }
 
+// TestVaultPathSchemeRejection pins the boundary between the two
+// credential-reference surfaces (docs/notes/credential-reference-syntax.md):
+// a fragment's x-vault-path is a bare path, while the vault:-schemed form is
+// the differential corpus's Secret.Ref shape. A corpus ref pasted into a
+// fragment is an ambiguous reference and is refused with its own error code —
+// not the owner-directory miss it would otherwise die as — even when the path
+// after the scheme would have been perfectly inside the owner's directory.
+func TestVaultPathSchemeRejection(t *testing.T) {
+	enforcer, _ := NewAllowlistEnforcer("seam/routes", "")
+
+	tests := []struct {
+		name      string
+		vaultPath string
+		owner     string
+		errMsg    string
+	}{
+		{
+			name:      "schemed_path_inside_owner_dir_still_rejected",
+			vaultPath: "vault:seam/routes/myowner/api/key",
+			owner:     "myowner",
+			errMsg:    "vault_path_carries_scheme",
+		},
+		{
+			name:      "full_canonical_corpus_ref_rejected",
+			vaultPath: "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
+			owner:     "argocd-ro",
+			errMsg:    "vault_path_carries_scheme",
+		},
+		{
+			name:      "bare_scheme_only_rejected",
+			vaultPath: "vault:",
+			owner:     "myowner",
+			errMsg:    "vault_path_carries_scheme",
+		},
+		{
+			name:      "bare_path_without_scheme_still_accepted",
+			vaultPath: "seam/routes/myowner/api/key",
+			owner:     "myowner",
+			errMsg:    "", // empty means must load cleanly
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := enforcer.ValidateVaultPath(tt.vaultPath, tt.owner)
+			if tt.errMsg == "" {
+				if err != nil {
+					t.Errorf("ValidateVaultPath() unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Errorf("ValidateVaultPath() expected error containing %q, got nil", tt.errMsg)
+			} else if !containsString(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateVaultPath() expected error containing %q, got %q", tt.errMsg, err.Error())
+			}
+		})
+	}
+}
+
 // TestUpstreamHostFailClosed tests that the allowlist fails closed when absent/empty/unparseable
 func TestUpstreamHostFailClosed(t *testing.T) {
 	tests := []struct {
