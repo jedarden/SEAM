@@ -32,24 +32,29 @@ request/response pairs, validate response bodies, check route coverage, and
 match each response snapshot to its captured pair; see
 [`corpus/argocd-proxy/COMPLETENESS.md`](../corpus/argocd-proxy/COMPLETENESS.md).
 
-Run the request/response round-trip check and the existing response-pair
-regressions with:
+Run the request/response round-trip check, the existing response-pair
+regressions, and the restart-readability test with:
 
 ```sh
-go test ./internal/server -run '^(TestCaptureCorpusDataIntegrity|TestProxyCaptureEnabledPreservesSuccessfulResponsePair|TestProxyCaptureEnabledPreservesErrorResponsePair)$' -count=5
+go test ./internal/server -run '^(TestCaptureCorpusDataIntegrity|TestProxyCaptureEnabledPreservesSuccessfulResponsePair|TestProxyCaptureEnabledPreservesErrorResponsePair|TestCaptureCorpusReadableAfterRestart)$' -count=5
 ```
 
 `TestCaptureCorpusDataIntegrity` sends a request with query parameters,
 headers, and a body through the capture middleware; verifies the live response;
 saves the corpus; parses the saved JSON; and compares the decoded request and
 response bodies, status, content types, headers, paths, and timestamps with
-the values that were sent and returned. Repeating the focused suite five times
+the values that were sent and returned. `TestCaptureCorpusReadableAfterRestart`
+is the durability test above: a restarted middleware loads the corpus the first
+process wrote and must reload every prior entry losslessly before appending.
+Repeating the focused suite five times
 guards against intermittent capture or save corruption.
 
 Both checks are enforced automatically, not left as manual steps: the
-`seam-ci` verify step runs them on every push to `main` (ahead of the full
-`go test -race ./...` sweep), and `scripts/definition-of-done.sh --slow`
--- included in `--all` -- gates them as the named checks `corpus integrity`
+`seam-ci` verify step runs the corpus-integrity and response-pair tests on
+every push to `main` (ahead of the full `go test -race ./...` sweep), and
+`scripts/definition-of-done.sh --slow`
+-- included in `--all` -- gates the same set plus
+`TestCaptureCorpusReadableAfterRestart` as the named checks `corpus integrity`
 and `capture corpus round-trip`. A malformed, incomplete, or mismatched
 corpus or response snapshot fails the build.
 
