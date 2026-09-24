@@ -3,8 +3,14 @@
 ## Document Metadata
 
 - **Created:** 2026-08-09
-- **Bead:** bf-3787s (documentation)
+- **Bead:** seam-6eb6d780 (documentation) — closed; rehydrated from retired bead-forge ID `bf-3787s`
 - **Status:** Design Documented
+
+> **Bead ID provenance:** this document was written against the retired
+> bead-forge (`bf-*`) store. The workspace was rehydrated into bead-rs on
+> 2026-08-14 (commit 9e9b514); the reference above now names the current
+> `seam-*` bead, with the original `bf-*` ID retained as provenance. The
+> linked bead is closed — it records design-era context, not open work.
 - **Related Components:**
   - Cache middleware (`internal/server/cache_middleware.go`)
   - Quota middleware (`internal/server/quota_middleware.go`)

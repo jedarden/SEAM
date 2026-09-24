@@ -3,12 +3,18 @@
 ## Document Metadata
 
 - **Created:** 2026-07-27
-- **Bead:** bf-49g8 (explore)
+- **Bead:** seam-ace37016 (explore) — closed; rehydrated from retired bead-forge ID `bf-49g8`
 - **Status:** Design Complete
 - **Related Beads:** 
-  - bf-1d0k (setup capture mechanism)
-  - bf-69n1 (argocd-ro proxy architecture)
-  - bf-4qv5 (corpus capture validation)
+  - seam-89d9a0f8 (setup capture mechanism) — closed; from `bf-1d0k`
+  - seam-5e9046fc (argocd-ro proxy architecture) — closed; from `bf-69n1`
+  - seam-611cf731 (corpus capture validation) — closed; from `bf-4qv5`
+
+> **Bead ID provenance:** this document was written against the retired
+> bead-forge (`bf-*`) store. The workspace was rehydrated into bead-rs on
+> 2026-08-14 (commit 9e9b514); each reference above now names its current
+> `seam-*` bead, with the original `bf-*` ID retained as provenance. All
+> linked beads are closed — they record design-era context, not open work.
 
 ## Overview
 

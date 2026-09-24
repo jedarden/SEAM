@@ -3,9 +3,15 @@
 ## Document Metadata
 
 - **Created:** 2026-07-27
-- **Bead:** bf-69n1 (explore)
+- **Bead:** seam-5e9046fc (explore) — closed; rehydrated from retired bead-forge ID `bf-69n1`
 - **Status:** Exploration/Design
-- **Related Beads:** bf-1d0k (setup capture mechanism), bf-1d0k (verify capture mechanism)
+- **Related Beads:** seam-89d9a0f8 (setup capture mechanism), seam-89d9a0f8 (verify capture mechanism) — closed; rehydrated from retired bead-forge ID `bf-1d0k`
+
+> **Bead ID provenance:** this document was written against the retired
+> bead-forge (`bf-*`) store. The workspace was rehydrated into bead-rs on
+> 2026-08-14 (commit 9e9b514); each reference above now names its current
+> `seam-*` bead, with the original `bf-*` ID retained as provenance. All
+> linked beads are closed — they record design-era context, not open work.
 
 ## Executive Summary
 
