@@ -52,6 +52,8 @@ Every `serve` configuration flag can also be set via an environment variable wit
 | `SEAM_MAX_BUFFERED_RESPONSE_BYTES` | `--max-buffered-response-bytes` | `1048576` |
 | `SEAM_HOT_RELOAD_ENABLED` | `--enable-hot-reload` | `false` |
 
+`--max-buffered-response-bytes` bounds only how much of a response SEAM may hold in memory for whole-body secret scrubbing; it is never a scrubbability limit and never rejects a response. A response whose declared `Content-Length` is at or under the cap is scrubbed whole and returned with its (recomputed) `Content-Length`. A response over the cap — or with no declared length, or whose *decoded* size exceeds the cap even when its encoded size does not — is scrubbed incrementally with bounded memory and streamed to the caller chunked (`Content-Length` removed) with the same status, headers, trailers, and content-encoding; nothing is truncated. A non-positive value falls back to the default. The two size caps are independent knobs: this one governs responses only, `--max-replayable-request-bytes` governs request replay only, and tuning one never moves the other.
+
 #### Precedence (serve)
 
 **Flags win over the environment.** An explicitly passed command-line flag takes precedence over a non-empty corresponding `SEAM_*` variable. Environment values fill flags that were not passed, and built-in defaults fill everything left unset. This gives operators an environment-based deployment default while preserving an explicit CLI override. `seam healthcheck` follows the same rule for `SEAM_CALLER_PORT`, so an explicit probe flag wins while an environment-only port override is still honoured.
