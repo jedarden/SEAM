@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -16,38 +17,65 @@ import (
 	"github.com/ardenone/seam/internal/spec"
 )
 
+// seamCommand is one entry of the CLI's command table. The table is the
+// single source of truth for both dispatch and the usage text, so a command
+// cannot be added to one and forgotten in the other — the usage smoke test
+// in main_usage_test.go pins the correspondence.
+type seamCommand struct {
+	name    string
+	summary string
+	run     func([]string)
+}
+
+var seamCommands = []seamCommand{
+	{"serve", "Start the SEAM gateway server", serveCommand},
+	{"healthcheck", "Probe the caller-facing liveness endpoint", healthcheckCommand},
+	{"lint", "Validate SEAM route fragments", lintCommand},
+	{"diff", "Show differences between fragment versions", diffCommand},
+	{"import", "Import fragments into SEAM", importCommand},
+}
+
+// writeUsage prints the top-level help. Kept byte-compatible with the text
+// main() printed before the command table existed: a consumer greps these
+// lines (the container HEALTHCHECK commentary in healthcheckCommand, for one,
+// reasons from them).
+func writeUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: seam <command> [<args>]")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Available commands:")
+	for _, command := range seamCommands {
+		fmt.Fprintf(w, "  %-16s %s\n", command.name, command.summary)
+	}
+}
+
+// writeUnknownCommand prints the rejection for an unrecognized subcommand,
+// naming the commands that do exist.
+func writeUnknownCommand(w io.Writer, name string) {
+	names := make([]string, 0, len(seamCommands))
+	for _, command := range seamCommands {
+		names = append(names, command.name)
+	}
+	fmt.Fprintf(w, "Unknown command: %s\n", name)
+	fmt.Fprintf(w, "Available commands: %s\n", strings.Join(names, ", "))
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: seam <command> [<args>]")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Available commands:")
-		fmt.Fprintln(os.Stderr, "  serve            Start the SEAM gateway server")
-		fmt.Fprintln(os.Stderr, "  healthcheck      Probe the caller-facing liveness endpoint")
-		fmt.Fprintln(os.Stderr, "  lint             Validate SEAM route fragments")
-		fmt.Fprintln(os.Stderr, "  diff             Show differences between fragment versions")
-		fmt.Fprintln(os.Stderr, "  import           Import fragments into SEAM")
+		writeUsage(os.Stderr)
 		os.Exit(1)
 	}
 
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
-	switch cmd {
-	case "serve":
-		serveCommand(args)
-	case "healthcheck":
-		healthcheckCommand(args)
-	case "lint":
-		lintCommand(args)
-	case "diff":
-		diffCommand(args)
-	case "import":
-		importCommand(args)
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		fmt.Fprintln(os.Stderr, "Available commands: serve, healthcheck, lint, diff, import")
-		os.Exit(1)
+	for _, command := range seamCommands {
+		if command.name == cmd {
+			command.run(args)
+			return
+		}
 	}
+	writeUnknownCommand(os.Stderr, cmd)
+	os.Exit(1)
 }
 
 // runHealthcheck probes a liveness URL and reports whether the gateway is

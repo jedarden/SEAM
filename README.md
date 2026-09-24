@@ -203,6 +203,62 @@ seam lint fragments/github-api/fragment.yaml
 
 Exit codes: `0` fragment written; `1` no paths matched the filter criteria; `2` failure — missing or invalid `--from-url`, a non-http(s) scheme, a fetch/HTTP error, a spec that parses as neither JSON nor YAML, or an unwritable output path.
 
+### Differential replay (tools/diffharness)
+
+`lint`, `diff` and `import` manage fragments; the **differential replay** harness in `tools/diffharness` is the conformance gate that decides whether a fragment may ship at all. It replays a captured corpus of real request/response pairs against both the incumbent proxy and SEAM, then compares the responses for equivalence — a service's fragment does not ship, and its migration prose is not deleted, until its corpus passes the replay. The tools live in their own Go module and have their own README; this section covers the workflow, [the harness README](tools/diffharness/README.md) covers the full corpus format and comparison rules.
+
+Build both tools from the harness module:
+
+```bash
+cd tools/diffharness
+go build -o seam-capture ./cmd/seam-capture
+go build -o seam-replay ./cmd/seam-replay
+```
+
+#### `seam-capture` — recording proxy
+
+```bash
+seam-capture \
+  --incumbent https://service.example.com \
+  --service service \
+  --corpus service-corpus.json \
+  --listen :8080
+```
+
+A transparent proxy that forwards every request to `--incumbent` and records the exchange (status, headers, body) into the `--corpus` JSON file. Credential-bearing headers are **redacted before the corpus is written**; the matching secret *references* are added to the corpus by hand afterwards (see [Secret-reference rules](#secret-reference-rules)). Capture can be turned off with `--capture-enabled=false` (or `SEAM_CAPTURE_ENABLED=false`) while keeping transparent forwarding, and bypassed per request with an `X-Seam-Capture-Skip` header — use it for health checks. Exit status: `0` on a clean shutdown (corpus saved); `2` missing required flags or an invalid `--incumbent`; a listen/save failure aborts with a logged fatal error.
+
+#### `seam-replay` — conformance tester
+
+```bash
+seam-replay \
+  --incumbent https://service.example.com \
+  --seam http://localhost:9000 \
+  --corpus service-corpus.json \
+  --secrets service-secrets.local.json \
+  --report service-report.json
+```
+
+**Inputs**
+
+- `--corpus` (required) - Captured corpus JSON (`schema: seam-diff-corpus/v1`)
+- `--incumbent`, `--seam` (required) - Base URLs; every corpus entry is replayed against both
+- `--secrets` (optional) - JSON file mapping each corpus secret ref to its literal value; falls back to the environment per the rules below
+- `--ignore-header` (repeatable) - Additional headers excluded from comparison, on top of the volatile defaults (`Date`, `Server`, `X-Request-Id`, `Set-Cookie`, `ETag`)
+- `--verbose` - Log each replay as it runs
+
+**Outputs** - a human-readable summary on stdout, and with `--report` a JSON report (`passCount`/`failCount`/`skipCount` plus per-entry verdicts and diffs). The JSON report is the conformance evidence attached to a cutover review.
+
+**Exit status**: `0` every replayable entry passed; `1` at least one entry FAILED *or* a fatal setup error (unreadable or invalid corpus, no replayable entries, unwritable report); `2` missing required flags.
+
+#### Secret-reference rules
+
+- A corpus carries **references, never values**. Each entry's `secrets` array names a `vault:<path>` ref, and the ref must nest under the enforced vault base (`rs-manager/rs-manager/seam/routes` by default; set `SEAM_VAULT_BASE_DIR` to match a capture taken under a different base). A ref outside the base is rejected when the corpus loads, not at replay.
+- Values are resolved in memory at replay time, file over environment: the `--secrets` file is consulted first, then `SEAM_DIFF_SECRET_<REF>`, where `<REF>` is the ref upper-cased with every run of non-`[A-Z0-9_]` characters collapsed to one `_` — so `vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token` resolves from `SEAM_DIFF_SECRET_VAULT_RS_MANAGER_RS_MANAGER_SEAM_ROUTES_ARGOCD_RO_RO_TOKEN`.
+- Keep the `--secrets` file out of git — the harness convention names it `*.local.json`. Populate it from your secret store for the duration of a run.
+- An unresolved ref **skips** its entry (`SKIP: unresolved secret ref`) rather than failing it: a configuration gap must not turn a corpus red.
+- A secret that appears byte-identically in a SEAM response is a hard **FAIL** (`secretLeaked` in the report). The leak check runs before the comparison and cannot be masked by expected-diff allowances.
+- Neither tool ever writes a secret value to disk — the corpus holds refs, the report holds verdicts.
+
 ### Examples
 
 #### Basic Usage (capture disabled)

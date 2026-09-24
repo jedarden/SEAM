@@ -1,0 +1,23 @@
+x-seam-schema: v1
+x-seam-owner: someone-else
+x-api-version: v1
+x-upstream: https://fixture-owner.example.com
+
+openapi: 3.1.0
+info:
+  title: Broken Fixture Fragment
+  version: 1.0.0
+  description: Deliberately invalid — x-seam-owner does not match this file's parent directory, so seam lint must exit 1 with a structural error finding.
+
+paths:
+  /api/ok:
+    get:
+      summary: Return ok
+      operationId: getOk
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object

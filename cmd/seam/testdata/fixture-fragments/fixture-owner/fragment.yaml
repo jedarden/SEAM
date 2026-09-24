@@ -1,0 +1,23 @@
+x-seam-schema: v1
+x-seam-owner: fixture-owner
+x-api-version: v1
+x-upstream: https://fixture-owner.example.com
+
+openapi: 3.1.0
+info:
+  title: Fixture Owner API
+  version: 1.0.0
+  description: Minimal lintable fragment used by the cmd/seam fixture smoke tests. The owner matches this file's parent directory, so `seam lint cmd/seam/testdata/fixture-fragments` passes cleanly.
+
+paths:
+  /api/ok:
+    get:
+      summary: Return ok
+      operationId: getOk
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
