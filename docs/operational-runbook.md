@@ -458,7 +458,10 @@ curl http://localhost:8080/health/upstreams
 **Purpose:** Expose Prometheus metrics for monitoring. The endpoint binds only
 to the operator listener (port 8081), accepts `GET`, and uses Prometheus text
 exposition. Each server owns an isolated registry; control-plane requests are
-excluded from caller request and response-cache series.
+excluded from caller request, response-cache and quota series — caller-port
+reserved paths via the `isReservedPath` short-circuit in the metrics, cache and
+quota middleware, operator-port endpoints because those middleware are not
+wired into the operator chain at all.
 
 **Metric taxonomy:**
 
@@ -476,7 +479,14 @@ excluded from caller request and response-cache series.
 | `seam_upstream_health` | gauge | `origin`, `state` | One-hot breaker state. Every known origin has `closed`, `open`, and `half_open` series; exactly one is `1`. |
 | `seam_upstream_breaker_enabled`, `seam_upstream_consecutive_failures` | gauge | `origin` | Current breaker policy status and qualifying failure streak. Removed origins disappear on the next scrape. |
 
-Quota metrics retain the `seam_quota_*` prefix and use route or scope labels.
+Quota metrics retain the `seam_quota_*` prefix and use route or scope labels:
+`seam_quota_cost_total{route}` (accumulated USD charge, recorded only when a
+route has a per-call cost), `seam_quota_bypassed_total{route}` (cache-hit quota
+bypasses), `seam_quota_exceeded_total{route}` (429 refusals), and
+`seam_quota_remaining{scope}` — registered but never populated, so it exposes
+no samples and must not be alerted on. The full bypass observability contract,
+including which request classes emit which series and headers, is
+`docs/notes/cache-quota-bypass-observability.md`.
 Runtime/process metrics use the standard `go_*` and `process_*` names. Labels
 must remain bounded: never add request paths, query values, caller tokens,
 secret references, or error strings.
@@ -631,9 +641,9 @@ curl -X POST http://localhost:8081/_seam/cache/cleanup
 #### Quota Exhaustion
 
 **Symptoms:**
-- HTTP 429 Too Many Requests responses
-- Log: `quota exceeded for caller`
-- Metrics show `seam_quota_remaining = 0`
+- HTTP 429 Too Many Requests responses carrying error code `quota_exceeded`
+- Log: `[Quota] Quota exceeded for <route> - remaining: $<amount>`
+- Metrics show `seam_quota_exceeded_total` increasing for the affected route
 
 **Diagnosis:**
 ```bash
@@ -641,10 +651,15 @@ curl -X POST http://localhost:8081/_seam/cache/cleanup
 curl http://localhost:8081/_seam/metrics | grep quota
 
 # Look for:
-# seam_quota_cost_total
-# seam_quota_bypassed_total
-# seam_quota_remaining
+# seam_quota_cost_total      (accumulated charge per route)
+# seam_quota_bypassed_total  (cache-hit bypasses per route)
+# seam_quota_exceeded_total  (refusals per route)
 ```
+
+Note: `seam_quota_remaining` is registered but never populated — it exposes no
+samples. Do not use it as a refusal signal; the per-route accumulated charge in
+`seam_quota_cost_total` against the route's configured limit is the live
+signal.
 
 **Resolution:**
 

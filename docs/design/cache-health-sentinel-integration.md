@@ -256,52 +256,41 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 
 #### 2. Cache Hit Bypass (User Traffic)
 
-When user traffic hits the cache, quota is checked but not deducted:
+When user traffic hits the cache, the request never reaches the quota
+middleware at all: `cacheMiddleware` serves the cached response directly and
+returns, so no quota check and no deduction happen. (Earlier revisions of this
+document described a "check with cost = 0" flow; the shipped chain
+short-circuits before `CheckAndRecordQuota` instead. The `cost == 0` branch
+inside the quota tracker exists for direct callers, not for this path.)
 
 ```go
-// From: internal/server/quota_middleware.go
-func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Skip quota for reserved paths
-        if isReservedPath(r.URL.Path) {
-            next.ServeHTTP(w, r)
-            return
-        }
-
-        // Check if this is a cache hit
-        cacheHit := isCacheHit(r)
-
-        // Get the cost per call for this route
-        costPerCall := s.getCostPerCall(route)
-
-        // If cache hit, use zero cost (bypasses quota deduction)
-        cost := costPerCall
-        if cacheHit {
-            cost = 0  // ← Quota check happens, but cost = 0
-        }
-
-        // Check quota (cache hits check without deducting)
-        allowed, remaining, err := s.quotaTracker.CheckAndRecordQuota(r.Context(), route, cost, token, user)
-
-        // ... rest of quota logic
-    })
+// From: internal/server/cache_middleware.go — the hit is served HERE; the
+// quota middleware downstream never runs for this request.
+if cachedResponse, found := s.cache.Get(cacheKey); found {
+    s.ensureMetrics().recordCacheHit(metricLabelsFromRequest(r))
+    ctx := context.WithValue(r.Context(), cacheHitKey, true)
+    r = r.WithContext(ctx)
+    s.serveCachedResponse(w, r, cachedResponse, true) // ← writes the response
+    return
 }
 ```
 
 **Impact:**
-- Quota **is checked** (validation happens)
-- Quota is **not deducted** (cost = 0)
-- `recordQuotaBypassed(route)` metric is recorded
-- Response headers: `X-Quota-Bypassed: cache-hit`
+- Quota is **not checked** (the request is short-circuited before the quota middleware)
+- Quota is **not deducted**
+- `seam_quota_bypassed_total{route}` is recorded once per hit, by `serveCachedResponse`
+- Response headers: `X-SEAM-Cache: HIT` and `X-Quota-Bypassed: cache-hit`; the
+  admission-time quota headers captured on the charged miss are stripped from
+  the replayed response (see the contract note for the exact list)
 
 ### Cost Counter Examples
 
 | Scenario | Cost Applied | Quota Checked | Headers | Metrics |
 |----------|--------------|---------------|---------|---------|
 | Health sentinel probe (`/_seam/health`) | No | No | None | None |
-| Cache miss (`/api/users`, first request) | Yes | Yes | `X-Quota-Cost-Per-Call`, `X-Quota-Remaining` | `metricQuotaCost` |
-| Cache hit (`/api/users`, subsequent request) | No | Yes | `X-Quota-Bypassed: cache-hit` | `metricQuotaBypassed` |
-| Quota exceeded (`/api/users`, over limit) | N/A | Yes | `Retry-After: 60` | `metricQuotaExceeded` |
+| Cache miss (`/api/users`, first request) | Yes | Yes | `X-Quota-Cost-Per-Call`, `X-Quota-Remaining`, `X-SEAM-Budget-Remaining` | `seam_quota_cost_total` |
+| Cache hit (`/api/users`, subsequent request) | No | No (short-circuited before the quota middleware) | `X-SEAM-Cache: HIT`, `X-Quota-Bypassed: cache-hit` | `seam_cache_hits_total`, `seam_quota_bypassed_total` |
+| Quota exceeded (`/api/users`, over limit) | N/A | Yes | `Retry-After: 60`, `X-SEAM-Budget-Remaining` | `seam_quota_exceeded_total` |
 
 ## Integration Points
 
@@ -417,13 +406,18 @@ if cacheHit {
 
 ### 5. Quota Bypass Headers and Metrics
 
-**Location:** `internal/server/quota_middleware.go:73`
+**Location:** `internal/server/quota_middleware.go` — the quota middleware's
+own cache-hit branch. In the shipped chain this branch is **unreachable**: the
+cache middleware serves a hit directly and never invokes the quota middleware.
+It is retained for direct composition (and covered by
+`TestQuotaBypass_ContextPropagation`); the hit observability callers actually
+see comes from `serveCachedResponse` below.
 
 ```go
-// Cache hits get a special header and metric
+// Cache hits get a special header and metric (defensive; see note above)
 if cacheHit {
     w.Header().Set("X-Quota-Bypassed", "cache-hit")
-    recordQuotaBypassed(route)  // ← Prometheus metric
+    s.ensureMetrics().recordQuotaBypassed(route)  // ← Prometheus metric
 }
 ```
 
@@ -445,32 +439,45 @@ if isActualHit {
 
 ## Metrics and Observability
 
-### Prometheus Metrics
+The canonical observability contract — exact metric names, label sets and
+values, the per-request-class signal matrix, and the header stripping rule —
+lives in [`docs/notes/cache-quota-bypass-observability.md`](../notes/cache-quota-bypass-observability.md)
+and is pinned by `TestBypassObservability_*` in
+`internal/server/bypass_observability_test.go`. Summary:
 
-All bypass events are tracked with dedicated Prometheus metrics:
+### Prometheus Metrics
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `seam_cache_hits_total` | Counter | `route` | Total cache hits by route |
-| `seam_cache_misses_total` | Counter | `route` | Total cache misses by route |
-| `seam_cache_hit_rate` | Gauge | - | Overall cache hit rate (0-1) |
-| `seam_quota_bypassed_total` | Counter | `route` | Total quota bypasses due to cache hit |
-| `seam_quota_cost_total` | Counter | `route` | Total accumulated cost in USD |
-| `seam_quota_exceeded_total` | Counter | `route` | Total quota exceeded errors |
+| `seam_cache_hits_total` | Counter | `route`, `version` | Total cache hits; `route` is the metric-route context (path template or `unmatched`), not the concrete URL |
+| `seam_cache_misses_total` | Counter | `route`, `version` | Total cache misses, including TTL=0 dedup-only lookups |
+| `seam_cache_hit_rate` | Gauge | - | Overall cache hit rate (0-1), scraped from the response cache's own counters |
+| `seam_quota_bypassed_total` | Counter | `route` | Total quota bypasses due to cache hit; `route` is the concrete request path (the quota key) |
+| `seam_quota_cost_total` | Counter | `route` | Total accumulated cost in USD, recorded only when cost > 0 |
+| `seam_quota_exceeded_total` | Counter | `route` | Total quota-exceeded refusals (HTTP 429) |
+| `seam_quota_remaining` | Gauge | `scope` | **Registered but never populated** — no samples are exposed; do not alert on it |
+
+Reserved-path traffic (control plane, health sentinel) records none of these:
+`metricsMiddleware`, `cacheMiddleware` and `quotaMiddleware` each short-circuit
+on `isReservedPath` before any series is touched, so probe traffic appears in
+no cache, quota or `seam_http_*` family.
 
 ### Response Headers
 
-**Cache hit headers:**
+**Cache hit headers** (admission-time quota headers captured on the charged
+miss — `X-Quota-Cost-Per-Call`, `X-Quota-Remaining`,
+`X-SEAM-Budget-Remaining` — are stripped from the replayed response):
 ```
 X-SEAM-Cache: HIT
 X-Quota-Bypassed: cache-hit
 ```
 
-**Cache miss headers:**
+**Cache miss headers** (a miss carries no `X-SEAM-Cache` header — `HIT` is
+the only value ever emitted; `formatCost` trims trailing zeros):
 ```
-X-SEAM-Cache: MISS
-X-Quota-Cost-Per-Call: $0.10
-X-Quota-Remaining: $0.90
+X-Quota-Cost-Per-Call: $0.1
+X-Quota-Remaining: $0.9
+X-SEAM-Budget-Remaining: amount=$0.9 unit=call window=1h resets=<RFC3339>
 ```
 
 **Health sentinel headers (no special headers):**
@@ -667,6 +674,8 @@ OK
 4. **`TestSeamHealthAliasServesSameBodyAsHealthz`** - Pins the served alias: `/_seam/health` is registered on the same handler as `/_seam/healthz` and answers 200 `"OK"` (and refuses non-GET) identically
 5. **`TestSeamHealthAliasReceivesReservedPathTreatment`** - Pins the reserved-path treatment of both health names (cache and quota bypass despite a configured TTL and cost) and their deliberate absence from the `reservedPaths` exact enumeration
 6. **`TestHealthzAndAliasAnswerWhileReadyzIs503`** - Pins liveness/readiness separation: a quarantined-everything route table 503s `/_seam/readyz` while both health names keep answering
+7. **`TestBypassObservability_ReservedRequestsEmitNoSignals`** - Pins the reserved-path observability contract through the production metrics→cache→quota order: zero samples in any `seam_http_*`, `seam_cache_*` or `seam_quota_*` family, no bypass or quota headers, fresh execution and $0 accumulated, with a quota-refused sanity path proving the configuration bites
+8. **`TestBypassObservability_CacheHitSignalContract`** - Pins the successful cache-hit contract: bypass headers, stripping of every admission-time quota header (including `X-SEAM-Budget-Remaining`), the hit/miss/bypass/cost metric values, the label-key split between cache and quota families, and that the hit is still counted in `seam_http_requests_total`
 
 ### Manual Testing
 

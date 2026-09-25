@@ -155,6 +155,10 @@ func (s *Server) serveCachedResponse(w http.ResponseWriter, r *http.Request, cac
 		// Remove quota cost headers for cache hits (they don't apply since quota was bypassed)
 		w.Header().Del("X-Quota-Cost-Per-Call")
 		w.Header().Del("X-Quota-Remaining")
+		// X-SEAM-Budget-Remaining is admission-time quota state captured on the
+		// charged miss; replaying it would report a stale remaining budget for a
+		// request that was never charged.
+		w.Header().Del("X-SEAM-Budget-Remaining")
 		// Record quota bypass
 		s.ensureMetrics().recordQuotaBypassed(r.URL.Path)
 	}

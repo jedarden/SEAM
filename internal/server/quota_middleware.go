@@ -81,7 +81,9 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 		}
 
 		if !allowed {
-			// Phase 13.2: Return 402 Payment Required for quota exhaustion
+			// Quota exhaustion: the ErrCodeQuotaExceeded envelope maps to
+			// 429 Too Many Requests (errors.go), carrying Retry-After and
+			// X-SEAM-Budget-Remaining.
 			log.Printf("[Quota] Quota exceeded for %s - remaining: $%.2f", route, remaining)
 			s.writeQuotaExceededResponse(w, r, route, remaining, costPerCall)
 			return
@@ -126,8 +128,10 @@ func (s *Server) getCostPerCall(route string) float64 {
 	return s.quotaTracker.GetCostPerCall(route)
 }
 
-// writeQuotaExceededResponse writes a 402 Payment Required response for quota exhaustion
-// Phase 13.2: 402 is used for quota refusal, 429 stays with loop breaker
+// writeQuotaExceededResponse writes the quota-exceeded refusal. The
+// ErrCodeQuotaExceeded envelope maps to 429 Too Many Requests on the wire;
+// earlier phase notes describing a 402 refusal do not match the shipped
+// error-code mapping.
 func (s *Server) writeQuotaExceededResponse(w http.ResponseWriter, r *http.Request, route string, remaining float64, costPerCall float64) {
 	// Calculate window reset time
 	windowDuration := s.quotaTracker.GetWindowDuration()
