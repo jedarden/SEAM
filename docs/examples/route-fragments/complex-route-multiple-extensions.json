@@ -72,11 +72,6 @@
     }
   },
   "x-upstream-strip-prefix": "/saas",
-  "x-credential-probe": {
-    "path": "/api/v2/health",
-    "method": "GET",
-    "interval": "30s"
-  },
   "x-breaker": {
     "threshold": 25,
     "openSeconds": 60,
@@ -90,10 +85,14 @@
         "operationId": "listUsers",
         "tags": ["users"],
         "x-required-scope": "saas:users:read",
-        "x-cost-per-call": 2.0,
+        "x-cost-per-call": {
+          "amount": 2.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10000,
-          "window_seconds": 3600
+          "amount": 10000,
+          "unit": "credits",
+          "window": "1h"
         },
         "parameters": [
           {
@@ -156,10 +155,14 @@
         "operationId": "createUser",
         "tags": ["users"],
         "x-required-scope": "saas:users:write",
-        "x-cost-per-call": 5.0,
+        "x-cost-per-call": {
+          "amount": 5.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 1000,
-          "window_seconds": 3600
+          "amount": 1000,
+          "unit": "credits",
+          "window": "1h"
         },
         "parameters": [
           {
@@ -220,14 +223,18 @@
         "operationId": "generateReport",
         "tags": ["reports"],
         "x-required-scope": "saas:reports:generate",
-        "x-cost-per-call": 50.0,
+        "x-cost-per-call": {
+          "amount": 50.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10,
-          "window_seconds": 3600
+          "amount": 10,
+          "unit": "credits",
+          "window": "1h"
         },
         "x-loop-guard": {
-          "max_iterations": 3,
-          "backoff_ms": 1000
+          "maxRepeats": 3,
+          "window": "1m"
         },
         "parameters": [
           {

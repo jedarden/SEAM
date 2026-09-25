@@ -31,10 +31,13 @@ paths:
     post:
       summary: Perform expensive data analysis
       operationId: performAnalysis
-      x-cost-per-call: 5
+      x-cost-per-call:
+        amount: 5
+        unit: credits
       x-quota:
-        limit: 100
-        window_seconds: 3600
+        amount: 100
+        unit: credits
+        window: 1h
       requestBody:
         required: true
         content:
@@ -94,10 +97,13 @@ paths:
     post:
       summary: Batch analysis requests
       operationId: batchAnalysis
-      x-cost-per-call: 15
+      x-cost-per-call:
+        amount: 15
+        unit: credits
       x-quota:
-        limit: 100
-        window_seconds: 3600
+        amount: 100
+        unit: credits
+        window: 1h
       requestBody:
         required: true
         content:
@@ -141,10 +147,13 @@ paths:
     get:
       summary: Export large dataset
       operationId: exportDataset
-      x-cost-per-call: 25
+      x-cost-per-call:
+        amount: 25
+        unit: credits
       x-quota:
-        limit: 100
-        window_seconds: 3600
+        amount: 100
+        unit: credits
+        window: 1h
       parameters:
         - name: dataset_id
           in: query

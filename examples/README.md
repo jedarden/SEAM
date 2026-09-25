@@ -186,10 +186,21 @@ These examples demonstrate how the schema integrates across SEAM's implementatio
 
 When the schema evolves (e.g., `x-seam-schema: v2`), these examples serve as the regression corpus:
 
-1. **Run validation:** `node examples/validate_examples.js`
-2. **Check for breaking changes:** Did any previously-valid examples become invalid?
+1. **Run validation:** `go test ./docs/examples` — this is the CI gate
+   (`docs/examples/doc_examples_test.go`); it lints every example in this
+   tree and `docs/examples/` against `spec/route-fragment-schema.json` and
+   the full seam lint rule set, and fails the build on any stale shape.
+   (`node examples/validate_examples.js` still works for a quick manual
+   check, but it validates a hardcoded file list and never runs in CI.)
+2. **Check for breaking changes:** Did any previously-valid examples become invalid? The gate answers this for you — it fails, naming the file and shape.
 3. **Update examples:** If the change is intentional (e.g., new required field), update the examples.
 4. **Document migration path:** Add a migration guide to the limitations document.
+
+The gate exempts exactly one lint code for documentation copies:
+`owner.directory-mismatch` (production fragments live at
+`fragments/<x-seam-owner>/<file>`; docs examples live under a documentation
+topic instead). Every other rule — including `owner.vault-path-mismatch` —
+applies in full.
 
 ---
 

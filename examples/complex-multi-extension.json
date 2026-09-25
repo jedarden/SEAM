@@ -63,13 +63,17 @@
         "description": "Multi-instance weather forecast endpoint. The region parameter selects the upstream instance. Loop guard prevents runaway iteration. Cost and quota are enforced per-caller.",
         "operationId": "getForecast",
         "x-loop-guard": {
-          "max_iterations": 10,
-          "backoff_ms": 100
+          "maxRepeats": 10,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.001,
+        "x-cost-per-call": {
+          "amount": 0.001,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 1000,
-          "window_seconds": 3600
+          "amount": 1000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -110,13 +114,17 @@
         "description": "Multi-instance current conditions endpoint. Lower per-call cost (0.0005) and higher quota limit (2000) than forecast.",
         "operationId": "getCurrentConditions",
         "x-loop-guard": {
-          "max_iterations": 5,
-          "backoff_ms": 50
+          "maxRepeats": 5,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.0005,
+        "x-cost-per-call": {
+          "amount": 0.0005,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 2000,
-          "window_seconds": 3600
+          "amount": 2000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -153,13 +161,17 @@
         "description": "Weather alerts endpoint. Higher cost (0.002) due to upstream pricing, with proportional quota limit.",
         "operationId": "getAlerts",
         "x-loop-guard": {
-          "max_iterations": 3,
-          "backoff_ms": 200
+          "maxRepeats": 3,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.002,
+        "x-cost-per-call": {
+          "amount": 0.002,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 500,
-          "window_seconds": 3600
+          "amount": 500,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {

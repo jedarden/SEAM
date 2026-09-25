@@ -17,10 +17,14 @@
         "description": "Enriches user profile with third-party data. This operation costs 15 credits per call and is limited to 1000 credits per hour per caller.",
         "operationId": "enrichProfile",
         "x-required-scope": "data-enrichment:enrich:profile",
-        "x-cost-per-call": 15,
+        "x-cost-per-call": {
+          "amount": 15,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 1000,
-          "window_seconds": 3600
+          "amount": 1000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -53,10 +57,14 @@
         "description": "Enriches company information with third-party data. This operation costs 50 credits per call (expensive!) and is limited to 500 credits per hour.",
         "operationId": "enrichCompany",
         "x-required-scope": "data-enrichment:enrich:company",
-        "x-cost-per-call": 50,
+        "x-cost-per-call": {
+          "amount": 50,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 500,
-          "window_seconds": 3600
+          "amount": 500,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -89,10 +97,14 @@
         "description": "Batch enrichment endpoint that processes multiple items in one call. Costs 100 credits per batch regardless of item count, making it cost-effective for bulk operations.",
         "operationId": "batchEnrich",
         "x-required-scope": "data-enrichment:enrich:batch",
-        "x-cost-per-call": 100,
+        "x-cost-per-call": {
+          "amount": 100,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 2000,
-          "window_seconds": 3600
+          "amount": 2000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -127,10 +139,14 @@
         "description": "Simple lookup operation that costs only 1 credit per call. High quota limit allows frequent calls.",
         "operationId": "cheapLookup",
         "x-required-scope": "data-enrichment:lookup:read",
-        "x-cost-per-call": 1,
+        "x-cost-per-call": {
+          "amount": 1,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10000,
-          "window_seconds": 3600
+          "amount": 10000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {

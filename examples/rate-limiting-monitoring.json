@@ -59,11 +59,14 @@
     }
   },
   "x-required-scope": "external:query:data",
-  "x-cost-per-call": 0.001,
+  "x-cost-per-call": {
+    "amount": 0.001,
+    "unit": "credits"
+  },
   "x-quota": {
-    "limit": 1000,
-    "window": "1h",
-    "scope": "per-token"
+    "amount": 1000,
+    "unit": "credits",
+    "window": "1h"
   },
   "paths": {
     "/{region}/query": {
@@ -72,14 +75,17 @@
         "description": "Multi-instance query endpoint with loop protection. The region parameter selects the upstream instance. Loop guard prevents infinite recursion. Cost tracking and quota enforced per-token.",
         "operationId": "queryExternal",
         "x-loop-guard": {
-          "max_depth": 10,
-          "max_redirects": 5
+          "maxRepeats": 10,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.002,
+        "x-cost-per-call": {
+          "amount": 0.002,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 500,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 500,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -118,14 +124,17 @@
         "description": "Multi-instance search endpoint. Lower per-call cost and higher quota limit than query endpoint. Reduced loop guard limits for faster failover.",
         "operationId": "searchExternal",
         "x-loop-guard": {
-          "max_depth": 5,
-          "max_redirects": 3
+          "maxRepeats": 5,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.001,
+        "x-cost-per-call": {
+          "amount": 0.001,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 2000,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 2000,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {
@@ -164,14 +173,17 @@
         "description": "Batch processing endpoint with higher per-call cost due to resource intensity. Correspondingly higher quota limit for bulk operations. Stricter loop guard limits.",
         "operationId": "batchExternal",
         "x-loop-guard": {
-          "max_depth": 3,
-          "max_redirects": 2
+          "maxRepeats": 3,
+          "window": "1m"
         },
-        "x-cost-per-call": 0.005,
+        "x-cost-per-call": {
+          "amount": 0.005,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 200,
-          "window": "1h",
-          "scope": "per-token"
+          "amount": 200,
+          "unit": "credits",
+          "window": "1h"
         },
         "responses": {
           "200": {

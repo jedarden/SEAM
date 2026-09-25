@@ -25,10 +25,14 @@
         "summary": "Generate text completion",
         "description": "High-cost endpoint: each call costs 100 credits. Quota is enforced per scope.",
         "operationId": "createCompletion",
-        "x-cost-per-call": 100,
+        "x-cost-per-call": {
+          "amount": 100,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 10000,
-          "window_seconds": 3600
+          "amount": 10000,
+          "unit": "credits",
+          "window": "1h"
         },
         "requestBody": {
           "required": true,
@@ -112,10 +116,14 @@
         "summary": "Generate chat completion",
         "description": "Higher-cost endpoint with multi-turn conversation support. Costs 150 credits per call.",
         "operationId": "createChatCompletion",
-        "x-cost-per-call": 150,
+        "x-cost-per-call": {
+          "amount": 150,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 15000,
-          "window_seconds": 3600
+          "amount": 15000,
+          "unit": "credits",
+          "window": "1h"
         },
         "requestBody": {
           "required": true,
@@ -171,10 +179,14 @@
         "summary": "Generate text embeddings",
         "description": "Lower-cost endpoint for vector embeddings. Costs 10 credits per call.",
         "operationId": "createEmbedding",
-        "x-cost-per-call": 10,
+        "x-cost-per-call": {
+          "amount": 10,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 50000,
-          "window_seconds": 3600
+          "amount": 50000,
+          "unit": "credits",
+          "window": "1h"
         },
         "requestBody": {
           "required": true,

@@ -88,7 +88,7 @@ paths:
           schema:
             type: string
           description: Address to geocode
-        - name: country_code:
+        - name: country_code
           in: query
           required: false
           schema:

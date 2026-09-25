@@ -25,10 +25,14 @@
         "operationId": "getCurrentWeather",
         "tags": ["weather"],
         "x-required-scope": "weather:read",
-        "x-cost-per-call": 1.0,
+        "x-cost-per-call": {
+          "amount": 1.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 1000,
-          "window_seconds": 86400
+          "amount": 1000,
+          "unit": "credits",
+          "window": "1d"
         },
         "parameters": [
           {
@@ -77,10 +81,14 @@
         "operationId": "getForecast",
         "tags": ["weather"],
         "x-required-scope": "weather:read",
-        "x-cost-per-call": 5.0,
+        "x-cost-per-call": {
+          "amount": 5.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 200,
-          "window_seconds": 86400
+          "amount": 200,
+          "unit": "credits",
+          "window": "1d"
         },
         "parameters": [
           {
@@ -130,10 +138,14 @@
         "operationId": "getHistoricalWeather",
         "tags": ["weather"],
         "x-required-scope": "weather:read",
-        "x-cost-per-call": 10.0,
+        "x-cost-per-call": {
+          "amount": 10.0,
+          "unit": "credits"
+        },
         "x-quota": {
-          "limit": 50,
-          "window_seconds": 86400
+          "amount": 50,
+          "unit": "credits",
+          "window": "1d"
         },
         "parameters": [
           {

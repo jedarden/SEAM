@@ -48,8 +48,8 @@
         "deprecated": true,
         "x-unscrubbable": "acknowledged",
         "x-loop-guard": {
-          "max_iterations": 100,
-          "backoff_ms": 100
+          "maxRepeats": 100,
+          "window": "1m"
         },
         "parameters": [
           {
@@ -255,8 +255,8 @@
         "description": "Process multiple items in one request. Protected by loop guard to prevent runaway iterations.",
         "operationId": "batchOperation",
         "x-loop-guard": {
-          "max_iterations": 500,
-          "backoff_ms": 50
+          "maxRepeats": 500,
+          "window": "1m"
         },
         "requestBody": {
           "required": true,
