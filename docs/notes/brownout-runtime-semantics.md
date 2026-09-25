@@ -1,8 +1,10 @@
 # Deprecated-Route Brownout: Runtime Semantics
 
-Status: implemented 2026-09-17; deprecation response headers 2026-09-25.
+Status: implemented 2026-09-17; deprecation response headers 2026-09-25;
+window metrics specified 2026-09-25.
 This document is the authority on how `x-seam-deprecated` behaves at runtime:
-brownout windows, and the Deprecation/Sunset response headers every
+brownout windows, the metrics a window's responses produce, and the
+Deprecation/Sunset response headers every
 otherwise-normal response for a deprecated route carries. The code comments
 in `internal/server/brownout_middleware.go` and
 `internal/server/deprecation_middleware.go` summarize the same contract; the
@@ -109,6 +111,34 @@ During an active window the response is:
 - Every 410 served is logged (`[brownout] served 410 for route … window …`)
   as the operator-facing record that live traffic appeared inside a window.
 
+## Metrics
+
+The metrics middleware wraps the entire cache/quota/brownout trio (it is the
+outermost signal-producing layer — see `Server.Start`), so a window 410 is
+ordinary counted traffic, never an accounting blind spot:
+
+- **Counted at its own status.** The 410 lands in
+  `seam_http_requests_total{route, method, version, status="410"}` under the
+  deprecated route's own labels, and in the
+  `seam_http_request_duration_seconds` histogram. An operator graphing status
+  codes sees the window as a 410 band, not as traffic that vanished.
+- **The retirement counter sees the caller.** The same request increments
+  `seam_route_version_requests_total{route, spec_version}`: a caller that
+  appears inside a window is real dependency — exactly the traffic that must
+  keep the quiet window shut (plan Phase 8: only a real caller resets or
+  holds it; probes never traverse the caller chain, so they cannot). A route
+  whose only remaining traffic is brownout 410s therefore never retires,
+  which is correct: those callers still need it.
+- **No cache or quota samples.** The 410 is served before the cache and
+  quota middlewares are consulted, so it produces no
+  `seam_cache_hits_total` / `seam_cache_misses_total` sample, no
+  `seam_quota_cost_total` charge, and no `seam_quota_bypassed_total` /
+  `seam_quota_exceeded_total` event — the metering silence is the same
+  short-circuit that makes the 410 consume no budget.
+- **The log line is the per-event record.** The counters say how many; the
+  `[brownout] served 410` log line is the only record naming *which* window
+  a given 410 belonged to.
+
 ## Sunset behavior
 
 Sunset is **advisory** and never removes a route by itself. Past the last
@@ -191,6 +221,7 @@ overlaps across offsets.
 | First active window names bounds | `TestServerBrownoutMiddleware_410NamesFirstActiveWindow` |
 | Union across overlapping windows | `TestBrownoutScheduler_OverlappingWindowsUnion` |
 | Full 410 header/body contract | `TestBrownoutScheduler_ResponseHeadersContract` |
+| Window 410 counted (requests_total 410, route-version counter), no cache/quota samples | `TestBrownoutWindow410Metrics` |
 | DORMANT / basic 410 / boundaries / replacement | existing `brownout_middleware_test.go` tests |
 | Mixed-offset adjacency accepted (no false positive) | `TestCheckDeprecation_MixedOffsetAdjacentWindowsAccepted` |
 | Mixed-offset overlap detected (no false negative) | `TestCheckDeprecation_MixedOffsetOverlapDetected` |
