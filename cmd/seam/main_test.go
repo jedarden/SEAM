@@ -803,6 +803,29 @@ func TestServeEmptyFragmentsDirEnvCountsAsUnset(t *testing.T) {
 	})
 }
 
+// README ("Fragment directory and hot-reload scope"): "--spec-dir never
+// influences which fragments are loaded", and <spec-dir>/fragments.d survives
+// only as a legacy fallback applied when the resolved directory is empty —
+// which the serve path reaches solely through an explicitly passed
+// --fragments-dir=. These subtests pin both sentences at the serve layer: a
+// set SEAM_SPEC_DIR leaves the ./fragments default standing, and an
+// explicitly empty --fragments-dir stays empty (the flag was passed, so
+// neither the environment nor the default may refill it).
+func TestServeSpecDirNeverSelectsFragments(t *testing.T) {
+	t.Run("spec-dir env does not redirect fragments resolution", func(t *testing.T) {
+		f := resolveServeConfig(t, nil, map[string]string{"SEAM_SPEC_DIR": "/env/spec"})
+		if got := *f.fragmentsDir; got != "./fragments" {
+			t.Errorf("fragments-dir = %q, want the default ./fragments (SEAM_SPEC_DIR never influences fragment resolution)", got)
+		}
+	})
+	t.Run("explicitly empty --fragments-dir stays empty", func(t *testing.T) {
+		f := resolveServeConfig(t, []string{"--fragments-dir="}, map[string]string{"SEAM_FRAGMENTS_DIR": "/env/fragments"})
+		if got := *f.fragmentsDir; got != "" {
+			t.Errorf("fragments-dir = %q, want %q (an explicitly passed empty flag is the serve path's only route to the legacy fallback)", got, "")
+		}
+	})
+}
+
 // README ("Precedence (serve)") states the empty-value rule for every
 // variable, not just the fragments directory: "A variable set to the empty
 // string counts as unset". This sweep makes that general statement auditable

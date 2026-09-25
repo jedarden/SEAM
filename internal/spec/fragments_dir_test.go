@@ -162,4 +162,47 @@ func TestNewLoaderResolvesSEAMFragmentsDir(t *testing.T) {
 			t.Errorf("error = %v, want it to name the ./fragments default", err)
 		}
 	})
+
+	t.Run("unset variable resolves ./fragments when it exists", func(t *testing.T) {
+		t.Setenv("SEAM_FRAGMENTS_DIR", "")
+		root := t.TempDir()
+		writeFragmentFixture(t, filepath.Join(root, "fragments"), "default-owner", "/default/path")
+		t.Chdir(root)
+
+		loader, err := NewLoader("http://localhost:8080")
+		if err != nil {
+			t.Fatalf("NewLoader: %v", err)
+		}
+		if got, want := loader.fragmentsDir, "./fragments"; got != want {
+			t.Errorf("resolved fragments dir = %q, want %q (the ./fragments default)", got, want)
+		}
+		listPathsContains(t, loader.ListPaths(), "/default/path")
+	})
+}
+
+// "--spec-dir never influences which fragments are loaded" (README). Even a
+// SEAM_SPEC_DIR pointing at a directory that holds a legacy fragments.d tree
+// must not redirect the env-driven loader: the <spec-dir>/fragments.d
+// fallback lives in NewWithFragments and fires only on an empty fragments-dir
+// argument, and NewLoader never passes one.
+func TestNewLoaderIgnoresSpecDirForFragments(t *testing.T) {
+	specDir := t.TempDir()
+	writeFragmentFixture(t, filepath.Join(specDir, "fragments.d"), "legacy-owner", "/legacy/path")
+
+	t.Setenv("SEAM_SPEC_DIR", specDir)
+	t.Setenv("SEAM_FRAGMENTS_DIR", "")
+	root := t.TempDir()
+	writeFragmentFixture(t, filepath.Join(root, "fragments"), "default-owner", "/default/path")
+	t.Chdir(root)
+
+	loader, err := NewLoader("http://localhost:8080")
+	if err != nil {
+		t.Fatalf("NewLoader: %v", err)
+	}
+	if got, want := loader.fragmentsDir, "./fragments"; got != want {
+		t.Errorf("resolved fragments dir = %q, want %q (the ./fragments default) despite SEAM_SPEC_DIR=%q", got, want, specDir)
+	}
+	paths := loader.ListPaths()
+	listPathsContains(t, paths, "/default/path")
+	listPathsExcludes(t, paths, "/legacy/path")
 }
