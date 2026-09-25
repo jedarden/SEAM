@@ -948,6 +948,11 @@ bao read policy/seam
 #   capabilities = ["deny"]
 # }
 #
+# (Evaluator boundary, not an evaluator grant: the evaluator is
+# detection-only since 2026-09-05 — no GitHub token, no credential of its
+# own. The deny is permanent, outlives the withdrawn token path, and is
+# asserted every 5 minutes by seam-evaluator-credential-boundary-canary.)
+#
 # path "secret/data/*" {
 #   capabilities = ["deny"]
 # }
@@ -1049,6 +1054,10 @@ path "secret/data/rs-manager/rs-manager/seam/routes/*" {
   capabilities = ["read"]
 }
 
+# Evaluator boundary, not an evaluator grant: the evaluator is detection-only
+# since 2026-09-05 (no GitHub token, no credential of its own). The deny is
+# permanent, outlives the withdrawn token path, and is asserted every 5
+# minutes by seam-evaluator-credential-boundary-canary.
 path "secret/data/seam-retirement-evaluator/*" {
   capabilities = ["deny"]
 }

@@ -1,5 +1,13 @@
 # Evaluator Token Isolation and Metrics Access Verification Plan
 
+> **GITHUB-TOKEN READS WITHDRAWN — 2026-09-05** (`declarat-b818338b`). The
+> evaluator is detection-only and holds no credential of any kind, so every
+> step below that reads `evaluators/seam-retirement-evaluator/github-token`
+> is historical: the correct result today is **403** on that path, and a read
+> succeeding is the regression. The evaluator's single live grant is the
+> query-only VictoriaMetrics credential
+> `rs-manager/seam-retirement-evaluator/victoriametrics-query`.
+
 ## Task Context
 
 **Bead:** `bf-1ek6n`
@@ -13,7 +21,7 @@ Verify that the seam-retirement-evaluator can read its GitHub token and query Vi
 
 ## Acceptance Criteria
 
-1. ✅ Evaluator successfully reads its GitHub token from OpenBao
+1. ~~✅ Evaluator successfully reads its GitHub token from OpenBao~~ — **withdrawn 2026-09-05, inverted**: the read must now fail (403); a success is the regression
 2. ✅ Evaluator successfully queries VictoriaMetrics for SEAM metrics
 3. ✅ SEAM's role fails to read the evaluator's token path (access denied)
 4. ✅ End-to-end test confirms isolation and access
@@ -89,17 +97,19 @@ bao read auth/kubernetes/role/seam
 # SEAM should be bound to SA: seam in namespace: seam
 ```
 
-### Method 3: Token Path Existence Verification
+### Method 3: Retired Token Path Denial Verification
 
-**Purpose:** Verify the evaluator's GitHub token path exists
+**Purpose:** ~~Verify the evaluator's GitHub token path exists~~ — withdrawn
+2026-09-05: verify the path stays **denied** (403). A read succeeding means
+the withdrawn grant came back.
 
 **Verification Commands:**
 ```bash
-# Check if token path exists
+# Must fail with permission denied (the grant was removed 2026-09-05)
 bao kv get secret/evaluators/seam-retirement-evaluator/github-token
 
-# Check if it's a placeholder
-bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token
+# The single live grant must read
+bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query
 ```
 
 ### Method 4: Runtime Access Verification (Recommended)

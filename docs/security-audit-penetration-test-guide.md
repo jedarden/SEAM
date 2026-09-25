@@ -283,6 +283,8 @@ func processRequestWithSecret(secret string) {
 set -e
 
 OPENBAO_ADDR="http://openbao-rs-manager.openbao.svc.cluster.local:8200"
+# Retired 2026-09-05: the evaluator is detection-only and holds no GitHub
+# credential. The path must stay denied — this probe asserts exactly that.
 EVALUATOR_TOKEN_PATH="evaluators/seam-retirement-evaluator/github-token"
 SEAM_ROUTE_PATH="rs-manager/rs-manager/seam/routes/test-route/token"
 
@@ -622,7 +624,7 @@ func TestResponsesContainOnlyReferences(t *testing.T) {
     - path: /error-exfil
       method: POST
       openbao:
-        path: evaluators/seam-retirement-evaluator/github-token  # Wrong path
+        path: evaluators/seam-retirement-evaluator/github-token  # Wrong path (and retired 2026-09-05 — must stay 403)
       backend:
         url: "http://localhost:8080/error"
         # Hope error message contains the secret
@@ -914,11 +916,12 @@ spec:
 
 1. **Secret Rotation**
    ```bash
-   # Rotate all potentially compromised secrets
+   # Rotate all potentially compromised secrets. The evaluator holds no
+   # credential (detection-only since 2026-09-05) and the old
+   # monitoring/victoriametrics/readonly-credentials path is not in the live
+   # policy — there is nothing to rotate on either, so neither is listed.
    for secret_path in \
-     "evaluators/seam-retirement-evaluator/github-token" \
-     "rs-manager/rs-manager/seam/routes/*/token" \
-     "monitoring/victoriametrics/readonly-credentials"
+     "rs-manager/rs-manager/seam/routes/*/token"
    do
      echo "Rotating secret: $secret_path"
      # Implement secret rotation procedure

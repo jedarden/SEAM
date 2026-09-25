@@ -4,8 +4,18 @@
 
 This runbook provides step-by-step procedures for testing and verifying the security isolation between SEAM and the seam-retirement-evaluator service. Use this guide to validate that all authentication and authorization paths work correctly.
 
-**Last Updated:** 2026-09-05  
+**Last Updated:** 2026-09-25  
 **Bead:** bf-4oa45
+
+> **GITHUB-TOKEN MODEL WITHDRAWN — 2026-09-05** (`declarat-b818338b`). The
+> evaluator is **detection-only**: no GitHub client, no PRs, no third-party
+> credential of any kind. The retired credential path
+> (`evaluators/seam-retirement-evaluator/github-token`) must stay absent and
+> **denied** — every step below that touches it expects *permission denied*,
+> and a read there succeeding is the security breach, not the fix. The
+> evaluator policy's single live grant is the query-only VictoriaMetrics
+> credential `rs-manager/seam-retirement-evaluator/victoriametrics-query`.
+> Do not restore the grant to make an old step pass — it had no caller.
 
 > **Vault base in force:** every SEAM route path below is written against the
 > enforced base `rs-manager/rs-manager/seam/routes`, so `bao kv` commands use
@@ -65,7 +75,7 @@ bao policy read seam-retirement-evaluator-policy
 
 **Expected Output:**
 - SEAM policy should show `rs-manager/rs-manager/seam/routes/*` allowed (plus a legacy grant on the retired `seam/routes/*` until cutover is verified), `evaluators/*` denied
-- Evaluator policy should show `evaluators/seam-retirement-evaluator/*` and `monitoring/victoriametrics/*` allowed, `rs-manager/rs-manager/seam/routes/*` denied
+- Evaluator policy should show a single read grant on `rs-manager/seam-retirement-evaluator/victoriametrics-query` (plus its `secret/metadata/` twin), denies on both SEAM route prefixes (`rs-manager/rs-manager/seam/routes/*` and the retired `seam/routes/*`), and **no** GitHub-token grant — that was removed 2026-09-05
 
 ### Step 2: Verify Kubernetes Roles
 
@@ -84,19 +94,20 @@ bao read auth/kubernetes/role/seam-retirement-evaluator
 ### Step 3: Verify Secrets Exist
 
 ```bash
-# Check evaluator GitHub token path
+# The retired evaluator GitHub credential path must NOT exist — a read here
+# must fail (the grant was removed 2026-09-05; a success is a policy regression)
 bao kv get secret/evaluators/seam-retirement-evaluator/github-token
 
-# Check VictoriaMetrics credentials path
-bao kv get secret/monitoring/victoriametrics/readonly-credentials
+# Check the evaluator's single live credential: the query-only VictoriaMetrics token
+bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query
 
 # Check at least one SEAM route secret exists
 bao kv list secret/rs-manager/rs-manager/seam/routes/
 ```
 
 **Expected Output:**
-- Evaluator token path should exist (may contain placeholder initially)
-- VictoriaMetrics credentials should exist
+- The retired GitHub credential path must stay absent and denied (permission denied / 403)
+- The VictoriaMetrics query credential should exist (`endpoint` and `token` fields)
 - At least one SEAM route secret should exist
 
 ## Comprehensive Testing (15 minutes)
@@ -153,15 +164,15 @@ kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig logs -n argo-workflows
 [timestamp] OpenBao is reachable
 [timestamp] Running as ServiceAccount: seam-retirement-evaluator in namespace: seam
 [timestamp] Successfully authenticated to OpenBao
-[timestamp] PASS: Can read own GitHub token path
+[timestamp] PASS: Retired GitHub credential path is denied (403)
 [timestamp] PASS: SEAM routes are correctly inaccessible
-[timestamp] PASS: Can read VictoriaMetrics credentials
+[timestamp] PASS: Can read the query-only VictoriaMetrics credential (victoriametrics-query)
 [timestamp] PASS: Correctly denied access to other paths (armor/)
 [timestamp] === Verification Results ===
 [timestamp] ✓ Evaluator ServiceAccount can authenticate to OpenBao
-[timestamp] ✓ Evaluator can read own GitHub token
+[timestamp] ✓ Retired GitHub credential path is denied (grant removed 2026-09-05 — its reappearance is an error)
 [timestamp] ✓ Evaluator cannot read SEAM routes (isolation verified)
-[timestamp] ✓ Evaluator can read VictoriaMetrics credentials
+[timestamp] ✓ Evaluator can read the query-only VictoriaMetrics credential
 [timestamp] ✓ Evaluator policy correctly bounded (cannot access other paths)
 [timestamp] === All verification tests passed ===
 ```
@@ -169,7 +180,7 @@ kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig logs -n argo-workflows
 **Interpretation:**
 - All "PASS" messages mean isolation is correctly enforced
 - "FAIL" messages mean security boundaries are violated (investigate immediately)
-- "WARNING" about placeholder token is acceptable during initial setup
+- A read on the retired GitHub credential path *succeeding* is the boundary violation — the verification was inverted 2026-09-05 so that state fails the run
 
 ### Test 3: Manual OpenBao Access Test
 
@@ -184,8 +195,11 @@ bao write -field=client_token auth/kubernetes/login role=seam-retirement-evaluat
 # Store the token
 export EVAL_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=seam-retirement-evaluator jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token))
 
-# Try to read evaluator token (should succeed)
+# Try to read the retired GitHub credential path (should FAIL — grant removed 2026-09-05)
 bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token
+
+# Try to read the query-only VictoriaMetrics credential (should succeed — the single grant)
+bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query
 
 # Try to read SEAM routes (should fail)
 bao kv get secret/rs-manager/rs-manager/seam/routes/
@@ -195,11 +209,13 @@ exit
 ```
 
 **Expected Output:**
-- Reading evaluator token: SUCCESS (returns token value or "REPLACE_WITH_ACTUAL_GITHUB_PAT")
+- Reading the retired GitHub credential path: FAILURE (permission denied — a success means the withdrawn grant came back)
+- Reading the VictoriaMetrics query credential: SUCCESS
 - Reading SEAM routes: FAILURE (permission denied error)
 
 **Interpretation:**
-- SUCCESS for evaluator token means evaluator can read its own secrets ✅
+- FAILURE for the retired credential path means the 2026-09-05 withdrawal still holds ✅
+- SUCCESS for the VictoriaMetrics query credential means the evaluator's single live grant is intact ✅
 - FAILURE for SEAM routes means evaluator is correctly isolated ✅
 
 ### Test 4: SEAM Isolation Test
@@ -214,7 +230,7 @@ bao write -field=client_token auth/kubernetes/login role=seam jwt=$(cat /var/run
 # Try to read SEAM routes (should succeed)
 bao kv get secret/rs-manager/rs-manager/seam/routes/
 
-# Try to read evaluator token (should fail)
+# Try to read the retired evaluator credential path (should fail — the deny outlives the withdrawn token)
 bao kv get secret/evaluators/seam-retirement-evaluator/github-token
 
 # Exit the pod
@@ -370,26 +386,21 @@ set -e
 
 echo "=== Phase 3: Validating Secret Paths ==="
 
-# Check evaluator token path
-echo "Checking evaluator GitHub token path..."
+# The retired evaluator credential path must stay denied
+echo "Checking retired evaluator credential path..."
 if bao kv get secret/evaluators/seam-retirement-evaluator/github-token >/dev/null 2>&1; then
-  TOKEN_VALUE=$(bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token)
-  if echo "$TOKEN_VALUE" | grep -q "REPLACE_WITH_ACTUAL_GITHUB_PAT"; then
-    echo "⚠ Evaluator token path exists but contains placeholder"
-  else
-    echo "✓ Evaluator token path exists with actual token"
-  fi
-else
-  echo "✗ Evaluator token path does not exist"
+  echo "✗ Retired evaluator credential path is readable (GRANT REGRESSION — withdrawn 2026-09-05)"
   exit 1
+else
+  echo "✓ Retired evaluator credential path absent/denied"
 fi
 
-# Check VictoriaMetrics credentials
-echo "Checking VictoriaMetrics credentials path..."
-if bao kv get secret/monitoring/victoriametrics/readonly-credentials >/dev/null 2>&1; then
-  echo "✓ VictoriaMetrics credentials path exists"
+# Check the query-only VictoriaMetrics credential
+echo "Checking VictoriaMetrics query credential path..."
+if bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query >/dev/null 2>&1; then
+  echo "✓ VictoriaMetrics query credential exists"
 else
-  echo "✗ VictoriaMetrics credentials path does not exist"
+  echo "✗ VictoriaMetrics query credential does not exist"
   exit 1
 fi
 
@@ -427,19 +438,19 @@ set -e
 # Authenticate
 EVAL_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=seam-retirement-evaluator jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token))
 
-# Test 1: Read own token (should succeed)
-if bao kv get secret/evaluators/seam-retirement-evaluator/github-token >/dev/null 2>&1; then
-  echo "✓ Evaluator can read own token"
+# Test 1: The retired GitHub credential path must be denied (grant removed 2026-09-05)
+if bao kv get secret/evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -qi "permission denied\|Invalid"; then
+  echo "✓ Retired credential path correctly denied"
 else
-  echo "✗ Evaluator cannot read own token"
+  echo "✗ Retired credential path is readable (SECURITY BREACH)"
   exit 1
 fi
 
-# Test 2: Read VM credentials (should succeed)
-if bao kv get secret/monitoring/victoriametrics/readonly-credentials >/dev/null 2>&1; then
-  echo "✓ Evaluator can read VM credentials"
+# Test 2: Read the query-only VictoriaMetrics credential (should succeed)
+if bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query >/dev/null 2>&1; then
+  echo "✓ Evaluator can read the VictoriaMetrics query credential"
 else
-  echo "✗ Evaluator cannot read VM credentials"
+  echo "✗ Evaluator cannot read the VictoriaMetrics query credential"
   exit 1
 fi
 
@@ -461,9 +472,9 @@ set -e
 # Authenticate
 SEAM_TOKEN=$(bao write -field=client_token auth/kubernetes/login role=seam jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token))
 
-# Test 1: Try to read evaluator token (should fail)
+# Test 1: Try to read the retired evaluator credential path (should fail — deny is permanent)
 if bao kv get secret/evaluators/seam-retirement-evaluator/github-token 2>&1 | grep -qi "permission denied\|Invalid"; then
-  echo "✓ SEAM correctly denied access to evaluator token"
+  echo "✓ SEAM correctly denied access to the retired evaluator credential path"
 else
   echo "✗ SEAM can access evaluator token (SECURITY BREACH)"
   exit 1
@@ -511,7 +522,11 @@ kubectl --kubeconfig=/home/coding/.kube/rs-manager.kubeconfig run -n seam connec
 
 ### Issue: "Permission denied" when reading own secrets
 
-**Symptom:** Evaluator cannot read its own GitHub token
+**Symptom:** Evaluator cannot read the query-only VictoriaMetrics credential
+`rs-manager/seam-retirement-evaluator/victoriametrics-query` — its single
+live grant. (Permission denied on the *retired* GitHub credential path is the
+correct, permanent state: that grant was removed 2026-09-05 and must not come
+back.)
 
 **Diagnosis:**
 ```bash
@@ -526,7 +541,7 @@ kubectl --kubeconfig=/home/coding/.kube/rs-manager.kubeconfig get sa seam-retire
 ```
 
 **Resolution:**
-- Re-run setup workflow: `kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig create -f declarative-config/infra/seam-retirement-evaluator/openbao-setup-job.yaml`
+- Check the rs-manager hardening-reconciler wrote `seam-retirement-evaluator-policy` this cycle (`k8s/rs-manager/openbao/hardening-reconciler.yml` — it is the policy's source of truth; the setup workflow no longer writes it)
 - Verify policy syntax is correct
 - Verify ServiceAccount name matches exactly
 

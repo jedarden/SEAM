@@ -34,7 +34,7 @@ path "secret/data/*" {
 - **Read-only:** SEAM can only read, never write secrets
 - **Namespace-scoped:** Only `rs-manager/rs-manager/seam/routes/*` is accessible
 - **Explicit deny:** All other paths are explicitly denied, including:
-  - `seam-retirement-evaluator/*` (evaluator's GitHub token)
+  - `seam-retirement-evaluator/*` (the evaluator credential prefix — its GitHub token was withdrawn 2026-09-05 when the evaluator went detection-only; the prefix stays denied)
   - `kalshi/*` (Kalshi credentials)
   - `armor/*` (Armor credentials)
   - Any other tenant's material

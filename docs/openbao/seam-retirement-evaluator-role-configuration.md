@@ -137,26 +137,30 @@ expectation.
 
 ## Expected Secrets Structure
 
-### 1. GitHub Token
-- **Path:** `secret/evaluators/seam-retirement-evaluator/github-token`
-- **Purpose:** GitHub Personal Access Token for retirement evaluator workflows
+### 1. GitHub Token — **WITHDRAWN 2026-09-05, do not provision**
+- **Path (historical):** `secret/evaluators/seam-retirement-evaluator/github-token`
+- **Status:** the read grant was removed from the authoritative policy (74ce49b0) when the evaluator went detection-only — it holds no GitHub credential of any kind. This path must stay absent **and denied** (403); a secret appearing here, or a read succeeding, is a policy regression, not a missing prerequisite.
+
+### 2. VictoriaMetrics Query Credential
+- **Path:** `secret/rs-manager/seam-retirement-evaluator/victoriametrics-query`
+- **Purpose:** Query-only bearer token for vmauth — the evaluator policy's single live grant (read endpoints only; the vmagent write token is deliberately elsewhere)
 - **Fields:**
-  - `token`: GitHub PAT (expected format: `ghp_`, `gho_`, or `ghu_` prefix)
-  - `created_by`: "seam-retirement-evaluator-setup-workflow"
-  - `created_on`: ISO 8601 timestamp
+  - `endpoint`: `http://victorialogs-single-ardenone-manager-vector-headless.monitoring.svc.cluster.local:8428`
+  - `token`: vmauth-scoped read-only bearer token
 
-**Status:** ❌ **NOT FOUND** (placeholder or missing)
+**Status:** the live grant; the draft `secret/monitoring/victoriametrics/readonly-credentials` path below was never applied and no longer exists as an expectation.
 
-### 2. VictoriaMetrics Credentials
+<details>
+<summary>Historical 2026-08-16 draft (never applied)</summary>
+
 - **Path:** `secret/monitoring/victoriametrics/readonly-credentials`
 - **Purpose:** Read-only credentials for VictoriaMetrics queries
 - **Fields:**
   - `username`: (empty for internal auth)
   - `password`: (empty for internal auth)
-  - `endpoint`: `http://victorialogs-single-ardenone-manager-vector-headless.monitoring.svc.cluster.local:8428`
   - `note`: Explains that VictoriaMetrics uses internal auth
 
-**Status:** ❌ **NOT FOUND** (placeholder or missing)
+</details>
 
 ---
 
@@ -269,8 +273,8 @@ Once the setup workflow is successfully executed, verify:
 - [ ] Role `auth/kubernetes/role/seam-retirement-evaluator` exists
 - [ ] Policy `seam-retirement-evaluator-policy` is loaded
 - [ ] ServiceAccount `seam-retirement-evaluator` exists in namespace `seam`
-- [ ] GitHub token secret exists at `secret/evaluators/seam-retirement-evaluator/github-token`
-- [ ] VictoriaMetrics credentials exist at `secret/monitoring/victoriametrics/readonly-credentials`
+- [ ] The retired GitHub credential path `secret/evaluators/seam-retirement-evaluator/github-token` stays absent **and denied** (403) — withdrawn 2026-09-05, the evaluator is detection-only
+- [ ] The query-only VictoriaMetrics credential exists at `secret/rs-manager/seam-retirement-evaluator/victoriametrics-query` (with `endpoint` and `token` fields)
 - [ ] SEAM policy cannot read evaluator secrets
 - [ ] Evaluator policy cannot read SEAM route secrets
 
