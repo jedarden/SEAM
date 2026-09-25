@@ -100,6 +100,30 @@ func TestNewWithFragmentsEmptyDirFallsBackToSpecDirFragmentsD(t *testing.T) {
 	listPathsContains(t, loader.ListPaths(), "/legacy/path")
 }
 
+// "…applied when the resolved directory is empty" — only. A non-empty resolved
+// directory stays authoritative even when it does not exist: LoadDirectory
+// treats a missing directory as "no fragments", not an error, so the fallback
+// condition must stay emptiness alone. An existence clause added there (a
+// plausible discovery edit) would silently redirect a missing explicit
+// directory onto the legacy <spec-dir>/fragments.d tree.
+func TestNewWithFragmentsNonEmptyMissingDirNeverFallsBack(t *testing.T) {
+	specDir := t.TempDir()
+	writeFragmentFixture(t, filepath.Join(specDir, "fragments.d"), "legacy-owner", "/legacy/path")
+
+	missing := filepath.Join(t.TempDir(), "absent")
+	loader, err := NewWithFragments(specDir, "http://localhost:8080", "", missing)
+	if err != nil {
+		t.Fatalf("NewWithFragments: %v", err)
+	}
+
+	if got, want := loader.fragmentsDir, missing; got != want {
+		t.Errorf("resolved fragments dir = %q, want %q (a non-empty resolved directory is authoritative even when missing)", got, want)
+	}
+	if paths := loader.ListPaths(); len(paths) != 0 {
+		t.Errorf("merged paths = %v, want none — the legacy <spec-dir>/fragments.d tree must not be merged while the resolved directory is non-empty", paths)
+	}
+}
+
 // A reload re-reads the directory captured at construction. A SEAM_FRAGMENTS_DIR
 // change in the process environment must not redirect it — the hot-reload
 // watcher watches the startup directory, so redirecting a reload would merge a
