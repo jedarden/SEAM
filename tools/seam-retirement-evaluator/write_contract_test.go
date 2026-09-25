@@ -37,6 +37,14 @@ var forbiddenWritePrimitives = []struct {
 	{"file write", regexp.MustCompile(`os\.(WriteFile|Create|OpenFile)|ioutil\.WriteFile`)},
 	{"non-GET http method constant", regexp.MustCompile(`http\.Method(Post|Put|Patch|Delete|Connect|Trace)\b`)},
 	{"non-GET http method literal", regexp.MustCompile(`"(POST|PUT|PATCH|DELETE|CONNECT|TRACE)"`)},
+	// A credential is the enabling half of a write path the SDK ban cannot
+	// see: a raw HTTP PUT plus a token is a full PR API with no library in
+	// sight. Host-token environment names, the git credential helper, and
+	// basic-auth headers are all forbidden outright — the evaluator reads a
+	// metrics endpoint that answers without authentication.
+	{"host credential environment variable", regexp.MustCompile(`GITHUB_TOKEN|GH_TOKEN|FORGEJO_TOKEN|GITEA_TOKEN|CODEBERG_TOKEN|GIT_PASSWORD|GIT_ASKPASS`)},
+	{"git credential helper", regexp.MustCompile(`git credential|credential\s+(fill|approve|reject|helper)|CredentialHelper|SetBasicAuth`)},
+	{"pull-request surface", regexp.MustCompile(`PullRequest|/pulls`)},
 }
 
 func TestWriteContractSourcesCarryNoWritePrimitive(t *testing.T) {

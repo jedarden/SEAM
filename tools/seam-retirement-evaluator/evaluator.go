@@ -158,11 +158,15 @@ func (re *RetirementEvaluator) emitRetirementFinding(candidate *RetirementCandid
 	// Build the deprecation block. The fragment schema does not know
 	// x-seam-deprecated yet and declarative-config stores route fragments as
 	// JSON entries inside one whole ConfigMap per route owner, so this block is
-	// the proposal the human lands, not something this process writes.
+	// the proposal the human lands, not something this process writes. The
+	// brownout key is singular: both consumers (internal/spec/lint.go
+	// checkDeprecation and the route-table extractor) read x-seam-deprecated.brownout,
+	// so the plural form this block once carried would parse as an unknown
+	// field and the windows would silently never fire.
 	deprecationBlock := fmt.Sprintf(`x-seam-deprecated:
   since: "%s"
   sunset: "%s"
-  brownouts:
+  brownout:
 %s`, now.Format("2006-01-02"), sunsetDate, brownouts)
 
 	fragmentPath := re.getFragmentPath(candidate)
