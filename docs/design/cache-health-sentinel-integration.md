@@ -696,6 +696,7 @@ OK
 6. **`TestHealthzAndAliasAnswerWhileReadyzIs503`** - Pins liveness/readiness separation: a quarantined-everything route table 503s `/_seam/readyz` while both health names keep answering
 7. **`TestBypassObservability_ReservedRequestsEmitNoSignals`** - Pins the reserved-path observability contract through the production metrics→cache→quota order: zero samples in any `seam_http_*`, `seam_cache_*` or `seam_quota_*` family, no bypass or quota headers, fresh execution and $0 accumulated, with a quota-refused sanity path proving the configuration bites
 8. **`TestBypassObservability_CacheHitSignalContract`** - Pins the successful cache-hit contract: bypass headers, stripping of every admission-time quota header (including `X-SEAM-Budget-Remaining`), the hit/miss/bypass/cost metric values, the label-key split between cache and quota families, and that the hit is still counted in `seam_http_requests_total`
+9. **`TestHealthSentinelConfiguredTTLAndCostStayBypassed`** - Pins the configured-TTL bypass for the two operator sentinels with their real handlers: with a cache TTL and a per-call cost (above the quota limit) configured for `/health/credentials` and `/health/upstreams` themselves, requests through the identity→cache→quota order carry the handlers' own `Cache-Control: no-store`, track live breaker state (nothing stale is replayed), store no cache entry and record no cache or quota metric — while the same configuration demonstrably refuses a non-reserved path and serves a cache HIT on another
 
 ### Manual Testing
 
