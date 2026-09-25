@@ -703,6 +703,30 @@ func TestServeEmptyEnvValueKeepsFlag(t *testing.T) {
 	}
 }
 
+// The README's fragment-directory resolution names SEAM_FRAGMENTS_DIR's empty
+// value explicitly ("an empty value counts as unset") and gives that variable
+// the only documented three-step order: explicit flag, then non-empty
+// variable, then the default. The clearServeEnv-based tests already cover the
+// empty direction implicitly — every resolveServeConfig call runs with the
+// variable empty unless a fixture sets it, so a dropped val != "" guard would
+// fail TestServeDefaultsWithoutFlagsOrEnv — but nothing named the case. These
+// subtests make the documented behaviour auditable directly; the non-empty
+// direction is pinned per-pair in TestServeEnvFillsOmittedFlag.
+func TestServeEmptyFragmentsDirEnvCountsAsUnset(t *testing.T) {
+	t.Run("empty variable keeps the default", func(t *testing.T) {
+		f := resolveServeConfig(t, nil, map[string]string{"SEAM_FRAGMENTS_DIR": ""})
+		if got := *f.fragmentsDir; got != "./fragments" {
+			t.Errorf("fragments-dir = %q, want the default ./fragments (empty env counts as unset)", got)
+		}
+	})
+	t.Run("empty variable keeps an explicit flag", func(t *testing.T) {
+		f := resolveServeConfig(t, []string{"--fragments-dir", "/flag/fragments"}, map[string]string{"SEAM_FRAGMENTS_DIR": ""})
+		if got := *f.fragmentsDir; got != "/flag/fragments" {
+			t.Errorf("fragments-dir = %q, want /flag/fragments (empty env counts as unset)", got)
+		}
+	})
+}
+
 // Port values parse with fmt.Sscanf %d, whose exact semantics are part of the
 // contract: an optional sign and digits with leading whitespace skipped, and
 // anything after the integer prefix ignored. A value with no leading integer
