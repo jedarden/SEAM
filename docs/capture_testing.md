@@ -1,36 +1,69 @@
 # Capture and Corpus Testing
 
 This document records the integrity checks for captured corpus data. The
-repository uses two related formats:
+repository keeps corpus data in two places:
 
-- Most `corpus/**/corpus.json` and `corpus-template.json` files are standalone
-  differential-harness inputs. They persist request data and replay
-  expectations; response values are collected from the incumbent and SEAM at
-  replay time. The live ArgoCD capture is the exception: its eight entries
-  also retain the incumbent response for capture auditing.
-- `corpus/argocd-proxy/*.json` includes the complete ArgoCD corpus, its schema
-  template, and response-body snapshots. The request plus response pair is
-  always the entry in `corpus/argocd-proxy/corpus.json`; snapshots are
-  developer-friendly response fixtures and are checked against those entries.
+- `tools/diffharness/testdata/*.json` holds the checked-in
+  differential-harness fixtures: `corpus-argocd.json` (the deployed
+  `argocd-ro` capture) and `example-corpus.json`. These persist request data
+  and replay expectations; response values are collected from the incumbent
+  and SEAM at replay time. The fixture format, including the
+  `secrets[].ref` grammar, is specified in
+  [`docs/design/argocd-ro-corpus-data-structure.md`](design/argocd-ro-corpus-data-structure.md).
 - `internal/server` capture files persist complete request/response pairs for
   middleware-level capture tests. Request and response bodies are encoded as
   standard base64 strings.
 
+Captured corpora under a repository-root `corpus/` directory are no longer
+tracked: the 2026-09-18 history purge (seam-70ae655e, commit 9984a5b) removed
+every checked-in corpus and `.gitignore`d the path, so live captures stay out
+of git.
+
 ## Automated checks
 
-Run the repository fixture checks from the repository root:
+### Corpus fixture integrity
+
+The checked-in corpus fixtures are validated by the diffharness module's own
+tests. The module is deliberately standalone — standard library only, it
+cannot import the gateway's `internal/spec` package — so its checks run from
+the module directory:
 
 ```sh
-go test ./corpus
+cd tools/diffharness && go test ./...
 ```
 
-This walks every checked-in `.json` file below `corpus/`, rejects empty files,
-and verifies JSON syntax. It also checks the metadata, unique entry IDs,
-request method/path, header shape, and base64 request bodies in each primary
-differential corpus. The ArgoCD-specific tests additionally require complete
-request/response pairs, validate response bodies, check route coverage, and
-match each response snapshot to its captured pair; see
-[`corpus/argocd-proxy/COMPLETENESS.md`](../corpus/argocd-proxy/COMPLETENESS.md).
+Loading a corpus (`corpus.Load`) and appending an entry
+(`Corpus.AppendEntry`) both validate:
+
+- the file parses as JSON and declares the exact schema version the harness
+  speaks;
+- a non-empty `service` token;
+- every entry has a non-empty `id`, and entry IDs are unique;
+- header keys and HTTP methods are canonicalized (a missing method defaults
+  to `GET`); and
+- **every `secrets[].ref` resolves under the enforced vault base.** A ref
+  must carry the `vault:` scheme and name a path free of traversal (`..`,
+  backslashes), glob characters (`*`, `?`, `[`), and templated segments
+  (`{}`); whatever remains must land strictly inside the enforced base
+  `rs-manager/rs-manager/seam/routes`. Containment is boundary-correct: a
+  sibling that merely shares a string prefix with the base, and a bare base
+  naming the parent itself, are both refused. `Load` enforces this at fixture
+  time and `AppendEntry` at capture time, so an off-base ref is rejected
+  while the corpus is still a fixture instead of failing secret resolution at
+  replay time. The retired cluster-agnostic base `seam/routes`
+  (consolidated 2026-09-04) fails both checks; the negative case is pinned by
+  `TestLoadValidatesSecretRefsAgainstEnforcedBase` ("retired
+  pre-consolidation base rejected") and `TestAppendEntryValidatesSecretRefs`.
+
+The enforced base mirrors `internal/spec.ResolveVaultBaseDir`:
+`DefaultVaultBaseDir` as above, overridden by `SEAM_VAULT_BASE_DIR` when that
+variable is non-blank after trimming (`TestVaultBaseDirOverrideHonored`).
+The mirror lives in `tools/diffharness/internal/corpus/corpus.go`; when the
+base moves, move both. The checked-in fixtures themselves are walked by
+`TestCheckedInFixturesResolveUnderEnforcedVaultBase`, which also pins
+`argocd-ro` as the canonical service token.
+
+### Capture round-trip and response-pair checks
 
 Run the request/response round-trip check, the existing response-pair
 regressions, and the restart-readability test with:
@@ -49,14 +82,22 @@ process wrote and must reload every prior entry losslessly before appending.
 Repeating the focused suite five times
 guards against intermittent capture or save corruption.
 
-Both checks are enforced automatically, not left as manual steps: the
+### Where each check is enforced
+
+These checks are enforced automatically, not left as manual steps: the
 `seam-ci` verify step runs the corpus-integrity and response-pair tests on
 every push to `main` (ahead of the full `go test -race ./...` sweep), and
 `scripts/definition-of-done.sh --slow`
 -- included in `--all` -- gates the same set plus
 `TestCaptureCorpusReadableAfterRestart` as the named checks `corpus integrity`
-and `capture corpus round-trip`. A malformed, incomplete, or mismatched
-corpus or response snapshot fails the build.
+and `capture corpus round-trip`. Both gates guard the retired root-level
+`go test ./corpus` walk behind a `[ -d corpus ]` check, because the purge
+removed the directory and the unguarded command fails with "directory not
+found". The diffharness module's fixture checks are not wired into either
+gate; run them from the module directory as shown above. A malformed capture
+or a failing round-trip fails the build; an off-base or malformed secret ref
+in a checked-in fixture fails the module run and must be fixed before the
+corpus is committed.
 
 ## Durability triggers
 
@@ -104,11 +145,11 @@ threshold.
 
 ## Results
 
-Last verified: 2026-09-16.
+Last verified: 2026-09-25.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
-| `go test ./corpus` | PASS | All checked-in corpus JSON documents, differential request records, and the complete ArgoCD capture |
+| `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
 | Capture durability suite, `-count=1` | PASS | Autosave threshold boundary, shutdown flush below threshold, toggle-respect and shutdown-failure containment, corpus readability after restart |
 
@@ -122,8 +163,9 @@ their test name rather than attributed to corpus integrity.
 
 Before committing a newly captured corpus:
 
-1. Run `go test ./corpus` and inspect the listed file count in the test output.
-2. Confirm every primary corpus has non-empty metadata and unique entry IDs.
+1. Run the fixture checks (`cd tools/diffharness && go test ./...`) and the
+   focused capture suite above.
+2. Confirm the primary corpus has non-empty metadata and unique entry IDs.
 3. Confirm request paths do not contain an embedded query string; put the
    query in the `query` field.
 4. Confirm non-empty request bodies decode from base64 and contain no
@@ -133,5 +175,8 @@ Before committing a newly captured corpus:
 6. Keep credentials as route references such as
    `vault:rs-manager/rs-manager/seam/routes/<service>/<key>` (SEAM's enforced
    base; the older cluster-agnostic `seam/routes` base is **retired** as of
-   the 2026-09-04 consolidation and fails validation); never put the resolved
-   value in a corpus, test fixture, log, or report.
+   the 2026-09-04 consolidation and fails validation). This is enforced, not
+   just reviewed: `corpus.Load` rejects any ref that is not `vault:`-schemed,
+   free of traversal/glob/template characters, and strictly under the
+   enforced base — see the fixture-integrity check above. Never put the
+   resolved value in a corpus, test fixture, log, or report.
