@@ -8,7 +8,9 @@
 // (docs/plan/plan.md, Testing Strategy → Conformance / differential harness).
 //
 // Security shape: a corpus entry never stores a credential value. It stores a
-// *reference* (Secret.Ref, e.g. "vault:seam/routes/argocd/ro-token") plus the
+// *reference* (Secret.Ref, e.g.
+// "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token" — the canonical
+// argocd-ro owner under the enforced base) plus the
 // metadata of how SEAM injects it. The literal value is resolved to memory at
 // replay time from a local, git-ignored secrets source (internal/secref), so a
 // corpus — a git-tracked test artifact attached to a cutover PR — can never
@@ -22,6 +24,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -30,6 +33,74 @@ import (
 // to the on-disk shape bumps this and the loader refuses a mismatch with a
 // pointed message, rather than guessing an older layout.
 const SchemaVersion = "seam-diff-corpus/v1"
+
+// Vault-ref enforcement. A corpus Secret.Ref names an OpenBao path under
+// SEAM's enforced vault base — the same base internal/spec/allowlist.go
+// imposes on a route fragment's x-vault-path when the gateway loads it. This
+// module is deliberately standalone (stdlib only, no SEAM gateway imports),
+// so the base and its resolution are mirrored here rather than imported; the
+// mirror's job is to catch an off-base ref while the corpus is still a
+// fixture, instead of letting a replay fail resolution at runtime.
+
+// DefaultVaultBaseDir is the vault prefix SEAM enforces when neither
+// SEAM_VAULT_BASE_DIR nor --vault-base-dir supplies one, mirroring
+// internal/spec.DefaultVaultBaseDir: the consolidated estate prefix with both
+// segments naming rs-manager, minus the leading mount. The pre-consolidation
+// base "seam/routes" is retired — a ref under it resolves outside the
+// enforced prefix and is rejected here at load time, not at replay.
+const DefaultVaultBaseDir = "rs-manager/rs-manager/seam/routes"
+
+// VaultBaseDirEnvVar is the Deployment variable that overrides
+// DefaultVaultBaseDir, mirroring internal/spec.VaultBaseDirEnvVar.
+const VaultBaseDirEnvVar = "SEAM_VAULT_BASE_DIR"
+
+// resolveVaultBaseDir returns the base dir in force: VaultBaseDirEnvVar wins
+// when it is non-blank after trimming, otherwise DefaultVaultBaseDir. The
+// harness has no flag, so the configured leg of
+// internal/spec.ResolveVaultBaseDir's precedence has no counterpart here.
+func resolveVaultBaseDir() string {
+	if val := strings.TrimSpace(os.Getenv(VaultBaseDirEnvVar)); val != "" {
+		return val
+	}
+	return DefaultVaultBaseDir
+}
+
+// validateSecretRef asserts one Secret.Ref is well-formed and resolves under
+// the enforced vault base, applying the same rejection classes the gateway's
+// AllowlistEnforcer.ValidateVaultPath applies to a fragment's x-vault-path:
+// traversal ("..", backslashes), glob characters, and templated segments are
+// rejected outright, and whatever remains must land strictly inside base.
+// The containment check is boundary-correct where a bare string prefix would
+// not be: "routes2/x" is not under base "routes" merely because it shares a
+// string prefix, and a bare base — direct access to the parent, which
+// ValidateVaultPath likewise refuses — is rejected.
+func validateSecretRef(ref, base string) error {
+	if ref == "" {
+		return errors.New("secret ref is empty")
+	}
+	if !strings.HasPrefix(ref, "vault:") {
+		return fmt.Errorf("secret ref %q does not carry the vault: scheme", ref)
+	}
+	p := strings.TrimPrefix(ref, "vault:")
+	if p == "" {
+		return fmt.Errorf("secret ref %q names no path", ref)
+	}
+	if strings.Contains(p, "..") || strings.Contains(p, "\\") {
+		return fmt.Errorf("secret ref %q contains traversal (.. or backslash)", ref)
+	}
+	if strings.ContainsAny(p, "*?[") {
+		return fmt.Errorf("secret ref %q contains glob characters", ref)
+	}
+	if strings.ContainsAny(p, "{}") {
+		return fmt.Errorf("secret ref %q contains templated segments", ref)
+	}
+	rel, err := filepath.Rel(filepath.Clean(base), filepath.Clean(p))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("secret ref %q resolves outside the enforced vault base %q (set %s to point at the base a capture was taken under)",
+			ref, base, VaultBaseDirEnvVar)
+	}
+	return nil
+}
 
 // Corpus is one service's captured differential corpus.
 type Corpus struct {
@@ -79,7 +150,7 @@ type Response struct {
 // only in memory during a replay (Secret.Bare, never serialized) and is
 // resolved by internal/secref from a local secrets source.
 type Secret struct {
-	Ref      string   `json:"ref"`      // e.g. "vault:seam/routes/argocd/ro-token"
+	Ref      string   `json:"ref"`      // e.g. "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token"
 	InjectAs InjectAs `json:"injectAs"` // how SEAM injects this credential
 	Bare     string   `json:"-"`        // resolved at replay time; never written to disk
 }
@@ -134,6 +205,7 @@ func Load(path string) (*Corpus, error) {
 	// Canonicalize every header key up front so comparison never has to think
 	// about case again, and detect duplicate entry IDs.
 	seen := make(map[string]int, len(c.Entries))
+	vaultBase := resolveVaultBaseDir()
 	for i := range c.Entries {
 		e := &c.Entries[i]
 		if e.ID == "" {
@@ -148,6 +220,11 @@ func Load(path string) (*Corpus, error) {
 			e.Request.Method = http.MethodGet
 		}
 		e.Request.Method = canonicalMethod(e.Request.Method)
+		for j, s := range e.Secrets {
+			if err := validateSecretRef(s.Ref, vaultBase); err != nil {
+				return nil, fmt.Errorf("corpus %q: entry %q secrets[%d]: %w", path, e.ID, j, err)
+			}
+		}
 	}
 	return &c, nil
 }
@@ -170,7 +247,9 @@ func (c *Corpus) Save(path string) error {
 }
 
 // AppendEntry adds an entry, assigning an ID if empty and guarding against
-// duplicates. Used by the capture proxy to grow a corpus in place.
+// duplicates. Used by the capture proxy to grow a corpus in place. Secret refs
+// are validated here too, so an off-base ref is refused at capture time rather
+// than saved into a fixture the next Load would reject.
 func (c *Corpus) AppendEntry(e Entry) error {
 	if e.ID == "" {
 		e.ID = fmt.Sprintf("entry-%d", len(c.Entries)+1)
@@ -185,6 +264,12 @@ func (c *Corpus) AppendEntry(e Entry) error {
 		e.Request.Method = http.MethodGet
 	}
 	e.Request.Method = canonicalMethod(e.Request.Method)
+	vaultBase := resolveVaultBaseDir()
+	for j, s := range e.Secrets {
+		if err := validateSecretRef(s.Ref, vaultBase); err != nil {
+			return fmt.Errorf("entry %q secrets[%d]: %w", e.ID, j, err)
+		}
+	}
 	c.Entries = append(c.Entries, e)
 	return nil
 }

@@ -27,6 +27,14 @@ This document specifies the data structure for capturing HTTP request/response p
 > `seam/routes` is **retired** (consolidated 2026-09-04) — a corpus reference
 > under the old base would resolve outside the enforced prefix and fail
 > validation, so it must not be copied into a new capture.
+>
+> **Canonical service token:** `argocd-ro`, the deployed fragment's
+> `x-seam-owner`. The corpus loader now enforces both properties at fixture
+> time (`tools/diffharness/internal/corpus` `Load` / `AppendEntry`): every
+> `secrets[].ref` must be `vault:`-schemed, free of traversal, glob, and
+> templated segments, and resolve strictly under the enforced base — a corpus
+> carrying an off-base or malformed ref is rejected when the fixture is
+> loaded, not when a replay fails to resolve it.
 
 ## Design Principles
 
@@ -43,7 +51,7 @@ This document specifies the data structure for capturing HTTP request/response p
 ```json
 {
   "schema": "seam-diff-corpus/v1",
-  "service": "argocd",
+  "service": "argocd-ro",
   "incumbent": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
   "capturedAt": "2026-07-27T12:00:00Z",
   "description": "ArgoCD read-only proxy corpus captured from production",
@@ -56,7 +64,7 @@ This document specifies the data structure for capturing HTTP request/response p
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `schema` | string | Yes | Schema version identifier. Must be `"seam-diff-corpus/v1"` |
-| `service` | string | Yes | Service name token. Must be `"argocd"` |
+| `service` | string | Yes | Service name token. Must be `"argocd-ro"` — the deployed fragment's `x-seam-owner` (`declarative-config/k8s/rs-manager/seam/routes/argocd-ro/`). The earlier `argocd` / `argocd-proxy` tokens are retired and must not be copied into a new corpus |
 | `incumbent` | string | Yes | Base URL of incumbent proxy captured against |
 | `capturedAt` | string | Yes | RFC3339 timestamp of first capture |
 | `description` | string | Yes | Free-form description of the corpus |
@@ -80,7 +88,7 @@ This document specifies the data structure for capturing HTTP request/response p
   },
   "secrets": [
     {
-      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
       "injectAs": {
         "kind": "bearer"
       }
@@ -117,7 +125,7 @@ This document specifies the data structure for capturing HTTP request/response p
 
 ```json
 {
-  "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+  "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
   "injectAs": {
     "kind": "bearer"
   }
@@ -162,7 +170,7 @@ This document specifies the data structure for capturing HTTP request/response p
 corpus/
 ├── README.md                           # Corpus capture documentation
 ├── capture-config.yaml                 # Global capture configuration
-└── argocd-proxy/
+└── argocd-ro/
     ├── README.md                       # ArgoCD-specific documentation
     ├── corpus.json                     # Primary corpus file
     ├── corpus-template.json            # Template with example entries
@@ -227,7 +235,7 @@ entryID(path, method) = kebab-case(path) + "-" + lower(method)
 
 ### Session Metadata
 
-**File:** `corpus/argocd-proxy/metadata/capture-session.json`
+**File:** `corpus/argocd-ro/metadata/capture-session.json`
 
 ```json
 {
@@ -288,7 +296,7 @@ All ArgoCD API requests require bearer authentication:
 {
   "secrets": [
     {
-      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
       "injectAs": {
         "kind": "bearer"
       }
@@ -302,7 +310,7 @@ All ArgoCD API requests require bearer authentication:
 ### Credential Safety
 
 ✅ **Safe:**
-- Secret references (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
+- Secret references (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token`)
 - Git-tracked corpus files
 - Shared in pull requests
 
@@ -338,7 +346,7 @@ Before committing corpus files:
 ```json
 {
   "schema": "seam-diff-corpus/v1",
-  "service": "argocd",
+  "service": "argocd-ro",
   "incumbent": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
   "capturedAt": "2026-07-27T12:00:00-04:00",
   "description": "ArgoCD read-only proxy corpus captured from production",
@@ -359,7 +367,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -384,7 +392,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -406,7 +414,7 @@ Before committing corpus files:
       },
       "secrets": [
         {
-          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -484,7 +492,7 @@ type Expect struct {
 2. **Request:** Required, with at least method and path
 3. **Headers:** Canonicalized keys (http.CanonicalHeaderKey)
 4. **Method:** Canonicalized (textproto.CanonicalMIMEHeaderKey)
-5. **Secrets:** Valid reference format
+5. **Secrets:** Valid reference format — enforced at load time against the enforced vault base (see the note above)
 6. **Expect:** Valid injection kind (header/bearer/query)
 
 ### Differential Testing Validation
@@ -517,7 +525,7 @@ curl -sk http://localhost:8082/api/v1/clusters
 ./seam-replay \
   --incumbent https://argocd-ro-ardenone-manager-ts.ardenone.com:8444 \
   --seam http://localhost:8080 \
-  --corpus corpus/argocd-proxy/corpus.json
+  --corpus corpus/argocd-ro/corpus.json
 ```
 
 ### Manual Corpus Creation

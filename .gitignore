@@ -114,6 +114,9 @@ generated/
 .beads/*.temp
 .beads/*.journal
 .br_recovery/
-corpus/
+# Root-level captured-corpus data only — the bare form also ignored the
+# tools/diffharness/internal/corpus/ Go package, silently dropping
+# corpus_test.go from every commit.
+/corpus/
 logs/
 scratch/

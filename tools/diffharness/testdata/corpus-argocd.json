@@ -1,9 +1,9 @@
 {
   "schema": "seam-diff-corpus/v1",
-  "service": "argocd",
+  "service": "argocd-ro",
   "incumbent": "https://argocd.example.com",
   "capturedAt": "2026-07-27T10:00:00Z",
-  "description": "Sample ArgoCD API corpus for testing",
+  "description": "Sample ArgoCD API corpus for testing (canonical service token argocd-ro, refs under the enforced vault base)",
   "entries": [
     {
       "id": "list-apps-get",
@@ -20,7 +20,7 @@
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
@@ -42,7 +42,7 @@
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {
             "kind": "bearer"
           }
