@@ -190,6 +190,36 @@ var serveEnvVarNames = []string{
 	"SEAM_HOT_RELOAD_ENABLED",
 }
 
+// serveFlagEnvPairs is the complete flag-to-environment mapping the README's
+// environment-variable table documents: one entry per serve flag, paired with
+// the SEAM_* variable applyEnvOverrides consults for it. Thirteen pairs follow
+// the mechanical rule — SEAM_ plus the flag name upper-cased with dashes as
+// underscores — and the two paired by meaning instead are marked derived:
+// false. TestServeFlagEnvMapping fails when a serve flag is added without an
+// entry here, which is what keeps the README's "all fifteen have a SEAM_*
+// environment counterpart" promise true.
+var serveFlagEnvPairs = []struct {
+	flag    string
+	envVar  string
+	derived bool
+}{
+	{"caller-port", "SEAM_CALLER_PORT", true},
+	{"operator-port", "SEAM_OPERATOR_PORT", true},
+	{"base-url", "SEAM_BASE_URL", true},
+	{"spec-dir", "SEAM_SPEC_DIR", true},
+	{"fragment-mode", "SEAM_FRAGMENT_MODE", true},
+	{"schema-path", "SEAM_SCHEMA_PATH", true},
+	{"capture-enabled", "SEAM_CAPTURE_ENABLED", true},
+	{"corpus-dir", "SEAM_CORPUS_DIR", true},
+	{"fragments-dir", "SEAM_FRAGMENTS_DIR", true},
+	{"upstream-ca-dir", "SEAM_UPSTREAM_CA_DIR", true},
+	{"allowlist-file", "SEAM_UPSTREAM_ALLOWLIST", false},
+	{"vault-base-dir", "SEAM_VAULT_BASE_DIR", true},
+	{"max-replayable-request-bytes", "SEAM_MAX_REPLAYABLE_REQUEST_BYTES", true},
+	{"max-buffered-response-bytes", "SEAM_MAX_BUFFERED_RESPONSE_BYTES", true},
+	{"enable-hot-reload", "SEAM_HOT_RELOAD_ENABLED", false},
+}
+
 // clearServeEnv blanks every SEAM_* configuration variable, because an empty
 // value is the code's "unset": a variable leaking in from the host
 // environment would otherwise silently flip individual cases.
@@ -428,6 +458,122 @@ func TestServeFlagOverridesEnv(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := resolveServeConfig(t, tc.args, tc.env)
 			tc.check(t, f)
+		})
+	}
+}
+
+// The mapping must describe the serve flag set exactly — every documented
+// flag exists, every flag is documented, the derived pairs really follow the
+// mechanical rule, and the only rule-breakers are the two the README names.
+// Pinning the count at fifteen is the point: the README promises all fifteen
+// serve flags have SEAM_* counterparts, so a sixteenth flag must arrive with
+// a mapping entry and a README update or this fails.
+func TestServeFlagEnvMapping(t *testing.T) {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	registerServeFlags(fs)
+
+	documented := make(map[string]bool, len(serveFlagEnvPairs))
+	envSeen := make(map[string]bool, len(serveFlagEnvPairs))
+	exceptions := 0
+	for _, pair := range serveFlagEnvPairs {
+		if documented[pair.flag] {
+			t.Errorf("flag --%s is documented twice in serveFlagEnvPairs", pair.flag)
+		}
+		documented[pair.flag] = true
+
+		if fs.Lookup(pair.flag) == nil {
+			t.Errorf("serveFlagEnvPairs pairs --%s with %s, but registerServeFlags defines no --%s flag", pair.flag, pair.envVar, pair.flag)
+		}
+
+		if envSeen[pair.envVar] {
+			t.Errorf("%s is paired with more than one flag", pair.envVar)
+		}
+		envSeen[pair.envVar] = true
+
+		if pair.derived {
+			want := "SEAM_" + strings.ToUpper(strings.ReplaceAll(pair.flag, "-", "_"))
+			if pair.envVar != want {
+				t.Errorf("--%s is marked mechanically derived but is paired with %s, want %s", pair.flag, pair.envVar, want)
+			}
+		} else {
+			exceptions++
+			// The README pairs these two by meaning, breaking the
+			// derivation: the allowlist variable keeps the upstream
+			// identity in its name, and the hot-reload variable predates
+			// the enable- prefix convention.
+			isDocumentedException := (pair.flag == "allowlist-file" && pair.envVar == "SEAM_UPSTREAM_ALLOWLIST") ||
+				(pair.flag == "enable-hot-reload" && pair.envVar == "SEAM_HOT_RELOAD_ENABLED")
+			if !isDocumentedException {
+				t.Errorf("--%s/%s is marked an exception but is not one of the two the README documents", pair.flag, pair.envVar)
+			}
+		}
+	}
+
+	if got := len(serveFlagEnvPairs); got != 15 {
+		t.Errorf("serveFlagEnvPairs documents %d flags, want 15 — the README promises all fifteen serve flags have SEAM_* counterparts; update the mapping and the README together", got)
+	}
+	if exceptions != 2 {
+		t.Errorf("%d pairs break the mechanical derivation, want exactly the 2 documented exceptions", exceptions)
+	}
+
+	var defined int
+	fs.VisitAll(func(*flag.Flag) { defined++ })
+	if defined != len(serveFlagEnvPairs) {
+		t.Errorf("registerServeFlags defines %d flags but serveFlagEnvPairs documents %d — a serve flag or its SEAM_* counterpart is missing from the mapping", defined, len(serveFlagEnvPairs))
+	}
+
+	// clearServeEnv must blank exactly the documented variables, or a host
+	// environment value can leak into an individual case through a variable
+	// the mapping no longer knows about.
+	if len(serveEnvVarNames) != len(serveFlagEnvPairs) {
+		t.Errorf("serveEnvVarNames blanks %d variables but the mapping documents %d", len(serveEnvVarNames), len(serveFlagEnvPairs))
+	}
+	for _, name := range serveEnvVarNames {
+		if !envSeen[name] {
+			t.Errorf("serveEnvVarNames blanks %s, which the mapping does not document — clearServeEnv and serveFlagEnvPairs disagree", name)
+		}
+	}
+}
+
+// The other half of the precedence rule: with the flag omitted, a non-empty
+// variable supplies the value — for every pair in the mapping, not only the
+// ones the flag-beats-env direction already exercises. The fixtures are keyed
+// by variable and looked up through serveFlagEnvPairs, so a mapping entry
+// without a fixture fails here too and the mapping can never grow an
+// untested pair.
+func TestServeEnvFillsOmittedFlag(t *testing.T) {
+	fixtures := map[string]struct {
+		value string
+		get   func(f *serveFlags) string
+	}{
+		"SEAM_CALLER_PORT":                  {value: "9100", get: func(f *serveFlags) string { return fmt.Sprint(*f.callerPort) }},
+		"SEAM_OPERATOR_PORT":                {value: "9101", get: func(f *serveFlags) string { return fmt.Sprint(*f.operatorPort) }},
+		"SEAM_BASE_URL":                     {value: "http://env.example", get: func(f *serveFlags) string { return *f.baseURL }},
+		"SEAM_SPEC_DIR":                     {value: "/env/spec", get: func(f *serveFlags) string { return *f.specDir }},
+		"SEAM_FRAGMENT_MODE":                {value: "true", get: func(f *serveFlags) string { return fmt.Sprint(*f.fragmentMode) }},
+		"SEAM_SCHEMA_PATH":                  {value: "/env/schema.json", get: func(f *serveFlags) string { return *f.schemaPath }},
+		"SEAM_CAPTURE_ENABLED":              {value: "true", get: func(f *serveFlags) string { return fmt.Sprint(*f.captureEnabled) }},
+		"SEAM_CORPUS_DIR":                   {value: "env-corpus", get: func(f *serveFlags) string { return *f.corpusDir }},
+		"SEAM_FRAGMENTS_DIR":                {value: "/env/fragments", get: func(f *serveFlags) string { return *f.fragmentsDir }},
+		"SEAM_UPSTREAM_CA_DIR":              {value: "/env/ca", get: func(f *serveFlags) string { return *f.upstreamCADir }},
+		"SEAM_UPSTREAM_ALLOWLIST":           {value: "/env/allowlist.yaml", get: func(f *serveFlags) string { return *f.allowlistFile }},
+		"SEAM_VAULT_BASE_DIR":               {value: "tenants/env", get: func(f *serveFlags) string { return *f.vaultBaseDir }},
+		"SEAM_MAX_REPLAYABLE_REQUEST_BYTES": {value: "2097152", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxReplayableRequestBytes) }},
+		"SEAM_MAX_BUFFERED_RESPONSE_BYTES":  {value: "2097152", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxBufferedResponseBytes) }},
+		"SEAM_HOT_RELOAD_ENABLED":           {value: "true", get: func(f *serveFlags) string { return fmt.Sprint(*f.hotReloadEnabled) }},
+	}
+
+	for _, pair := range serveFlagEnvPairs {
+		fixture, ok := fixtures[pair.envVar]
+		if !ok {
+			t.Errorf("serveFlagEnvPairs pairs --%s with %s, but no env-fills fixture exists for %s; add one to TestServeEnvFillsOmittedFlag", pair.flag, pair.envVar, pair.envVar)
+			continue
+		}
+		t.Run(pair.envVar, func(t *testing.T) {
+			f := resolveServeConfig(t, nil, map[string]string{pair.envVar: fixture.value})
+			if got := fixture.get(f); got != fixture.value {
+				t.Errorf("%s=%q with --%s omitted resolved %s, want %s", pair.envVar, fixture.value, pair.flag, got, fixture.value)
+			}
 		})
 	}
 }
