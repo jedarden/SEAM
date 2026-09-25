@@ -72,6 +72,17 @@ the build if one appears.
 restore manifests there. New infrastructure configuration goes directly to the
 authoritative `declarative-config` repository paths named by that pointer.
 
+The same pointer rule covers CI. The live **seam-ci WorkflowTemplate** lives
+only in `jedarden/declarative-config` at
+`k8s/iad-ci/argo-workflows/seam-ci-workflowtemplate.yml` — edit CI behavior
+there and let the `argo-workflows-ns-iad-ci` ArgoCD app sync it. The in-repo
+file `declarative-config/k8s/iad-ci/argo-workflows/seam-ci.yaml` is a pointer
+only (bead `seam-5515cac0`, 2026-09-25): it held a stale early snapshot that
+ArgoCD never applied, and editing a copy like that changes no CI behavior
+while looking like it does — the failure class behind the 2026-09 red-gate
+incidents. If a doc or a grep names the in-repo path, follow its pointer to
+the authoritative file before changing anything.
+
 ## Beads
 
 This workspace migrated from bead-forge to **bead-rs on 2026-08-14**. Use the
