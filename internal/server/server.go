@@ -575,12 +575,18 @@ func (s *Server) operatorNotFoundHandler(w http.ResponseWriter, r *http.Request)
 		Write(w, r)
 }
 
-// healthzHandler returns 200 OK for liveness checks
+// healthzHandler returns 200 OK for liveness checks. It serves both liveness
+// names, /_seam/healthz and the /_seam/health alias. Cache-Control is
+// defensive, mirroring the /health/credentials sentinel: for callers that
+// invoke the handler without SEAM's reserved-path middleware; the /_seam/
+// prefix reservation still guarantees that neither liveness name enters the
+// response cache.
 func (s *Server) healthzHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		MethodNotAllowed("Only GET method is allowed").Write(w, r)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
 }

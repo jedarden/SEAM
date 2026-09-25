@@ -13,11 +13,12 @@ import (
 // Endpoints"): /_seam/health is registered on the same handler as
 // /_seam/healthz; neither health name is a reservedPaths exact entry — both
 // ride the already-reserved /_seam/ prefix; both receive the reserved-path
-// treatment (cache and quota middleware bypass); and a reload that
-// quarantines every fragment takes the pod out of the Service via
-// /_seam/readyz while both liveness names keep answering. Before these tests
-// no named test pinned any of that, so a reserved-path or routing refactor
-// could silently drop the alias or change its liveness semantics.
+// treatment (cache and quota middleware bypass) and both answer with the
+// handler's own Cache-Control: no-store; and a reload that quarantines every
+// fragment takes the pod out of the Service via /_seam/readyz while both
+// liveness names keep answering. Before these tests no named test pinned any
+// of that, so a reserved-path or routing refactor could silently drop the
+// alias or change its liveness semantics.
 
 // newHealthAliasTestServer builds a server whose mux carries the production
 // route registrations, with the allowlist readiness dependency neutralised
@@ -65,6 +66,19 @@ func TestSeamHealthAliasServesSameBodyAsHealthz(t *testing.T) {
 	}
 	if got := alias.Body.String(); got != healthz.Body.String() {
 		t.Fatalf("/_seam/health body = %q, want the /_seam/healthz body %q", got, healthz.Body.String())
+	}
+
+	// Same handler also means the same cache posture: like the
+	// /health/credentials sentinel, the liveness handler carries its own
+	// no-store so a liveness verdict is never cacheable even when the
+	// handler is invoked without SEAM's reserved-path middleware.
+	for name, rec := range map[string]*httptest.ResponseRecorder{
+		"/_seam/healthz": healthz,
+		"/_seam/health":  alias,
+	} {
+		if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("%s Cache-Control = %q, want no-store", name, got)
+		}
 	}
 
 	// Same handler means the same method semantics, not merely the same
@@ -147,6 +161,9 @@ func TestSeamHealthAliasReceivesReservedPathTreatment(t *testing.T) {
 		}
 		if got := rec.Header().Get("X-Quota-Cost-Per-Call"); got != "" {
 			t.Errorf("%s: X-Quota-Cost-Per-Call = %q, want no quota header on a reserved path", path, got)
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("%s through the caller chain: Cache-Control = %q, want the handler's own no-store", path, got)
 		}
 	}
 

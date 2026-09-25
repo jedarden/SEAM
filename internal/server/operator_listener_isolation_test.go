@@ -232,6 +232,36 @@ func TestCallerListenerServesOwnEndpoints(t *testing.T) {
 		}
 	})
 
+	// The served alias rides the same caller listener as /_seam/healthz. The
+	// mux-level alias tests pass even if the listener were rewired to serve a
+	// mux that never received the alias registration, so pin the alias on the
+	// real socket too, including the handler's own no-store directive.
+	t.Run("health-alias", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet,
+			fmt.Sprintf("http://localhost:%d/_seam/health", s.config.CallerPort), nil)
+		if err != nil {
+			t.Fatalf("Failed to build request for /_seam/health: %v", err)
+		}
+		resp, err := isolationTestClient.Do(req)
+		if err != nil {
+			t.Fatalf("Request GET /_seam/health against port %d failed: %v", s.config.CallerPort, err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to read response body for /_seam/health: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Caller port must serve /_seam/health with 200, got %d: %s", resp.StatusCode, body)
+		}
+		if strings.TrimSpace(string(body)) != "OK" {
+			t.Errorf("Expected health alias body 'OK', got %q", body)
+		}
+		if got := resp.Header.Get("Cache-Control"); got != "no-store" {
+			t.Errorf("/_seam/health Cache-Control = %q, want no-store", got)
+		}
+	})
+
 	// readyz gates on real readiness (allowlist + OpenBao), so pinning it
 	// proves the caller listener routes through the full readiness chain
 	// and not just a liveness stub.

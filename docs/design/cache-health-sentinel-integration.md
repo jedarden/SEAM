@@ -45,8 +45,8 @@ SEAM provides several health sentinel endpoints:
 
 | Endpoint | Purpose | Response |
 |----------|---------|----------|
-| `/_seam/healthz` | Liveness probe | `200 OK` with body `"OK"` |
-| `/_seam/health` | Liveness probe (served alias) | `200 OK` with body `"OK"` |
+| `/_seam/healthz` | Liveness probe | `200 OK` with body `"OK"` and `Cache-Control: no-store` |
+| `/_seam/health` | Liveness probe (served alias) | `200 OK` with body `"OK"` and `Cache-Control: no-store` |
 | `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body |
 | `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
 | `/health/upstreams` | Upstream health | `200 OK` with per-upstream last-2xx/breaker state plus route-table health |
