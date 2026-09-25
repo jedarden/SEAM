@@ -131,12 +131,21 @@ Corpus hygiene rules:
   *specific* incumbent behavior; an incumbent deploy that alters responses
   invalidates the capture.
 
-Corpora live at `corpus/<service>/corpus.json` (per-cluster corpora for the
-kubectl-proxy fleet at `corpus/kubectl-proxies/<cluster>/`). The four
-services in Phase 6b scope already have captured corpora.
+Runtime captures live at `corpus/<service>/corpus.json` (per-cluster corpora
+for the kubectl-proxy fleet at `corpus/kubectl-proxies/<cluster>/`) — a
+**gitignored** path since the 2026-09-18 history purge, so a fresh clone has
+no corpora until a capture run creates one. The only committed corpora are
+the reviewed fixtures under `tools/diffharness/testdata/`
+(`corpus-argocd.json` covers the deployed argocd-ro service). The four
+services in Phase 6b scope have captured corpora only where a capture run
+has been (re-)executed on the host doing the validation.
 
-**Exit criteria:** corpus committed covering every documented route and the
-error shapes; no literal secret values in the corpus file.
+**Exit criteria:** a corpus covering every documented route and the error
+shapes exists on the validating host (re-captured via
+`scripts/capture-argocd.sh`, or the committed fixture where one exists); no
+literal secret values in the corpus file. Committing a corpus means
+promoting a reviewed capture into `tools/diffharness/testdata/`, not
+committing the runtime file.
 
 ---
 
@@ -209,6 +218,12 @@ seam-cutover check \
   --agent-doc-contains 'argocd-ro-ardenone-manager-ts' \
   --report corpus/argocd-proxy/cutover-check.json
 ```
+
+The `--corpus`/`--secrets`/`--report` paths above are gitignored runtime
+files: they must exist from a capture run on the validating host (re-capture
+with `scripts/capture-argocd.sh` if absent), or the corpus argument can point
+at the committed fixture `tools/diffharness/testdata/corpus-argocd.json`
+when a fresh capture is not warranted.
 
 Run it **from a worker-vantage host** (ex44 or the lab, holding a
 worker-tagged tailnet identity) — item 2 is only meaningful from where the
@@ -464,7 +479,9 @@ bead) — restoring it is then a paste, and the bead is the audit trail.
   (plan GAP 8); credential injection is first proved end-to-end in Phase 4.
 - **Unmetered, read-only** — lowest blast radius; needs neither the cost
   governor nor caller auth to be safe, which is exactly why it is the pilot.
-- **Corpus:** `corpus/argocd-proxy/corpus.json`; capture helper
+- **Corpus:** runtime capture `corpus/argocd-proxy/corpus.json` (gitignored —
+  re-capture if absent) or the committed fixture
+  `tools/diffharness/testdata/corpus-argocd.json`; capture helper
   `scripts/capture-argocd.sh`.
 - **Watch for:** the incumbent is the fleet's ArgoCD *read* path used by
   operators and automation — during soak, monitor both the agent traffic

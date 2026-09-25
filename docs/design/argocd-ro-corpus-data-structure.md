@@ -39,7 +39,11 @@ This document specifies the data structure for capturing HTTP request/response p
 ## Design Principles
 
 1. **Security-First:** Credentials stored as references only, never literal values
-2. **Git-Tracked:** Corpus files are committed to version control for reproducibility
+2. **Two-tier storage:** The reviewed fixtures under `tools/diffharness/testdata/*.json` are
+   committed so replay is reproducible from a fresh clone. Runtime captures written under a
+   repository-root `corpus/` directory are **gitignored** (since the 2026-09-18 history purge,
+   seam-70ae655e / commit 9984a5b) and stay out of git; promoting a runtime capture to a
+   fixture is a deliberate, reviewed act, not an automatic one
 3. **Replayable:** Each entry can be replayed verbatim against both incumbent and SEAM
 4. **Differential-Ready:** Structured for comparison between two HTTP responses
 5. **Self-Documenting:** Human-readable descriptions and stable IDs
@@ -166,37 +170,54 @@ This document specifies the data structure for capturing HTTP request/response p
 
 ### Directory Layout
 
+Corpus data lives in two tiers:
+
+**Committed fixtures** — `tools/diffharness/testdata/*.json`, tracked in git:
+
 ```
-corpus/
-├── README.md                           # Corpus capture documentation
-├── capture-config.yaml                 # Global capture configuration
-└── argocd-ro/
-    ├── README.md                       # ArgoCD-specific documentation
-    ├── corpus.json                     # Primary corpus file
-    ├── corpus-template.json            # Template with example entries
-    ├── applications-list.json          # Per-endpoint capture files (optional)
-    ├── clusters-list.json              # Per-endpoint capture files (optional)
-    └── metadata/
-        ├── capture-session.json        # Session metadata
-        └── validation-report.json      # Validation results
+tools/diffharness/testdata/
+├── corpus-argocd.json            # The deployed argocd-ro capture (fixture)
+├── example-corpus.json           # Schema/example fixture used by the module tests
+└── secrets-argocd.local.json     # Fixture secret references (refs only, no values)
 ```
+
+These are validated by the diffharness module's own tests
+(`cd tools/diffharness && go test ./...`) and are the corpora a fresh clone
+can replay immediately.
+
+**Runtime captures** — under a repository-root `corpus/` directory,
+**gitignored** (`/corpus/` in `.gitignore` since the 2026-09-18 purge):
+
+```
+corpus/                                # gitignored — never committed
+└── <service>/
+    ├── corpus.json                    # Primary corpus file written by a capture run
+    ├── secrets.local.json             # Local secret values (git-ignored by design)
+    └── metadata/                      # Session metadata (optional)
+```
+
+The `/corpus/` ignore rule is deliberately anchored to the repository root:
+a bare `corpus/` pattern would also ignore the
+`tools/diffharness/internal/corpus/` Go package and silently drop its tests
+from every commit.
 
 ### File Naming Conventions
 
 **Primary corpus file:** `corpus.json`
 - Single source of truth for differential testing
 - Sorted by entry ID for stable diffs
-- Git-tracked
+- Committed **only** as a reviewed fixture under `tools/diffharness/testdata/`;
+  the runtime copy stays untracked
 
 **Per-endpoint captures:** `{endpoint}-{method}.json`
 - Optional granular capture files
 - Useful for debugging specific endpoints
 - Merged into primary corpus before testing
 
-**Template file:** `corpus-template.json`
-- Example entries showing all fields
+**Example fixture:** `tools/diffharness/testdata/example-corpus.json`
+- Committed example entries showing all fields
 - Reference for manual corpus creation
-- Not used in automated testing
+- Exercised by the diffharness module tests
 
 ## Metadata Format
 
@@ -311,29 +332,35 @@ All ArgoCD API requests require bearer authentication:
 
 ✅ **Safe:**
 - Secret references (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token`)
-- Git-tracked corpus files
-- Shared in pull requests
+- Checked-in fixture corpora under `tools/diffharness/testdata/`, after the review checklist below
 
 ❌ **Never:**
 - Literal credential values in corpus files
 - Base64-encoded credentials (except request/response bodies)
 - Personal access tokens or API keys
+- Committing a runtime capture from `corpus/` without promoting it to a reviewed fixture first
 
 ### Corpus Review Checklist
 
-Before committing corpus files:
+Before promoting a runtime capture into a committed fixture under
+`tools/diffharness/testdata/`:
 
 1. ✅ Verify all `secrets[].ref` fields use reference format
 2. ✅ Check no literal bearer tokens in headers
 3. ✅ Ensure response bodies don't leak credentials
 4. ✅ Validate JSON syntax with `jq .`
 5. ✅ Review descriptions for sensitive information
+6. ✅ Run the fixture checks (`cd tools/diffharness && go test ./...`) — the
+   loader rejects an off-base or malformed `secrets[].ref` at fixture time
+
+Runtime captures under `corpus/` are never committed as-is; they are
+working data for a replay run, and only a reviewed copy becomes a fixture.
 
 ### Access Control
 
 **Corpus files:**
 - Mode: `0644` (readable by all, writable by owner)
-- Git-tracked: Yes
+- Git-tracked: fixtures only (`tools/diffharness/testdata/`); runtime `corpus/` is git-ignored
 - Encryption: No (plaintext JSON)
 
 **Secret resolution:**
@@ -518,6 +545,30 @@ curl -sk http://localhost:8082/api/v1/clusters
 ./scripts/capture-argocd.sh stop
 ```
 
+**Capture/restart lifecycle.** The supported lifecycle is
+start → capture → graceful stop → restart:
+
+- `start` launches the capture proxy; persistence is automatic from there —
+  an autosave lands every 10 entries, and a graceful stop (`stop`, SIGTERM)
+  flushes the corpus. Killing the process ungracefully loses at most the
+  entries captured since the last autosave.
+- A restart does **not** truncate: on start the tool loads an existing corpus
+  file and appends to it (`capturedAt` stays pinned to the first capture). A
+  corpus whose `service` token differs from the `--service` flag is refused
+  rather than mixed.
+- Entry IDs must stay unique, so re-capturing a path that is already in the
+  loaded corpus is refused (logged, not appended) — the corpus accumulates
+  distinct requests, and a deliberate re-capture of the same route means
+  starting from a fresh file.
+- The output path is inside the gitignored `corpus/` tree; nothing a capture
+  run writes is a commit candidate until it is promoted to a reviewed fixture
+  under `tools/diffharness/testdata/` (checklist above).
+
+The gateway's internal capture middleware follows the same triggers —
+autosave threshold, graceful-shutdown flush, and lossless reload after a
+restart — as pinned by the durability tests in
+`docs/capture_testing.md`.
+
 ### Replay Phase
 
 ```bash
@@ -525,12 +576,16 @@ curl -sk http://localhost:8082/api/v1/clusters
 ./seam-replay \
   --incumbent https://argocd-ro-ardenone-manager-ts.ardenone.com:8444 \
   --seam http://localhost:8080 \
-  --corpus corpus/argocd-ro/corpus.json
+  --corpus tools/diffharness/testdata/corpus-argocd.json
 ```
+
+(A replay against a runtime capture points `--corpus` at that untracked
+`corpus/<service>/corpus.json` instead; the checked-in fixture is what a
+fresh clone can replay without capturing first.)
 
 ### Manual Corpus Creation
 
-1. Copy `corpus-template.json` as starting point
+1. Copy `tools/diffharness/testdata/example-corpus.json` as starting point
 2. Add entries following the schema
 3. Validate JSON: `jq . corpus.json`
 4. Test with `seam-replay`
@@ -564,9 +619,10 @@ curl -sk http://localhost:8082/api/v1/clusters
 
 - **SEAM Plan:** `docs/plan/plan.md`
 - **Corpus Capture Integration:** `docs/design/argocd-ro-proxy-corpus-capture-integration.md`
+- **Integrity checks and lifecycle:** `docs/capture_testing.md`
 - **Corpus Package:** `tools/diffharness/internal/corpus/corpus.go`
 - **Capture Tool:** `tools/diffharness/cmd/seam-capture/main.go`
-- **Configuration:** `corpus/capture-config.yaml`
+- **Committed fixtures:** `tools/diffharness/testdata/` (runtime `corpus/` is git-ignored)
 
 ---
 

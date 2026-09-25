@@ -143,6 +143,23 @@ failure tests (`TestCaptureDiskWriteFailuresAreNonBlocking`,
 still answers every request, retains all entries, and recovers on the next
 threshold.
 
+### Standalone capture tool lifecycle
+
+The standalone `seam-capture` proxy (`tools/diffharness/cmd/seam-capture`,
+driven by `scripts/capture-argocd.sh`) follows the same persistence model:
+
+- on start it loads an existing corpus file and appends to it (a `service`
+  mismatch with the `--service` flag is refused; an incumbent-URL change only
+  warns), or starts a fresh corpus when no file exists;
+- an autosave lands every 10 appended entries and a graceful stop flushes the
+  corpus, so an ungraceful kill loses at most the entries since the last
+  autosave;
+- entry IDs must remain unique, so re-capturing a path already present in the
+  loaded corpus is refused (logged, not appended) — a deliberate re-capture
+  starts from a fresh file; and
+- its output under the repository-root `corpus/` directory is gitignored
+  runtime data, never a commit candidate (see the storage split above).
+
 ## Results
 
 Last verified: 2026-09-25.

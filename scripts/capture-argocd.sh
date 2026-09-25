@@ -7,8 +7,10 @@
 # Usage:
 #   ./scripts/capture-argocd.sh [start|stop|status]
 #
-# The captured corpus is saved to corpus/argocd-proxy/corpus.json
-# and can be replayed using seam-replay for differential testing.
+# The captured corpus is saved to corpus/argocd-proxy/corpus.json — a
+# gitignored runtime path, never committed. Promote a reviewed capture into
+# tools/diffharness/testdata/ to make it a committed fixture. The corpus can
+# be replayed using seam-replay for differential testing.
 
 set -e
 

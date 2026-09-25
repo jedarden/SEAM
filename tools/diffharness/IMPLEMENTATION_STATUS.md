@@ -102,7 +102,9 @@ seam-replay \
 **Security Design:**
 - Secret references only (never literal values)
 - Values resolved at replay time from local git-ignored file or environment
-- Corpus can be safely committed to Git without leaking secrets
+- Reviewed fixture corpora under `testdata/` are safe to commit (refs only);
+  runtime captures under the repository-root `corpus/` directory are
+  gitignored and never committed
 
 ### 4. Comparison Engine
 

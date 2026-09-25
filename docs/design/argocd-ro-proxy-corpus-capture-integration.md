@@ -107,7 +107,14 @@ The current ArgoCD read-only proxy is accessed via:
 
 **Schema Version:** `seam-diff-corpus/v1`
 
-**Location:** `corpus/argocd-proxy/corpus.json`
+**Location:** `corpus/argocd-proxy/corpus.json` — a **runtime capture path,
+gitignored** (`/corpus/` in `.gitignore` since the 2026-09-18 history purge,
+seam-70ae655e / commit 9984a5b). A capture run writes here and the file stays
+out of git. The corpora that *are* committed are the reviewed fixtures under
+`tools/diffharness/testdata/` (`corpus-argocd.json`, `example-corpus.json`);
+promoting a runtime capture into that directory is a deliberate, reviewed act
+(see the review checklist in
+[`argocd-ro-corpus-data-structure.md`](argocd-ro-corpus-data-structure.md)).
 
 **Structure:**
 ```json
@@ -142,7 +149,7 @@ The current ArgoCD read-only proxy is accessed via:
 **Security Model:**
 - Credentials stored as **references only** (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
 - Never literal values in corpus files
-- Git-tracked corpus files are safe to commit
+- Checked-in fixtures (`tools/diffharness/testdata/*.json`) are refs-only and safe to commit after review; runtime captures under `corpus/` are gitignored and never committed
 - Literal values resolved at replay-time from local secrets source
 
 #### 3. Control Scripts
@@ -155,20 +162,49 @@ The current ArgoCD read-only proxy is accessed via:
 - `status` - Show capture status and entry count
 - `restart` - Stop/start cycle
 
+**Supported capture/restart lifecycle:**
+
+- **Persistence is automatic once started:** an autosave lands every 10
+  entries, and a graceful `stop` flushes the corpus. An ungraceful kill loses
+  at most the entries captured since the last autosave.
+- **Restart appends, never truncates.** On start the tool loads an existing
+  corpus file and appends to it; `capturedAt` stays pinned to the first
+  capture. A corpus whose `service` token differs from `--service` is
+  refused rather than mixed; an incumbent-URL change logs a warning.
+- **Entry IDs are unique**, so re-capturing a path already in the loaded
+  corpus is refused (logged, not appended). A deliberate re-capture of the
+  same routes means starting from a fresh corpus file.
+- **Capture-disabled mode is a transparent forwarding path** — requests
+  reach the incumbent, nothing is recorded.
+- **Everything a capture run writes lands under the gitignored `corpus/`
+  tree** and stays out of git; only a reviewed promotion into
+  `tools/diffharness/testdata/` becomes a committed fixture.
+
+The gateway's internal capture middleware follows the same triggers
+(autosave threshold, graceful-shutdown flush, lossless reload after
+restart), pinned by the durability tests catalogued in
+[`docs/capture_testing.md`](../capture_testing.md).
+
 **Configuration:**
 - `SEAM_ARGOCD_INCUMBENT_URL` - Override incumbent URL
 - `SEAM_CAPTURE_PORT` - Override listen port
 
 ### Current Corpus Status
 
-**Captured Entries (as of 2026-07-27):**
-1. `api-v1-applications-get` - List all applications
-2. `api-v1-clusters-get` - List all clusters
+The corpora captured in July 2026 were removed from git by the 2026-09-18
+history purge (seam-70ae655e / commit 9984a5b) and the `corpus/` path was
+gitignored. What exists today:
+
+- **Committed fixtures** (replayable from a fresh clone):
+  `tools/diffharness/testdata/corpus-argocd.json` — the deployed `argocd-ro`
+  capture — plus `example-corpus.json`.
+- **Runtime captures:** none checked in; a fresh capture run writes to
+  `corpus/argocd-proxy/corpus.json`, which stays untracked.
 
 **Capture Configuration:**
 - Incumbent: `https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`
 - Listen port: 8082
-- Corpus path: `corpus/argocd-proxy/corpus.json`
+- Corpus path: `corpus/argocd-proxy/corpus.json` (runtime, gitignored)
 
 ## Request/Response Flow Analysis
 
@@ -353,9 +389,13 @@ Request/response bodies are base64-encoded to handle binary data and ensure JSON
 1. Run capture proxy in production-like environment
 2. Execute typical client operations against capture proxy
 3. Build representative corpus
-4. Commit corpus to repository
+4. Promote the reviewed capture into the committed fixtures under
+   `tools/diffharness/testdata/` (runtime captures under `corpus/` are
+   gitignored and are not themselves committed)
 
-**Status:** ✅ Complete - Basic corpus captured (2 entries)
+**Status:** ✅ Complete - Basic corpus captured and re-homed as the checked-in
+fixture `tools/diffharness/testdata/corpus-argocd.json` after the 2026-09-18
+history purge removed the original from git
 
 ### Phase 2: Corpus Expansion
 
@@ -398,9 +438,9 @@ Request/response bodies are base64-encoded to handle binary data and ensure JSON
 ### Corpus File Security
 
 - ✅ Corpus files contain **only secret references**, not values
-- ✅ Safe to commit to git
+- ✅ Committed fixtures (`tools/diffharness/testdata/*.json`) are safe to commit after review; runtime captures under `corpus/` are gitignored and stay out of git entirely
 - ✅ Can be shared without credential exposure
-- ✅ Review process ensures no accidental credential leakage
+- ✅ Review process (plus the loader's enforced vault-base validation) ensures no accidental credential leakage
 
 ### Capture Proxy Security
 
@@ -440,7 +480,7 @@ Request/response bodies are base64-encoded to handle binary data and ensure JSON
 
 3. **Corpus file empty/invalid**
    - Stop capture gracefully: `./scripts/capture-argocd.sh stop`
-   - Validate JSON: `cat corpus/argocd-proxy/corpus.json | jq`
+   - Validate JSON: `cat corpus/argocd-proxy/corpus.json | jq` (runtime path, untracked)
    - Check write permissions
 
 ## Next Steps
@@ -458,7 +498,8 @@ Request/response bodies are base64-encoded to handle binary data and ensure JSON
 - **Capture Tool:** `tools/diffharness/cmd/seam-capture/main.go`
 - **Corpus Package:** `tools/diffharness/internal/corpus/corpus.go`
 - **Control Scripts:** `scripts/capture-argocd.sh`
-- **Corpus Files:** `corpus/argocd-proxy/`
+- **Committed fixtures:** `tools/diffharness/testdata/` (runtime captures under `corpus/` are gitignored)
+- **Integrity checks and lifecycle:** `docs/capture_testing.md`
 
 ---
 
