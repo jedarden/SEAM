@@ -387,22 +387,25 @@ if isReservedPath(r.URL.Path) {
 
 ### 4. Cache Hit Quota Bypass
 
-**Location:** `internal/server/quota_middleware.go:30`
+**Location:** `internal/server/quota_middleware.go` — the quota middleware's
+own cache-hit branch
 
 ```go
-// Check if this is a cache hit from the context set by cache middleware
-cacheHit := isCacheHit(r)
-
-// Get the cost per call for this route
-costPerCall := s.getCostPerCall(route)
-
-// If cache hit, use zero cost (bypasses quota deduction)
-cost := costPerCall
+// If cache hit, bypass quota entirely - Phase 13.2
 if cacheHit {
-    cost = 0  // ← Cache hits pay no quota cost
-    log.Printf("[Quota] Cache hit for %s - bypassing quota deduction", route)
+    log.Printf("[Quota] Cache hit for %s - bypassing quota check and deduction", route)
+    w.Header().Set("X-Quota-Bypassed", "cache-hit")
+    s.ensureMetrics().recordQuotaBypassed(route)
+    next.ServeHTTP(w, r)
+    return
 }
 ```
+
+**Unreachable in the shipped chain.** `cacheMiddleware` serves a hit directly
+and never invokes the quota middleware (see *Cache Hit Bypass (User Traffic)*
+above), so this branch exists for direct composition only and is covered by
+`TestQuotaBypass_ContextPropagation`. The hit observability callers actually
+see comes from `serveCachedResponse` (§5 below).
 
 ### 5. Quota Bypass Headers and Metrics
 
@@ -544,40 +547,30 @@ OK
 └──────────┬───────────────────────┘
            │
            ▼
-┌─────────────────────┐
-│ Cache Middleware    │
-│ Cache Key Lookup    │
-│ Cache HIT!          │
-└─────────┬───────────┘
+┌──────────────────────────────────┐
+│ Cache Middleware                 │
+│ Cache Key Lookup                 │
+│ Cache HIT!                       │
+│ serveCachedResponse writes the   │
+│ response HERE and returns        │
+└─────────┬────────────────────────┘
            │
-           ├──────────────────────────────────┐
-           │ Set context: cacheHitKey = true  │
-           └──────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Quota Middleware    │
-│ Check cache hit     │
-│ context → true      │
-│ cost = 0            │
-└─────────┬───────────┘
-           │
+           │  Quota middleware never runs for
+           │  this request — no check, no
+           │  deduction, no quota headers of
+           │  its own
            ▼
 ┌────────────────────────────────┐
-│ Check quota with cost = 0      │
-│ Record quota bypass metric     │
-│ Set bypass headers             │
-└─────────┬──────────────────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Return Cached      │
-│ Response           │
-│ Headers:           │
-│ X-SEAM-Cache: HIT  │
-│ X-Quota-Bypassed:  │
-│   cache-hit        │
-└─────────────────────┘
+│ Response (replayed)            │
+│ Headers:                       │
+│ X-SEAM-Cache: HIT              │
+│ X-Quota-Bypassed: cache-hit    │
+│ (admission-time quota headers  │
+│  stripped)                     │
+│ Metrics:                       │
+│ seam_cache_hits_total +1       │
+│ seam_quota_bypassed_total +1   │
+└────────────────────────────────┘
 ```
 
 ### Uncached User Request Flow (Miss)
@@ -645,12 +638,16 @@ OK
 4. **Quota Distortion:** If probes consumed quota, they'd crowd out legitimate user traffic
 5. **Cache Pollution:** Health responses change too frequently to be useful cache entries
 
-### Why Cache Hits Still Check Quota
+### Why Cache Hits Skip Quota Entirely
 
-1. **Validation:** Ensures the caller hasn't been deactivated or exceeded their limit
-2. **Audit Trail:** Every request (even cache hits) is validated against quota policy
-3. **Future-Proofing:** Allows per-request quotas (not just per-dollar) in future
-4. **Metric Accuracy:** Distinguishes between "allowed but cached" vs "not allowed"
+1. **The miss already paid:** admission, quota check and cost deduction happen
+   exactly once — on the charged miss that populated the cache entry
+2. **Double-charging defeats the cache:** re-charging a hit would make repeat
+   reads cost the same as origin traffic, removing the incentive the cache
+   exists to create
+3. **Still observable:** the hit is counted in `seam_http_requests_total` and
+   emits `seam_cache_hits_total` plus `seam_quota_bypassed_total`, so
+   "allowed and cached" stays distinguishable from a quota refusal
 
 ### Why Two Different Bypass Mechanisms
 
@@ -660,9 +657,10 @@ OK
 - For infrastructure control plane endpoints only
 
 **Cache hit bypass** (user traffic):
-- Quota validation happens, but cost = 0
-- Metrics and headers recorded for observability
-- Optimizes legitimate user requests without sacrificing validation
+- The hit short-circuits in `cacheMiddleware`: the quota middleware never runs,
+  so there is no check and no deduction
+- Metrics and headers recorded by `serveCachedResponse` for observability
+- Optimizes legitimate user requests — admission was already paid on the miss
 
 ## Testing and Validation
 
