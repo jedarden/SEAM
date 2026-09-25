@@ -181,6 +181,86 @@ func TestOperatorTrustPathOverridesRespectClusterBoundary(t *testing.T) {
 	}
 }
 
+// applyInClusterTrustBoundary adds the warning half of the refusal: each
+// operator-supplied value the boundary drops is announced in the log, so an
+// operator can see why their override did not take effect. The matrix pins
+// all four cases the upstream-trust contract names — a supplied CA dir and a
+// supplied allowlist are refused (and warned) in-cluster, the defaults
+// resolve to the mounted paths without any warning, and outside a cluster
+// arbitrary paths pass through unchanged and unwarned.
+func TestApplyInClusterTrustBoundaryRefusalMatrix(t *testing.T) {
+	const (
+		operatorCADir     = "/tmp/operator-ca-bundles"
+		operatorAllowlist = "/tmp/operator-allowlist.yaml"
+	)
+
+	tests := []struct {
+		name          string
+		inCluster     bool
+		caDir         string
+		allowlistFile string
+		wantCADir     string
+		wantAllowlist string
+		wantWarnings  []string
+	}{
+		{
+			name:          "in-cluster supplied CA dir is refused and warned",
+			inCluster:     true,
+			caDir:         operatorCADir,
+			wantCADir:     server.DefaultUpstreamCADir,
+			wantAllowlist: server.DefaultUpstreamAllowlistFile,
+			wantWarnings:  []string{"--upstream-ca-dir"},
+		},
+		{
+			name:          "in-cluster supplied allowlist is ignored and warned",
+			inCluster:     true,
+			allowlistFile: operatorAllowlist,
+			wantCADir:     server.DefaultUpstreamCADir,
+			wantAllowlist: server.DefaultUpstreamAllowlistFile,
+			wantWarnings:  []string{"--allowlist-file"},
+		},
+		{
+			name:          "in-cluster defaults resolve to the mounted paths without warnings",
+			inCluster:     true,
+			wantCADir:     server.DefaultUpstreamCADir,
+			wantAllowlist: server.DefaultUpstreamAllowlistFile,
+		},
+		{
+			name:          "outside a cluster arbitrary paths pass through without warnings",
+			caDir:         operatorCADir,
+			allowlistFile: operatorAllowlist,
+			wantCADir:     operatorCADir,
+			wantAllowlist: operatorAllowlist,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			previous := log.Writer()
+			log.SetOutput(&logs)
+			t.Cleanup(func() { log.SetOutput(previous) })
+
+			gotCADir, gotAllowlist := applyInClusterTrustBoundary(tc.caDir, tc.allowlistFile, tc.inCluster)
+
+			if gotCADir != tc.wantCADir {
+				t.Errorf("upstream CA dir = %q, want %q", gotCADir, tc.wantCADir)
+			}
+			if gotAllowlist != tc.wantAllowlist {
+				t.Errorf("allowlist file = %q, want %q", gotAllowlist, tc.wantAllowlist)
+			}
+			for _, warning := range tc.wantWarnings {
+				if !strings.Contains(logs.String(), "WARNING: "+warning) {
+					t.Errorf("refusal warning naming %q missing from log output %q", warning, logs.String())
+				}
+			}
+			if len(tc.wantWarnings) == 0 && logs.Len() != 0 {
+				t.Errorf("expected no warnings, got log output %q", logs.String())
+			}
+		})
+	}
+}
+
 // resolveVaultBaseDir is the CLI half of the vault base directory contract:
 // the flag wins, then SEAM_VAULT_BASE_DIR, and when neither names a prefix the
 // choice falls to spec.DefaultVaultBaseDir, which is where

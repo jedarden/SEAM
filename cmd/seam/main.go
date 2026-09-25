@@ -309,23 +309,12 @@ func serveCommand(args []string) {
 	maxBufferedResponseBytes := f.maxBufferedResponseBytes
 	hotReloadEnabled := f.hotReloadEnabled
 
-	// Detect if running in-cluster and refuse custom upstream CA directory
+	// Detect if running in-cluster and refuse operator overrides of the two
+	// upstream-trust paths. The allowlist is operator-owned in Kubernetes and
+	// arrives through the ConfigMap volume; a developer-supplied path must
+	// never be able to replace that mounted control in a pod.
 	isInCluster := detectInClusterEnvironment()
-	finalUpstreamCADir := resolveUpstreamCADir(*upstreamCADir, isInCluster)
-	if isInCluster && *upstreamCADir != "" {
-		log.Printf("[config] WARNING: --upstream-ca-dir is refused in-cluster; using %s", server.DefaultUpstreamCADir)
-	}
-
-	// The allowlist is operator-owned in Kubernetes and arrives through the
-	// ConfigMap volume. A developer-supplied path must never be able to replace
-	// that mounted control in a pod.
-	finalAllowlistFile := resolveAllowlistFile(*allowlistFile, isInCluster)
-	if isInCluster {
-		if *allowlistFile != "" {
-			log.Printf("[config] WARNING: --allowlist-file is refused in-cluster; using %s", server.DefaultUpstreamAllowlistFile)
-		}
-		finalAllowlistFile = server.DefaultUpstreamAllowlistFile
-	}
+	finalUpstreamCADir, finalAllowlistFile := applyInClusterTrustBoundary(*upstreamCADir, *allowlistFile, isInCluster)
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("Starting SEAM gateway server:")
@@ -424,6 +413,21 @@ func resolveAllowlistFile(requested string, inCluster bool) string {
 		return server.DefaultUpstreamAllowlistFile
 	}
 	return requested
+}
+
+// applyInClusterTrustBoundary is the serve path's single seam for the
+// in-cluster upstream-trust refusal: both paths resolve through their
+// boundary rules, and each operator-supplied value the boundary drops is
+// announced with a WARNING, so the refusal is visible in the pod log instead
+// of silently overriding the operator's configuration.
+func applyInClusterTrustBoundary(upstreamCADir, allowlistFile string, inCluster bool) (finalUpstreamCADir, finalAllowlistFile string) {
+	if inCluster && upstreamCADir != "" {
+		log.Printf("[config] WARNING: --upstream-ca-dir is refused in-cluster; using %s", server.DefaultUpstreamCADir)
+	}
+	if inCluster && allowlistFile != "" {
+		log.Printf("[config] WARNING: --allowlist-file is refused in-cluster; using %s", server.DefaultUpstreamAllowlistFile)
+	}
+	return resolveUpstreamCADir(upstreamCADir, inCluster), resolveAllowlistFile(allowlistFile, inCluster)
 }
 
 // resolveVaultBaseDir applies the CLI precedence rule to the
