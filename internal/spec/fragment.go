@@ -644,6 +644,15 @@ func (fl *FragmentLoader) GetQuarantinedCount() int {
 	return len(fl.quarantined)
 }
 
+// LastLoaded reports when the loader last (re)read the fragments tree.
+// LoadDirectory stamps it when a load starts, so it reflects the most recent
+// successful load: a failed hot reload discards the replacement loader, which
+// leaves this timestamp — like the counts — at their last successful values.
+// It is the zero time before the first load.
+func (fl *FragmentLoader) LastLoaded() time.Time {
+	return fl.lastLoadedTimestamp
+}
+
 // FragmentStatus represents the status of a single fragment
 type FragmentStatus struct {
 	SourceFile        string   `json:"source_file"`

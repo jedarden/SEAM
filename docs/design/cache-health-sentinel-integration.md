@@ -49,7 +49,7 @@ SEAM provides several health sentinel endpoints:
 | `/_seam/health` | Liveness probe (served alias) | `200 OK` with body `"OK"` |
 | `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body |
 | `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
-| `/health/upstreams` | Upstream health | `200 OK` (future: route table health) |
+| `/health/upstreams` | Upstream health | `200 OK` with per-upstream last-2xx/breaker state plus route-table health |
 
 `/_seam/healthz` is the liveness name the control-plane design enumerates:
 the plan's reserved-namespace decision (2026-07-20) names `/_seam/healthz`,
@@ -67,6 +67,28 @@ is configured for the path. An open breaker is reported as `status: "unhealthy"`
 a half-open breaker as `"degraded"`, and the endpoint remains
 HTTP 200 so operators can inspect the structured response. No credential
 values are returned.
+
+`/health/upstreams` is the same kind of operator-only, read-only sentinel —
+also a reserved path, also `Cache-Control: no-store`, also HTTP 200 so the
+structured body can be inspected rather than inferred from a status code.
+Alongside per-upstream last-2xx and breaker state (`seam-9c6613a7`), it
+carries the route-table health this document originally deferred as
+"future: route table health". The `route_table` object reports:
+
+- `fragment_mode`, `fragments_loaded`, `fragments_quarantined` and
+  `last_loaded` — the FragmentLoader's view of the fragments tree. These
+  describe the last *successful* (re)load: a failed hot reload discards the
+  replacement loader, so the counts and timestamp hold their previous values.
+- `routes` — the number of routes in the live route table (the same count
+  the `route_table` readiness dependency gates on).
+- `hot_reload` — the HotReloadManager's last-reload result: enabled,
+  in-progress, reload/failure counters, and `last_reload_time`. A gap
+  between rising `failure_count` and unchanged fragment counts is the
+  signature of a failing reload serving stale routes; absent when hot
+  reload is not running (static mode, or before Enable).
+
+Every source is nil-safe: in static mode `fragment_mode` is `false`, the
+counts are `0`, and `last_loaded`/`hot_reload` are omitted.
 
 ### Readiness Dependencies (`/_seam/readyz`)
 
@@ -696,7 +718,7 @@ curl -i http://localhost:8080/api/test
 ### Potential Enhancements
 
 1. **Per-Caller Health Endpoints:** Custom health probes per caller configuration
-2. **Dependency Health Checks:** `/health/upstreams` checks route table connectivity
+2. **Dependency Health Checks:** `/health/upstreams` renders route-table health (fragment counts, route count, last hot-reload result); *active* connectivity probing of upstreams remains future
 3. **Cache Warming:** Proactive cache population for high-traffic endpoints
 4. **Conditional Bypass:** Configurable bypass for additional control plane paths
 

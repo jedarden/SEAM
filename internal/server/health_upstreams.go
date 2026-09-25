@@ -16,6 +16,60 @@ type UpstreamHealthResponse struct {
 
 	// Upstreams is the list of all tracked upstreams with their last-2xx and breaker state.
 	Upstreams []UpstreamHealthEntry `json:"upstreams"`
+
+	// RouteTable is the route-table health the cache-health-sentinel design
+	// deferred as "future: route table health".
+	RouteTable RouteTableHealth `json:"route_table"`
+}
+
+// RouteTableHealth is the route-table half of the /health/upstreams response:
+// fragment load state, live route count, and the last hot-reload result.
+// Fragment counts and LastLoaded describe the last successful (re)load — a
+// failed hot reload discards the replacement FragmentLoader, so they hold
+// their previous values while HotReload.FailureCount climbs.
+type RouteTableHealth struct {
+	// FragmentMode reports whether the server merged its route table from
+	// fragments (true) or a single static spec file (false). In static mode
+	// the fragment counts are 0 and LastLoaded and HotReload are absent.
+	FragmentMode bool `json:"fragment_mode"`
+
+	// FragmentsLoaded is the number of valid (non-quarantined) fragments.
+	FragmentsLoaded int `json:"fragments_loaded"`
+
+	// FragmentsQuarantined is the number of fragments quarantined by
+	// validation or path-collision detection.
+	FragmentsQuarantined int `json:"fragments_quarantined"`
+
+	// Routes is the number of routes in the live route table. Zero is also
+	// what a nil holder or uninitialized table reports.
+	Routes int `json:"routes"`
+
+	// LastLoaded is when the fragment loader last read the fragments tree
+	// (UTC); absent in static mode or before the first load.
+	LastLoaded *time.Time `json:"last_loaded,omitempty"`
+
+	// HotReload is the last hot-reload result; absent when the hot-reload
+	// manager is not running (static mode, or fragment mode before Enable).
+	HotReload *HotReloadHealth `json:"hot_reload,omitempty"`
+}
+
+// HotReloadHealth mirrors HotReloadManager.Status() with a stable JSON shape.
+type HotReloadHealth struct {
+	// Enabled reports whether the hot-reload manager is watching mounts.
+	Enabled bool `json:"enabled"`
+
+	// InProgress reports whether a reload is running right now.
+	InProgress bool `json:"in_progress"`
+
+	// ReloadCount is the number of successful reloads since process start.
+	ReloadCount uint64 `json:"reload_count"`
+
+	// FailureCount is the number of failed reloads since process start.
+	FailureCount uint64 `json:"failure_count"`
+
+	// LastReload is when the last reload succeeded (UTC); null when no
+	// reload has succeeded yet.
+	LastReload *time.Time `json:"last_reload_time"`
 }
 
 // UpstreamHealthEntry represents the health state of a single upstream.
@@ -111,12 +165,65 @@ func (s *Server) healthUpstreamsHandler(w http.ResponseWriter, r *http.Request) 
 	})
 
 	response := UpstreamHealthResponse{
-		Timestamp: time.Now().UTC(),
-		Upstreams: entries,
+		Timestamp:  time.Now().UTC(),
+		Upstreams:  entries,
+		RouteTable: s.routeTableHealth(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+// routeTableHealth projects the fragment loader, route table, and hot-reload
+// manager onto the route-table health shape. Every source is nil-safe so the
+// endpoint keeps answering in static mode and during partial initialization.
+func (s *Server) routeTableHealth() RouteTableHealth {
+	health := RouteTableHealth{
+		Routes: s.routeTableHolder.RouteCount(), // nil-safe: reports zero
+	}
+
+	if s.hotReloadManager != nil {
+		health.HotReload = hotReloadHealthFromStatus(s.hotReloadManager.Status())
+	}
+
+	if s.specLoader == nil || s.specLoader.FragmentLoader == nil {
+		return health
+	}
+
+	fl := s.specLoader.FragmentLoader
+	health.FragmentMode = true
+	health.FragmentsLoaded = fl.GetValidFragmentCount()
+	health.FragmentsQuarantined = fl.GetQuarantinedCount()
+	if loaded := fl.LastLoaded(); !loaded.IsZero() {
+		ts := loaded.UTC()
+		health.LastLoaded = &ts
+	}
+
+	return health
+}
+
+// hotReloadHealthFromStatus projects HotReloadManager.Status() onto the stable
+// HotReloadHealth wire shape, tolerating absent or mistyped keys so a change
+// in the status map degrades to zero values rather than a panic.
+func hotReloadHealthFromStatus(status map[string]interface{}) *HotReloadHealth {
+	health := &HotReloadHealth{}
+	if v, ok := status["enabled"].(bool); ok {
+		health.Enabled = v
+	}
+	if v, ok := status["in_progress"].(bool); ok {
+		health.InProgress = v
+	}
+	if v, ok := status["reload_count"].(uint64); ok {
+		health.ReloadCount = v
+	}
+	if v, ok := status["failure_count"].(uint64); ok {
+		health.FailureCount = v
+	}
+	if v, ok := status["last_reload_time"].(time.Time); ok && !v.IsZero() {
+		ts := v.UTC()
+		health.LastReload = &ts
+	}
+	return health
 }
