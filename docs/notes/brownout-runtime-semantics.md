@@ -1,8 +1,11 @@
 # Deprecated-Route Brownout: Runtime Semantics
 
-Status: implemented 2026-09-17. This document is the authority on how
-`x-seam-deprecated` brownout windows behave at runtime. The code comments in
-`internal/server/brownout_middleware.go` summarize the same contract; the
+Status: implemented 2026-09-17; deprecation response headers 2026-09-25.
+This document is the authority on how `x-seam-deprecated` behaves at runtime:
+brownout windows, and the Deprecation/Sunset response headers every
+otherwise-normal response for a deprecated route carries. The code comments
+in `internal/server/brownout_middleware.go` and
+`internal/server/deprecation_middleware.go` summarize the same contract; the
 tests named at the bottom pin it.
 
 ## What a brownout window is
@@ -113,6 +116,47 @@ window — and a fortiori past sunset — the route serves normally until a
 human merges the removal PR. Nothing in the gateway deletes or refuses a
 route because a date on the fragment passed.
 
+## Deprecation and Sunset response headers
+
+Outside windows a deprecated route serves normally, and every response it
+serves announces the deprecation. The header set is written by
+`DeprecationHeaders.Apply` from the same enforcement point that serves
+window 410s, on the pass-through side, before the cache is consulted — so
+cache hits and misses carry it alike:
+
+| Header | Value |
+|---|---|
+| `Deprecation` | `since=<since>` — the fragment's `since` verbatim |
+| `Sunset` | `<sunset>` verbatim, only when the fragment declares one |
+| `Link` | `<base>/docs/route?path=<template>&version=<v>; rel="deprecation"`, then `<base>/changes; rel="deprecation"`, then `<replacement>[?version=<v>]; rel="alternate"` when a replacement is declared |
+
+`<base>` comes from `X-Forwarded-Proto`/`X-Forwarded-Host` when present,
+else the request's own scheme and host. A route deprecated only by OpenAPI
+`deprecated: true` on the operation — no fragment-root `x-seam-deprecated` —
+has no since date; `extractDeprecation` records `"unknown"` and the header
+reads `Deprecation: since=unknown`.
+
+An active-window 410 never gets this pass-through set layered onto its own:
+the window check runs first and serves the 410 directly (see "Response
+contract" above), so a 410's Link headers are exactly the two it writes
+itself.
+
+### Header names: no `X-` prefix
+
+The gateway emits the unprefixed RFC 9745 `Deprecation` and RFC 8594
+`Sunset` fields. Some example fragments
+(`examples/fragments/5-complex-multi-instance.yaml`, `docs/examples/…`)
+declare `X-Deprecation`/`X-Sunset` as response headers in the example API
+document — those describe what an example API advertises in its own response
+declarations, not the gateway's emission contract. The schema's own
+`$comment`s ("populates Deprecation directly", "emitted as Sunset verbatim")
+and `docs/notes/route-fragment-schema-v1.md` ("This field drives the
+Deprecation and Sunset HTTP headers (RFC 9745, RFC 8594)") name the
+unprefixed fields, and RFC 6648 deprecates the `X-` prefix for new fields.
+Callers looking for `X-Deprecation`/`X-Sunset` will not find them; the
+unprefixed names are the contract, and the gateway emits no `X-`-prefixed
+deprecation headers.
+
 ## Lint gate (up front, not runtime)
 
 `internal/spec/lint.go` (`checkDeprecation`) rejects, at fragment
@@ -152,3 +196,12 @@ overlaps across offsets.
 | Mixed-offset overlap detected (no false negative) | `TestCheckDeprecation_MixedOffsetOverlapDetected` |
 | End instant past sunset detected | `TestCheckDeprecation_WindowPastSunsetOffsetDetected` |
 | Shared instant parse incl. lenient separators | `TestParseBrownoutInstant` |
+| Pass-through header set, self-resolved (no context match) | `TestServerDeprecationMiddleware_EmitsHeadersWithoutContextMatch` |
+| Sunset omitted when unset; no alternate link without replacement | `TestServerDeprecationMiddleware_SunsetOmittedWhenUnset` |
+| Dormant on non-deprecated route / unmatched path | `TestServerDeprecationMiddleware_DormantOnNonDeprecatedRoute`, `TestServerDeprecationMiddleware_NoRouteMatchIsDormant` |
+| Reserved-path bypass precedes header emission | `TestServerDeprecationMiddleware_ReservedPathBypass` |
+| Probe bypass covers headers too | `TestServerDeprecationMiddleware_ProbeRequestsBypass` |
+| Operation-level `deprecated: true` advertised (`since=unknown`) | `TestServerDeprecationMiddleware_OperationLevelDeprecatedAdvertised` |
+| Window 410 carries only its own headers (no pass-through layering) | `TestServerDeprecationMiddleware_ActiveWindow410NotDoubleHeadered` |
+| Headers in the gap between windows | `TestServerDeprecationMiddleware_InactiveWindowCarriesHeaders` |
+| Headers persist past sunset (sunset advisory) | `TestServerDeprecationMiddleware_PastSunsetStillAdvertised` |

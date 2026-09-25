@@ -36,6 +36,13 @@ import (
 //   - Sunset never removes a route by itself: it is advisory (plan AP-08), so
 //     past the last window — and a fortiori past sunset — the route serves
 //     normally until a human merges the removal PR.
+//
+// Outside windows the route serves normally, and a deprecated route
+// announces itself on every response it serves: DeprecationHeaders.Apply
+// writes the Deprecation/Sunset and Link header set before the inner chain
+// runs, so cache hits and misses carry it alike. An active-window 410 never
+// gets that pass-through set layered onto it — the 410 is served before
+// Apply runs and writes its own header set.
 type BrownoutScheduler struct {
 	// clock allows time-based tests to inject a fixed time
 	clock func() time.Time
@@ -76,22 +83,28 @@ func (bs *BrownoutScheduler) ServeForMatch(w http.ResponseWriter, r *http.Reques
 	}
 
 	deprecated := routeMatch.Route.Deprecated
-	if len(deprecated.Brownouts) == 0 {
-		// No brownout windows defined - DORMANT (fail-safe)
-		next.ServeHTTP(w, r)
-		return
-	}
 
-	// Check if current time is within any brownout window (union semantics:
-	// first active window in array order wins).
-	now := bs.clock()
-	for _, window := range deprecated.Brownouts {
-		if window.IsActiveAt(now) {
-			// Active brownout - return 410 Gone
-			bs.serveBrownoutResponse(w, r, &routeMatch.Route, &window)
-			return
+	// Window check first (union semantics: first active window in array order
+	// wins). An active window serves the 410 and nothing else, so a window
+	// response carries exactly the header set the 410 handler writes — the
+	// pass-through header set below is never layered onto it. No windows at
+	// all is DORMANT (fail-safe): the check is skipped, headers still apply.
+	if len(deprecated.Brownouts) > 0 {
+		now := bs.clock()
+		for i := range deprecated.Brownouts {
+			if deprecated.Brownouts[i].IsActiveAt(now) {
+				// Active brownout - return 410 Gone
+				bs.serveBrownoutResponse(w, r, &routeMatch.Route, &deprecated.Brownouts[i])
+				return
+			}
 		}
 	}
+
+	// Serving normally (no windows defined, or outside every one). A
+	// deprecated route advertises its since/sunset metadata on every response:
+	// the headers go on before the inner chain runs (cache, quota, proxy), so
+	// cache hits and misses carry them alike.
+	NewDeprecationHeaders().Apply(w, r, routeMatch)
 
 	// Not in a brownout window - proceed normally
 	next.ServeHTTP(w, r)
@@ -190,12 +203,14 @@ func (bs *BrownoutScheduler) SetClock(clock func() time.Time) {
 }
 
 // brownoutMiddleware is the caller-facing enforcement point for
-// x-seam-deprecated brownout windows. It is the outermost of the caller
-// chain's cache/quota/brownout trio (quota innermost, then cache, then
-// brownout — see Server.Start), so a 410 served inside a window precedes
-// caching and metering: browned-out traffic consumes no quota, the 410 is
-// never itself cached, and a cached pre-window response cannot mask an
-// active window.
+// x-seam-deprecated routes: a 410 inside a scheduled brownout window, the
+// Deprecation/Sunset and Link header set on every otherwise-normal response.
+// It is the outermost of the caller chain's cache/quota/brownout trio (quota
+// innermost, then cache, then brownout — see Server.Start), so a 410 served
+// inside a window precedes caching and metering: browned-out traffic consumes
+// no quota, the 410 is never itself cached, and a cached pre-window response
+// cannot mask an active window. Header emission runs on the pass-through
+// side, before the cache is consulted, so hits and misses carry it alike.
 //
 // Dispatch publishes the authoritative route match into the request context
 // only inside the caller mux (stage 4, via withRouteMatch) — after every
