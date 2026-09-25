@@ -753,6 +753,26 @@ func (s *Server) openapiJSONHandler(w http.ResponseWriter, r *http.Request) {
 // docsHandler serves the OpenAPI documentation UI with embedded spec
 // Fetches the merged OpenAPI spec from the spec loader and serves it with Scalar API Reference
 //
+// The page is this server's only HTML entry point and wires the Agentation
+// feedback toolbar per the workspace UI policy. Two things must both hold or
+// the toolbar silently never mounts while the page renders perfectly:
+//
+//   - an import map resolving the bare specifiers agentation's module chain
+//     imports (react, react-dom, react-dom/client, react/jsx-runtime,
+//     agentation) MUST appear before the module that uses them, or the module
+//     dies on an unresolved specifier; and
+//   - the module must actually MOUNT the toolbar: agentation is a library
+//     exporting the <Agentation/> React component, not a self-mounting
+//     script — a bare `import "agentation"` resolves, exports its component,
+//     and renders nothing. The loader below creates #agentation-root and
+//     renders the component into it.
+//
+// /docs/route renders no HTML of its own: with Accept: text/html it redirects
+// to /docs#anchor, so this page is the feedback surface for both URLs.
+//
+// The wiring contract is pinned by TestDocsAgentationWiring; the browser-level
+// mount check (#agentation-root in the DOM) is scripts/verify-agentation-mount.sh.
+//
 // Phase 7: Returns the spec filtered by the caller's identity scopes.
 // Only routes that the caller has at least one required scope for are included.
 //
@@ -857,6 +877,30 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
     body { margin: 0; padding: 0; }
     #scalar-app { height: 100vh; }
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom": "https://esm.sh/react-dom@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+      "agentation": "https://esm.sh/agentation@3.1.2?external=react,react-dom"
+    }
+  }
+  </script>
+  <script type="module">
+    // Module scripts are deferred, so document.body exists when this runs.
+    // See the docsHandler comment: agentation is a library, not a
+    // self-mounting script — importing it alone renders nothing.
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import { Agentation } from "agentation";
+
+    const host = document.createElement("div");
+    host.id = "agentation-root";
+    document.body.appendChild(host);
+    createRoot(host).render(React.createElement(Agentation));
+  </script>
 </head>
 <body>
   <div id="scalar-app"></div>
