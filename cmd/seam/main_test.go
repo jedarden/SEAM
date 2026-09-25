@@ -261,6 +261,53 @@ func TestApplyInClusterTrustBoundaryRefusalMatrix(t *testing.T) {
 	}
 }
 
+// applyInClusterTrustBoundary's warnings are the operator-facing record of a
+// refusal, and identifying a refusal must not re-disclose the refused value:
+// the WARNING names the flag and the mounted path that replaces it, while the
+// operator-supplied value itself — a path chosen outside the cluster,
+// potentially pointing into credential-bearing storage — never reaches the
+// pod log. This also pins the both-overrides case the refusal matrix above
+// does not exercise: two supplied values produce exactly two warnings, one
+// per refused option, and both mounted paths win.
+func TestApplyInClusterTrustBoundaryWarningsIdentifyWithoutExposing(t *testing.T) {
+	const (
+		operatorCADir     = "/tmp/operator-secret-ca-bundles"
+		operatorAllowlist = "/tmp/operator-secret-allowlist.yaml"
+	)
+
+	var logs bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(previous) })
+
+	gotCADir, gotAllowlist := applyInClusterTrustBoundary(operatorCADir, operatorAllowlist, true)
+
+	if gotCADir != server.DefaultUpstreamCADir || gotAllowlist != server.DefaultUpstreamAllowlistFile {
+		t.Fatalf("both overrides supplied in-cluster: ca-dir=%q allowlist=%q, want the mounted %q and %q",
+			gotCADir, gotAllowlist, server.DefaultUpstreamCADir, server.DefaultUpstreamAllowlistFile)
+	}
+
+	output := logs.String()
+	for _, announcement := range []string{
+		"WARNING: --upstream-ca-dir",
+		"WARNING: --allowlist-file",
+		"using " + server.DefaultUpstreamCADir,
+		"using " + server.DefaultUpstreamAllowlistFile,
+	} {
+		if !strings.Contains(output, announcement) {
+			t.Errorf("refusal log %q does not announce %q", output, announcement)
+		}
+	}
+	if warnings := strings.Count(output, "WARNING"); warnings != 2 {
+		t.Errorf("both overrides supplied, but the log carries %d WARNING lines, want one per refused value (2): %q", warnings, output)
+	}
+	for _, refused := range []string{operatorCADir, operatorAllowlist} {
+		if strings.Contains(output, refused) {
+			t.Errorf("refusal log %q echoes the refused operator value %q", output, refused)
+		}
+	}
+}
+
 // resolveVaultBaseDir is the CLI half of the vault base directory contract:
 // the flag wins, then SEAM_VAULT_BASE_DIR, and when neither names a prefix the
 // choice falls to spec.DefaultVaultBaseDir, which is where
