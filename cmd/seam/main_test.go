@@ -77,6 +77,109 @@ func TestAllowlistPathIsFixedInCluster(t *testing.T) {
 	}
 }
 
+// resolveUpstreamCADir is the CLI half of the upstream CA trust boundary: the
+// bundles that authenticate upstream TLS come from the mounted ConfigMap
+// directory inside a cluster, so an operator-supplied --upstream-ca-dir or
+// SEAM_UPSTREAM_CA_DIR value cannot replace the mount there, while outside a
+// cluster the operator's own directory is accepted.
+func TestUpstreamCADirIsFixedInCluster(t *testing.T) {
+	const operatorDir = "/tmp/operator-ca-bundles"
+
+	tests := []struct {
+		name      string
+		requested string
+		inCluster bool
+		want      string
+	}{
+		{name: "operator directory refused in-cluster", requested: operatorDir, inCluster: true, want: server.DefaultUpstreamCADir},
+		{name: "empty request falls back to the mounted default in-cluster", requested: "", inCluster: true, want: server.DefaultUpstreamCADir},
+		{name: "operator directory accepted outside a cluster", requested: operatorDir, inCluster: false, want: operatorDir},
+		{name: "empty request falls back to the default outside a cluster", requested: "", inCluster: false, want: server.DefaultUpstreamCADir},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveUpstreamCADir(tc.requested, tc.inCluster); got != tc.want {
+				t.Fatalf("resolveUpstreamCADir(%q, %v) = %q, want %q", tc.requested, tc.inCluster, got, tc.want)
+			}
+		})
+	}
+}
+
+// detectInClusterEnvironment is the trigger for both trust refusals, and it
+// demands both standard Kubernetes service variables: either one alone is an
+// accident of the environment, not a cluster.
+func TestDetectInClusterEnvironmentRequiresBothServiceVariables(t *testing.T) {
+	tests := []struct {
+		name          string
+		serviceHost   string
+		servicePort   string
+		wantInCluster bool
+	}{
+		{name: "both service variables present", serviceHost: "10.96.0.1", servicePort: "443", wantInCluster: true},
+		{name: "service host alone is not a cluster", serviceHost: "10.96.0.1", servicePort: "", wantInCluster: false},
+		{name: "service port alone is not a cluster", serviceHost: "", servicePort: "443", wantInCluster: false},
+		{name: "neither service variable is not a cluster", serviceHost: "", servicePort: "", wantInCluster: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("KUBERNETES_SERVICE_HOST", tc.serviceHost)
+			t.Setenv("KUBERNETES_PORT", tc.servicePort)
+
+			if got := detectInClusterEnvironment(); got != tc.wantInCluster {
+				t.Fatalf("detectInClusterEnvironment() = %v, want %v", got, tc.wantInCluster)
+			}
+		})
+	}
+}
+
+// The full refusal chain at the resolution seam: operator-supplied
+// SEAM_UPSTREAM_CA_DIR and SEAM_UPSTREAM_ALLOWLIST values reach the flag
+// storage through applyEnvOverrides — the path a Deployment actually uses —
+// and once the Kubernetes service variables classify the process as
+// in-cluster the trust resolvers hand back the mounted paths, while with the
+// variables absent the same operator values pass through untouched.
+func TestOperatorTrustPathOverridesRespectClusterBoundary(t *testing.T) {
+	const (
+		operatorCADir     = "/tmp/operator-ca-bundles"
+		operatorAllowlist = "/tmp/operator-allowlist.yaml"
+	)
+
+	f := resolveServeConfig(t, nil, map[string]string{
+		"SEAM_UPSTREAM_CA_DIR":    operatorCADir,
+		"SEAM_UPSTREAM_ALLOWLIST": operatorAllowlist,
+	})
+	if *f.upstreamCADir != operatorCADir || *f.allowlistFile != operatorAllowlist {
+		t.Fatalf("env overrides lost: ca-dir=%q allowlist=%q", *f.upstreamCADir, *f.allowlistFile)
+	}
+
+	t.Setenv("KUBERNETES_SERVICE_HOST", "10.96.0.1")
+	t.Setenv("KUBERNETES_PORT", "443")
+	if inCluster := detectInClusterEnvironment(); !inCluster {
+		t.Fatal("both service variables present, but the environment did not classify as in-cluster")
+	} else {
+		if got := resolveUpstreamCADir(*f.upstreamCADir, inCluster); got != server.DefaultUpstreamCADir {
+			t.Errorf("in-cluster upstream CA dir = %q, want mounted %q", got, server.DefaultUpstreamCADir)
+		}
+		if got := resolveAllowlistFile(*f.allowlistFile, inCluster); got != server.DefaultUpstreamAllowlistFile {
+			t.Errorf("in-cluster allowlist file = %q, want mounted %q", got, server.DefaultUpstreamAllowlistFile)
+		}
+	}
+
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_PORT", "")
+	if inCluster := detectInClusterEnvironment(); inCluster {
+		t.Fatal("cleared service variables classified the environment as in-cluster")
+	}
+	if got := resolveUpstreamCADir(*f.upstreamCADir, false); got != operatorCADir {
+		t.Errorf("local upstream CA dir = %q, want operator value %q", got, operatorCADir)
+	}
+	if got := resolveAllowlistFile(*f.allowlistFile, false); got != operatorAllowlist {
+		t.Errorf("local allowlist file = %q, want operator value %q", got, operatorAllowlist)
+	}
+}
+
 // resolveVaultBaseDir is the CLI half of the vault base directory contract:
 // the flag wins, then SEAM_VAULT_BASE_DIR, and when neither names a prefix the
 // choice falls to spec.DefaultVaultBaseDir, which is where

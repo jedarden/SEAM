@@ -309,17 +309,11 @@ func serveCommand(args []string) {
 	maxBufferedResponseBytes := f.maxBufferedResponseBytes
 	hotReloadEnabled := f.hotReloadEnabled
 
-	// Determine final upstream CA directory
-	finalUpstreamCADir := *upstreamCADir
-	if finalUpstreamCADir == "" {
-		finalUpstreamCADir = server.DefaultUpstreamCADir
-	}
-
 	// Detect if running in-cluster and refuse custom upstream CA directory
 	isInCluster := detectInClusterEnvironment()
+	finalUpstreamCADir := resolveUpstreamCADir(*upstreamCADir, isInCluster)
 	if isInCluster && *upstreamCADir != "" {
 		log.Printf("[config] WARNING: --upstream-ca-dir is refused in-cluster; using %s", server.DefaultUpstreamCADir)
-		finalUpstreamCADir = server.DefaultUpstreamCADir
 	}
 
 	// The allowlist is operator-owned in Kubernetes and arrives through the
@@ -409,6 +403,22 @@ func detectInClusterEnvironment() bool {
 	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_PORT") != ""
 }
 
+// resolveUpstreamCADir applies the in-cluster trust boundary to the
+// operator-supplied upstream CA directory: the bundles that authenticate
+// upstream TLS come from the mounted ConfigMap directory inside a cluster, so
+// a --upstream-ca-dir / SEAM_UPSTREAM_CA_DIR value cannot replace the mount
+// there, while outside a cluster the operator's own directory is accepted.
+// resolveAllowlistFile enforces the same boundary for the upstream host
+// allowlist.
+func resolveUpstreamCADir(requested string, inCluster bool) string {
+	if inCluster || requested == "" {
+		return server.DefaultUpstreamCADir
+	}
+	return requested
+}
+
+// resolveAllowlistFile applies the in-cluster trust boundary to the
+// operator-supplied upstream host allowlist path.
 func resolveAllowlistFile(requested string, inCluster bool) string {
 	if inCluster {
 		return server.DefaultUpstreamAllowlistFile
