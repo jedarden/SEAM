@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -506,6 +507,20 @@ func TestServeFlagOverridesEnv(t *testing.T) {
 			},
 		},
 		{
+			// The vault branch short-circuits on flagWasSet before the env is
+			// consulted, so the flag wins even though the delegated resolver
+			// would have preferred it too (TestResolveVaultBaseDir pins that
+			// resolver directly; this pins the wiring around it).
+			name: "vault base dir",
+			args: []string{"--vault-base-dir", "tenants/flag"},
+			env:  map[string]string{"SEAM_VAULT_BASE_DIR": "tenants/env"},
+			check: func(t *testing.T, f *serveFlags) {
+				if *f.vaultBaseDir != "tenants/flag" {
+					t.Errorf("vault-base-dir = %q, want tenants/flag (flag beats env)", *f.vaultBaseDir)
+				}
+			},
+		},
+		{
 			name: "max replayable request bytes",
 			args: []string{"--max-replayable-request-bytes", "12345"},
 			env:  map[string]string{"SEAM_MAX_REPLAYABLE_REQUEST_BYTES": "2097152"},
@@ -562,6 +577,25 @@ func TestServeFlagOverridesEnv(t *testing.T) {
 			f := resolveServeConfig(t, tc.args, tc.env)
 			tc.check(t, f)
 		})
+	}
+
+	// The flag-beats-env direction must stay pinned for every documented
+	// pair, the way TestServeEnvFillsOmittedFlag pins env-fills: a mapping
+	// entry without a case above fails here, so the table cannot grow an
+	// untested pair.
+	covered := make(map[string]bool, len(tests))
+	for _, tc := range tests {
+		if len(tc.env) != 1 {
+			t.Fatalf("case %q sets %d environment variables, want exactly 1 — the coverage check keys each case to its paired variable", tc.name, len(tc.env))
+		}
+		for name := range tc.env {
+			covered[name] = true
+		}
+	}
+	for _, name := range serveEnvVarNames {
+		if !covered[name] {
+			t.Errorf("no flag-beats-env case exists for %s; add one to TestServeFlagOverridesEnv", name)
+		}
 	}
 }
 
@@ -635,6 +669,48 @@ func TestServeFlagEnvMapping(t *testing.T) {
 		if !envSeen[name] {
 			t.Errorf("serveEnvVarNames blanks %s, which the mapping does not document — clearServeEnv and serveFlagEnvPairs disagree", name)
 		}
+	}
+}
+
+// TestServeFlagEnvMapping pins the table to the flag set; this pins the code
+// to the table. Every SEAM_* lookup applyEnvOverrides performs must be one of
+// the documented variables, and every documented variable must still be
+// consulted — so a renamed lookup, a newly added one, or a silently dropped
+// one is a configuration-contract change that fails here until the mapping
+// and the README's environment-variable table move with it. The lookups run
+// against an all-empty environment, where every branch reaches its getenv
+// call.
+func TestServeEnvOverridesConsultExactlyTheDocumentedVariables(t *testing.T) {
+	consulted := make(map[string]bool)
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	f := registerServeFlags(fs)
+	f.applyEnvOverrides(func(key string) string {
+		consulted[key] = true
+		return ""
+	}, fs)
+
+	for _, name := range serveEnvVarNames {
+		if !consulted[name] {
+			t.Errorf("applyEnvOverrides never consulted %s — the lookup was removed or renamed; restore it or move serveEnvVarNames, serveFlagEnvPairs and the README table together", name)
+		}
+	}
+
+	var undocumented []string
+	for key := range consulted {
+		documented := false
+		for _, name := range serveEnvVarNames {
+			if name == key {
+				documented = true
+				break
+			}
+		}
+		if !documented {
+			undocumented = append(undocumented, key)
+		}
+	}
+	if len(undocumented) > 0 {
+		sort.Strings(undocumented)
+		t.Errorf("applyEnvOverrides consulted variables outside the documented mapping: %v — every SEAM_* lookup is part of the configuration contract; document them or remove the lookups", undocumented)
 	}
 }
 
@@ -725,6 +801,139 @@ func TestServeEmptyFragmentsDirEnvCountsAsUnset(t *testing.T) {
 			t.Errorf("fragments-dir = %q, want /flag/fragments (empty env counts as unset)", got)
 		}
 	})
+}
+
+// README ("Precedence (serve)") states the empty-value rule for every
+// variable, not just the fragments directory: "A variable set to the empty
+// string counts as unset". This sweep makes that general statement auditable
+// for all fifteen documented pairs, in both directions — with the flag omitted
+// the documented default survives, and over an explicit flag the flag value
+// survives. The expectations are the documented defaults themselves (the same
+// literals TestServeDefaultsWithoutFlagsOrEnv pins) rather than a second
+// resolution: through the lookup function applyEnvOverrides takes, an absent
+// variable and an empty one are indistinguishable, so comparing two
+// resolutions could not tell a dropped val != "" guard from the contract.
+func TestServeEmptyEnvValueCountsAsUnsetForEveryPair(t *testing.T) {
+	fields := map[string]struct {
+		get         func(f *serveFlags) string
+		wantDefault string
+		args        []string
+		wantFlag    string
+	}{
+		"SEAM_CALLER_PORT": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.callerPort) },
+			wantDefault: "8080",
+			args:        []string{"--caller-port", "9000"},
+			wantFlag:    "9000",
+		},
+		"SEAM_OPERATOR_PORT": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.operatorPort) },
+			wantDefault: "8081",
+			args:        []string{"--operator-port", "9001"},
+			wantFlag:    "9001",
+		},
+		"SEAM_BASE_URL": {
+			get:         func(f *serveFlags) string { return *f.baseURL },
+			wantDefault: "http://localhost:8080",
+			args:        []string{"--base-url", "http://flag.example"},
+			wantFlag:    "http://flag.example",
+		},
+		"SEAM_SPEC_DIR": {
+			get:         func(f *serveFlags) string { return *f.specDir },
+			wantDefault: "./spec",
+			args:        []string{"--spec-dir", "/flag/spec"},
+			wantFlag:    "/flag/spec",
+		},
+		"SEAM_FRAGMENT_MODE": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.fragmentMode) },
+			wantDefault: "false",
+			args:        []string{"--fragment-mode"},
+			wantFlag:    "true",
+		},
+		"SEAM_SCHEMA_PATH": {
+			get:         func(f *serveFlags) string { return *f.schemaPath },
+			wantDefault: "./spec/route-fragment-schema.json",
+			args:        []string{"--schema-path", "/flag/schema.json"},
+			wantFlag:    "/flag/schema.json",
+		},
+		"SEAM_CAPTURE_ENABLED": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.captureEnabled) },
+			wantDefault: "false",
+			args:        []string{"--capture-enabled"},
+			wantFlag:    "true",
+		},
+		"SEAM_CORPUS_DIR": {
+			get:         func(f *serveFlags) string { return *f.corpusDir },
+			wantDefault: "corpus",
+			args:        []string{"--corpus-dir", "flag-corpus"},
+			wantFlag:    "flag-corpus",
+		},
+		"SEAM_FRAGMENTS_DIR": {
+			get:         func(f *serveFlags) string { return *f.fragmentsDir },
+			wantDefault: "./fragments",
+			args:        []string{"--fragments-dir", "/flag/fragments"},
+			wantFlag:    "/flag/fragments",
+		},
+		"SEAM_UPSTREAM_CA_DIR": {
+			// The flag-level default is empty here; /etc/gateway/upstream-ca is
+			// applied by serveCommand's trust resolver, which has its own
+			// in-cluster tests.
+			get:         func(f *serveFlags) string { return *f.upstreamCADir },
+			wantDefault: "",
+			args:        []string{"--upstream-ca-dir", "/flag/ca"},
+			wantFlag:    "/flag/ca",
+		},
+		"SEAM_UPSTREAM_ALLOWLIST": {
+			get:         func(f *serveFlags) string { return *f.allowlistFile },
+			wantDefault: "",
+			args:        []string{"--allowlist-file", "/flag/allowlist.yaml"},
+			wantFlag:    "/flag/allowlist.yaml",
+		},
+		"SEAM_VAULT_BASE_DIR": {
+			get:         func(f *serveFlags) string { return *f.vaultBaseDir },
+			wantDefault: spec.DefaultVaultBaseDir,
+			args:        []string{"--vault-base-dir", "tenants/flag"},
+			wantFlag:    "tenants/flag",
+		},
+		"SEAM_MAX_REPLAYABLE_REQUEST_BYTES": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.maxReplayableRequestBytes) },
+			wantDefault: "1048576",
+			args:        []string{"--max-replayable-request-bytes", "12345"},
+			wantFlag:    "12345",
+		},
+		"SEAM_MAX_BUFFERED_RESPONSE_BYTES": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.maxBufferedResponseBytes) },
+			wantDefault: "1048576",
+			args:        []string{"--max-buffered-response-bytes", "12345"},
+			wantFlag:    "12345",
+		},
+		"SEAM_HOT_RELOAD_ENABLED": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.hotReloadEnabled) },
+			wantDefault: "false",
+			args:        []string{"--enable-hot-reload"},
+			wantFlag:    "true",
+		},
+	}
+
+	for _, pair := range serveFlagEnvPairs {
+		field, ok := fields[pair.envVar]
+		if !ok {
+			t.Errorf("serveFlagEnvPairs pairs --%s with %s, but no empty-value fixture exists for %s; add one to TestServeEmptyEnvValueCountsAsUnsetForEveryPair", pair.flag, pair.envVar, pair.envVar)
+			continue
+		}
+		t.Run(pair.envVar+" empty keeps the default", func(t *testing.T) {
+			f := resolveServeConfig(t, nil, map[string]string{pair.envVar: ""})
+			if got := field.get(f); got != field.wantDefault {
+				t.Errorf("%s=\"\" with --%s omitted resolved %q, want the default %q (empty counts as unset)", pair.envVar, pair.flag, got, field.wantDefault)
+			}
+		})
+		t.Run(pair.envVar+" empty keeps an explicit flag", func(t *testing.T) {
+			f := resolveServeConfig(t, field.args, map[string]string{pair.envVar: ""})
+			if got := field.get(f); got != field.wantFlag {
+				t.Errorf("%s=\"\" over %v resolved %q, want the flag value %q (empty counts as unset)", pair.envVar, field.args, got, field.wantFlag)
+			}
+		})
+	}
 }
 
 // Port values parse with fmt.Sscanf %d, whose exact semantics are part of the
