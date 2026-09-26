@@ -263,3 +263,78 @@ func TestDocsRouteHTMLRedirectsToAgentationSurface(t *testing.T) {
 		t.Errorf("redirect Location = %q, want prefix /docs# — /docs/route HTML traffic must land on the Agentation-wired /docs page", loc)
 	}
 }
+
+// TestDocsPathsNeverRendersHTML pins the third documentation surface: /docs/paths
+// is the machine-readable twin of /docs (the Phase 11.2 last-2xx tracker), with
+// no Accept negotiation at all — every representation it serves is
+// application/json. There is no HTML entry point to wire here, so the toolbar
+// contract is satisfied by absence; this test keeps it that way the same way
+// TestDocsRouteHTMLRedirectsToAgentationSurface guards the redirect branch. If
+// /docs/paths ever grows a text/html representation, that page needs the same
+// import map and mount loader the shared shell carries — a page that renders
+// fine with no toolbar is exactly the silently-broken state this file exists
+// to prevent.
+func TestDocsPathsNeverRendersHTML(t *testing.T) {
+	callerPort := getAvailablePort(t)
+	operatorPort := getAvailablePort(t)
+
+	cfg := &Config{
+		CallerPort:    callerPort,
+		OperatorPort:  operatorPort,
+		BaseURL:       fmt.Sprintf("http://localhost:%d", callerPort),
+		SpecDir:       "../../spec",
+		AllowlistFile: newBaselineAllowlistFile(t),
+	}
+
+	s := New(cfg)
+	s.identityResolver = newLoopbackTestIdentityResolver()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer func() { _ = s.Shutdown(ctx) }()
+	s.setOpenBaoReady(true)
+
+	time.Sleep(100 * time.Millisecond)
+
+	url := fmt.Sprintf("http://localhost:%d/docs/paths", callerPort)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	// Ask for the UI representation the way a browser would: the pin is that
+	// there is none to serve.
+	req.Header.Set("Accept", "text/html")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /docs/paths status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("GET /docs/paths Content-Type = %q, want application/json — a text/html branch here would need its own Agentation import map and mount loader", ct)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read /docs/paths body: %v", err)
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatalf("/docs/paths body is not valid JSON: %v", err)
+	}
+	// Belt and suspenders: the machine-readable twin must not smuggle any of
+	// the HTML shell's toolbar markers into its body either.
+	page := string(body)
+	for _, marker := range []string{docsAgentationImportMapTag, docsAgentationModuleTag, "agentation-root"} {
+		if strings.Contains(page, marker) {
+			t.Errorf("/docs/paths body contains %q — it must stay the machine-readable twin, not grow an unwired HTML branch", marker)
+		}
+	}
+}
