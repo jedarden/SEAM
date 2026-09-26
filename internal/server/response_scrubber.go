@@ -423,6 +423,18 @@ func copyResponseTrailers(w http.ResponseWriter, trailers http.Header, scrubber 
 	}
 }
 
+// streamResponse delivers the upstream response with every injected value
+// scrubbed from the body, headers, and trailers. A response whose declared
+// Content-Length is at or under maxBuffered is decoded, held whole, scrubbed,
+// and re-sent with its recomputed Content-Length. The fallback for a decoded
+// body that turns out to exceed maxBuffered — including one whose declared
+// length promised less and trips the cap mid-read — and for a response with
+// no declared length at all is the incremental scrubber: it streams with
+// bounded memory and never truncates, re-encodes with the upstream's
+// content-encoding, and reaches the caller chunked (Content-Length removed)
+// with the upstream's status, headers, and trailers intact and their
+// credential-bearing values still scrubbed. The cap therefore bounds memory,
+// never scrubbability.
 func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Response, maxBuffered int64) error {
 	if resp.Body == nil {
 		resp.Body = http.NoBody
