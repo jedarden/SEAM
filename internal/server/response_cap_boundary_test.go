@@ -78,6 +78,36 @@ func TestResponseCapAtLimitBuffersWholeResponse(t *testing.T) {
 	}
 }
 
+func TestResponseCapBelowLimitBuffersWholeResponse(t *testing.T) {
+	secret := []byte("below-cap-secret-fixture")
+	// 30 bytes against a 4 KiB cap: strictly below, with room to spare, so the
+	// buffered path is the one that runs.
+	body := append([]byte("head-"), secret...)
+	body = append(body, []byte("-tail")...)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Length", itoa(len(body)))
+		_, _ = w.Write(body)
+	}))
+	defer upstream.Close()
+
+	proxy := newResponseCapProxy(t, upstream.URL, 4096)
+	response := serveWithInjectedSecret(t, proxy, secret)
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	got, _ := io.ReadAll(response.Body)
+	want := ScrubBytes(body, secret)
+	assertScrubbedExactly(t, secret, got, want)
+	// Below the cap the response still takes the buffered path, so the
+	// recomputed length survives; a chunked response here would mean the cap
+	// demoted an under-cap body to streaming.
+	if got := response.Header.Get("Content-Length"); got != itoa(len(want)) {
+		t.Fatalf("Content-Length = %q, want %q (buffered path preserves the length below the cap too)", got, itoa(len(want)))
+	}
+}
+
 func TestResponseCapOverLimitStreamsBoundedAndNeverTruncates(t *testing.T) {
 	secret := []byte("over-cap-stream-secret-fixture")
 	// 64 KiB against a 1 KiB cap: 64x the cap must still arrive complete.
@@ -189,6 +219,39 @@ func TestResponseCapDecodedExceedsDeclaredUnderCapFallsBackToStreaming(t *testin
 	assertScrubbedExactly(t, secret, got, want)
 	if got := response.Header.Get("Content-Length"); got != "" {
 		t.Fatalf("Content-Length = %q, want it removed once the decoded body tripped the cap", got)
+	}
+}
+
+func TestResponseCapDeclaredOverLimitStillScrubsSmallBody(t *testing.T) {
+	secret := []byte("declared-over-cap-secret")
+	// The policy classifies by the declared length: a response claiming more
+	// than the cap goes to the incremental scrubber even if the body turns out
+	// six times smaller than it. Scrubbing must hold there too — the one way
+	// this seam could leak is an oversized *declaration* routing a body to an
+	// unscrubbed copy.
+	body := append([]byte("small-"), secret...)
+	resp := &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        http.Header{"Content-Type": []string{"text/plain"}, "Content-Length": []string{"5000"}},
+		ContentLength: 5000,
+		Body:          io.NopCloser(bytes.NewReader(body)),
+	}
+
+	scrubber := newSecretScrubber([][]byte{secret})
+	recorder := httptest.NewRecorder()
+	if err := scrubber.streamResponse(recorder, resp, 1024); err != nil {
+		t.Fatalf("streamResponse() error = %v", err)
+	}
+	response := recorder.Result()
+	t.Cleanup(func() { _ = response.Body.Close() })
+
+	got, _ := io.ReadAll(response.Body)
+	want := ScrubBytes(body, secret)
+	assertScrubbedExactly(t, secret, got, want)
+	// The upstream's declared length was copied and then dropped: the streamed
+	// body is the scrubbed 31 bytes, not the promised 5000.
+	if got := response.Header.Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want it removed when the declared length exceeds the cap", got)
 	}
 }
 
