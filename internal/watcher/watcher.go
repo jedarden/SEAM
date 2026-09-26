@@ -150,7 +150,8 @@ func (mw *MountWatcher) Stop() {
 // excessive reloads when multiple ConfigMaps update simultaneously.
 type Coordinator struct {
 	watchers map[string]*MountWatcher // mount path -> watcher
-	reloadCh chan struct{}            // Signals that a reload is needed
+	watchCh  chan struct{}            // Raw change signals from mount watchers
+	reloadCh chan struct{}            // Debounced reload signals for consumers
 	stopCh   chan struct{}            // Signals the coordinator to stop
 	stopped  bool                     // Whether coordinator has been stopped
 	mu       sync.Mutex               // Protects stopped state
@@ -164,6 +165,7 @@ func NewCoordinator() *Coordinator {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Coordinator{
 		watchers: make(map[string]*MountWatcher),
+		watchCh:  make(chan struct{}, 1),
 		reloadCh: make(chan struct{}, 1),
 		stopCh:   make(chan struct{}),
 		debounce: 250 * time.Millisecond, // Coalesce changes across all mounts
@@ -215,7 +217,7 @@ func (c *Coordinator) forwardWatchChanges(watcher *MountWatcher) {
 func (c *Coordinator) scheduleReload() {
 	// Non-blocking send to buffer
 	select {
-	case c.reloadCh <- struct{}{}:
+	case c.watchCh <- struct{}{}:
 	default:
 		// Reload already scheduled, don't block
 	}
@@ -235,14 +237,19 @@ func (c *Coordinator) Start() {
 	go c.debounceLoop()
 }
 
-// debounceLoop debounces reload signals from all mount watchers
+// debounceLoop debounces reload signals from all mount watchers. It is the
+// only consumer of the raw watch signals; when the debounce timer fires it
+// forwards one debounced signal on reloadCh for reload consumers. The two
+// channels must stay separate: a consumer selecting on the raw signal channel
+// races the debouncer for every event, and whichever consumer loses drops the
+// reload on the floor.
 func (c *Coordinator) debounceLoop() {
 	var timer *time.Timer
 	var timerCh <-chan time.Time
 
 	for {
 		select {
-		case <-c.reloadCh:
+		case <-c.watchCh:
 			// Reset or start timer
 			if timer != nil {
 				timer.Stop()
@@ -253,6 +260,13 @@ func (c *Coordinator) debounceLoop() {
 		case <-timerCh:
 			// Timer fired, trigger reload
 			log.Printf("[Coordinator] Triggering reload after debounce")
+			// Non-blocking: a pending signal means the consumer has not
+			// drained the previous reload yet, and that reload re-reads the
+			// current tree anyway.
+			select {
+			case c.reloadCh <- struct{}{}:
+			default:
+			}
 			// Clear timer channel to prevent repeat fires
 			timerCh = nil
 			timer = nil
