@@ -412,6 +412,11 @@ func (s *Server) setupRoutes() {
 	// Setup docs handler - fetches spec internally and serves ReDoc UI
 	s.callerMux.HandleFunc("/docs", s.docsHandler)
 
+	// Control-plane contract: the compiled-in OpenAPI document for SEAM's own
+	// endpoints (see control_plane_openapi.go). Sits under the reserved /docs/
+	// prefix, so no reservedPaths entry is needed.
+	s.callerMux.HandleFunc(controlPlaneDocsPath, s.docsControlPlaneHandler)
+
 	s.callerMux.HandleFunc("/docs/route", s.docsRouteHandler)
 	s.callerMux.HandleFunc("/docs/paths", s.docsPathsHandler)
 
@@ -873,15 +878,28 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
 	// Escape the JSON for safe embedding in HTML script tag
 	specJSONEscaped = strings.ReplaceAll(specJSONEscaped, "</script>", `<\/script>`)
 
-	html := `<!DOCTYPE html>
+	_, _ = w.Write([]byte(docsHTMLShell("SEAM API Documentation",
+		"Interactive API documentation for SEAM Gateway", specJSONEscaped)))
+}
+
+// docsHTMLShell renders the shared documentation page: the Scalar reference
+// bootstrap around an embedded spec document, plus the Agentation feedback
+// toolbar wiring (import map positioned before the mounting module loader)
+// and the cross-link nav between the two documentation entry points. /docs
+// (upstream reference) and /docs/control-plane (control-plane contract) both
+// render through this shell so the toolbar contract and the nav are defined
+// exactly once; TestDocsAgentationWiring pins the /docs instance of it.
+func docsHTMLShell(title, description, specJSON string) string {
+	return `<!DOCTYPE html>
 <html>
 <head>
-  <title>SEAM API Documentation</title>
+  <title>` + title + `</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { margin: 0; padding: 0; }
-    #scalar-app { height: 100vh; }
+    #docs-nav { padding: 8px 16px; background: #f6f8fa; border-bottom: 1px solid #d0d7de; font-family: system-ui, sans-serif; font-size: 14px; }
+    #scalar-app { height: calc(100vh - 41px); }
   </style>
   <script type="importmap">
   {
@@ -909,16 +927,21 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
   </script>
 </head>
 <body>
+  <nav id="docs-nav">
+    <strong>SEAM documentation:</strong>
+    <a href="/docs">Upstream API reference</a> &middot;
+    <a href="/docs/control-plane">Control-plane API contract</a>
+  </nav>
   <div id="scalar-app"></div>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   <script>
-    var specData = ` + specJSONEscaped + `;
+    var specData = ` + specJSON + `;
     Scalar.createApiReference('#scalar-app', {
       spec: specData,
       theme: 'default',
       metaData: {
-        title: 'SEAM API Documentation',
-        description: 'Interactive API documentation for SEAM Gateway'
+        title: '` + title + `',
+        description: '` + description + `'
       },
       // Enable interactive features
       isEditable: false,
@@ -935,8 +958,8 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
         open: true
       },
       seo: {
-        title: 'SEAM API Documentation',
-        description: 'Interactive API documentation for SEAM Gateway'
+        title: '` + title + `',
+        description: '` + description + `'
       },
       routing: {
         basePath: '/docs'
@@ -945,8 +968,6 @@ func (s *Server) docsHandler(w http.ResponseWriter, r *http.Request) {
   </script>
 </body>
 </html>`
-
-	_, _ = w.Write([]byte(html))
 }
 
 // docsRouteHandler returns the route slice of the served OpenAPI document.
