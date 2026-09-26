@@ -240,3 +240,105 @@ paths:
 			code, stdout.String(), stderr.String())
 	}
 }
+
+// SEAM_UPSTREAM_ALLOWLIST is the third lint variable the README's
+// flag-over-environment rule names, and the only one whose absence is
+// meaningful: an absent allowlist is inert before Phase 6a, while any file
+// that is supplied — by flag or by environment — is authoritative and
+// fail-closed. Reading the precedence off real exit codes pins both that the
+// variable fills an omitted flag and that the resolved path is the one the
+// command actually lints against, the way the fragments-dir and schema-path
+// pairs above do. The blank-variable phase also pins the empty-counts-as-unset
+// half of the contract: a set-but-empty variable must stay inert, not resolve
+// to a path.
+func TestLintEnvSuppliesDefaultAllowlistPath(t *testing.T) {
+	clearLintEnv(t)
+	restrictedDir := writeLintFixtureDir(t, `x-seam-schema: v1
+x-seam-owner: owner
+x-api-version: v1
+x-upstream: https://not-allowed.example.com
+x-upstream-plaintext: acknowledged
+paths:
+  /api:
+    get:
+      responses:
+        "200":
+          description: ok
+`)
+	allowlist := filepath.Join(t.TempDir(), "allowlist.yaml")
+	if err := os.WriteFile(allowlist, []byte("hosts:\n  - api.example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("empty variable stays inert", func(t *testing.T) {
+		t.Setenv("SEAM_UPSTREAM_ALLOWLIST", "")
+		var stdout, stderr bytes.Buffer
+		code := runLintCommand([]string{
+			"--fragments-dir", restrictedDir,
+			"--schema", lintCommandTestSchemaPath(t),
+		}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("empty SEAM_UPSTREAM_ALLOWLIST was not inert: code=%d stdout=%s stderr=%s",
+				code, stdout.String(), stderr.String())
+		}
+	})
+
+	t.Run("variable fills the omitted flag", func(t *testing.T) {
+		t.Setenv("SEAM_UPSTREAM_ALLOWLIST", allowlist)
+		var stdout, stderr bytes.Buffer
+		code := runLintCommand([]string{
+			"--fragments-dir", restrictedDir,
+			"--schema", lintCommandTestSchemaPath(t),
+		}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("lint with env allowlist returned %d, want 1 (the host-not-allowed finding): stdout=%s stderr=%s",
+				code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "upstream.host-not-allowed") {
+			t.Fatalf("lint did not apply the env-supplied allowlist: %s", stdout.String())
+		}
+	})
+}
+
+func TestLintExplicitFlagBeatsEnvAllowlistPath(t *testing.T) {
+	clearLintEnv(t)
+	validDir := writeLintFixtureDir(t, `x-seam-schema: v1
+x-seam-owner: owner
+x-api-version: v1
+x-upstream: https://api.example.com
+x-upstream-plaintext: acknowledged
+paths:
+  /api:
+    get:
+      responses:
+        "200":
+          description: ok
+`)
+	// The environment names a manifest that rejects the fixture's host, so any
+	// leakage of the variable into the resolution turns into exit 1 rather
+	// than passing vacuously.
+	restrictive := filepath.Join(t.TempDir(), "restrictive-allowlist.yaml")
+	if err := os.WriteFile(restrictive, []byte("hosts:\n  - other.example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SEAM_UPSTREAM_ALLOWLIST", restrictive)
+
+	permissive := filepath.Join(t.TempDir(), "permissive-allowlist.yaml")
+	if err := os.WriteFile(permissive, []byte("hosts:\n  - api.example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{
+		"--fragments-dir", validDir,
+		"--schema", lintCommandTestSchemaPath(t),
+		"--upstream-allowlist", permissive,
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("flagged allowlist lost to the environment: code=%d stdout=%s stderr=%s",
+			code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), "upstream.host-not-allowed") {
+		t.Fatalf("lint applied the env allowlist over the explicit flag: %s", stdout.String())
+	}
+}

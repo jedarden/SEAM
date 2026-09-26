@@ -99,7 +99,13 @@ non-boolean.
 - `cmd/seam/lint_command_test.go` — `TestLintEnvSuppliesDefaultFragmentsDir`,
   `TestLintExplicitFlagBeatsEnvFragmentsDir`,
   `TestLintEnvSuppliesDefaultSchemaPath`,
-  `TestLintExplicitFlagBeatsEnvSchemaPath`.
+  `TestLintExplicitFlagBeatsEnvSchemaPath`,
+  `TestLintEnvSuppliesDefaultAllowlistPath`,
+  `TestLintExplicitFlagBeatsEnvAllowlistPath`. The allowlist pair completes
+  the trio the table above names for lint: it is also the one variable whose
+  *absence* is meaningful (inert before Phase 6a, authoritative once
+  supplied), so the pair's first phase pins that a set-but-empty variable
+  stays inert rather than resolving to a path.
 - `cmd/seam/diff_command_test.go` — `TestDiffEnvSuppliesDefaultFragmentsDir`,
   `TestDiffExplicitFlagBeatsEnvFragmentsDir`.
 
