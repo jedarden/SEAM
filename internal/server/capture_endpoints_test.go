@@ -32,7 +32,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 	}
 
 	t.Run("status on operator mux", func(t *testing.T) {
-		resp := serveMuxRequest(s.operatorMux, http.MethodGet, "/_seam/capture/status")
+		resp := serveMuxWithIdentity(s.operatorMux, http.MethodGet, "/_seam/capture/status", identityWithScopes("seam:ops:read"))
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
@@ -53,7 +53,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 	})
 
 	t.Run("save on operator mux", func(t *testing.T) {
-		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
+		resp := serveMuxWithIdentity(s.operatorMux, http.MethodPost, "/_seam/capture/save", identityWithScopes("seam:ops:read"))
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
@@ -93,7 +93,7 @@ func TestCaptureEndpointsAreOperatorOnly(t *testing.T) {
 		{name: "save is not exposed on caller mux", method: http.MethodPost, path: "/_seam/capture/save"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := serveMuxRequest(s.callerMux, tc.method, tc.path)
+			resp := serveMuxWithIdentity(s.callerMux, tc.method, tc.path, nil)
 			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusNotFound {
 				t.Fatalf("expected caller mux status %d, got %d", http.StatusNotFound, resp.StatusCode)
@@ -120,7 +120,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 			{name: "save rejects GET", method: http.MethodGet, path: "/_seam/capture/save"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				resp := serveMuxRequest(s.operatorMux, tc.method, tc.path)
+				resp := serveMuxWithIdentity(s.operatorMux, tc.method, tc.path, identityWithScopes("seam:ops:read"))
 				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode != http.StatusMethodNotAllowed {
 					t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, resp.StatusCode)
@@ -137,7 +137,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 			SpecDir:      "../../spec",
 		})
 
-		resp := serveMuxRequest(s.operatorMux, http.MethodGet, "/_seam/capture/status")
+		resp := serveMuxWithIdentity(s.operatorMux, http.MethodGet, "/_seam/capture/status", identityWithScopes("seam:ops:read"))
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -160,7 +160,7 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 			SpecDir:      "../../spec",
 		})
 
-		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
+		resp := serveMuxWithIdentity(s.operatorMux, http.MethodPost, "/_seam/capture/save", identityWithScopes("seam:ops:read"))
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusServiceUnavailable {
 			t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, resp.StatusCode)
@@ -182,17 +182,10 @@ func TestCaptureEndpointsMethodAndStateErrors(t *testing.T) {
 			CorpusDir:      corpusPath,
 		})
 
-		resp := serveMuxRequest(s.operatorMux, http.MethodPost, "/_seam/capture/save")
+		resp := serveMuxWithIdentity(s.operatorMux, http.MethodPost, "/_seam/capture/save", identityWithScopes("seam:ops:read"))
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 		}
 	})
-}
-
-func serveMuxRequest(mux http.Handler, method, path string) *http.Response {
-	req := httptest.NewRequest(method, path, nil)
-	recorder := httptest.NewRecorder()
-	mux.ServeHTTP(recorder, req)
-	return recorder.Result()
 }

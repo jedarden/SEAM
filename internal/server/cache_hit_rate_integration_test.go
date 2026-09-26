@@ -387,6 +387,9 @@ func TestCacheHitRateStatusEndpoint(t *testing.T) {
 
 	// Query cache status endpoint
 	reqStatus := httptest.NewRequest(http.MethodGet, "/_seam/cache/status", nil)
+	// The route is scope-gated on seam:ops:read; present the operator scope so
+	// the test exercises the handler rather than the gate.
+	reqStatus = reqStatus.WithContext(contextWithIdentity(reqStatus.Context(), identityWithScopes("seam:ops:read")))
 	wStatus := httptest.NewRecorder()
 	s.operatorMux.ServeHTTP(wStatus, reqStatus)
 

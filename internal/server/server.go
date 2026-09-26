@@ -447,10 +447,10 @@ func (s *Server) setupRoutes() {
 	// Phase 7: Operator-tier endpoints require seam:ops:read scope
 	s.operatorMux.HandleFunc("/_seam/metrics", s.metricsHandler)
 	s.operatorMux.HandleFunc("/config/status", s.operatorScopeMiddleware("seam:ops:read", s.configStatusHandler))
-	s.operatorMux.HandleFunc("/_seam/capture/save", s.captureSaveHandler)
-	s.operatorMux.HandleFunc("/_seam/capture/status", s.captureStatusHandler)
-	s.operatorMux.HandleFunc("/_seam/cache/status", s.cacheStatusHandler)
-	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.cacheCleanupHandler)
+	s.operatorMux.HandleFunc("/_seam/capture/save", s.operatorScopeMiddleware("seam:ops:read", s.captureSaveHandler))
+	s.operatorMux.HandleFunc("/_seam/capture/status", s.operatorScopeMiddleware("seam:ops:read", s.captureStatusHandler))
+	s.operatorMux.HandleFunc("/_seam/cache/status", s.operatorScopeMiddleware("seam:ops:read", s.cacheStatusHandler))
+	s.operatorMux.HandleFunc("/_seam/cache/cleanup", s.operatorScopeMiddleware("seam:ops:read", s.cacheCleanupHandler))
 	s.operatorMux.HandleFunc("/health/credentials", s.operatorScopeMiddleware("seam:ops:read", s.credentialsHealthHandler))
 	s.operatorMux.HandleFunc("/health/upstreams", s.operatorScopeMiddleware("seam:ops:read", s.healthUpstreamsHandler))
 	s.operatorMux.HandleFunc("/", s.operatorNotFoundHandler)
@@ -657,6 +657,7 @@ func (s *Server) captureSaveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -672,6 +673,7 @@ func (s *Server) captureStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
@@ -1796,6 +1798,7 @@ func (s *Server) cacheStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
@@ -1837,6 +1840,7 @@ func (s *Server) cacheCleanupHandler(w http.ResponseWriter, r *http.Request) {
 
 	stats := s.cache.Stats()
 
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{

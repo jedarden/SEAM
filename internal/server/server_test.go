@@ -1094,6 +1094,9 @@ func TestCaptureStatusEndpointWhenDisabled(t *testing.T) {
 	s := New(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/_seam/capture/status", nil)
+	// The route is scope-gated on seam:ops:read; present the operator scope so
+	// the test exercises the handler rather than the gate.
+	req = req.WithContext(contextWithIdentity(req.Context(), identityWithScopes("seam:ops:read")))
 	w := httptest.NewRecorder()
 
 	s.operatorMux.ServeHTTP(w, req)
@@ -1128,6 +1131,9 @@ func TestCaptureStatusEndpointWhenEnabled(t *testing.T) {
 	s := New(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/_seam/capture/status", nil)
+	// The route is scope-gated on seam:ops:read; present the operator scope so
+	// the test exercises the handler rather than the gate.
+	req = req.WithContext(contextWithIdentity(req.Context(), identityWithScopes("seam:ops:read")))
 	w := httptest.NewRecorder()
 
 	s.operatorMux.ServeHTTP(w, req)
