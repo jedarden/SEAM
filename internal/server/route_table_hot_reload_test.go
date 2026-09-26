@@ -16,6 +16,11 @@ import (
 	"github.com/ardenone/seam/internal/watcher"
 )
 
+// The tests in this file stress route-table swaps under real concurrency; they
+// skip in short mode. hot_reload_fragment_swap_test.go is their deterministic
+// short-mode counterpart: the same swap/in-flight guarantees pinned without
+// load, sleep-free, so `go test -short` still exercises them.
+
 // TestRouteTableHotReloadUnderLoad tests that route table swaps happen
 // atomically without dropping connections while concurrent requests are in flight.
 //
@@ -414,17 +419,6 @@ func BenchmarkRouteTableMatchUnderSwaps(b *testing.B) {
 	}
 
 	close(stopSwaps)
-}
-
-// TestLoadFragmentsReload tests the LoadFragments method on the spec loader
-func TestLoadFragmentsReload(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping fragment reload test in short mode")
-	}
-
-	// This test would require setting up a temporary fragments directory
-	// For now, we'll test that the method exists and can be called
-	t.Skip("LoadFragments test requires temporary directory setup")
 }
 
 // TestMultiMountWatcher tests that multiple mount points are watched correctly
