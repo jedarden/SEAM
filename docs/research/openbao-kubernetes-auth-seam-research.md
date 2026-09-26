@@ -1,5 +1,7 @@
 # OpenBao Kubernetes-auth Research: SEAM and seam-retirement-evaluator
 
+<!-- seam-pointerguard: historical — point-in-time record from the 2026-08 bf-era OpenBao rollout; it quotes declarative-config/infra/ staging copies removed from this repository. The authoritative home for SEAM infrastructure is jedarden/declarative-config (see declarative-config/infra/README.md). -->
+
 > **ROUTE BOUNDARY SUPERSEDED — 2026-09-04.** This research predates the
 > `secret/seam/*` → `secret/rs-manager/rs-manager/seam/*` consolidation. Every
 > `seam/routes` path below is the **legacy / retired** base: SEAM's enforced

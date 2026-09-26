@@ -1,5 +1,7 @@
 # OpenBao Provisioning Target Resources Report
 
+<!-- seam-pointerguard: historical — point-in-time record from the 2026-08 bf-era OpenBao rollout; it quotes declarative-config/infra/ staging copies removed from this repository. The authoritative home for SEAM infrastructure is jedarden/declarative-config (see declarative-config/infra/README.md). -->
+
 **Generated:** 2026-08-14  
 **Cluster:** ardenone-cluster (OpenBao on rs-manager)  
 **Purpose:** List expected provisioning targets and their existence status

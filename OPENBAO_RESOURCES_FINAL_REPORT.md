@@ -1,5 +1,7 @@
 # OpenBao Resources - Final Comprehensive Report
 
+<!-- seam-pointerguard: historical — point-in-time record from the 2026-08 bf-era OpenBao rollout; it quotes declarative-config/infra/ staging copies removed from this repository. The authoritative home for SEAM infrastructure is jedarden/declarative-config (see declarative-config/infra/README.md). -->
+
 **Generated:** 2026-08-14  
 **Task:** bf-3yqry - Document missing or malformed OpenBao resources  
 **Cluster:** ardenone-cluster (OpenBao on rs-manager)  

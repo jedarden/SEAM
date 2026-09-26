@@ -81,7 +81,11 @@ only (bead `seam-5515cac0`, 2026-09-25): it held a stale early snapshot that
 ArgoCD never applied, and editing a copy like that changes no CI behavior
 while looking like it does — the failure class behind the 2026-09 red-gate
 incidents. If a doc or a grep names the in-repo path, follow its pointer to
-the authoritative file before changing anything.
+the authoritative file before changing anything. The rule is enforced by
+`internal/pointerguard`, which fails the build if a manifest reappears under
+either path or a document instructs a reader to run or apply files from them;
+frozen point-in-time records that quote such instructions carry a
+`seam-pointerguard: historical` header marker instead.
 
 ## Beads
 
