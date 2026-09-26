@@ -30,6 +30,15 @@ var internalRouteMetadata = map[string]string{
 	// fragment schema accepts is dropped at merge time and root-only routes
 	// silently become public.
 	"x-required-scope": internalRouteMetadataPrefix + "required-scope",
+	// x-seam-deprecated is the fragment-root retirement verdict the
+	// retirement evaluator proposes and the route-fragment schema sanctions at
+	// the root ("marking every route deprecated"). Without this entry the
+	// merge drops the block — merge copies only paths and components — and
+	// every route the block covered silently served as undeprecated. Like
+	// x-required-scope above, a path-item-level x-seam-deprecated REPLACES the
+	// fragment-root default for that path: the route-table builder reads the
+	// plain path-item extension first and this propagated marker second.
+	"x-seam-deprecated": internalRouteMetadataPrefix + "deprecated",
 }
 
 type pathRewriteFinding struct {

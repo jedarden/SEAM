@@ -108,6 +108,12 @@ The deprecation verdict travels through SEAM's existing hot-reload path:
 
 **No deployment required** - the verdict IS the fragment.
 
+The full handoff procedure — reading the finding, verifying it, landing the
+block in declarative-config, observing the hot reload, and reverting — is
+[docs/retirement-handoff-runbook.md](../../docs/retirement-handoff-runbook.md);
+the SEAM side of the acceptance is pinned by
+`internal/server/retirement_handoff_test.go`.
+
 ## Configuration
 
 ### Environment Variables

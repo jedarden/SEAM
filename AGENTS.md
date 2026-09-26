@@ -64,9 +64,12 @@ change. A human lands it as an ordinary commit to `declarative-config` `main`
 — adding the proposed `x-seam-deprecated` block to the route fragment named in
 the record — and reverts the same way if a caller appears. SEAM hot-reloads
 the fragment, so no deployment and no review gate are involved; reversibility
-is the gate. Do not re-add a write path (git-host client, forge token, PR
-opener, git exec) to the evaluator: its module's write-contract test fails
-the build if one appears.
+is the gate. The step-by-step procedure (reading the record, the pre-land
+lint gate, fragment-root placement, hot-reload observation, revert) is
+[docs/retirement-handoff-runbook.md](docs/retirement-handoff-runbook.md). Do
+not re-add a write path (git-host client, forge token, PR opener, git exec)
+to the evaluator: its module's write-contract test fails the build if one
+appears.
 
 `declarative-config/infra/` in this repo is a retirement pointer only. Do not
 restore manifests there. New infrastructure configuration goes directly to the
