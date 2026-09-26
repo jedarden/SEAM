@@ -4,7 +4,7 @@
 
 - **Created:** 2026-07-27
 - **Bead:** seam-5e9046fc (explore) — closed; rehydrated from retired bead-forge ID `bf-69n1`
-- **Status:** Exploration/Design
+- **Status:** Design — reconciled against the implementation 2026-09-25 (seam-e368ef50)
 - **Related Beads:** seam-89d9a0f8 (setup capture mechanism), seam-89d9a0f8 (verify capture mechanism) — closed; rehydrated from retired bead-forge ID `bf-1d0k`
 
 > **Bead ID provenance:** this document was written against the retired
@@ -12,6 +12,19 @@
 > 2026-08-14 (commit 9e9b514); each reference above now names its current
 > `seam-*` bead, with the original `bf-*` ID retained as provenance. All
 > linked beads are closed — they record design-era context, not open work.
+
+> **Implementation reconciliation (2026-09-25, seam-e368ef50):** this design
+> predates several subsystems it now depends on and has been refreshed to
+> match the code. The route-fragment system is **implemented** (fragment merge
+> mode, per-service fragment directories, hot reload — see the
+> [Fragment directory and hot-reload
+> scope](../../README.md#fragment-directory-and-hot-reload-scope) section of
+> the README); the internal capture middleware is **implemented**
+> (`--capture-enabled`, wrapped into the dispatch path); and `seam-replay`
+> differential testing is **implemented**, with the cutover workflow that
+> gates on it documented in [`../migration-runbook.md`](../migration-runbook.md).
+> Paths, endpoint lists, statuses, and workflow references below were verified
+> against the tree at the commit carrying this edit.
 
 ## Executive Summary
 
@@ -28,14 +41,21 @@ The SEAM gateway (`internal/server/server.go`) currently implements:
   - Operator-only port (default 8081) - for administrative operations
 
 - **Control-plane endpoints** (reserved paths that short-circuit route-table lookup):
-  - `/openapi.json` - OpenAPI spec serving
-  - `/docs` - API documentation
-  - `/_seam/healthz` - Kubernetes liveness probe
-  - `/_seam/readyz` - Kubernetes readiness probe
-  - `/_seam/metrics` - Prometheus metrics
-  - `/config/status` - Configuration fragment status
+  - *Caller listener:* `/openapi.json` - OpenAPI spec serving; `/docs`, `/docs/route`, `/docs/paths` - API documentation; `/_seam/health` (alias) and `/_seam/healthz` - Kubernetes liveness probe; `/_seam/readyz` - Kubernetes readiness probe; `/whoami`, `/scopes` - identity and scope introspection; `/api/v1/tailscale/ephemeral-key` - ephemeral key issuance; `/changes` - version migration endpoints; plus the catch-all dispatch handler for upstream proxying
+  - *Operator listener:* `/_seam/metrics` - Prometheus metrics; `/config/status` - configuration fragment status; `/_seam/capture/save`, `/_seam/capture/status` - corpus flush and capture status; `/_seam/cache/status`, `/_seam/cache/cleanup` - response-cache operations; `/health/credentials`, `/health/upstreams` - health sentinels (operator-tier endpoints behind `seam:ops:read`)
 
-- **Route-fragment system (planned):** Dynamic route loading from OpenAPI fragments
+- **Route-fragment system (implemented):** In fragment mode (`--fragment-mode` /
+  `SEAM_FRAGMENT_MODE`) every route SEAM serves is merged from a single
+  fragments directory resolved once at startup (`--fragments-dir` /
+  `SEAM_FRAGMENTS_DIR`, default `./fragments` — one subdirectory per service,
+  e.g. `fragments/argocd-ro/`). `--enable-hot-reload` /
+  `SEAM_HOT_RELOAD_ENABLED` adds a file-watch reload that re-walks the tree,
+  re-merges, and atomically swaps the route table (in-flight requests finish
+  on the old table); schema validation runs at startup only and `seam lint`
+  remains the structural gate. See the
+  [Fragment directory and hot-reload
+  scope](../../README.md#fragment-directory-and-hot-reload-scope) section of
+  the README for the authoritative description.
 
 ### 2. Incumbent ArgoCD Proxy
 
@@ -264,27 +284,26 @@ seam-replay → Incumbent Proxy → Response (recorded as baseline)
    └─ Control plane ───┴────────────────────────▶
 ```
 
-### Option 2: SEAM Internal Middleware (Future Enhancement)
+### Option 2: SEAM Internal Middleware (Implemented)
 
-**Implementation:** Middleware within SEAM's HTTP handlers
+**Implementation:** Middleware within SEAM's HTTP handlers — built in the
+server constructor when capture is enabled and wrapped around the caller-facing
+dispatch handler (`internal/server/server.go`, dispatch path:
+`callerHandler = s.captureMiddleware.Wrap(callerHandler)`).
 
-**Integration Point:** In `setupRoutes()` or as middleware wrapper
+**Configuration:**
+- `--capture-enabled` / `SEAM_CAPTURE_ENABLED` - enable capture (default off)
+- `--corpus-dir` / `SEAM_CORPUS_DIR` - corpus directory (default `corpus`,
+  gitignored); the middleware writes `<corpus-dir>/corpus.json`
 
-**Code Location:** `internal/server/server.go:99-109`
-
-**Example Integration:**
-```go
-// In setupRoutes()
-captureMiddleware := NewCaptureMiddleware(corpusPath)
-s.callerMux.Handle("/", captureMiddleware.Wrap(s.routeHandler))
-
-// Capture middleware would:
-// 1. Intercept request before routing
-// 2. Record request details
-// 3. Pass through to route handler
-// 4. Capture response
-// 5. Append to corpus
-```
+**Behavior:**
+1. An existing corpus is loaded at startup (`Load`), so a restart appends
+   rather than truncates
+2. Requests through the dispatch path are recorded and forwarded; responses
+   are captured and appended to the corpus
+3. An autosave lands every 10 entries; `Server.Shutdown` flushes the corpus
+4. `/_seam/capture/save` and `/_seam/capture/status` (operator listener)
+   expose a manual flush and the live entry count
 
 **Pros:**
 - Integrated into SEAM lifecycle
@@ -407,7 +426,9 @@ history purge removed the original from git
 3. Add expected response metadata
 4. Populate secret references
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending — the committed fixture `corpus-argocd.json` holds two
+entries (`list-apps-get`, `get-app-myapp-get`); sync, manifest, and
+repository routes are not yet captured
 
 ### Phase 3: SEAM Implementation
 
@@ -419,7 +440,10 @@ history purge removed the original from git
 3. Configure secret injection
 4. Test with corpus replay
 
-**Status:** ⏳ Pending
+**Status:** 🟡 Partially complete — `fragments/argocd-ro/1-argocd-read-only-proxy.yaml`
+is authored (applications list/get, clusters list). Route serving comes from
+the implemented fragment system; credential curation (`x-vault-path` /
+`x-inject-as`) and the remaining routes are still pending
 
 ### Phase 4: Differential Testing
 
@@ -431,7 +455,12 @@ history purge removed the original from git
 3. Fix any discrepancies
 4. Ensure all corpus entries pass
 
-**Status:** ⏳ Pending
+**Status:** 🟡 Tooling shipped — `seam-replay`
+(`tools/diffharness/cmd/seam-replay`) replays a corpus against the incumbent
+and SEAM with differential comparison and leak detection, and the cutover
+workflow in [`../migration-runbook.md`](../migration-runbook.md) gates on its
+pass report (hard gate). A live differential run against the deployed
+`argocd-ro` proxy is still pending
 
 ## Security Considerations
 
@@ -487,19 +516,26 @@ history purge removed the original from git
 
 1. ✅ **Complete exploration of current architecture** (this document)
 2. ⏳ **Expand corpus coverage** - Capture additional ArgoCD API routes
-3. ⏳ **Implement SEAM argocd route fragment**
-4. ⏳ **Implement seam-replay differential testing**
-5. ⏳ **Validate corpus passes against SEAM implementation**
+3. 🟡 **Complete the SEAM argocd route fragment** - `fragments/argocd-ro/`
+   authored; credential curation and remaining routes pending
+4. ✅ **Implement seam-replay differential testing** - shipped, with the
+   cutover workflow documented in [`../migration-runbook.md`](../migration-runbook.md)
+5. ⏳ **Validate corpus passes against SEAM implementation** - the live
+   differential run that gates cutover
 
 ## References
 
 - **SEAM Server:** `internal/server/server.go`
-- **Spec Loader:** `internal/spec/loader.go`
+- **Spec Loader:** `internal/spec/loader.go` (fragment load/merge/lint in `internal/spec/`)
+- **Hot Reload:** `internal/server/hot_reload.go` (route-table swap on fragment changes)
 - **Capture Tool:** `tools/diffharness/cmd/seam-capture/main.go`
+- **Replay Tool:** `tools/diffharness/cmd/seam-replay/main.go`
 - **Corpus Package:** `tools/diffharness/internal/corpus/corpus.go`
 - **Control Scripts:** `scripts/capture-argocd.sh`
 - **Committed fixtures:** `tools/diffharness/testdata/` (runtime captures under `corpus/` are gitignored)
 - **Integrity checks and lifecycle:** `docs/capture_testing.md`
+- **Cutover workflow:** `docs/migration-runbook.md` (`seam-replay` pass report as the hard gate; `seam-cutover` go/no-go runner)
+- **Fragment mode and hot-reload scope:** README, [Fragment directory and hot-reload scope](../../README.md#fragment-directory-and-hot-reload-scope)
 
 ---
 
