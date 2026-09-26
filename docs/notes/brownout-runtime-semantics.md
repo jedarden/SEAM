@@ -1,7 +1,8 @@
 # Deprecated-Route Brownout: Runtime Semantics
 
 Status: implemented 2026-09-17; deprecation response headers 2026-09-25;
-window metrics specified 2026-09-25.
+window metrics specified 2026-09-25; metadata-vs-runtime verdict summary
+2026-09-26.
 This document is the authority on how `x-seam-deprecated` behaves at runtime:
 brownout windows, the metrics a window's responses produce, and the
 Deprecation/Sunset response headers every
@@ -9,6 +10,27 @@ otherwise-normal response for a deprecated route carries. The code comments
 in `internal/server/brownout_middleware.go` and
 `internal/server/deprecation_middleware.go` summarize the same contract; the
 tests named at the bottom pin it.
+
+## Metadata-only? The one-paragraph verdict
+
+`x-seam-deprecated` is **not** metadata-only, but its runtime reach is
+narrower than "deprecated means gone". It has exactly three effects, each
+conditional on the clock:
+
+| Effect | When | What the caller sees |
+|---|---|---|
+| Response **headers** | every response, always (outside *and* after windows) | `Deprecation: since=…`, `Sunset: …` when declared, `Link` set — the route still serves |
+| **Response and availability** | only inside a declared brownout window | structured `410 Gone` instead of the proxied response; no quota consumed, never cached |
+| **Removal** | never | sunset is advisory: past sunset the route serves normally until a human merges the removal PR — no date on the fragment ever deletes or refuses a route |
+
+So: declaring the block changes what every response advertises, changes the
+response itself only during scheduled windows, and never changes
+availability outside them. Between windows, past the last window, and past
+sunset the route serves normally. The four window states a fragment can be
+in at any instant — active, expired, overlapping (lint-rejected but honored
+as a union if it reaches the gateway), and malformed (inert) — are each
+pinned by a time-controlled test (`SetClock`); the test map at the bottom
+names them.
 
 ## What a brownout window is
 
