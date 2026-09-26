@@ -17,7 +17,15 @@ repository keeps corpus data in two places:
 Captured corpora under a repository-root `corpus/` directory are no longer
 tracked: the 2026-09-18 history purge (seam-70ae655e, commit 9984a5b) removed
 every checked-in corpus and `.gitignore`d the path, so live captures stay out
-of git.
+of git. The split is enforced, not conventional:
+`internal/corpusboundary` checks that the anchored `/corpus/` ignore entry
+stays in place (a bare `corpus/` pattern would also swallow the nested
+`tools/diffharness/internal/corpus/` package, silently dropping it from
+commits), that nothing under `corpus/` is ever tracked in a real checkout,
+and that the checked-in fixture and package paths stay tracked and outside
+every ignore rule. Deliberately promoting a capture means moving it into
+`tools/diffharness/testdata/` — where the fixture validation below applies —
+never committing it under `corpus/`.
 
 ## Automated checks
 
@@ -93,10 +101,17 @@ every push to `main` (ahead of the full `go test -race ./...` sweep), and
 and `capture corpus round-trip`. Both gates guard the retired root-level
 `go test ./corpus` walk behind a `[ -d corpus ]` check, because the purge
 removed the directory and the unguarded command fails with "directory not
-found". The diffharness module's fixture checks are not wired into either
-gate; run them from the module directory as shown above. A malformed capture
+found". The diffharness module's fixture checks are wired into the
+`--slow` lane as a third named check, `diffharness fixture validation`,
+which runs `go test ./internal/corpus/` from the module directory: the
+module is standalone, so the root `go test ./...` sweep never descends into
+it, and without the lane the fixture validation only happened when someone
+remembered to run it by hand. The `corpus/` vs `testdata/` boundary itself
+is pinned by `internal/corpusboundary` in the root sweep (and by the
+NEEDLE close gate, which runs it in a clean extraction). A malformed capture
 or a failing round-trip fails the build; an off-base or malformed secret ref
-in a checked-in fixture fails the module run and must be fixed before the
+in a checked-in fixture fails the module run — by hand above, or via the
+`diffharness fixture validation` lane — and must be fixed before the
 corpus is committed.
 
 ## Durability triggers
@@ -162,11 +177,13 @@ driven by `scripts/capture-argocd.sh`) follows the same persistence model:
 
 ## Results
 
-Last verified: 2026-09-25.
+Last verified: 2026-09-26.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
 | `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection |
+| `diffharness fixture validation` (DoD `--slow`) | PASS | The same fixture validation, wired into the Definition of Done as `go test ./internal/corpus/` so the root sweep's module boundary cannot silently drop it |
+| `internal/corpusboundary` | PASS | Anchored `/corpus/` ignore entry present and effective; guarded fixture and package paths outside every ignore rule; nothing under `corpus/` tracked in a real checkout |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
 | Capture durability suite, `-count=1` | PASS | Autosave threshold boundary, shutdown flush below threshold, toggle-respect and shutdown-failure containment, corpus readability after restart |
 

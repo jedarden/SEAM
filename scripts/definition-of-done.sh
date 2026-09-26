@@ -149,6 +149,22 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
     echo "Skipping corpus integrity - no corpus directory present"
   fi
 
+  # tools/diffharness is a standalone nested Go module, so the root
+  # `go test -race ./...` above never descends into it. Its corpus
+  # package is the only validator the checked-in fixtures
+  # (tools/diffharness/testdata) receive: schema version, entry-ID
+  # uniqueness, header/method canonicalization, and secrets[].ref
+  # enforcement against the enforced vault base
+  # (docs/capture_testing.md, "Corpus fixture integrity"). Unlike the
+  # runtime-corpus lane above, the fixtures are committed, so this lane
+  # has no directory guard -- it must always run. The
+  # corpus/ vs testdata/ boundary itself is pinned by
+  # internal/corpusboundary in the root sweep.
+  run_check "diffharness fixture validation" bash -c '
+    cd tools/diffharness
+    go test ./internal/corpus/
+  '
+
   # Capture round-trip, response-pair preservation, and lossless corpus
   # readability across a server restart (docs/capture_testing.md), five
   # repetitions per the doc -- a single pass can miss intermittent
