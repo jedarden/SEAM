@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -376,6 +377,142 @@ func TestRouteTableCarriesUnscrubbableAcknowledgement(t *testing.T) {
 	if len(routes) != 1 || !routes[0].Unscrubbable {
 		t.Fatalf("route acknowledgement was not carried: %+v", routes)
 	}
+}
+
+// TestAcknowledgedRouteStillScrubsScannableResponse pins the acknowledgement's
+// scope: x-unscrubbable permits unscannable-response pass-through, it is not a
+// blanket scrubbing opt-out. A response the proxy can scan is scrubbed — body,
+// headers, and trailers — even on an acknowledged route.
+func TestAcknowledgedRouteStillScrubsScannableResponse(t *testing.T) {
+	secret := []byte("acknowledged-scannable-fixture")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Echo", string(secret))
+		w.Header().Add("Trailer", "X-Echo-Trailer")
+		body := append([]byte("body-before-"), secret...)
+		body = append(body, []byte("-body-after")...)
+		w.Header().Set("Content-Length", itoa(len(body)))
+		w.WriteHeader(http.StatusTeapot)
+		_, _ = w.Write(body)
+		w.Header().Set("X-Echo-Trailer", string(secret))
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxyWithConfig(upstream.URL, &ReverseProxyConfig{MaxBufferedResponseBytes: 1024})
+	if err != nil {
+		t.Fatalf("NewReverseProxyWithConfig() error = %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	withRouteMatch(req, &RouteMatch{Route: RouteEntry{
+		PathTemplate: "/", Method: http.MethodGet, APIVersion: "v1", Unscrubbable: true,
+		InjectAs: &InjectAs{Kind: InjectionHeader, Name: "X-Api-Key"},
+	}}, func(context.Context, RouteEntry) ([]byte, error) { return secret, nil })
+	recorder := httptest.NewRecorder()
+	proxy.ServeHTTP(recorder, req)
+	response := recorder.Result()
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusTeapot {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusTeapot)
+	}
+	body, _ := io.ReadAll(response.Body)
+	assertNoSecret(t, secret, body)
+	assertNoSecret(t, secret, []byte(response.Header.Get("X-Echo")))
+	assertNoSecret(t, secret, []byte(response.Trailer.Get("X-Echo-Trailer")))
+	if !bytes.Contains(body, []byte(RedactedSecret)) {
+		t.Fatalf("acknowledged route body %q was not scrubbed", body)
+	}
+}
+
+// TestAcknowledgedUnscannablePassThroughIsWholeResponse pins the other half of
+// the contract: on an acknowledged route an unscannable response passes through
+// unsanitized as a whole — body, headers, and trailers are delivered byte for
+// byte, with no redaction marker anywhere.
+func TestAcknowledgedUnscannablePassThroughIsWholeResponse(t *testing.T) {
+	secret := []byte("whole-response-fixture")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-Echo", string(secret))
+		w.Header().Add("Trailer", "X-Echo-Trailer")
+		w.WriteHeader(http.StatusTeapot)
+		_, _ = w.Write(append([]byte("opaque-"), secret...))
+		w.Header().Set("X-Echo-Trailer", string(secret))
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("NewReverseProxy() error = %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	withRouteMatch(req, &RouteMatch{Route: RouteEntry{
+		PathTemplate: "/", Method: http.MethodGet, APIVersion: "v1", Unscrubbable: true,
+		InjectAs: &InjectAs{Kind: InjectionHeader, Name: "X-Api-Key"},
+	}}, func(context.Context, RouteEntry) ([]byte, error) { return secret, nil })
+	recorder := httptest.NewRecorder()
+	proxy.ServeHTTP(recorder, req)
+	response := recorder.Result()
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusTeapot {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusTeapot)
+	}
+	body, _ := io.ReadAll(response.Body)
+	want := append([]byte("opaque-"), secret...)
+	if !bytes.Equal(body, want) {
+		t.Fatalf("acknowledged opaque body = %q, want untouched %q", body, want)
+	}
+	if got := response.Header.Get("X-Echo"); got != string(secret) {
+		t.Fatalf("acknowledged opaque header = %q, want untouched", got)
+	}
+	if got := response.Trailer.Get("X-Echo-Trailer"); got != string(secret) {
+		t.Fatalf("acknowledged opaque trailer = %q, want untouched", got)
+	}
+	if bytes.Contains(body, []byte(RedactedSecret)) {
+		t.Fatalf("acknowledged opaque pass-through contains a redaction marker: %q", body)
+	}
+}
+
+// TestAcknowledgedUnscannablePassThroughEmitsOperatorLog pins the request-time
+// observability: an unsanitized pass-through is the one moment a credential can
+// reach a caller unredacted, so the emission naming the route must exist and
+// must itself never carry the credential.
+func TestAcknowledgedUnscannablePassThroughEmitsOperatorLog(t *testing.T) {
+	secret := []byte("pass-through-log-fixture")
+	var logs bytes.Buffer
+	previousWriter := log.Writer()
+	previousFlags := log.Flags()
+	log.SetOutput(&logs)
+	log.SetFlags(0)
+	defer func() {
+		log.SetOutput(previousWriter)
+		log.SetFlags(previousFlags)
+	}()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write(append([]byte("opaque-"), secret...))
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("NewReverseProxy() error = %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/opaque", nil)
+	withRouteMatch(req, &RouteMatch{Route: RouteEntry{
+		PathTemplate: "/opaque", Method: http.MethodGet, APIVersion: "v1", Unscrubbable: true,
+		InjectAs: &InjectAs{Kind: InjectionHeader, Name: "X-Api-Key"},
+	}}, func(context.Context, RouteEntry) ([]byte, error) { return secret, nil })
+	recorder := httptest.NewRecorder()
+	proxy.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	if !strings.Contains(logs.String(), "unsanitized") || !strings.Contains(logs.String(), "/opaque") {
+		t.Fatalf("pass-through log does not name the unsanitized route: %q", logs.String())
+	}
+	assertNoSecret(t, secret, logs.Bytes())
 }
 
 func assertNoSecret(t *testing.T, secret, value []byte) {

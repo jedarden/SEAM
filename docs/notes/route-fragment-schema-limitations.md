@@ -131,11 +131,11 @@ The SEAM route fragment schema (`x-seam-schema: v1`) is deliberately incomplete 
 
 ### 2.4 Security and Authorization
 
-**`x-unscrubbable` semantics**
-- **Current state:** Boolean acknowledged opt-in for body-restructuring adapters
-- **Question:** Does `x-unscrubbable` bypass ALL scrubbing, or just body validation?
-- **Ambiguity:** Path parameter scrubbing? Query parameter scrubbing?
-- **Decision needed:** Clarify scrubbing scope for unscrubbable routes
+**`x-unscrubbable` semantics** — **RESOLVED 2026-09-26** (`x-unscrubbable-contract.md`)
+- **Current state:** Acknowledged opt-in. Permits unscannable responses (opaque media types, unsupported `Content-Encoding`, protocol upgrades) to pass through whole — body, headers, trailers unsanitized — instead of being refused.
+- **Decision:** The acknowledgement does **not** disable scrubbing of scannable responses; body, headers, and trailers are scrubbed on acknowledged routes exactly as on ordinary ones. There is no request-side effect: inbound sanitation runs on every route regardless.
+- **Former ambiguity (path/query scrubbing):** moot — no request-side scrubbing exists to bypass.
+- **Enforcement:** the schema and `extractAcknowledgedExtension` pin the literal `acknowledged`; `seam lint` warns (`scrubbing.unscrubbable` human review at root and operation level, `scrubbing.unscrubbable-vacuous` when the fragment injects no credential); config status enumerates acknowledged routes in its `scrubbing` section; request logs record refused and unsanitized pass-through responses.
 
 **Scope inheritance and merging**
 - **Current state:** Operation-level `x-required-scope` *replaces* fragment-root, never merges

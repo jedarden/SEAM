@@ -81,6 +81,78 @@ func TestLintDirectory9aHardErrorsAndFlags(t *testing.T) {
 	}
 }
 
+// TestLintDirectoryUnscrubbableAcknowledgementContract pins the lint half of
+// the x-unscrubbable contract: every acknowledgement draws the human-review
+// warning at whichever level declares it, and an acknowledgement on a fragment
+// that injects no credential is additionally flagged as vacuous.
+func TestLintDirectoryUnscrubbableAcknowledgementContract(t *testing.T) {
+	rootAcknowledgement := strings.ReplaceAll(
+		validLintFragment("owner", "v1", "https://api.example.com"),
+		"x-upstream: https://api.example.com\n",
+		"x-upstream: https://api.example.com\nx-unscrubbable: acknowledged\n")
+	operationAcknowledgement := strings.ReplaceAll(
+		validLintFragment("owner", "v1", "https://api.example.com"),
+		"    get:\n",
+		"    get:\n      x-unscrubbable: acknowledged\n")
+	injection := "x-vault-path: seam/routes/owner/token\nx-inject-as:\n  kind: header\n  name: X-Api-Key\n"
+
+	tests := []struct {
+		name            string
+		fragment        string
+		wantVacuousCode bool
+	}{
+		{
+			name:            "root acknowledgement with credential injection is not vacuous",
+			fragment:        strings.ReplaceAll(rootAcknowledgement, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+injection),
+			wantVacuousCode: false,
+		},
+		{
+			name:            "operation acknowledgement with credential injection is not vacuous",
+			fragment:        strings.ReplaceAll(operationAcknowledgement, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+injection),
+			wantVacuousCode: false,
+		},
+		{
+			name:            "root acknowledgement without credential injection is vacuous",
+			fragment:        rootAcknowledgement,
+			wantVacuousCode: true,
+		},
+		{
+			name:            "operation acknowledgement without credential injection is vacuous",
+			fragment:        operationAcknowledgement,
+			wantVacuousCode: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeLintTestFragment(t, root, "owner", "route.yaml", test.fragment)
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			if report.HasErrors() {
+				t.Fatalf("fragment was rejected: %+v", report.Errors)
+			}
+			hasReview, hasVacuous := false, false
+			for _, warning := range report.Warnings {
+				switch warning.Code {
+				case "scrubbing.unscrubbable":
+					hasReview = true
+				case "scrubbing.unscrubbable-vacuous":
+					hasVacuous = true
+				}
+			}
+			if !hasReview {
+				t.Fatalf("acknowledgement drew no human-review warning: %+v", report.Warnings)
+			}
+			if hasVacuous != test.wantVacuousCode {
+				t.Fatalf("vacuous warning = %v, want %v (warnings: %+v)", hasVacuous, test.wantVacuousCode, report.Warnings)
+			}
+		})
+	}
+}
+
 func TestLintDirectoryDetectsTripleCollisionsButAllowsMethodAndVersionCoexistence(t *testing.T) {
 	root := t.TempDir()
 	writeLintTestFragment(t, root, "owner", "a.yaml", validLintFragment("owner", "v1", "https://api.example.com"))

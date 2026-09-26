@@ -330,8 +330,8 @@ components:
 - **Required:** No
 - **Constraints:** Only accepted value is `"acknowledged"`
 - **Example:** `"x-unscrubbable": "acknowledged"`
-- **Relationships:** Also allowed at operation level
-- **Purpose:** Opt-out of response scrubbing for routes that cannot be scrubbed
+- **Relationships:** Also allowed at operation level; meaningful only on a credential-injection fragment (`x-vault-path` + `x-inject-as`)
+- **Purpose:** Acknowledgement that the route's responses may be unscannable. Permits unscannable responses (opaque bodies, unsupported content encodings, protocol upgrades) to pass through whole instead of being refused; does **not** disable scrubbing of scannable responses. Full contract: `x-unscrubbable-contract.md`.
 
 #### x-requires-approval (fragment-root)
 - **Type:** boolean
@@ -403,8 +403,8 @@ components:
 - **Required:** No
 - **Constraints:** Same as fragment-root form
 - **Example:** In a `post` operation: `"x-unscrubbable": "acknowledged"`
-- **Relationships:** Overrides fragment-root setting
-- **Purpose:** Operation-level opt-out of response scrubbing
+- **Relationships:** Narrows the fragment-root acknowledgement to this operation; cannot rescind one (absence is refusal, not permission)
+- **Purpose:** Operation-level acknowledgement that the route's responses may be unscannable. Full contract: `x-unscrubbable-contract.md`.
 
 #### x-requires-approval (operation-level)
 - **Type:** boolean

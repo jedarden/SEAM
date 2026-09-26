@@ -629,23 +629,38 @@ func (f *lintFragment) checkTransport(report *LintReport) {
 }
 
 func (f *lintFragment) checkUnscrubbable(report *LintReport) {
+	acknowledged := false
 	if f.data["x-unscrubbable"] == "acknowledged" {
+		acknowledged = true
 		f.addWarning(report, "scrubbing.unscrubbable", "x-unscrubbable: acknowledged requires human review")
 	}
 	paths, ok := f.data["paths"].(map[string]any)
-	if !ok {
-		return
-	}
-	for _, pathValue := range paths {
-		pathItem, ok := pathValue.(map[string]any)
-		if !ok {
-			continue
-		}
-		for _, operationValue := range pathItem {
-			operation, ok := operationValue.(map[string]any)
-			if ok && operation["x-unscrubbable"] == "acknowledged" {
-				f.addWarning(report, "scrubbing.unscrubbable", "operation x-unscrubbable: acknowledged requires human review")
+	if ok {
+		for _, pathValue := range paths {
+			pathItem, ok := pathValue.(map[string]any)
+			if !ok {
+				continue
 			}
+			for _, operationValue := range pathItem {
+				operation, ok := operationValue.(map[string]any)
+				if ok && operation["x-unscrubbable"] == "acknowledged" {
+					acknowledged = true
+					f.addWarning(report, "scrubbing.unscrubbable", "operation x-unscrubbable: acknowledged requires human review")
+				}
+			}
+		}
+	}
+	// Scrubbing only happens for routes that inject a credential, so an
+	// acknowledgement on a fragment with no x-vault-path/x-inject-as pair
+	// guards nothing. Absence of the pair is what "vacuous" means here —
+	// the schema enforces both-or-neither, but the lint check must not
+	// depend on the schema having run.
+	if acknowledged {
+		_, hasVaultPath := f.data["x-vault-path"]
+		_, hasInjectAs := f.data["x-inject-as"]
+		if !hasVaultPath || !hasInjectAs {
+			f.addWarning(report, "scrubbing.unscrubbable-vacuous",
+				"x-unscrubbable: acknowledged has no effect without credential injection (x-vault-path + x-inject-as)")
 		}
 	}
 }

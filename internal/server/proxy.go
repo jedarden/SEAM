@@ -577,8 +577,15 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 		_, encodingsErr := parseContentEncodings(upstreamResp.Header.Get("Content-Encoding"))
 		if responseIsOpaque(upstreamResp) || encodingsErr != nil {
 			if !scrubConfig.allowUnscannable {
+				log.Printf("[proxy] refusing unscannable response for %s %s (status %d, content-type %q): no x-unscrubbable acknowledgement",
+					r.Method, route, upstreamResp.StatusCode, upstreamResp.Header.Get("Content-Type"))
 				return errUnscannableResponse
 			}
+			// The acknowledgement's whole contract is this line: the response is
+			// passed through body, headers, and trailers unsanitized, so the
+			// emission is the only durable record that it happened.
+			log.Printf("[proxy] x-unscrubbable acknowledgement: serving unscannable response unsanitized for %s %s (status %d, content-type %q)",
+				r.Method, route, upstreamResp.StatusCode, upstreamResp.Header.Get("Content-Type"))
 			if err := scrubber.serveUnscannable(w, upstreamResp); err != nil {
 				return fmt.Errorf("streaming acknowledged unscannable response: %w", err)
 			}
