@@ -21,6 +21,15 @@ var internalRouteMetadata = map[string]string{
 	"x-instance-param":        internalRouteMetadataPrefix + "instance-param",
 	"x-upstream-strip-prefix": internalRouteMetadataPrefix + "upstream-strip-prefix",
 	"x-fanout-scope":          internalRouteMetadataPrefix + "fanout-scope",
+	// x-required-scope is the fragment-root DEFAULT scope requirement for
+	// every operation on the route; an operation-level x-required-scope
+	// REPLACES it, never merges (route-fragment-schema.md). The route-table
+	// builder resolves the operation extension first and this propagated
+	// marker second, so a silent operation inherits the default and an
+	// overriding operation hides it. Without this entry the root form the
+	// fragment schema accepts is dropped at merge time and root-only routes
+	// silently become public.
+	"x-required-scope": internalRouteMetadataPrefix + "required-scope",
 }
 
 type pathRewriteFinding struct {
