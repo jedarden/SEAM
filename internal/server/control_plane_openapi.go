@@ -214,7 +214,7 @@ func changesPathItem() map[string]interface{} {
 		"get": map[string]interface{}{
 			"tags":            []interface{}{"changes"},
 			"summary":         "Return route-contract and visibility changes between spec versions",
-			"description":     "Caller listener. Compares the current spec against a prior version held in the in-memory ring buffer. Level 1 lists routes with contract and visibility indicators; level 2 adds field-level diffs. Route entries are filtered to the caller's visible scopes. With no since parameter the oldest version still in the ring buffer is used; a since the buffer has evicted yields 200 with since_known=false and no route entries — it is not an error.",
+			"description":     "Caller listener. Compares the current spec against a prior version held in the in-memory ring buffer. Level 1 lists routes with contract and visibility indicators; level 2 adds field-level diffs. Route entries are filtered to the caller's visible scopes. With no since parameter the oldest version still in the ring buffer is used; a since the buffer has evicted yields 200 with since_known=false and no route entries — it is not an error. The endpoint is reserved by exact path and the /changes namespace has no sub-paths: a version-shaped sub-path such as /changes/1.2.3 is not a migration endpoint, is not reserved, and dispatches through the caller pipeline to 404 route_not_found in the common error envelope.",
 			"x-seam-listener": "caller",
 			"parameters": []interface{}{
 				map[string]interface{}{
@@ -235,7 +235,7 @@ func changesPathItem() map[string]interface{} {
 					"name":        "scope-since",
 					"in":          "query",
 					"required":    false,
-					"description": "X-SEAM-Scope-Version hash to diff the caller's scope state against. When present, the response gains scope_changes entries with change_type granted or revoked.",
+					"description": "X-SEAM-Scope-Version hash to diff the caller's scope state against. When present, the response gains a scope_changes entry; change_type is currently always unknown — the scope-state diff is a Phase 8.4 placeholder.",
 					"schema":      map[string]interface{}{"type": "string"},
 				},
 			},
@@ -563,7 +563,7 @@ func controlPlaneSchemaComponents() map[string]interface{} {
 			"required": []interface{}{"scopes", "change_type"},
 			"properties": map[string]interface{}{
 				"scopes":      map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
-				"change_type": map[string]interface{}{"type": "string", "enum": []interface{}{"granted", "revoked"}},
+				"change_type": map[string]interface{}{"type": "string", "enum": []interface{}{"granted", "revoked", "unknown"}, "description": "granted and revoked are the computed states; unknown is the Phase 8.4 placeholder served while the scope-state diff is not yet computed."},
 			},
 		},
 		"ChangesResponse": map[string]interface{}{
@@ -584,7 +584,7 @@ func controlPlaneSchemaComponents() map[string]interface{} {
 				},
 				"routes":        map[string]interface{}{"type": "array", "items": map[string]interface{}{"$ref": "#/components/schemas/RouteChange"}},
 				"route_count":   map[string]interface{}{"type": "integer"},
-				"scope_changes": map[string]interface{}{"type": "array", "items": map[string]interface{}{"$ref": "#/components/schemas/ScopeChange"}, "description": "Present only when scope-since was supplied."},
+				"scope_changes": map[string]interface{}{"$ref": "#/components/schemas/ScopeChange", "description": "Present only when scope-since was supplied. One entry, not an array: the endpoint reports the caller's single scope-state delta."},
 			},
 		},
 		"WorkerKeyRequest": map[string]interface{}{

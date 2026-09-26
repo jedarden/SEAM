@@ -684,6 +684,7 @@ func testReservedPathBypassProtection(t *testing.T) {
 			"/openapi.json",
 			"/docs",
 			"/config/status",
+			"/changes",
 		}
 
 		for _, path := range reservedPaths {
@@ -717,6 +718,7 @@ func testReservedPathBypassProtection(t *testing.T) {
 			"/_seam/readyz",
 			"/health/live",
 			"/config/status",
+			"/changes",
 		}
 
 		for _, path := range reservedPaths {

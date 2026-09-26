@@ -48,7 +48,7 @@ control-plane document.
 |---|---|---|---|
 | `/whoami` | GET | none (returns the caller's own view) | Identity, effective scopes, `scope_version`; also sets `X-SEAM-Scope-Version` |
 | `/scopes` | GET | `seam:scopes:read-all` for `?all=1` only | Two merged sources: `spec` (fragment `x-required-scope`) + `builtin`; default output filtered to the caller's scopes |
-| `/changes` | GET | none; route entries scope-filtered | `level` ∈ {1,2} else 400; `since` unknown/evicted is `200` + `since_known:false`, not an error; `scope-since` adds `scope_changes` |
+| `/changes` | GET | none; route entries scope-filtered | `level` ∈ {1,2} else 400; `since` unknown/evicted is `200` + `since_known:false`, not an error; `scope-since` adds `scope_changes` (currently `change_type: unknown`); reserved by exact path — `/changes/…` sub-paths are not migration endpoints and 404 `route_not_found` |
 | `/api/v1/tailscale/ephemeral-key` | POST | `seam:tailscale:key-create` | Body `{worker_id}`; response carries the **live tskey secret**; 503 inside the client hold-down with `retry_after` |
 | `/docs` | GET | none (JSON branch is scope-filtered) | `Accept: application/json` → raw filtered spec; otherwise Scalar HTML |
 | `/docs/route` | GET | 404-oracle scope filtering | `path` required, `version` grammar `^v[1-9][0-9]*$` or `_unversioned`; HTML Accept → `302 /docs#anchor` |
