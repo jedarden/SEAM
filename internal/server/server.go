@@ -1600,6 +1600,15 @@ func (s *Server) Start(ctx context.Context) error {
 	callerHandler = s.headerStrippingMiddleware(callerHandler)
 	log.Printf("Header-stripping middleware active on caller-facing port (stage 2)")
 
+	// Wrap with scope version middleware (Phase 7 - adds X-SEAM-Scope-Version header).
+	// It must sit INSIDE stage 3: it computes the hash from the identity stage 3
+	// put in the request context, and assembled outside it would read a nil
+	// identity and stamp the empty scope-set hash over every response —
+	// clobbering the correct values the handlers set. That order is load-bearing
+	// and pinned by TestCallerListenerAssembledPipelineStampsCallerScopeVersion.
+	callerHandler = s.scopeVersionMiddleware(callerHandler)
+	log.Printf("Scope version middleware active on caller-facing port (Phase 7 - adds X-SEAM-Scope-Version header)")
+
 	// Wrap with identity resolution middleware (stage 3 - WhoIs, Phase 7)
 	callerHandler = s.identityResolutionMiddleware(callerHandler)
 	log.Printf("Identity resolution middleware active on caller-facing port (stage 3, Phase 7 - INERT)")
@@ -1607,10 +1616,6 @@ func (s *Server) Start(ctx context.Context) error {
 	// Wrap with authorization middleware (stage 5 - x-required-scope, Phase 7)
 	callerHandler = s.authorizationMiddleware(callerHandler)
 	log.Printf("Authorization middleware active on caller-facing port (stage 5, Phase 7 - INERT)")
-
-	// Wrap with scope version middleware (Phase 7 - adds X-SEAM-Scope-Version header)
-	callerHandler = s.scopeVersionMiddleware(callerHandler)
-	log.Printf("Scope version middleware active on caller-facing port (Phase 7 - adds X-SEAM-Scope-Version header)")
 
 	// Wrap with validation middleware (stage 1 - control-plane detection)
 	callerHandler = s.validationMiddleware(callerHandler)

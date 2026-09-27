@@ -361,11 +361,14 @@ func docsRoutePathItem() map[string]interface{} {
 }
 
 func docsPathsPathItem() map[string]interface{} {
+	// The 200 schema must keep describing what docsPathsHandler actually
+	// writes: paths is the array GetAllPathStatuses returns, its item fields
+	// the Last2xxStatus JSON tags. Pinned by TestDocsPathsResponseThroughCallerPipeline.
 	return map[string]interface{}{
 		"get": map[string]interface{}{
 			"tags":            []interface{}{"documentation"},
 			"summary":         "Return every path with its last-2xx status",
-			"description":     "Caller listener. Observability over the served upstream surface: metadata (spec and API version, total path count) plus a per-path map of last-2xx status from the tracker. Cache-Control: no-store.",
+			"description":     "Caller listener. Observability over the served upstream surface: metadata (spec and API version, total path count) plus a per-path list of last-2xx status entries from the tracker. Only paths with at least one dispatch since restart are tracked. Cache-Control: no-store.",
 			"x-seam-listener": "caller",
 			"responses": map[string]interface{}{
 				"200": jsonResponse("Path statuses plus metadata.", map[string]interface{}{
@@ -381,9 +384,24 @@ func docsPathsPathItem() map[string]interface{} {
 							},
 						},
 						"paths": map[string]interface{}{
-							"type":                 "object",
-							"additionalProperties": true,
-							"description":          "Map of upstream path to its last-2xx status entry.",
+							"type": "array",
+							"description": "Every tracked path with its three-state last-2xx status " +
+								"(" + Last2xxNoAttempt + ", " + Last2xxNoSuccess + ", or " + Last2xxSucceeded + "). " +
+								"Tracking is in-memory and restart-scoped, so an empty array means " +
+								"no dispatch has been observed since this process started.",
+							"items": map[string]interface{}{
+								"type": "object",
+								"properties": map[string]interface{}{
+									"path":                        map[string]interface{}{"type": "string"},
+									"state":                       map[string]interface{}{"type": "string"},
+									"last_attempt_at":             map[string]interface{}{"type": "string", "format": "date-time"},
+									"last_success_at":             map[string]interface{}{"type": "string", "format": "date-time"},
+									"attempts_since_last_success": map[string]interface{}{"type": "integer"},
+									"last_error":                  map[string]interface{}{"type": "string"},
+									"source":                      map[string]interface{}{"type": "string"},
+								},
+								"required": []interface{}{"state", "attempts_since_last_success"},
+							},
 						},
 					},
 				}),
