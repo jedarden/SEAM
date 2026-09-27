@@ -2,6 +2,10 @@
 /seam
 /seam_test
 /seam-test
+# Binaries dropped by an in-directory `go build` inside a tools/ nested module
+# (or at the root by a since-removed tool) — build output, never source.
+/starvation-alert-contradiction-detector
+/tools/seam-retirement-evaluator/seam-retirement-evaluator
 *.test
 *.exe
 *.exe~
