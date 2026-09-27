@@ -29,7 +29,9 @@ the control-plane document (`x-seam-listener: caller`). The operator-only port
 `/health/upstreams`, `/_seam/capture/*`, `/_seam/cache/*`) is a separate
 surface gated on `seam:ops:read` by the operator scope middleware; it is
 pinned by its own contract tests and is deliberately **not** in the
-control-plane document.
+control-plane document. The capture and cache endpoints' per-endpoint
+request/response/error/idempotence contracts are documented in
+[operator-capture-cache-contracts.md](operator-capture-cache-contracts.md).
 
 ## Authentication (no endpoint accepts a credential)
 
