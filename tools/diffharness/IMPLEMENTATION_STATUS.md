@@ -149,6 +149,36 @@ seam-replay \
    vault:seam/routes/argocd/ro-token → SEAM_DIFF_SECRET_VAULT_SEAM_ROUTES_ARGOCD_RO_TOKEN
    ```
 
+### 6. Cutover Gate Runner (`seam-cutover`)
+
+**Purpose:** Mechanizes the go/no-go gate of a per-service SEAM cutover —
+the runbook (docs/migration-runbook.md, Stage 2) owns the gate items; this
+tool is where they execute.
+
+**Location:** `/home/coding/SEAM/tools/diffharness/cmd/seam-cutover/`
+
+**Features:**
+- `check` subcommand runs the mechanical gate: SEAM healthz/readyz, the
+  operator-port trust-boundary refusal (transport-level silence = the ACL
+  holds; ANY HTTP answer, even 403, = FAIL), corpus route presence in
+  `/openapi.json` with segment-wise path-template matching, DNS preconditions
+  for the dual-run window, the prose-still-present guard (fails the
+  wrong-direction sequencing case too), and `seam-replay` as a subprocess
+  gated on its exit code
+- Unarmed checks report SKIP, never a silent pass; MANUAL items (≥60 s
+  retry-budget attestation; Phase 13 cost governor for `--metered` services)
+  are printed for the cutover PR
+- Writes the JSON check report to `--report`, with the replay report derived
+  beside it (`<report>-replay.json`)
+- Exit codes: 0 = no mechanical failures, 1 = at least one mechanical FAIL
+  (NO-GO, blocks this service only), 2 = usage error
+- `rollback` subcommand prints the per-service rollback runbook (L1 agent
+  traffic / L2 fragment / L3 binary) with the concrete `git revert`
+  revert-finding commands filled in — never a live mutation
+
+**Usage:** see the README's `seam-cutover` section and
+docs/migration-runbook.md §Stage 2 and §Rollback.
+
 ## Testing
 
 **Location:** `/home/coding/SEAM/tools/diffharness/internal/compare/compare_test.go`

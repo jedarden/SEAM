@@ -4,7 +4,7 @@ The differential capture + replay tool for testing SEAM route conformance. This 
 
 ## Overview
 
-The harness consists of two tools:
+The harness consists of three tools:
 
 ### `seam-capture` - Recording Proxy
 
@@ -43,6 +43,47 @@ seam-replay \
 - Compares responses for equivalence
 - Outputs JSON report and human-readable summary
 - Exits non-zero on any FAIL
+
+### `seam-cutover` - Cutover Gate Runner
+
+Mechanizes the go/no-go gate of a per-service SEAM cutover. The gate items,
+their blocking rules, and the exit-code contract are owned by the
+[migration runbook](../../docs/migration-runbook.md) (Stage 2); this tool is
+where they execute.
+
+```bash
+seam-cutover check \
+  --service argocd \
+  --seam https://seam-rs-manager-ts.ardenone.com:8444 \
+  --operator https://seam-rs-manager-ts.ardenone.com:8445 \
+  --incumbent https://argocd-ro-ardenone-manager-ts.ardenone.com:8444 \
+  --corpus corpus/argocd-proxy/corpus.json \
+  --replay-bin ./seam-replay \
+  --secrets corpus/argocd-proxy/secrets.local.json \
+  --agent-doc /home/coding/CLAUDE.md \
+  --agent-doc-contains 'argocd-ro-ardenone-manager-ts' \
+  --report corpus/argocd-proxy/cutover-check.json
+```
+
+- `check` runs the mechanical gate: SEAM healthz/readyz, the operator-port
+  trust-boundary refusal (must be probed from a worker-vantage host), corpus
+  route presence in `/openapi.json` (path templates matched segment-wise),
+  DNS preconditions for the dual-run window, the prose-still-present guard
+  (`--agent-doc` must still contain the incumbent pointer — it fails the
+  wrong-direction sequencing case too), and `seam-replay` as a subprocess
+  gated on its exit code
+- Unarmed checks (`--operator`, `--replay-bin`, `--agent-doc` not given)
+  report SKIP, never a silent pass; `--metered` adds the Phase 13
+  cost-governor MANUAL item
+- Writes the JSON report to `--report`; the replay report is derived beside
+  it (`<report>-replay.json`) so a cutover PR attaches both
+- Exit codes: `0` no mechanical failures (MANUAL items still need operator
+  attestation in the cutover PR), `1` at least one mechanical FAIL (NO-GO —
+  blocks this service only), `2` usage error
+- `rollback --service <svc> [--level agent|fragment|binary|all]` prints the
+  per-service rollback runbook with the concrete revert-finding commands
+  filled in — the mechanism everywhere is `git revert` in
+  declarative-config, never a live mutation
 
 ## Corpus Format
 
@@ -176,7 +217,10 @@ After redaction, responses must match:
 cd tools/diffharness
 go build -o seam-capture ./cmd/seam-capture
 go build -o seam-replay ./cmd/seam-replay
+go build -o seam-cutover ./cmd/seam-cutover
 ```
+
+The built binaries are git-ignored (repo `.gitignore`) — never commit them.
 
 ## Testing
 

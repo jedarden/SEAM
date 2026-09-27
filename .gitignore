@@ -6,6 +6,12 @@
 # (or at the root by a since-removed tool) — build output, never source.
 /starvation-alert-contradiction-detector
 /tools/seam-retirement-evaluator/seam-retirement-evaluator
+# tools/diffharness builds (README "Building" section) and release-style
+# artifacts dropped at the root — build output, never source.
+/tools/diffharness/seam-capture
+/tools/diffharness/seam-replay
+/tools/diffharness/seam-cutover
+/seam_*_linux_amd64*
 *.test
 *.exe
 *.exe~
