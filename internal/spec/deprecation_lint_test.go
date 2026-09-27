@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -497,6 +498,151 @@ func TestParseBrownoutInstant(t *testing.T) {
 			if gotUTC := got.UTC().String(); gotUTC != tt.wantUTC {
 				t.Errorf("parseBrownoutInstant(%q) = %s, want %s", tt.input, gotUTC, tt.wantUTC)
 			}
+		})
+	}
+}
+
+// TestCheckDeprecation_OperationLevelBlockRejected pins the retirement
+// handoff runbook's placement rule: the route-table extractor never reads an
+// operation-level x-seam-deprecated, so the pre-land gate must reject a
+// proposal pasted inside an operation instead of letting it land a
+// deprecation that silently never fires. The schema cannot do this —
+// operations accept unknown x-* keys by design — which is why the check lives
+// in lint (the same idiom as the operation-level x-api-version rejection).
+func TestCheckDeprecation_OperationLevelBlockRejected(t *testing.T) {
+	fragment := &lintFragment{
+		file: "test.yaml",
+		data: map[string]any{
+			"paths": map[string]any{
+				"/old-route": map[string]any{
+					"get": map[string]any{
+						"x-seam-deprecated": map[string]any{
+							"since": "2026-09-26",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := &LintReport{}
+	fragment.checkDeprecation(report)
+
+	if len(report.Errors) != 1 {
+		t.Fatalf("Expected 1 error, got %d: %+v", len(report.Errors), report.Errors)
+	}
+
+	if report.Errors[0].Code != "deprecation.wrong-placement" {
+		t.Errorf("Expected error code 'deprecation.wrong-placement', got %q", report.Errors[0].Code)
+	}
+}
+
+// TestCheckDeprecation_PathItemOverrideValidated pins that the sanctioned
+// path-item override gets the same shape rules as the fragment-root block:
+// the runtime reads this form, so an invalid one must fail the pre-land gate
+// with the override named in the diagnostic.
+func TestCheckDeprecation_PathItemOverrideValidated(t *testing.T) {
+	fragment := &lintFragment{
+		file: "test.yaml",
+		data: map[string]any{
+			"paths": map[string]any{
+				"/old-route": map[string]any{
+					"x-seam-deprecated": map[string]any{
+						"since": "2024-13-01", // Invalid month
+					},
+				},
+			},
+		},
+	}
+
+	report := &LintReport{}
+	fragment.checkDeprecation(report)
+
+	if len(report.Errors) != 1 {
+		t.Fatalf("Expected 1 error, got %d: %+v", len(report.Errors), report.Errors)
+	}
+
+	if report.Errors[0].Code != "deprecation.since-invalid" {
+		t.Errorf("Expected error code 'deprecation.since-invalid', got %q", report.Errors[0].Code)
+	}
+	if want := `x-seam-deprecated on path "/old-route"`; !strings.Contains(report.Errors[0].Message, want) {
+		t.Errorf("Diagnostic must name the override block: want substring %q, got %q", want, report.Errors[0].Message)
+	}
+}
+
+// TestCheckDeprecation_PathItemOverrideValidShape pins that a well-formed
+// override is accepted: rejection targets placements and shapes the runtime
+// would silently drop, not the override form itself.
+func TestCheckDeprecation_PathItemOverrideValidShape(t *testing.T) {
+	fragment := &lintFragment{
+		file: "test.yaml",
+		data: map[string]any{
+			"paths": map[string]any{
+				"/old-route": map[string]any{
+					"x-seam-deprecated": map[string]any{
+						"since":  "2026-09-26",
+						"sunset": "2026-12-25",
+					},
+					"get": map[string]any{
+						"responses": map[string]any{},
+					},
+				},
+			},
+		},
+	}
+
+	report := &LintReport{}
+	fragment.checkDeprecation(report)
+
+	if len(report.Errors) != 0 {
+		t.Errorf("Well-formed path-item override rejected: %+v", report.Errors)
+	}
+}
+
+// TestCheckDeprecation_UnknownFieldRejected pins the runbook's plural-
+// `brownouts` trap on both placements: an unknown key is read by nothing, so
+// its effect silently never fires. At the fragment root the schema's
+// additionalProperties: false makes the same rejection; a path-item block is
+// invisible to the schema, so the check has to live in lint either way.
+func TestCheckDeprecation_UnknownFieldRejected(t *testing.T) {
+	cases := []struct {
+		name string
+		data map[string]any
+	}{
+		{"root block", map[string]any{
+			"x-seam-deprecated": map[string]any{
+				"since":     "2026-09-26",
+				"brownouts": []any{},
+			},
+		}},
+		{"path-item override", map[string]any{
+			"paths": map[string]any{
+				"/old-route": map[string]any{
+					"x-seam-deprecated": map[string]any{
+						"since":     "2026-09-26",
+						"brownouts": []any{},
+					},
+				},
+			},
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fragment := &lintFragment{
+				file: "test.yaml",
+				data: tc.data,
+			}
+
+			report := &LintReport{}
+			fragment.checkDeprecation(report)
+
+			for _, err := range report.Errors {
+				if err.Code == "deprecation.unknown-field" && strings.Contains(err.Message, "brownouts") {
+					return
+				}
+			}
+			t.Errorf("Plural brownouts key not rejected: %+v", report.Errors)
 		})
 	}
 }

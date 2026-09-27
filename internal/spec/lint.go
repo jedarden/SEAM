@@ -1507,36 +1507,88 @@ func (f *lintFragment) checkAdapterBuffering(report *LintReport, adapter map[str
 	}
 }
 
-// checkDeprecation validates x-seam-deprecated structure
-// Per Phase 8.3: ordered, non-overlapping brownout windows inside [since, sunset]
+// checkDeprecation validates x-seam-deprecated structure and placement.
+// Per Phase 8.3: ordered, non-overlapping brownout windows inside [since,
+// sunset]. Placement follows the retirement handoff runbook
+// (docs/retirement-handoff-runbook.md): the block belongs at the fragment
+// root, where it covers every path the fragment declares, or directly on a
+// path item as the per-path override the route-table extractor honors. An
+// operation-level block is never read — extractDeprecation deliberately skips
+// the operation level — so a proposal pasted there lands a commit whose
+// deprecation silently never fires. The schema cannot police either misplaced
+// form (path items and operations accept unknown x-* keys by design), so lint
+// is the gate for both, the same idiom as checkAPIVersion.
 func (f *lintFragment) checkDeprecation(report *LintReport) {
-	deprecated, hasDeprecated := f.data["x-seam-deprecated"]
-	if !hasDeprecated {
-		return
+	if deprecated, hasDeprecated := f.data["x-seam-deprecated"]; hasDeprecated {
+		f.checkDeprecationBlock(report, "x-seam-deprecated", deprecated)
 	}
 
+	paths, _ := f.data["paths"].(map[string]any)
+	for path, pathValue := range paths {
+		pathItem, ok := pathValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		if block, present := pathItem["x-seam-deprecated"]; present {
+			// Sanctioned per-path override: the runtime reads this form, so
+			// it must satisfy the same shape rules as the root block.
+			f.checkDeprecationBlock(report, fmt.Sprintf("x-seam-deprecated on path %q", path), block)
+		}
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, ok := operationValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			if _, present := operation["x-seam-deprecated"]; present {
+				f.addError(report, "deprecation.wrong-placement", fmt.Sprintf("x-seam-deprecated on %s %s is never read: deprecation extraction skips the operation level, so the block would silently never fire. Declare it at the fragment root (covers every path the fragment declares) or on the path item (overrides the root for that one path)", method, path))
+			}
+		}
+	}
+}
+
+// checkDeprecationBlock validates one x-seam-deprecated object — the
+// fragment-root block or a path-item override. label names the block in
+// diagnostics; at the root it is the bare field name, so the historical
+// message shape is unchanged.
+func (f *lintFragment) checkDeprecationBlock(report *LintReport, label string, deprecated any) {
 	// A bare true is a lint error - must be an object
 	if _, isBool := deprecated.(bool); isBool {
-		f.addError(report, "deprecation.bare-true", "x-seam-deprecated must be an object with 'since' field; bare true is not allowed")
+		f.addError(report, "deprecation.bare-true", label+" must be an object with 'since' field; bare true is not allowed")
 		return
 	}
 
 	deprecatedMap, ok := deprecated.(map[string]any)
 	if !ok {
 		// Schema should catch this, but validate anyway
-		f.addError(report, "deprecation.invalid-type", "x-seam-deprecated must be an object")
+		f.addError(report, "deprecation.invalid-type", label+" must be an object")
 		return
+	}
+
+	// An unknown key is where a deprecation goes to die: nothing reads it, so
+	// its effect silently never fires (the runbook's plural `brownouts` trap).
+	// The schema's additionalProperties: false already rejects unknown keys on
+	// the root block; no schema constraint sees a path-item block, and this
+	// names the bad key either way.
+	for key := range deprecatedMap {
+		switch key {
+		case "since", "sunset", "brownout":
+		default:
+			f.addError(report, "deprecation.unknown-field", fmt.Sprintf("%s.%s is not a deprecation field (known fields: since, sunset, brownout); nothing reads an unknown key, so its effect silently never fires", label, key))
+		}
 	}
 
 	// Validate required 'since' field (ISO date)
 	since, hasSince := deprecatedMap["since"].(string)
 	if !hasSince || since == "" {
-		f.addError(report, "deprecation.since-missing", "x-seam-deprecated.since is required and must be an ISO date string")
+		f.addError(report, "deprecation.since-missing", label+".since is required and must be an ISO date string")
 		return
 	}
 
 	if !isValidISODate(since) {
-		f.addError(report, "deprecation.since-invalid", fmt.Sprintf("x-seam-deprecated.since must be a valid ISO date (YYYY-MM-DD), got %q", since))
+		f.addError(report, "deprecation.since-invalid", fmt.Sprintf("%s.since must be a valid ISO date (YYYY-MM-DD), got %q", label, since))
 		return
 	}
 
@@ -1544,13 +1596,13 @@ func (f *lintFragment) checkDeprecation(report *LintReport) {
 	sunset, hasSunset := deprecatedMap["sunset"].(string)
 	if hasSunset && sunset != "" {
 		if !isValidISODate(sunset) {
-			f.addError(report, "deprecation.sunset-invalid", fmt.Sprintf("x-seam-deprecated.sunset must be a valid ISO date (YYYY-MM-DD), got %q", sunset))
+			f.addError(report, "deprecation.sunset-invalid", fmt.Sprintf("%s.sunset must be a valid ISO date (YYYY-MM-DD), got %q", label, sunset))
 			return
 		}
 
 		// Sunset must be after since
 		if !isDateAfter(sunset, since) {
-			f.addError(report, "deprecation.sunset-before-since", fmt.Sprintf("x-seam-deprecated.sunset %q must be after since %q", sunset, since))
+			f.addError(report, "deprecation.sunset-before-since", fmt.Sprintf("%s.sunset %q must be after since %q", label, sunset, since))
 		}
 	}
 
@@ -1571,18 +1623,18 @@ func (f *lintFragment) checkDeprecation(report *LintReport) {
 			brownoutArray[i] = v
 		}
 	} else {
-		f.addError(report, "deprecation.brownout-invalid", "x-seam-deprecated.brownout must be an array")
+		f.addError(report, "deprecation.brownout-invalid", label+".brownout must be an array")
 		return
 	}
 
 	if len(brownoutArray) == 0 {
-		f.addError(report, "deprecation.brownout-empty", "x-seam-deprecated.brownout array must not be empty")
+		f.addError(report, "deprecation.brownout-empty", label+".brownout array must not be empty")
 		return
 	}
 
 	// Brownout requires sunset
 	if !hasSunset || sunset == "" {
-		f.addError(report, "deprecation.brownout-without-sunset", "x-seam-deprecated.brownout requires x-seam-deprecated.sunset to be set")
+		f.addError(report, "deprecation.brownout-without-sunset", label+".brownout requires "+label+".sunset to be set")
 		return
 	}
 
@@ -1591,7 +1643,7 @@ func (f *lintFragment) checkDeprecation(report *LintReport) {
 	for i, window := range brownoutArray {
 		windowMap, ok := window.(map[string]any)
 		if !ok {
-			f.addError(report, "deprecation.brownout-window-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d] must be an object", i))
+			f.addError(report, "deprecation.brownout-window-invalid", fmt.Sprintf("%s.brownout[%d] must be an object", label, i))
 			continue
 		}
 
@@ -1599,42 +1651,42 @@ func (f *lintFragment) checkDeprecation(report *LintReport) {
 		end, hasEnd := windowMap["end"].(string)
 
 		if !hasStart || start == "" {
-			f.addError(report, "deprecation.brownout-start-missing", fmt.Sprintf("x-seam-deprecated.brownout[%d].start is required and must be an ISO date-time string", i))
+			f.addError(report, "deprecation.brownout-start-missing", fmt.Sprintf("%s.brownout[%d].start is required and must be an ISO date-time string", label, i))
 			continue
 		}
 		if !hasEnd || end == "" {
-			f.addError(report, "deprecation.brownout-end-missing", fmt.Sprintf("x-seam-deprecated.brownout[%d].end is required and must be an ISO date-time string", i))
+			f.addError(report, "deprecation.brownout-end-missing", fmt.Sprintf("%s.brownout[%d].end is required and must be an ISO date-time string", label, i))
 			continue
 		}
 
 		if !isValidISODateTime(start) {
-			f.addError(report, "deprecation.brownout-start-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d].start must be a valid ISO date-time (RFC 3339), got %q", i, start))
+			f.addError(report, "deprecation.brownout-start-invalid", fmt.Sprintf("%s.brownout[%d].start must be a valid ISO date-time (RFC 3339), got %q", label, i, start))
 			continue
 		}
 		if !isValidISODateTime(end) {
-			f.addError(report, "deprecation.brownout-end-invalid", fmt.Sprintf("x-seam-deprecated.brownout[%d].end must be a valid ISO date-time (RFC 3339), got %q", i, end))
+			f.addError(report, "deprecation.brownout-end-invalid", fmt.Sprintf("%s.brownout[%d].end must be a valid ISO date-time (RFC 3339), got %q", label, i, end))
 			continue
 		}
 
 		// End must be after start
 		if !isDateTimeAfter(end, start) {
-			f.addError(report, "deprecation.brownout-end-before-start", fmt.Sprintf("x-seam-deprecated.brownout[%d].end %q must be after start %q", i, end, start))
+			f.addError(report, "deprecation.brownout-end-before-start", fmt.Sprintf("%s.brownout[%d].end %q must be after start %q", label, i, end, start))
 			continue
 		}
 
 		// Window must be within [since, sunset]
 		if !isDateTimeWithinRange(start, since, sunset) {
-			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("x-seam-deprecated.brownout[%d].start %q is outside the deprecation range [%s, %s]", i, start, since, sunset))
+			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("%s.brownout[%d].start %q is outside the deprecation range [%s, %s]", label, i, start, since, sunset))
 			continue
 		}
 		if !isDateTimeWithinRange(end, since, sunset) {
-			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("x-seam-deprecated.brownout[%d].end %q is outside the deprecation range [%s, %s]", i, end, since, sunset))
+			f.addError(report, "deprecation.brownout-out-of-range", fmt.Sprintf("%s.brownout[%d].end %q is outside the deprecation range [%s, %s]", label, i, end, since, sunset))
 			continue
 		}
 
 		// Check for ordering (no overlapping, sequential windows)
 		if lastEnd != "" && !isDateTimeAfterOrEqual(start, lastEnd) {
-			f.addError(report, "deprecation.brownout-overlapping", fmt.Sprintf("x-seam-deprecated.brownout[%d].start %q must be after or equal to previous window's end %q (windows must be ordered and non-overlapping)", i, start, lastEnd))
+			f.addError(report, "deprecation.brownout-overlapping", fmt.Sprintf("%s.brownout[%d].start %q must be after or equal to previous window's end %q (windows must be ordered and non-overlapping)", label, i, start, lastEnd))
 			continue
 		}
 

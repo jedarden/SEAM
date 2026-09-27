@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -339,5 +340,249 @@ func TestExtractDeprecation_PropagatedFragmentRootMarker(t *testing.T) {
 	}
 	if dep == nil || dep.Since != "2020-01-01" {
 		t.Fatalf("plain-over-marker extraction = %+v, want the plain key to win (Since 2020-01-01)", dep)
+	}
+}
+
+// writeFragmentPlacingBlock writes the legacy-service fragment with the
+// evaluator's proposal placed at placement: "path-item" (the sanctioned
+// per-path override), "path-item-plural" (the override carrying the runbook's
+// plural `brownouts` trap), or "operation" (pasted inside the operation —
+// never read). The "root" placement is writeLegacyServiceFragment above.
+func writeFragmentPlacingBlock(t *testing.T, fragmentsDir, placement string) string {
+	t.Helper()
+
+	serviceDir := filepath.Join(fragmentsDir, "legacy-service")
+	if err := os.MkdirAll(serviceDir, 0o755); err != nil {
+		t.Fatalf("create service dir: %v", err)
+	}
+
+	head := `x-seam-schema: v1
+x-seam-owner: legacy-service
+x-api-version: v1
+x-upstream: https://legacy-service.example.internal
+openapi: 3.1.0
+info:
+  title: legacy-service
+  version: "1.0.0"
+paths:
+  /old-route:
+`
+	var body string
+	switch placement {
+	case "path-item":
+		body = `    x-seam-deprecated:
+      since: "2026-09-26"
+      sunset: "2026-12-25"
+      brownout:
+        - start: "2026-10-26T11:35:23Z"
+          end: "2026-11-02T11:35:23Z"
+    get:
+      responses:
+        "200":
+          description: ok
+`
+	case "path-item-plural":
+		body = `    x-seam-deprecated:
+      since: "2026-09-26"
+      sunset: "2026-12-25"
+      brownouts:
+        - start: "2026-10-26T11:35:23Z"
+          end: "2026-11-02T11:35:23Z"
+    get:
+      responses:
+        "200":
+          description: ok
+`
+	case "operation":
+		body = `    get:
+      x-seam-deprecated:
+        since: "2026-09-26"
+        sunset: "2026-12-25"
+        brownout:
+          - start: "2026-10-26T11:35:23Z"
+            end: "2026-11-02T11:35:23Z"
+      responses:
+        "200":
+          description: ok
+`
+	default:
+		t.Fatalf("unknown placement %q", placement)
+	}
+
+	fragment := head + body
+	path := filepath.Join(serviceDir, "route.yaml")
+	if err := os.WriteFile(path, []byte(fragment), 0o644); err != nil {
+		t.Fatalf("write fragment: %v", err)
+	}
+	return path
+}
+
+// lintOneFragment runs the pre-land gate exactly the way the runbook's step 3
+// prescribes it: seam lint <fragment-file> --schema spec/route-fragment-schema.json.
+func lintOneFragment(t *testing.T, fragmentPath, fragmentsDir, schemaPath string) spec.LintReport {
+	t.Helper()
+	report, err := spec.LintFiles([]string{fragmentPath}, spec.LintOptions{
+		FragmentsDir: fragmentsDir,
+		SchemaPath:   schemaPath,
+	})
+	if err != nil {
+		t.Fatalf("LintFiles: %v", err)
+	}
+	return report
+}
+
+// TestRetirementHandoff_MisplacedProposalRejectedByPrelandGate covers the
+// placement half of the runbook's step 3. The evaluator's proposal is only
+// correct at the fragment root. The same block pasted inside an operation is
+// schema-permissive (path items and operations accept unknown x-* keys by
+// design) yet never read, so the pre-land gate — not the schema — has to
+// reject it, and the route table shows why: the route would keep serving
+// undeprecated through every brownout window. The plural-`brownouts` variant
+// of the trap dies on the unknown-field rule, and the sanctioned path-item
+// override must lint clean and reach the route table, so rejection stays
+// targeted at placements and shapes whose effect would silently never fire.
+func TestRetirementHandoff_MisplacedProposalRejectedByPrelandGate(t *testing.T) {
+	schemaPath := fragmentsSchemaPath(t)
+	baseURL := "http://gateway.example"
+
+	t.Run("operation-level proposal rejected and never honored", func(t *testing.T) {
+		fragmentsDir := t.TempDir()
+		fragmentPath := writeFragmentPlacingBlock(t, fragmentsDir, "operation")
+
+		report := lintOneFragment(t, fragmentPath, fragmentsDir, schemaPath)
+		if !report.HasErrors() {
+			t.Fatal("operation-level proposal accepted by the pre-land gate; the runbook's reject rule is gone")
+		}
+		sawPlacementError := false
+		for _, e := range report.Errors {
+			if e.Code == "deprecation.wrong-placement" {
+				sawPlacementError = true
+			}
+			if e.Code == "fragment.schema" {
+				t.Errorf("schema unexpectedly flagged the operation-level block (%v); the lint rule is what catches this placement", e.Message)
+			}
+		}
+		if !sawPlacementError {
+			t.Fatalf("no deprecation.wrong-placement error: %+v", report.Errors)
+		}
+
+		// And the runtime shows why the gate exists: the block is present in
+		// the fragment but never read, so the route ships undeprecated.
+		loader, err := spec.NewWithFragments(fragmentsDir, baseURL, schemaPath, fragmentsDir)
+		if err != nil {
+			t.Fatalf("NewWithFragments: %v", err)
+		}
+		if err := loader.LoadFragments(); err != nil {
+			t.Fatalf("LoadFragments: %v", err)
+		}
+		if dep := findRouteEntry(t, buildTableFromLoader(t, loader), "/old-route").Deprecated; dep != nil {
+			t.Fatalf("operation-level block was honored (%+v); extraction must skip the operation level", dep)
+		}
+	})
+
+	t.Run("path-item plural brownouts rejected", func(t *testing.T) {
+		fragmentsDir := t.TempDir()
+		fragmentPath := writeFragmentPlacingBlock(t, fragmentsDir, "path-item-plural")
+
+		report := lintOneFragment(t, fragmentPath, fragmentsDir, schemaPath)
+		for _, e := range report.Errors {
+			if e.Code == "deprecation.unknown-field" && strings.Contains(e.Message, "brownouts") {
+				return
+			}
+		}
+		t.Fatalf("plural brownouts on a path-item override not rejected: %+v", report.Errors)
+	})
+
+	t.Run("path-item override accepted and honored", func(t *testing.T) {
+		fragmentsDir := t.TempDir()
+		fragmentPath := writeFragmentPlacingBlock(t, fragmentsDir, "path-item")
+
+		report := lintOneFragment(t, fragmentPath, fragmentsDir, schemaPath)
+		if report.HasErrors() {
+			t.Fatalf("well-formed path-item override rejected by the pre-land gate: %+v", report.Errors)
+		}
+
+		loader, err := spec.NewWithFragments(fragmentsDir, baseURL, schemaPath, fragmentsDir)
+		if err != nil {
+			t.Fatalf("NewWithFragments: %v", err)
+		}
+		if err := loader.LoadFragments(); err != nil {
+			t.Fatalf("LoadFragments: %v", err)
+		}
+		dep := findRouteEntry(t, buildTableFromLoader(t, loader), "/old-route").Deprecated
+		if dep == nil || dep.Since != "2026-09-26" {
+			t.Fatalf("sanctioned path-item override never reached the route table: %+v", dep)
+		}
+	})
+}
+
+// TestRetirementHandoff_RevertClearsAdvertisedDeprecation walks the runbook's
+// step 5: the verdict travels the same channel back. The human's revert
+// removes the block from the fragment, the hot-reload path reloads and swaps,
+// and the very same clock instant that produced an in-window 410 moments
+// earlier serves 200 with nothing advertised.
+func TestRetirementHandoff_RevertClearsAdvertisedDeprecation(t *testing.T) {
+	fragmentsDir := t.TempDir()
+	schemaPath := fragmentsSchemaPath(t)
+	baseURL := "http://gateway.example"
+
+	// Landed verdict: the proposal sits at the fragment root and the route is
+	// advertised as deprecated.
+	writeLegacyServiceFragment(t, fragmentsDir, true)
+	loader, err := spec.NewWithFragments(fragmentsDir, baseURL, schemaPath, fragmentsDir)
+	if err != nil {
+		t.Fatalf("NewWithFragments: %v", err)
+	}
+	if err := loader.LoadFragments(); err != nil {
+		t.Fatalf("LoadFragments: %v", err)
+	}
+	landed := buildTableFromLoader(t, loader)
+	if findRouteEntry(t, landed, "/old-route").Deprecated == nil {
+		t.Fatal("landed proposal never reached the route table")
+	}
+
+	holder := NewThreadSafeTableHolder(landed)
+	scheduler := NewBrownoutScheduler()
+	server := &Server{routeTableHolder: holder, brownoutScheduler: scheduler}
+	handler := server.brownoutMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	serveAt := func(clock string) *httptest.ResponseRecorder {
+		t.Helper()
+		scheduler.SetClock(func() time.Time { return mustClock(t, clock) })
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/old-route", nil))
+		return rec
+	}
+
+	// While the verdict stands: inside window 1 the route 410s.
+	if rec := serveAt("2026-10-27T12:00:00Z"); rec.Code != http.StatusGone {
+		t.Fatalf("pre-revert inside window 1: status = %d, want 410", rec.Code)
+	}
+
+	// Step 5: the revert — the human removes the block (the git revert of the
+	// landing commit), the same hot-reload path rebuilds, the swap lands.
+	writeLegacyServiceFragment(t, fragmentsDir, false)
+	if err := loader.LoadFragments(); err != nil {
+		t.Fatalf("revert LoadFragments: %v", err)
+	}
+	reverted := buildTableFromLoader(t, loader)
+	if dep := findRouteEntry(t, reverted, "/old-route").Deprecated; dep != nil {
+		t.Fatalf("reverted fragment still deprecated: %+v", dep)
+	}
+	if err := holder.Swap(reverted); err != nil {
+		t.Fatalf("Swap after revert: %v", err)
+	}
+
+	// The same instant, post-revert: served normally, nothing advertised, no
+	// brownout marker.
+	rec := serveAt("2026-10-27T12:00:00Z")
+	if rec.Code != http.StatusOK {
+		t.Errorf("post-revert inside former window: status = %d, want 200", rec.Code)
+	}
+	for _, header := range []string{"Deprecation", "Sunset", "X-SEAM-Brownout"} {
+		if got := rec.Header().Get(header); got != "" {
+			t.Errorf("post-revert %s = %q, want absent", header, got)
+		}
 	}
 }

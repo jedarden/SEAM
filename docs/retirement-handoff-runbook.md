@@ -140,9 +140,11 @@ rejects the block otherwise.
 
    Exit 0 means the block is schema-valid and deprecation-clean. (The
    fragment-root placement is what the schema sanctions and lint validates;
-   the acceptance test
-   `internal/server/retirement_handoff_test.go` proves the same shape is
-   honored by the runtime.)
+   the acceptance tests in
+   `internal/server/retirement_handoff_test.go` prove the same shape is
+   honored by the runtime.) A block pasted inside an operation fails this
+   gate — `deprecation.wrong-placement` — because the runtime never reads
+   one; the plural `brownouts` key fails it too, wherever the block sits.
 4. Commit to `main` and push. ArgoCD syncs the ConfigMap; nothing else to do.
 
 ## Step 4 — Observe the hot reload
@@ -204,6 +206,17 @@ The SEAM-side half of this contract is pinned by
 - `TestExtractDeprecation_PropagatedFragmentRootMarker` — pins that the
   fragment-root block (propagated marker) and the path-item block (plain
   key, wins on conflict) both reach `extractDeprecation`.
+- `TestRetirementHandoff_MisplacedProposalRejectedByPrelandGate` — the
+  placement half of step 3: the proposal pasted inside an operation is
+  rejected by the pre-land gate (`deprecation.wrong-placement`) even though
+  the schema cannot see it, and the runtime shows why — the block is never
+  read, so the route stays undeprecated. The plural-`brownouts` trap is
+  rejected on a path-item override too (`deprecation.unknown-field`), while
+  a well-formed path-item override lints clean and reaches the route table.
+- `TestRetirementHandoff_RevertClearsAdvertisedDeprecation` — step 5: the
+  revert travels the same hot-reload path back (reload → rebuild → swap),
+  and the same clock instant that produced an in-window 410 serves 200 with
+  nothing advertised once the block is gone.
 
 The evaluator-side half — fragment-shaped emission, one record and counter
 per candidate, and no write path — is pinned in
