@@ -379,6 +379,40 @@ func TestRouteTableCarriesUnscrubbableAcknowledgement(t *testing.T) {
 	}
 }
 
+// TestRouteTableRefusesNonAcknowledgedUnscrubbableValue pins the runtime
+// re-validation half of the contract (x-unscrubbable-contract.md): the
+// route-table build re-checks the literal, and any value other than
+// "acknowledged" — including a YAML boolean, the "false form" the contract
+// forbids — fails the build rather than silently clearing the flag.
+func TestRouteTableRefusesNonAcknowledgedUnscrubbableValue(t *testing.T) {
+	tests := []struct {
+		name string
+		node *yaml.Node
+	}{
+		{"string other than acknowledged", &yaml.Node{Kind: yaml.ScalarNode, Value: "unacknowledged"}},
+		{"yaml boolean true", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			document := &v3.Document{Paths: &v3.Paths{PathItems: orderedmap.New[string, *v3.PathItem]()}}
+			operation := &v3.Operation{Responses: &v3.Responses{Codes: orderedmap.New[string, *v3.Response]()}}
+			operation.Responses.Codes.Set("200", &v3.Response{Description: "OK"})
+			operation.Extensions = orderedmap.New[string, *yaml.Node]()
+			operation.Extensions.Set("x-upstream", &yaml.Node{Kind: yaml.ScalarNode, Value: "http://upstream.test"})
+			operation.Extensions.Set("x-unscrubbable", test.node)
+			document.Paths.PathItems.Set("/opaque", &v3.PathItem{Get: operation})
+
+			_, err := BuildRouteTable(document)
+			if err == nil {
+				t.Fatalf("BuildRouteTable accepted a non-acknowledged x-unscrubbable value")
+			}
+			if !strings.Contains(err.Error(), "x-unscrubbable") {
+				t.Fatalf("BuildRouteTable() error = %v, want it to name x-unscrubbable", err)
+			}
+		})
+	}
+}
+
 // TestAcknowledgedRouteStillScrubsScannableResponse pins the acknowledgement's
 // scope: x-unscrubbable permits unscannable-response pass-through, it is not a
 // blanket scrubbing opt-out. A response the proxy can scan is scrubbed — body,

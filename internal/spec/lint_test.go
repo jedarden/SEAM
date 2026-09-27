@@ -153,6 +153,30 @@ func TestLintDirectoryUnscrubbableAcknowledgementContract(t *testing.T) {
 	}
 }
 
+// TestLintDirectoryRefusesNonAcknowledgedUnscrubbableValue pins the admission
+// half of the contract (x-unscrubbable-contract.md): the field accepts exactly
+// "acknowledged" — absence is refusal, not permission, and there is no false
+// form, so any other value, including a YAML boolean, is a schema error rather
+// than a warnable acknowledgement.
+func TestLintDirectoryRefusesNonAcknowledgedUnscrubbableValue(t *testing.T) {
+	for _, value := range []string{"unacknowledged", "yes", "true"} {
+		t.Run(value, func(t *testing.T) {
+			root := t.TempDir()
+			fragment := strings.ReplaceAll(
+				validLintFragment("owner", "v1", "https://api.example.com"),
+				"x-upstream: https://api.example.com\n",
+				"x-upstream: https://api.example.com\nx-unscrubbable: "+value+"\n")
+			writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			assertFindingCodes(t, report.Errors, []string{"fragment.schema"})
+		})
+	}
+}
+
 func TestLintDirectoryDetectsTripleCollisionsButAllowsMethodAndVersionCoexistence(t *testing.T) {
 	root := t.TempDir()
 	writeLintTestFragment(t, root, "owner", "a.yaml", validLintFragment("owner", "v1", "https://api.example.com"))
