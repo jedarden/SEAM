@@ -361,3 +361,66 @@ func TestEphemeralKeyEndpointRefusalEnvelope(t *testing.T) {
 		}
 	})
 }
+
+// TestEphemeralKeyEndpointStampsControlPlaneHeaders pins the endpoint's own
+// header behaviour against the caller control-plane conventions the other
+// contract endpoints pin for themselves. The handler never sets
+// X-SEAM-Scope-Version itself (unlike /whoami and /scopes), so the stamp on
+// its responses is the scope-version middleware of the assembled caller
+// pipeline — driven here in the production order, stage 3 outside the
+// scope-version wrapper, the assembly TestCallerListenerAssembledPipeline-
+// StampsCallerScopeVersion pins over a real listener. Every response must
+// carry the caller's own scope-set hash, on the issuance 200 and on the
+// under-scope 403 alike, and the refusal keeps the envelope's
+// Cache-Control: no-store under that same wrapper.
+func TestEphemeralKeyEndpointStampsControlPlaneHeaders(t *testing.T) {
+	t.Run("issuance response carries the caller's scope version", func(t *testing.T) {
+		upstream, _ := newEphemeralKeyFakeUpstream(t, "needle-alpha")
+		s := newEphemeralKeyTestServer(t, upstream.URL)
+		s.identityResolver = newLoopbackTestIdentityResolver()
+		s.identityResolver.setResolveOverride(func(remoteAddr string) (*Identity, error) {
+			return ephemeralKeyIdentity("seam:tailscale:key-create"), nil
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/tailscale/ephemeral-key",
+			strings.NewReader(`{"worker_id":"needle-alpha"}`))
+		resp := httptest.NewRecorder()
+		s.identityResolutionMiddleware(s.scopeVersionMiddleware(s.callerMux)).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+		want := ComputeScopeVersionHash([]string{"seam:tailscale:key-create"})
+		if got := resp.Header().Get("X-SEAM-Scope-Version"); got != want {
+			t.Errorf("X-SEAM-Scope-Version = %q, want the caller's scope-set hash %q", got, want)
+		}
+	})
+
+	t.Run("refusal keeps the headers under the full pipeline", func(t *testing.T) {
+		upstream, state := newEphemeralKeyFakeUpstream(t, "needle-alpha")
+		s := newEphemeralKeyTestServer(t, upstream.URL)
+		s.identityResolver = newLoopbackTestIdentityResolver()
+		s.identityResolver.setResolveOverride(func(remoteAddr string) (*Identity, error) {
+			return ephemeralKeyIdentity("seam:read"), nil
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/tailscale/ephemeral-key",
+			strings.NewReader(`{"worker_id":"needle-alpha"}`))
+		resp := httptest.NewRecorder()
+		s.identityResolutionMiddleware(s.scopeVersionMiddleware(s.callerMux)).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d; body: %s", resp.Code, http.StatusForbidden, resp.Body.String())
+		}
+		want := ComputeScopeVersionHash([]string{"seam:read"})
+		if got := resp.Header().Get("X-SEAM-Scope-Version"); got != want {
+			t.Errorf("X-SEAM-Scope-Version = %q, want the denied caller's scope-set hash %q", got, want)
+		}
+		if got := resp.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("Cache-Control = %q, want no-store", got)
+		}
+		if state.callCount() != 0 {
+			t.Errorf("upstream hit %d times on refusal, want 0", state.callCount())
+		}
+	})
+}
