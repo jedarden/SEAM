@@ -25,7 +25,8 @@ commits), that nothing under `corpus/` is ever tracked in a real checkout,
 and that the checked-in fixture and package paths stay tracked and outside
 every ignore rule. Deliberately promoting a capture means moving it into
 `tools/diffharness/testdata/` — where the fixture validation below applies —
-never committing it under `corpus/`.
+never committing it under `corpus/`; the step-by-step procedure is the
+promotion runbook below.
 
 ## Automated checks
 
@@ -186,6 +187,135 @@ driven by `scripts/capture-argocd.sh`) follows the same persistence model:
 - its output under the repository-root `corpus/` directory is gitignored
   runtime data, never a commit candidate (see the storage split above).
 
+## Promotion runbook: capture → fixture
+
+Promotion is the deliberate act of turning a runtime capture under
+`corpus/` into a reviewed fixture under `tools/diffharness/testdata/` — the
+only path capture data may take into git
+(`TestRuntimeCorpusStaysOutOfGit` fails while anything under `corpus/` is
+tracked). Neither capture producer writes fixture-ready data: the metadata
+below is stamped with producer defaults and `secrets[]` is never
+populated, so every step here is mandatory.
+
+### 1. Flush the pending entries to disk
+
+The gateway's capture middleware holds entries in memory between the
+persistence triggers above. Flush without stopping the process through the
+operator endpoint:
+
+```sh
+# Where the corpus lives and how many entries are held (operator listener)
+curl -sS -H "Authorization: Bearer $OPERATOR_TOKEN" \
+  "$OPERATOR_URL/_seam/capture/status" | jq .
+# → {"enabled":true,"entry_count":N,"corpus_dir":"corpus"}
+
+# Snapshot-flush to <corpus_dir>/corpus.json
+curl -sS -X POST -H "Authorization: Bearer $OPERATOR_TOKEN" \
+  "$OPERATOR_URL/_seam/capture/save" | jq .
+# → {"status":"saved","entry_count":N}
+```
+
+Both endpoints are bound on the operator listener only — the caller mux
+answers 404 for them (`TestCaptureEndpointsAreOperatorOnly`) — and require
+the `seam:ops:read` scope. `save` is POST-only (405 otherwise, pinned by
+the `save rejects GET` case of `TestCaptureEndpointsMethodAndStateErrors`),
+ignores any request body, and is a **snapshot rewrite, not a drain**:
+entries stay in memory and a repeat save neither duplicates nor drops
+anything (`TestCaptureSaveFlushIsIdempotent`). With capture disabled it
+answers 503 `Capture middleware not enabled`; a failed write answers
+`capture_failed` and retains the entries. Compare `entry_count` from
+`status` before and after the flush — the file must now carry all of them.
+
+Graceful shutdown is the equivalent flush for either producer —
+`Server.Shutdown` persists a corpus that never crossed the autosave
+threshold (`TestShutdownFlushesCorpusBelowAutoSaveThreshold`), and
+`scripts/capture-argocd.sh stop` stops the standalone capture proxy — but
+the endpoint does it without ending the capture session.
+
+### 2. Rewrite the capture metadata to the fixture conventions
+
+A raw capture carries its producer's defaults, not the fixture contract of
+[`docs/design/argocd-ro-corpus-data-structure.md`](design/argocd-ro-corpus-data-structure.md):
+
+| Field | What a raw capture stamps | Fixture convention |
+| --- | --- | --- |
+| `schema` | `seam-diff-corpus/v1` | unchanged — the only version `corpus.Load` accepts |
+| `service` | `seam` (middleware) / the `--service` flag (`seam-capture`; `capture-argocd.sh` passes the retired `argocd`) | the canonical deployed token `argocd-ro` — `argocd` / `argocd-proxy` are retired |
+| `incumbent` | the placeholder `seam-incumbent` (middleware) | the base URL actually captured against |
+| `capturedAt` | re-stamped at **every** middleware `Save` | RFC3339 timestamp of the **first** capture; appends never update it |
+| `secrets[]` | never populated by either producer | one `vault:` ref per credential, written by hand |
+
+- The middleware's `capturedAt` is the *save* time, so a promoted fixture
+  must carry the first-capture timestamp instead — take it from the
+  session metadata (`corpus/<service>/metadata/capture-session.json`
+  `startedAt`) when the session recorded one.
+- `seam-capture` stamps `--service` verbatim and refuses a corpus whose
+  stored service differs from the flag (an incumbent change only warns), so
+  pass `--service argocd-ro` at capture time; because
+  `capture-argocd.sh` still hardcodes the retired `argocd`, its output
+  always needs the token rewritten during this step, and its
+  `corpus/argocd-proxy/` output path names the retired token too.
+- Every promoted entry needs its `secrets[].ref` written by hand — both
+  producers capture requests only (`seam-capture` carries an explicit
+  TODO). Copy the path from the route fragment's `x-vault-path`, keep the
+  `vault:` scheme, and prefer `injectAs.kind: bearer` (which takes no
+  `name`) for bearer credentials. The shape to copy is
+  `vault:rs-manager/rs-manager/seam/routes/argocd-ro/<key>`.
+
+### 3. Gate the promotion through the fixture validations
+
+Copy the flushed file into `tools/diffharness/testdata/<name>.json`, then
+let the loader reject what eyeballing misses. `corpus.Load` — and
+`Corpus.AppendEntry` at capture time — validate:
+
+- the file parses as JSON and declares `seam-diff-corpus/v1` exactly;
+- a non-empty `service` token;
+- unique, non-empty entry IDs;
+- canonicalized header keys and HTTP methods (a missing method defaults to
+  `GET`); and
+- every `secrets[].ref`: `vault:`-schemed, free of traversal (`..`,
+  backslashes), glob (`*`, `?`, `[`) and templated (`{}`) segments, and
+  resolving strictly inside the enforced base
+  `rs-manager/rs-manager/seam/routes` — the retired `seam/routes` base
+  fails, and containment is boundary-correct (details in the
+  fixture-integrity check above).
+
+`TestCheckedInFixturesResolveUnderEnforcedVaultBase` then walks the
+checked-in fixtures with the default enforced base pinned (env cleared)
+and, for `corpus-argocd.json`, additionally pins `argocd-ro` as the
+`service` token with every ref under `<base>/argocd-ro/`. **That test
+walks an explicit fixture list, not a `testdata/` glob — add the promoted
+file to the `fixtures` slice in
+`tools/diffharness/internal/corpus/corpus_test.go` as part of the
+promotion**, so it receives the same walk on every future run. Also work
+through the design doc's corpus review checklist over the candidate:
+`jq .` for syntax, no literal bearer tokens in headers, no credential
+leakage in captured bodies, descriptions reviewed for sensitive content.
+
+### 4. Re-run the fixture suite, then commit by pathspec
+
+```sh
+cd tools/diffharness && go test ./...
+```
+
+The module is standalone, so the root sweep never runs it — this re-run is
+the promotion gate, not a formality, and it is the same set enforced as the
+`diffharness fixture validation` lane in DoD `--slow`. Then commit the
+named paths explicitly:
+
+```sh
+git add tools/diffharness/testdata/<name>.json \
+        tools/diffharness/internal/corpus/corpus_test.go
+git commit -m "test(corpus): promote <name> capture to fixture (seam-…)"
+```
+
+A pathspec commit, never a directory add: `corpus/` is gitignored and must
+stay untracked, and a blanket `git add` is exactly how a runtime capture —
+or the adjacent debris of a capture session — slips into a commit. The
+`internal/corpusboundary` suite pins the whole split: the anchored
+`/corpus/` ignore entry, the tracked guarded fixture and package paths,
+and the fixture-validation lane staying wired.
+
 ## Results
 
 Last verified: 2026-09-26.
@@ -206,7 +336,10 @@ their test name rather than attributed to corpus integrity.
 
 ## Review requirements for new captures
 
-Before committing a newly captured corpus:
+These are the content-level review items for a newly captured corpus; the
+mechanical steps around them (flush, metadata rewrite, validation gates,
+pathspec commit) are the promotion runbook above. Before committing a
+newly captured corpus:
 
 1. Run the fixture checks (`cd tools/diffharness && go test ./...`) and the
    focused capture suite above.
