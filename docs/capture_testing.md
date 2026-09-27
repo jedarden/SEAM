@@ -66,10 +66,21 @@ Loading a corpus (`corpus.Load`) and appending an entry
 The enforced base mirrors `internal/spec.ResolveVaultBaseDir`:
 `DefaultVaultBaseDir` as above, overridden by `SEAM_VAULT_BASE_DIR` when that
 variable is non-blank after trimming (`TestVaultBaseDirOverrideHonored`).
-The mirror lives in `tools/diffharness/internal/corpus/corpus.go`; when the
-base moves, move both. The checked-in fixtures themselves are walked by
-`TestCheckedInFixturesResolveUnderEnforcedVaultBase`, which also pins
-`argocd-ro` as the canonical service token.
+The mirror lives in `tools/diffharness/internal/corpus/corpus.go`. The
+harness module is deliberately standalone (stdlib only, no SEAM gateway
+imports), so it cannot import `internal/spec` to stay honest; the shared
+base is instead pinned to a one-line golden file,
+`internal/spec/testdata/enforced-vault-base.txt`, that both suites read —
+`TestDefaultVaultBaseDirMatchesGolden` asserts SEAM's `DefaultVaultBaseDir`
+and `ResolveVaultBaseDir` against it, and `TestEnforcedVaultBaseMatchesGolden`
+(the corpus package) asserts this module's mirror against the same file. The
+agreement is enforced, not manual: a one-sided move fails the suite that did
+not move, so the drift surfaces at fixture time instead of as replay-time
+secret-resolution failures (the base already moved once, on the 2026-09-04
+consolidation). When the base moves, move all three — the SEAM constant, the
+mirror, and the golden — in one change. The checked-in fixtures themselves
+are walked by `TestCheckedInFixturesResolveUnderEnforcedVaultBase`, which
+also pins `argocd-ro` as the canonical service token.
 
 ### Capture round-trip and response-pair checks
 
