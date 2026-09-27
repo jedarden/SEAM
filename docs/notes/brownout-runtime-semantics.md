@@ -196,11 +196,15 @@ itself.
 ### Header names: no `X-` prefix
 
 The gateway emits the unprefixed RFC 9745 `Deprecation` and RFC 8594
-`Sunset` fields. Some example fragments
-(`examples/fragments/5-complex-multi-instance.yaml`, `docs/examples/…`)
-declare `X-Deprecation`/`X-Sunset` as response headers in the example API
+`Sunset` fields. One example fragment
+(`examples/fragments/5-complex-multi-instance.yaml`) still declares
+`X-Deprecation`/`X-Sunset` as response headers in the example API
 document — those describe what an example API advertises in its own response
-declarations, not the gateway's emission contract. The schema's own
+declarations, not the gateway's emission contract. The docs/examples copies
+used to advertise the same prefixed headers; they now declare the unprefixed
+fields, and `docs/examples/doc_examples_test.go`
+(`TestDocumentationExamplesTeachLandedExtensionSemantics`) fails any
+docs/examples fragment that reintroduces them. The schema's own
 `$comment`s ("populates Deprecation directly", "emitted as Sunset verbatim")
 and `docs/notes/route-fragment-schema-v1.md` ("This field drives the
 Deprecation and Sunset HTTP headers (RFC 9745, RFC 8594)") name the

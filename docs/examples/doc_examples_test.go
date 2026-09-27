@@ -9,6 +9,7 @@
 package docexamples
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -295,6 +296,232 @@ func containsEmpty(segments []string) bool {
 		}
 	}
 	return false
+}
+
+// driftNoScrubPattern matches the blanket no-scrubbing claim the
+// complex-route example used to teach ("Responses are not scrubbed - may
+// contain echoed secrets"). The landed x-unscrubbable contract
+// (docs/notes/x-unscrubbable-contract.md; pinned by seam-1e05bb3e)
+// design-contradicts that premise: the acknowledgement changes exactly one
+// runtime behavior — an *unscannable* response is passed through whole
+// instead of refused — and every response the proxy can scan is scrubbed on
+// an acknowledged route exactly as on an ordinary one. The contract's own
+// vocabulary for the pass-through is "unsanitized", so "not scrubbed" /
+// "never scrubbed" has no true use anywhere in the documentation estate.
+var driftNoScrubPattern = regexp.MustCompile(`(?i)\b(?:not|never)\s+scrubbed\b`)
+
+// driftDeprecationHeaderPattern matches the X- prefixed deprecation-family
+// response-header names. The gateway emits the unprefixed RFC 9745
+// Deprecation and RFC 8594 Sunset fields plus Link rel=deprecation links
+// (internal/server/deprecation_middleware.go), and
+// docs/notes/brownout-runtime-semantics.md ("Header names: no X- prefix")
+// records that callers looking for X-Deprecation/X-Sunset will not find
+// them — RFC 6648 deprecates the prefix for new fields.
+var driftDeprecationHeaderPattern = regexp.MustCompile(`(?i)^x-(?:deprecation|sunset)$`)
+
+// httpMethodKeys are the OpenAPI path-item operation keys.
+var httpMethodKeys = map[string]bool{
+	"get": true, "put": true, "post": true, "delete": true,
+	"options": true, "head": true, "patch": true, "trace": true,
+}
+
+// TestDocumentationExamplesTeachLandedExtensionSemantics pins the two
+// extension-semantics contracts that no schema rule reaches: prose and
+// response-header declarations are grammar-valid OpenAPI, so the lint gate
+// above passes straight past them while still teaching callers something the
+// gateway does not do. It walks every .json/.yaml/.yml file under
+// docs/examples (including route-fragments/) and fails on:
+//
+//   - a response-header declaration named X-Deprecation/X-Sunset: the
+//     gateway never emits an X- prefixed deprecation header, so an example
+//     advertising one on a documented response teaches a header that does
+//     not exist;
+//   - any string asserting responses are "not scrubbed"/"never scrubbed":
+//     the seam-1e05bb3e-contradicted premise. Acknowledgement is not a
+//     scrubbing opt-out;
+//   - an x-unscrubbable: "acknowledged" site (fragment root or operation,
+//     the two placements the runtime accepts) whose sibling description
+//     never names the unscannable scope: an example that acknowledges
+//     without stating what the acknowledgement actually does teaches the
+//     same omission by silence.
+//
+// Only docs/examples is walked. The examples/ tree also declares
+// X-Deprecation/X-Sunset response headers, but brownout-runtime-semantics.md
+// already frames those as what the example API advertises in its own
+// response declarations rather than a gateway-emission claim — a documented
+// divergence, and a different estate from the one this gate owns.
+func TestDocumentationExamplesTeachLandedExtensionSemantics(t *testing.T) {
+	checkExtensionSemantics(t, "docs/examples", ".")
+}
+
+func checkExtensionSemantics(t *testing.T, name, dir string) {
+	t.Helper()
+
+	files := 0
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".json", ".yaml", ".yml":
+		default:
+			return nil
+		}
+		files++
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Errorf("%s: read: %v", path, err)
+			return nil
+		}
+		var decoded any
+		if err := yaml.Unmarshal(contents, &decoded); err != nil {
+			t.Errorf("%s: parse: %v", path, err)
+			return nil
+		}
+		normalized, err := normalizeDocValue(decoded)
+		if err != nil {
+			t.Errorf("%s: normalize: %v", path, err)
+			return nil
+		}
+		doc, ok := normalized.(map[string]any)
+		if !ok {
+			t.Errorf("%s: top-level document is %T, want an object", path, normalized)
+			return nil
+		}
+		scrubDescriptionsForDrift(t, path, "", doc)
+		checkDeprecationHeaderNames(t, path, doc)
+		checkAcknowledgementDescriptions(t, path, doc)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", name, err)
+	}
+	if files == 0 {
+		t.Fatalf("no .json/.yaml/.yml files under %s - the documentation tree is missing", name)
+	}
+}
+
+// scrubDescriptionsForDrift sweeps every string in the document for the
+// blanket no-scrubbing claim, wherever it hides: operation descriptions,
+// schema property descriptions, summaries, examples.
+func scrubDescriptionsForDrift(t *testing.T, file, path string, value any) {
+	t.Helper()
+
+	switch value := value.(type) {
+	case map[string]any:
+		for key, child := range value {
+			scrubDescriptionsForDrift(t, file, fieldPath(path, key), child)
+		}
+	case []any:
+		for i, child := range value {
+			scrubDescriptionsForDrift(t, file, fieldPath(path, fmt.Sprint(i)), child)
+		}
+	case string:
+		if match := driftNoScrubPattern.FindString(value); match != "" {
+			t.Errorf("%s: %s: claims %q - the x-unscrubbable contract (docs/notes/x-unscrubbable-contract.md) is not a scrubbing opt-out: an acknowledgement only lets an unscannable response pass through instead of being refused, and every scannable response is still scrubbed", file, path, match)
+		}
+	}
+}
+
+// checkDeprecationHeaderNames rejects X- prefixed deprecation-family
+// response-header declarations anywhere in the paths object.
+func checkDeprecationHeaderNames(t *testing.T, file string, doc map[string]any) {
+	t.Helper()
+
+	paths, ok := doc["paths"].(map[string]any)
+	if !ok {
+		return
+	}
+	for path, item := range paths {
+		pathItem, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, op := range pathItem {
+			if !httpMethodKeys[strings.ToLower(method)] {
+				continue
+			}
+			operation, ok := op.(map[string]any)
+			if !ok {
+				continue
+			}
+			responses, ok := operation["responses"].(map[string]any)
+			if !ok {
+				continue
+			}
+			for status, resp := range responses {
+				response, ok := resp.(map[string]any)
+				if !ok {
+					continue
+				}
+				headers, ok := response["headers"].(map[string]any)
+				if !ok {
+					continue
+				}
+				for header := range headers {
+					if driftDeprecationHeaderPattern.MatchString(header) {
+						t.Errorf("%s: /paths/%s/%s/responses/%s/headers/%s: declares an X- prefixed deprecation header - the gateway emits the unprefixed RFC 9745 Deprecation and RFC 8594 Sunset fields and never an X- prefixed form (docs/notes/brownout-runtime-semantics.md, \"Header names: no X- prefix\")", file, path, method, status, header)
+					}
+				}
+			}
+		}
+	}
+}
+
+// checkAcknowledgementDescriptions requires every x-unscrubbable:
+// "acknowledged" site — fragment root or operation, the two placements
+// extractAcknowledgedExtension reads — to state the acknowledgement's actual
+// scope in its sibling description. "unscannable" is the contract's own term
+// of art for what the acknowledgement covers, so its presence is the
+// cheapest structural proof the prose teaches the landed behavior rather
+// than the refuted one.
+func checkAcknowledgementDescriptions(t *testing.T, file string, doc map[string]any) {
+	t.Helper()
+
+	if doc["x-unscrubbable"] == "acknowledged" {
+		description := ""
+		if info, ok := doc["info"].(map[string]any); ok {
+			description, _ = info["description"].(string)
+		}
+		requireUnscannableScope(t, file, "/x-unscrubbable", "/info/description", description)
+	}
+
+	paths, ok := doc["paths"].(map[string]any)
+	if !ok {
+		return
+	}
+	for path, item := range paths {
+		pathItem, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, op := range pathItem {
+			if !httpMethodKeys[strings.ToLower(method)] {
+				continue
+			}
+			operation, ok := op.(map[string]any)
+			if !ok {
+				continue
+			}
+			if operation["x-unscrubbable"] != "acknowledged" {
+				continue
+			}
+			description, _ := operation["description"].(string)
+			requireUnscannableScope(t, file, "/paths/"+path+"/"+method+"/x-unscrubbable", "/description", description)
+		}
+	}
+}
+
+func requireUnscannableScope(t *testing.T, file, site, descriptionPath, description string) {
+	t.Helper()
+
+	if !strings.Contains(strings.ToLower(description), "unscannable") {
+		t.Errorf("%s: %s: acknowledges x-unscrubbable without stating its scope - the acknowledgement covers unscannable responses only (opaque media types, unsupported Content-Encoding, protocol upgrades are passed through instead of refused); scannable responses are still scrubbed. Say so in %s.", file, site, descriptionPath)
+	}
 }
 
 // normalizeDocValue makes yaml.v3's map[any]any representation safe for the

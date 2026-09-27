@@ -43,7 +43,7 @@
     "/v2/resources": {
       "get": {
         "summary": "List resources (deprecated)",
-        "description": "This endpoint is deprecated. Use /v3/resources instead. Responses are not scrubbed - may contain echoed secrets.",
+        "description": "This endpoint is deprecated. Use /v3/resources instead. The gateway marks every response with the RFC 9745 Deprecation and RFC 8594 Sunset headers plus Link rel=deprecation links. Carries x-unscrubbable: acknowledged - unscannable upstream responses (opaque media types, unsupported Content-Encoding, protocol upgrades) are passed through whole instead of refused; every scannable response is still scrubbed for echoed injected credentials.",
         "operationId": "listResources",
         "deprecated": true,
         "x-unscrubbable": "acknowledged",
@@ -75,18 +75,18 @@
           "200": {
             "description": "Paginated resource list",
             "headers": {
-              "X-Deprecation": {
+              "Deprecation": {
                 "schema": {
                   "type": "string"
                 },
-                "description": "Deprecation notice"
+                "description": "Emitted by the gateway (RFC 9745): since= followed by the x-seam-deprecated since date"
               },
-              "X-Sunset": {
+              "Sunset": {
                 "schema": {
                   "type": "string",
                   "format": "date"
                 },
-                "description": "Sunset date"
+                "description": "Emitted by the gateway (RFC 8594): the x-seam-deprecated sunset date verbatim"
               }
             },
             "content": {
@@ -153,7 +153,7 @@
                     "description": { "type": "string" },
                     "configuration": {
                       "type": "object",
-                      "description": "May contain sensitive data - responses are not scrubbed"
+                      "description": "May contain sensitive data - every scannable response is scrubbed for echoed injected credentials"
                     },
                     "metadata": {
                       "type": "object"
