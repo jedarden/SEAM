@@ -204,6 +204,16 @@ According to the comprehensive OpenBao report (OPENBAO_RESOURCES_FINAL_REPORT.md
 
 ## Remediation Path
 
+> **Withdrawn 2026-09-05 — do not execute this remediation.** The evaluator is
+> detection-only: it holds no GitHub credential and must never hold one, so
+> step 2's `github-token` parameter (and any "replace the placeholder PAT"
+> step below) provisions a credential that is now a policy regression. The
+> prerequisites this section chases also no longer hold: the ServiceAccount
+> and the `seam-retirement-evaluator` role exist on rs-manager — both standing
+> canaries authenticate with them — and the policy in force is the
+> reconciler-written `openbao-policy.hcl` (single `victoriametrics-query`
+> grant; both route denies; the retired GitHub-token grant removed).
+
 ### Immediate Actions Required
 1. **Create ServiceAccount:**
    ```bash
@@ -263,6 +273,17 @@ attesting the denies. Do not treat either route deny as live-verified until that
 canary reports `PASS` again; confirming it needs an OpenBao operator session,
 which the `sys/policies/acl` read path requires from ex44.
 
+**Update 2026-09-27 (supersedes the "failing canary" caveat above):** the
+GitHub-credential step the 2026-09-04 note describes no longer exists — the
+canaries were rewired at the 2026-09-05 withdrawal and now attest the
+detection-only shape (`seam-retirement-evaluator-access-canary`: denied on
+both SEAM route prefixes and the vmagent write token, reads the
+`victoriametrics-query` credential, queries VM through vmauth, requires
+write/delete rejection; `seam-evaluator-credential-boundary-canary`: 403 on
+the retired credential path as `seam`). Both canary Deployments are Running
+and readiness-green on rs-manager as of this update, so the route denies are
+live-attested again.
+
 ---
 
 ## Verification Checklist
@@ -294,9 +315,9 @@ Once the setup workflow is successfully executed, verify:
 The `seam-retirement-evaluator` role configuration is well-documented and properly designed with strong security isolation. However, **the role does not currently exist** in OpenBao because the provisioning workflow has never been successfully executed. The primary blocker is the missing ServiceAccount `seam-retirement-evaluator` in the `seam` namespace.
 
 **Next Steps:**
-1. Create the missing ServiceAccount
-2. Execute the setup workflow
-3. Verify role creation and test access
-4. Replace placeholder GitHub token with actual PAT
+1. ~~Create the missing ServiceAccount~~ — exists (both canaries authenticate with it)
+2. ~~Execute the setup workflow~~ — withdrawn 2026-09-05; the policy is written by the rs-manager hardening reconciler, not this workflow
+3. Verify role creation and test access — standing canaries attest this every 5 minutes
+4. ~~Replace placeholder GitHub token with actual PAT~~ — **withdrawn**: the evaluator is detection-only; the retired token path must stay absent and denied (403)
 
 This documentation serves as the authoritative reference for the expected configuration once provisioning is completed.

@@ -5,8 +5,8 @@ log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
 error() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: $1" >&2; return 1; }
 warn() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] WARNING: $1" >&2; }
 
-log "=== Evaluator Token Isolation and Metrics Access Verification ==="
-log "Testing: Evaluator can read token/metrics, SEAM cannot read evaluator token"
+log "=== Evaluator Isolation Verification (detection-only, post-withdrawal) ==="
+log "Testing: retired token path stays denied, the single live victoriametrics-query grant reads, SEAM cannot read evaluator credential paths"
 
 # Check if we have admin access to OpenBao
 if [ -z "$BAO_ADDR" ]; then
@@ -64,43 +64,43 @@ else
 fi
 
 # ===================================================================
-# Part 2: Verify Token Path Exists
+# Part 2: Verify the Retired Token Path Stays Denied
 # ===================================================================
 log ""
-log "=== Part 2: Verifying Evaluator Token Path ==="
+log "=== Part 2: Verifying the Retired Evaluator Token Path (withdrawn 2026-09-05) ==="
 
+# The evaluator is detection-only and holds no GitHub credential of any
+# kind. The retired path must stay absent AND denied: a read succeeding here
+# means the withdrawn grant (or the secret) came back -- a policy regression,
+# never a missing prerequisite to "fix".
 if bao kv get secret/evaluators/seam-retirement-evaluator/github-token >/dev/null 2>&1; then
-  log "✓ Evaluator GitHub token path exists"
-
-  TOKEN_CONTENT=$(bao kv get -field=token secret/evaluators/seam-retirement-evaluator/github-token 2>/dev/null || echo "")
-  if [ "$TOKEN_CONTENT" = "REPLACE_WITH_ACTUAL_GITHUB_PAT" ]; then
-    warn "Token path contains placeholder - update with actual GitHub PAT"
-  elif [ -n "$TOKEN_CONTENT" ]; then
-    log "✓ Token contains actual value (not placeholder)"
-  else
-    warn "Token value appears empty"
-  fi
+  error "✗ Retired evaluator token path is READABLE -- the withdrawn grant has come back (policy regression)"
 else
-  error "✗ Evaluator GitHub token path does not exist"
+  log "✓ Retired evaluator token path absent/denied (403) -- withdrawal holds"
 fi
 
 # ===================================================================
-# Part 3: Verify VictoriaMetrics Credentials Path
+# Part 3: Verify the Single Live Grant -- VictoriaMetrics Query Credential
 # ===================================================================
 log ""
-log "=== Part 3: Verifying VictoriaMetrics Credentials ==="
+log "=== Part 3: Verifying the VictoriaMetrics Query Credential ==="
 
-if bao kv get secret/monitoring/victoriametrics/readonly-credentials >/dev/null 2>&1; then
-  log "✓ VictoriaMetrics credentials path exists"
+# The evaluator policy's single live grant: the query-only bearer token that
+# vmauth scopes to read endpoints. (The draft
+# secret/monitoring/victoriametrics/readonly-credentials path was never
+# applied, is not in the live policy, and is covered by default-deny -- it is
+# not an expectation and its absence is correct.)
+if bao kv get secret/rs-manager/seam-retirement-evaluator/victoriametrics-query >/dev/null 2>&1; then
+  log "✓ VictoriaMetrics query credential path exists"
 
-  VM_ENDPOINT=$(bao kv get -field=endpoint secret/monitoring/victoriametrics/readonly-credentials 2>/dev/null || echo "")
+  VM_ENDPOINT=$(bao kv get -field=endpoint secret/rs-manager/seam-retirement-evaluator/victoriametrics-query 2>/dev/null || echo "")
   if [ -n "$VM_ENDPOINT" ]; then
     log "✓ VictoriaMetrics endpoint configured: $VM_ENDPOINT"
   else
-    warn "VictoriaMetrics endpoint not configured in credentials"
+    warn "VictoriaMetrics endpoint field not configured in credential"
   fi
 else
-  warn "VictoriaMetrics credentials path does not exist (may not be required)"
+  error "✗ VictoriaMetrics query credential path does not exist (the evaluator policy's single live grant is missing)"
 fi
 
 # ===================================================================
@@ -144,7 +144,7 @@ fi
 # Part 5: Verify SEAM Cannot Read Evaluator Token
 # ===================================================================
 log ""
-log "=== Part 5: Verifying SEAM Cannot Read Evaluator Token ==="
+log "=== Part 5: Verifying SEAM Cannot Read Evaluator Credential Paths ==="
 
 # Check SEAM Kubernetes role exists and has correct policies
 if bao read auth/kubernetes/role/seam >/dev/null 2>&1; then
@@ -185,18 +185,18 @@ log "  ✓ SEAM policy exists and isolates evaluator paths"
 log "  ✓ Each role is bound to its respective ServiceAccount"
 log ""
 log "Evaluator Access:"
-log "  ✓ Evaluator token path exists at secret/evaluators/seam-retirement-evaluator/github-token"
+log "  ✓ Retired token path stays absent/denied (withdrawn 2026-09-05 -- detection-only, no credential)"
 log "  ✓ Evaluator Kubernetes role configured correctly"
-log "  ✓ Evaluator policy allows reading own token and VictoriaMetrics credentials"
+log "  ✓ Evaluator policy's single live grant (victoriametrics-query) reads"
 log ""
 log "SEAM Access Restriction:"
 log "  ✓ SEAM policy explicitly denies evaluator paths (or uses default-deny)"
 log "  ✓ SEAM cannot read evaluator's GitHub token path"
 log ""
 log "Next Steps:"
-log "  1. If evaluator token is placeholder, update with actual GitHub PAT"
+log "  1. Nothing to provision: the evaluator is detection-only and must never hold a credential"
 log "  2. Deploy the evaluator using seam-retirement-evaluator ServiceAccount"
-log "  3. Run the evaluator and verify it can read its token and query VictoriaMetrics"
-log "  4. Confirm SEAM deployment cannot access evaluator token path"
+log "  3. Run the evaluator and verify its unauthenticated VM queries and detection-only output"
+log "  4. Confirm SEAM cannot access evaluator credential paths (the boundary canary attests the 403 every cycle)"
 log ""
 log "=== Verification Complete ==="

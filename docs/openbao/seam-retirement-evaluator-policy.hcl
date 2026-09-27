@@ -11,10 +11,14 @@
 #    route path")
 #
 # Two things differ between this draft and what is deployed:
-#   * the credential paths -- the deployed policy grants read on the exact
-#     paths secret/data/seam-retirement-evaluator/github/token and
+#   * the credential paths -- the deployed policy grants read on exactly one
+#     credential, the query-only
 #     secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query
-#     (+ their secret/metadata/ counterparts), not on broad prefixes;
+#     (+ its secret/metadata/ counterpart). The
+#     secret/data/seam-retirement-evaluator/github/token grant it formerly
+#     carried was REMOVED 2026-09-05 (declarat-b818338b) when the evaluator
+#     went detection-only -- it holds no GitHub credential and that path must
+#     stay absent and denied. Not on broad prefixes either, unlike this draft;
 #   * the deny set -- the deployed policy denies the CONSOLIDATED route prefix
 #     secret/data/rs-manager/rs-manager/seam/routes/* as well as the legacy
 #     secret/data/seam/routes/*. Only the legacy deny appears below, because

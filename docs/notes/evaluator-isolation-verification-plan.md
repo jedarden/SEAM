@@ -17,7 +17,7 @@
 
 ## Objective
 
-Verify that the seam-retirement-evaluator can read its GitHub token and query VictoriaMetrics for SEAM metrics, while SEAM's role provably cannot read the evaluator's token path, ensuring proper security isolation.
+~~Verify that the seam-retirement-evaluator can read its GitHub token and query VictoriaMetrics for SEAM metrics, while SEAM's role provably cannot read the evaluator's token path, ensuring proper security isolation.~~ — **withdrawn 2026-09-05**: the evaluator is detection-only and reads no token of any kind. Today this plan verifies the inverted shape: the retired GitHub-token path stays **denied** (403; a read succeeding is the regression), the evaluator's single live grant — the query-only VictoriaMetrics credential `rs-manager/seam-retirement-evaluator/victoriametrics-query` — reads, and SEAM still cannot reach evaluator credential paths.
 
 ## Acceptance Criteria
 
@@ -131,10 +131,10 @@ spec:
 EOF
 ```
 
-This workflow runs as the evaluator SA and tests:
-- Can read own GitHub token
+This workflow runs as the evaluator SA and tests (post-withdrawal shape; the live template was rewired 2026-09-05 and asserts the denials):
+- ~~Can read own GitHub token~~ — **withdrawn**: the retired `github/token` path must return **403**; a read succeeding is the regression
 - Cannot read SEAM routes (denied)
-- Can read VictoriaMetrics credentials
+- Can read the single live grant, the query-only `victoriametrics-query` credential
 
 **Option B: Run Manual Verification Script**
 
@@ -154,12 +154,12 @@ export BAO_TOKEN="<your-admin-token>"
 ```bash
 # From a pod running as seam-retirement-evaluator SA
 # 1. Authenticate to OpenBao
-# 2. Read GitHub token
-# 3. Query VictoriaMetrics for metrics
+# 2. Read the retired GitHub-token path — must FAIL (403; withdrawn 2026-09-05)
+# 3. Read the query-only victoriametrics-query credential, then query VictoriaMetrics
 
 # Expected results:
-# - GitHub token readable
-# - VictoriaMetrics query successful
+# - Retired GitHub-token path DENIED (403) — a success is the regression
+# - victoriametrics-query credential reads; VictoriaMetrics query successful
 # - SEAM routes access denied
 ```
 

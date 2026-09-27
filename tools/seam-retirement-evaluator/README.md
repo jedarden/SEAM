@@ -22,22 +22,25 @@ appears. There is no PR, no branch, no token, and no write path of any kind.
 seam-retirement-evaluator (Deployment)
 ├── ServiceAccount: seam-retirement-evaluator
 ├── OpenBao Role: seam-retirement-evaluator-policy
-│   ├── Reads: secret/evaluators/seam-retirement-evaluator/*
-│   ├── Reads: secret/monitoring/victoriametrics/*
-│   └── Explicitly DENIED: secret/rs-manager/rs-manager/seam/routes/*
+│   ├── Reads: secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query
+│   │   (the query-only VictoriaMetrics bearer token — the single grant,
+│   │   plus its secret/metadata/ twin; the GitHub-token grant was removed
+│   │   2026-09-05 when the evaluator went detection-only)
+│   └── Explicitly DENIED: secret/data/rs-manager/rs-manager/seam/routes/*
+│       and secret/data/seam/routes/*
 │       (isolation from SEAM at the enforced vault base dir; the legacy
-│       secret/seam/routes/* deny is retained only until the
-│       pre-consolidation paths retire — a glob is prefix-exact, so the
-│       legacy deny alone stops matching once the data consolidates)
+│       deny is retained only until the pre-consolidation paths retire — a
+│       glob is prefix-exact, so the legacy deny alone stops matching once
+│       the data consolidates)
 └── VictoriaMetrics endpoint (read-only query, no credential)
 ```
 
 ### Key Isolation Guarantees
 
-- **Dedicated OpenBao Path**: `secret/evaluators/seam-retirement-evaluator/*` is NOT readable by SEAM
-- **Explicit Deny Policy**: SEAM policy explicitly denies access to evaluator paths
+- **Single Credential Grant**: the only secret the evaluator role can read is the query-only `victoriametrics-query` bearer token; the retired GitHub-token path must stay absent and denied (403) — a grant or secret reappearing there is a policy regression
+- **Explicit Deny Policy**: SEAM policy explicitly denies access to evaluator credential paths (`seam-evaluator-credential-boundary-canary` requires a 403 on the retired credential path every cycle); the evaluator policy denies both SEAM route prefixes
 - **Separate SA**: Independent ServiceAccount with minimal RBAC
-- **No Cross-Access**: Evaluator cannot read SEAM route secrets; SEAM cannot read evaluator credentials
+- **No Cross-Access**: Evaluator cannot read SEAM route secrets; SEAM cannot read evaluator credential paths
 - **No write path**: the evaluator holds no git-host credential and cannot reach one
 
 ## Functionality
