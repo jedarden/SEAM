@@ -13,16 +13,16 @@ import (
 // boundary is the point — the agreement itself is the contract.
 const enforcedVaultBaseGolden = "../../../../internal/spec/testdata/enforced-vault-base.txt"
 
-// TestEnforcedVaultBaseMatchesGolden is the diffharness half of the
-// vault-base drift tripwire (docs/capture_testing.md). This package's suite
-// validates fixtures only against its own DefaultVaultBaseDir mirror, and
+// TestVaultBaseDirMatchesGolden is the diffharness half of the vault-base
+// drift tripwire (docs/capture_testing.md). This package's suite validates
+// fixtures only against its own DefaultVaultBaseDir mirror, and
 // internal/spec's suite only against SEAM's constant, so a one-sided move of
 // either stayed green on both sides and surfaced only as replay-time
 // secret-resolution failures. Reading the golden file internal/spec's own
 // tripwire (TestDefaultVaultBaseDirMatchesGolden) reads makes the drift fail
 // at fixture time instead. When the base moves, move all three:
 // internal/spec.DefaultVaultBaseDir, this mirror, and the golden.
-func TestEnforcedVaultBaseMatchesGolden(t *testing.T) {
+func TestVaultBaseDirMatchesGolden(t *testing.T) {
 	t.Setenv(VaultBaseDirEnvVar, "") // the golden describes the un-overridden base
 
 	raw, err := os.ReadFile(enforcedVaultBaseGolden)

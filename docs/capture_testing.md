@@ -72,7 +72,7 @@ imports), so it cannot import `internal/spec` to stay honest; the shared
 base is instead pinned to a one-line golden file,
 `internal/spec/testdata/enforced-vault-base.txt`, that both suites read —
 `TestDefaultVaultBaseDirMatchesGolden` asserts SEAM's `DefaultVaultBaseDir`
-and `ResolveVaultBaseDir` against it, and `TestEnforcedVaultBaseMatchesGolden`
+and `ResolveVaultBaseDir` against it, and `TestVaultBaseDirMatchesGolden`
 (the corpus package) asserts this module's mirror against the same file. The
 agreement is enforced, not manual: a one-sided move fails the suite that did
 not move, so the drift surfaces at fixture time instead of as replay-time
