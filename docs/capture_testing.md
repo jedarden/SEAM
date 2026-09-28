@@ -7,8 +7,10 @@ repository keeps corpus data in two places:
   differential-harness fixtures: `corpus-argocd.json` (the deployed
   `argocd-ro` capture) and `example-corpus.json`. These persist request data
   and replay expectations; response values are collected from the incumbent
-  and SEAM at replay time. The fixture format, including the
-  `secrets[].ref` grammar, is specified in
+  and SEAM at replay time — a runtime capture's per-entry `response` is
+  dropped at promotion, never committed. The fixture format, including the
+  optional capture-time `response`/`timestamp` fields promotion strips, the
+  `secrets[].ref` grammar, and the three redaction points, is specified in
   [`docs/design/argocd-ro-corpus-data-structure.md`](design/argocd-ro-corpus-data-structure.md).
 - `internal/server` capture files persist complete request/response pairs for
   middleware-level capture tests. Request and response bodies are encoded as
@@ -81,7 +83,11 @@ secret-resolution failures (the base already moved once, on the 2026-09-04
 consolidation). When the base moves, move all three — the SEAM constant, the
 mirror, and the golden — in one change. The checked-in fixtures themselves
 are walked by `TestCheckedInFixturesResolveUnderEnforcedVaultBase`, which
-also pins `argocd-ro` as the canonical service token.
+also pins `argocd-ro` as the canonical service token and the fixture
+convention that no entry carries a capture-time `response` (promotion drops
+it; replay collects fresh responses from both targets). The documented
+capture → fixture conversion itself is pinned by
+`TestPromotionLifecycleConvertsCaptureToFixture` in the same package.
 
 ### Capture round-trip and response-pair checks
 
@@ -246,6 +252,8 @@ A raw capture carries its producer's defaults, not the fixture contract of
 | `service` | `seam` (middleware) / the `--service` flag (`seam-capture`; `capture-argocd.sh` passes the retired `argocd`) | the canonical deployed token `argocd-ro` — `argocd` / `argocd-proxy` are retired |
 | `incumbent` | the placeholder `seam-incumbent` (middleware) | the base URL actually captured against |
 | `capturedAt` | re-stamped at **every** middleware `Save` | RFC3339 timestamp of the **first** capture; appends never update it |
+| per-entry `response` | the incumbent response observed at capture — both producers populate it | **dropped.** A fixture retains request data and replay expectations; replay collects fresh responses from both targets, and the checked-in-fixture walk (`TestCheckedInFixturesResolveUnderEnforcedVaultBase`) rejects an entry that still carries one |
+| per-entry `timestamp` | stamped per entry by both producers | optional — informational; replay never reads it |
 | `secrets[]` | never populated by either producer | one `vault:` ref per credential, written by hand |
 
 - The middleware's `capturedAt` is the *save* time, so a promoted fixture
@@ -264,6 +272,37 @@ A raw capture carries its producer's defaults, not the fixture contract of
   `vault:` scheme, and prefer `injectAs.kind: bearer` (which takes no
   `name`) for bearer credentials. The shape to copy is
   `vault:rs-manager/rs-manager/seam/routes/argocd-ro/<key>`.
+
+#### What redaction has — and has not — already happened
+
+Redaction is not one step; it happens at three points on the way from capture
+to a committed fixture (the full story, including the replay-time leg, is the
+design doc's [Redaction
+section](design/argocd-ro-corpus-data-structure.md#redaction)):
+
+- **The middleware already scrubbed credential locations at capture time.**
+  Request headers `Authorization`, `Proxy-Authorization`, `Cookie`,
+  `Set-Cookie`, `X-Api-Key` (case-insensitive), query parameters named
+  `api_key` / `api-key` / `apikey`, `access_token` / `access-token`,
+  `auth_token` / `auth-token`, and every header/query name the matched route
+  fragment declares injectable were replaced with the marker
+  `[REDACTED-BY-SEAM]` before the entry was retained. In the promoted fixture
+  the marker is the *expected* state — it means "value scrubbed at capture;
+  the real value resolves at replay through `secrets[].ref`".
+- **The standalone `seam-capture` scrubbed nothing.** It records what crossed
+  the wire verbatim, so its output can carry a literal bearer token in a
+  header. That is a promotion blocker: the review scrubs it to the marker (or
+  removes the header) before the fixture is committed.
+- **Neither producer scrubs bodies.** A credential in a request body (or in
+  the captured response, which is recorded verbatim — and dropped at
+  promotion, per the table above) survives capture; the review checklist's
+  body inspection below is the only gate.
+
+The whole conversion — both producer shapes in, fixture-convention corpus
+out, markers preserved, verbatim credentials scrubbed — is pinned end to end
+by `TestPromotionLifecycleConvertsCaptureToFixture`
+(`tools/diffharness/internal/corpus`), which runs in the
+`diffharness module gate` lane.
 
 ### 3. Gate the promotion through the fixture validations
 
@@ -286,14 +325,19 @@ let the loader reject what eyeballing misses. `corpus.Load` — and
 `TestCheckedInFixturesResolveUnderEnforcedVaultBase` then walks the
 checked-in fixtures with the default enforced base pinned (env cleared)
 and, for `corpus-argocd.json`, additionally pins `argocd-ro` as the
-`service` token with every ref under `<base>/argocd-ro/`. **That test
+`service` token with every ref under `<base>/argocd-ro/`. The walk also
+enforces the fixture convention from step 2: an entry that still carries a
+capture-time `response` fails it. **That test
 walks an explicit fixture list, not a `testdata/` glob — add the promoted
 file to the `fixtures` slice in
 `tools/diffharness/internal/corpus/corpus_test.go` as part of the
 promotion**, so it receives the same walk on every future run. Also work
 through the design doc's corpus review checklist over the candidate:
-`jq .` for syntax, no literal bearer tokens in headers, no credential
-leakage in captured bodies, descriptions reviewed for sensitive content.
+`jq .` for syntax, no literal bearer tokens in headers (a
+`[REDACTED-BY-SEAM]` marker is the expected scrubbed state; the standalone
+producer records headers verbatim), no credential values in captured
+bodies (bodies are never scrubbed by either producer), no capture-time
+`response` left on any entry, descriptions reviewed for sensitive content.
 
 ### 4. Re-run the fixture suite, then commit by pathspec
 
@@ -325,7 +369,7 @@ Last verified: 2026-09-26.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
-| `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection |
+| `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection; the checked-in-fixture walk (no capture-time `response` survives promotion) and the promotion-lifecycle pin (`TestPromotionLifecycleConvertsCaptureToFixture`) that proves the documented capture → fixture conversion |
 | `diffharness module gate` (DoD `--slow`) | PASS | The whole nested module — fixtures, comparator, and the replay/cutover tools — built and tested in the Definition of Done, so the root sweep's module boundary cannot silently drop any of it |
 | `internal/corpusboundary` | PASS | Anchored `/corpus/` ignore entry present and effective; guarded fixture and package paths outside every ignore rule; nothing under `corpus/` tracked in a real checkout |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |

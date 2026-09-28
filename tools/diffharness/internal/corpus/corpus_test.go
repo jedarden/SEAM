@@ -1117,6 +1117,14 @@ func TestCheckedInFixturesResolveUnderEnforcedVaultBase(t *testing.T) {
 						t.Errorf("entry %d (%q) secrets[%d]: %v", i, e.ID, j, err)
 					}
 				}
+				// Fixture convention: a checked-in fixture retains request
+				// data and replay expectations; replay collects fresh
+				// responses from both targets, so the capture-time response
+				// is dropped at promotion and never committed
+				// (docs/capture_testing.md, promotion runbook step 2).
+				if e.Response != nil {
+					t.Errorf("entry %d (%q) still carries a capture-time response — promotion drops it; replay compares fresh responses, never the stored one", i, e.ID)
+				}
 			}
 		})
 	}

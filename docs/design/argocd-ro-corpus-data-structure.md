@@ -20,6 +20,19 @@
 
 This document specifies the data structure for capturing HTTP request/response pairs from the ArgoCD read-only proxy. The corpus serves as the oracle for differential testing during service migration to SEAM.
 
+> **Capture vs. fixture vs. replay.** One schema serves three phases, and
+> keeping them apart resolves most of the confusion around it. A **runtime
+> capture** (either producer) records complete request/response pairs — each
+> entry may carry the incumbent `response` observed at capture time. A
+> **checked-in fixture** (the promoted form under
+> `tools/diffharness/testdata/`) retains request data and replay expectations
+> only: promotion drops the capture-time response. **Replay** collects fresh
+> responses from incumbent and SEAM at replay time and compares those — the
+> stored response is an informational record of what the incumbent returned
+> when the entry was captured, never a comparison oracle. The integrity checks
+> for both tiers, and the capture → fixture promotion runbook, live in
+> [`docs/capture_testing.md`](../capture_testing.md).
+
 > **Secret-reference base:** the `ref` values below are written against SEAM's
 > enforced base `rs-manager/rs-manager/seam/routes` (`internal/spec/allowlist.go`
 > `DefaultVaultBaseDir`; `SEAM_VAULT_BASE_DIR` overrides), matching the
@@ -79,6 +92,7 @@ This document specifies the data structure for capturing HTTP request/response p
 ```json
 {
   "id": "list-applications-get",
+  "timestamp": "2026-07-27T12:00:00-04:00",
   "description": "List all ArgoCD applications",
   "request": {
     "method": "GET",
@@ -89,6 +103,14 @@ This document specifies the data structure for capturing HTTP request/response p
     },
     "bodyB64": "",
     "bodyContentType": ""
+  },
+  "response": {
+    "statusCode": 200,
+    "headers": {
+      "Content-Type": ["application/json"]
+    },
+    "bodyB64": "eyJhcHBsaWNhdGlvbnMiOltdfQ==",
+    "bodyContentType": "application/json"
   },
   "secrets": [
     {
@@ -109,8 +131,10 @@ This document specifies the data structure for capturing HTTP request/response p
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | Yes | Stable, human-readable entry ID (kebab-case) |
+| `timestamp` | string | No | RFC3339 capture time of this individual entry (informational; replay never reads it) |
 | `description` | string | No | What this entry exercises |
 | `request` | object | Yes | HTTP request object (see below) |
+| `response` | object | No | Incumbent response observed at capture time (see below). Runtime captures carry it; promotion drops it — replay compares fresh responses, never the stored one |
 | `secrets` | array | No | Secret reference objects |
 | `expect` | object | No | Per-entry comparison overrides |
 
@@ -124,6 +148,40 @@ This document specifies the data structure for capturing HTTP request/response p
 | `headers` | object | No | Header map with canonicalized keys |
 | `bodyB64` | string | No | Base64-encoded request body |
 | `bodyContentType` | string | No | Content-Type of request body |
+
+### Response Object Schema
+
+The optional entry-level `response` is what the incumbent returned when the
+entry was captured. Both producers populate it, which makes a runtime capture
+a complete request/response record and preserves the incumbent behavior the
+test case was built from. It is a capture-time record only: replay obtains
+fresh responses from both targets and never compares against the stored one,
+and promotion drops the field — a checked-in fixture carries request data and
+replay expectations, not a frozen response nobody scrubs and replay never
+reads (see [Redaction](#redaction) for why that matters).
+
+```json
+{
+  "statusCode": 200,
+  "headers": {
+    "Content-Type": ["application/json"]
+  },
+  "bodyB64": "eyJhcHBsaWNhdGlvbnMiOltdfQ==",
+  "bodyContentType": "application/json"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `statusCode` | int | Yes | Status the incumbent returned at capture time |
+| `headers` | object | No | Response header map with canonicalized keys |
+| `bodyB64` | string | No | Base64-encoded response body |
+| `bodyContentType` | string | No | Content-Type of response body |
+
+Unlike a request's credential headers and query values (scrubbed at capture by
+the gateway middleware — see [Redaction](#redaction)), a response's headers
+and body are recorded **verbatim** by both producers. That is a second reason
+promotion drops the field rather than committing it.
 
 ### Secret Reference Schema
 
@@ -183,7 +241,9 @@ tools/diffharness/testdata/
 
 These are validated by the diffharness module's own tests
 (`cd tools/diffharness && go test ./...`) and are the corpora a fresh clone
-can replay immediately.
+can replay immediately. A fixture carries request data and replay
+expectations only — the capture-time `response` is dropped at promotion, and
+replay collects fresh responses from both targets.
 
 **Runtime captures** — under a repository-root `corpus/` directory,
 **gitignored** (`/corpus/` in `.gitignore` since the 2026-09-18 purge):
@@ -231,7 +291,7 @@ from every commit.
    - Never updated on subsequent appends
    - Example: `"2026-07-27T12:00:00-04:00"`
 
-2. **Entry-level:** (optional) `capturedAt` in entry metadata
+2. **Entry-level:** (optional) `timestamp` on each entry
    - Capture time of individual entry
    - Useful for chronological analysis
    - Not required for replay
@@ -340,17 +400,71 @@ All ArgoCD API requests require bearer authentication:
 - Personal access tokens or API keys
 - Committing a runtime capture from `corpus/` without promoting it to a reviewed fixture first
 
+### Redaction
+
+Redaction happens at three distinct points, and a corpus moves through all of
+them:
+
+1. **At capture — gateway middleware only.** Before an entry is retained, the
+   capture middleware (`internal/server/capture.go`) replaces the *value* of
+   every credential-bearing request header — `Authorization`,
+   `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`
+   (case-insensitive) — and of every query parameter named `api_key` /
+   `api-key` / `apikey`, `access_token` / `access-token`, `auth_token` /
+   `auth-token`, plus every header/query name the matched route fragment
+   declares injectable, with the marker `[REDACTED-BY-SEAM]` (`RedactedSecret`
+   — the same marker the gateway's live response scrubber substitutes for an
+   echoed secret).
+2. **Not at capture — standalone `seam-capture`.** The standalone capture
+   proxy records what crossed the wire verbatim; it does no redaction, and it
+   never populates `secrets[]`. Its output therefore depends on the promotion
+   review below: a literal credential in a captured header or body is a
+   promotion blocker, scrubbed to the marker or removed.
+3. **At replay — the comparator.** `seam-replay` substitutes every resolved
+   bare secret with `[REDACTED-BY-SEAM]` on both sides of the comparison
+   before diffing bodies and headers, so an endpoint that echoes its
+   credential back is a PASS exactly when the echo was scrubbed to the marker,
+   and a leak failure when the literal survives (rule C5/S3 of
+   [`differential-replay-contract.md`](differential-replay-contract.md)).
+
+Two consequences worth stating explicitly:
+
+- Request **bodies** are never scrubbed by either producer — a credential in
+  a body survives capture, and only the promotion review catches it.
+- **Response** headers and bodies are recorded verbatim by both producers
+  (the middleware's scrub covers request headers and query values only). This
+  is a second reason promotion drops the captured `response` rather than
+  committing it: a fixture should not carry a payload nobody scrubbed and
+  replay never reads.
+
+In a promoted fixture the marker is the *expected* state for a credential
+location: it says "the value was scrubbed at capture; the real value resolves
+at replay through `secrets[].ref`". The whole conversion — both producer
+shapes in, fixture-convention corpus out, markers preserved, verbatim
+credentials scrubbed — is pinned end to end by
+`TestPromotionLifecycleConvertsCaptureToFixture`
+(`tools/diffharness/internal/corpus`), so the documented conversion cannot
+silently stop matching what the loader and the fixture walk enforce.
+
 ### Corpus Review Checklist
 
 Before promoting a runtime capture into a committed fixture under
 `tools/diffharness/testdata/`:
 
 1. ✅ Verify all `secrets[].ref` fields use reference format
-2. ✅ Check no literal bearer tokens in headers
-3. ✅ Ensure response bodies don't leak credentials
-4. ✅ Validate JSON syntax with `jq .`
-5. ✅ Review descriptions for sensitive information
-6. ✅ Run the fixture checks (`cd tools/diffharness && go test ./...`) — the
+2. ✅ Check no literal bearer tokens in headers — a `[REDACTED-BY-SEAM]`
+   marker is the expected scrubbed state, a literal value is a promotion
+   blocker (see [Redaction](#redaction)). The standalone producer records
+   headers verbatim, so this check is never optional for its output.
+3. ✅ Confirm no entry still carries a capture-time `response` — the fixture
+   convention drops it, which also retires the leak surface, since response
+   payloads are recorded verbatim and never scrubbed (enforced by
+   `TestCheckedInFixturesResolveUnderEnforcedVaultBase`)
+4. ✅ Confirm request bodies carry no credential values — bodies are never
+   scrubbed by either producer, so this review is the only gate
+5. ✅ Validate JSON syntax with `jq .`
+6. ✅ Review descriptions for sensitive information
+7. ✅ Run the fixture checks (`cd tools/diffharness && go test ./...`) — the
    loader rejects an off-base or malformed `secrets[].ref` at fixture time
 
 Runtime captures under `corpus/` are never committed as-is; they are
@@ -369,6 +483,10 @@ working data for a replay run, and only a reviewed copy becomes a fixture.
 - Storage: Git-ignored local files
 
 ## Complete Example
+
+A fixture-form corpus — what a promoted capture looks like under
+`tools/diffharness/testdata/`: requests, replay expectations, hand-written
+secret refs, and no capture-time `response` on any entry.
 
 ```json
 {
@@ -470,8 +588,10 @@ type Corpus struct {
 
 type Entry struct {
     ID          string
+    Timestamp   string    // optional; capture time of this entry
     Description string
     Request     Request
+    Response    *Response // incumbent response at capture; promotion drops it
     Secrets     []Secret
     Expect      *Expect
 }
@@ -480,6 +600,13 @@ type Request struct {
     Method          string
     Path            string
     Query           string
+    Headers         map[string][]string
+    BodyB64         string
+    BodyContentType string
+}
+
+type Response struct {
+    StatusCode      int
     Headers         map[string][]string
     BodyB64         string
     BodyContentType string
@@ -596,10 +723,16 @@ fresh clone can replay without capturing first.)
 
 **Current:** `seam-diff-corpus/v1`
 
+**Shipped in v1:** capture-time response recording — the optional entry-level
+`response` (and the per-entry `timestamp`) store what the incumbent returned
+when the entry was captured, making a runtime capture a complete
+request/response record. It is informational only: replay compares fresh
+responses collected from both targets, and promotion strips the field from a
+promoted fixture (see [Response Object Schema](#response-object-schema)).
+
 **Planned additions:**
-- v2: Response capture (currently request-only)
-- v3: Multi-scenario entries (parameterized tests)
-- v4: Streaming response capture
+- v2: Multi-scenario entries (parameterized tests)
+- v3: Streaming response capture
 
 ### Automation
 
