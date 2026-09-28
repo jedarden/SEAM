@@ -711,7 +711,7 @@ curl -i http://localhost:8080/_seam/health
 
 # Cached endpoint (first request, cache miss)
 curl -i http://localhost:8080/api/test
-# Expected: X-SEAM-Cache: MISS, X-Quota-Cost-Per-Call: $0.10
+# Expected: no X-SEAM-Cache header, X-Quota-Cost-Per-Call: $0.1
 
 # Cached endpoint (second request, cache hit)
 curl -i http://localhost:8080/api/test
