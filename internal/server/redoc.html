@@ -6,6 +6,27 @@
   <meta name="description" content="{{ .Description }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/docs/static/redoc.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom": "https://esm.sh/react-dom@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+      "agentation": "https://esm.sh/agentation@3.1.2?external=react,react-dom"
+    }
+  }
+  </script>
+  <script type="module">
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import { Agentation } from "agentation";
+
+    const host = document.createElement("div");
+    host.id = "agentation-root";
+    document.body.appendChild(host);
+    createRoot(host).render(React.createElement(Agentation));
+  </script>
 </head>
 <body>
   <div id="api-doc"></div>
@@ -38,6 +59,18 @@
       },
       document.getElementById("api-doc")
     );
+  </script>
+  <script>
+    window.addEventListener("load", function () {
+      var root = document.getElementById("agentation-root");
+      document.documentElement.setAttribute(
+        "data-seam-agentation-root",
+        root ? "present" : "missing"
+      );
+      if (!root) {
+        throw new Error("Agentation root did not exist after page load");
+      }
+    });
   </script>
 </body>
 </html>

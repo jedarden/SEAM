@@ -13,6 +13,8 @@
 #
 #   - `id="agentation-root"` — the host the loader creates; the workspace UI
 #     policy's own definition of wired (document.getElementById(...)).
+#   - `data-seam-agentation-root="present"` — a post-load assertion written by
+#     the page itself after document.getElementById("agentation-root") succeeds.
 #   - the component's portal (`data-agentation-portal` hosting
 #     `<agentation-toolbar>`) — Agentation renders itself through a portal
 #     appended to <body>, NOT inside #agentation-root, so the host div alone
@@ -142,16 +144,19 @@ if ! "$CHROME" "${CHROME_FLAGS[@]}" \
 fi
 [ -n "$SERVE_PID" ] && kill "$SERVE_PID" 2>/dev/null || true
 
-HOST_OK=no; PORTAL=no
+HOST_OK=no; LOAD_ASSERTION=no; PORTAL=no
 grep -q 'id="agentation-root"' "$WORK_DIR/dom.html" && HOST_OK=yes
+grep -q 'data-seam-agentation-root="present"' "$WORK_DIR/dom.html" && LOAD_ASSERTION=yes
 grep -q '<agentation-toolbar>\|data-agentation-portal' "$WORK_DIR/dom.html" && PORTAL=yes
 
-if [ "$HOST_OK$PORTAL" = yesyes ]; then
-    echo "MOUNT OK: #agentation-root host present and the Agentation toolbar portal rendered in $DOCS_URL"
+if [ "$HOST_OK$LOAD_ASSERTION$PORTAL" = yesyesyes ]; then
+    echo "MOUNT OK: #agentation-root present after page load and the Agentation toolbar portal rendered in $DOCS_URL"
     exit 0
 fi
-if [ "$HOST_OK" = yes ]; then
+if [ "$HOST_OK$LOAD_ASSERTION" = yesyes ]; then
     echo "MOUNT FAILED: #agentation-root exists but the toolbar portal did not render — the loader created the host, then the import or render failed" >&2
+elif [ "$HOST_OK" = yes ]; then
+    echo "MOUNT FAILED: #agentation-root exists but the post-load document.getElementById assertion did not pass" >&2
 else
     echo "MOUNT FAILED: #agentation-root absent from the rendered DOM of $DOCS_URL" >&2
     echo "The page loaded but the mount loader never ran — check the import map precedes the module and esm.sh was reachable." >&2

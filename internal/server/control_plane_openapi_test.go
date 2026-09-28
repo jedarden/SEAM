@@ -254,6 +254,11 @@ func TestDocsControlPlaneHTMLShell(t *testing.T) {
 			t.Errorf("mount loader is missing %q", snippet)
 		}
 	}
+	if !strings.Contains(page, docsAgentationLoadCheck) ||
+		!strings.Contains(page, docsAgentationLoadMarker) ||
+		!strings.Contains(page, docsAgentationLoadResult) {
+		t.Error("control-plane docs page is missing the post-load Agentation root assertion")
+	}
 
 	if !strings.Contains(page, `href="/docs"`) || !strings.Contains(page, `href="`+controlPlaneDocsPath+`"`) {
 		t.Error("docs nav is missing the cross-links between /docs and /docs/control-plane")

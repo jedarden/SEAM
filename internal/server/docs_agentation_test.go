@@ -42,6 +42,9 @@ import (
 const (
 	docsAgentationImportMapTag = `<script type="importmap">`
 	docsAgentationModuleTag    = `<script type="module">`
+	docsAgentationLoadCheck    = `document.getElementById("agentation-root")`
+	docsAgentationLoadMarker   = `data-seam-agentation-root`
+	docsAgentationLoadResult   = `root ? "present" : "missing"`
 )
 
 // docsAgentationMountSnippets are the load-bearing fragments of the mount
@@ -177,6 +180,48 @@ func TestDocsAgentationWiring(t *testing.T) {
 		if !strings.Contains(module, snippet) {
 			t.Errorf("mount loader is missing %q — without it the page renders fine but #agentation-root never appears", snippet)
 		}
+	}
+	if !strings.Contains(page, docsAgentationLoadCheck) {
+		t.Errorf("page is missing the post-load document.getElementById assertion")
+	}
+	if !strings.Contains(page, docsAgentationLoadMarker) || !strings.Contains(page, docsAgentationLoadResult) {
+		t.Errorf("page is missing the post-load Agentation result marker")
+	}
+}
+
+func TestStaticDocumentationTemplatesCarryAgentationWiring(t *testing.T) {
+	for _, path := range []string{"redoc.html", "assets/redoc.html"} {
+		t.Run(path, func(t *testing.T) {
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", path, err)
+			}
+			page := string(body)
+			if got := strings.Count(page, docsAgentationImportMapTag); got != 1 {
+				t.Fatalf("import map tags in %s = %d, want exactly 1", path, got)
+			}
+			mapIdx := strings.Index(page, docsAgentationImportMapTag)
+			moduleIdx := strings.Index(page, docsAgentationModuleTag)
+			if moduleIdx == -1 {
+				t.Fatal("no Agentation module script")
+			}
+			if mapIdx > moduleIdx {
+				t.Fatal("import map appears after the Agentation module script")
+			}
+			moduleEnd := strings.Index(page[moduleIdx:], "</script>")
+			if moduleEnd == -1 {
+				t.Fatal("unterminated Agentation module script")
+			}
+			module := page[moduleIdx : moduleIdx+moduleEnd]
+			for _, snippet := range docsAgentationMountSnippets {
+				if !strings.Contains(module, snippet) {
+					t.Errorf("mount loader is missing %q", snippet)
+				}
+			}
+			if !strings.Contains(page, docsAgentationLoadCheck) || !strings.Contains(page, docsAgentationLoadMarker) || !strings.Contains(page, docsAgentationLoadResult) {
+				t.Error("template is missing the post-load Agentation root assertion")
+			}
+		})
 	}
 }
 

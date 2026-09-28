@@ -928,6 +928,22 @@ func docsHTMLShell(title, description, specJSON string) string {
     document.body.appendChild(host);
     createRoot(host).render(React.createElement(Agentation));
   </script>
+  <script>
+    // Keep the browser-level integration check honest: module evaluation can
+    // fail while the rest of the documentation page still renders. The
+    // post-load assertion records the result in the DOM so a headless browser
+    // check can inspect the same state a user sees.
+    window.addEventListener("load", function () {
+      var root = document.getElementById("agentation-root");
+      document.documentElement.setAttribute(
+        "data-seam-agentation-root",
+        root ? "present" : "missing"
+      );
+      if (!root) {
+        throw new Error("Agentation root did not exist after page load");
+      }
+    });
+  </script>
 </head>
 <body>
   <nav id="docs-nav">
