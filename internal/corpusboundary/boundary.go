@@ -57,14 +57,16 @@ var GuardedPaths = []string{
 	"tools/diffharness/testdata/secrets-argocd.local.json",
 }
 
-// FixtureValidationLane is the definition-of-done check name that runs the
-// diffharness corpus package — the validator every checked-in fixture gets.
+// DiffharnessModuleGateLane is the definition-of-done check name that builds
+// and tests the whole tools/diffharness nested module — the root sweeps never
+// descend into a nested module, so this lane is the module's only CI gate and
+// the corpus package inside it is the validator every checked-in fixture gets.
 // The boundary test asserts the lane stays wired into
-// scripts/definition-of-done.sh, so the fixture validation cannot be
-// unwired silently again (docs/capture_testing.md, "Where each check is
-// enforced", previously recorded the fixture checks as wired into neither
-// gate).
-const FixtureValidationLane = "diffharness fixture validation"
+// scripts/definition-of-done.sh, so neither the fixture validation nor the
+// differential comparison contract's implementation (compare, seam-replay,
+// seam-cutover) can drop out of the gate silently
+// (docs/design/differential-replay-contract.md, rule G2).
+const DiffharnessModuleGateLane = "diffharness module gate"
 
 // Pattern is one parsed .gitignore line.
 type Pattern struct {

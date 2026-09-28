@@ -114,17 +114,20 @@ and `capture corpus round-trip`. Both gates guard the retired root-level
 `go test ./corpus` walk behind a `[ -d corpus ]` check, because the purge
 removed the directory and the unguarded command fails with "directory not
 found". The diffharness module's fixture checks are wired into the
-`--slow` lane as a third named check, `diffharness fixture validation`,
-which runs `go test ./internal/corpus/` from the module directory: the
-module is standalone, so the root `go test ./...` sweep never descends into
-it, and without the lane the fixture validation only happened when someone
-remembered to run it by hand. The `corpus/` vs `testdata/` boundary itself
-is pinned by `internal/corpusboundary` in the root sweep (and by the
-NEEDLE close gate, which runs it in a clean extraction). A malformed capture
-or a failing round-trip fails the build; an off-base or malformed secret ref
-in a checked-in fixture fails the module run — by hand above, or via the
-`diffharness fixture validation` lane — and must be fixed before the
-corpus is committed.
+`--slow` lane as a third named check, `diffharness module gate`, which
+builds and tests the whole module (`go build ./... && go test ./...`) from
+the module directory: the module is standalone, so the root `go test ./...`
+sweep never descends into it, and without the lane neither the fixture
+validation nor the differential comparison contract's implementation
+(internal/compare, seam-replay, seam-cutover — the contract document is
+[docs/design/differential-replay-contract.md](design/differential-replay-contract.md),
+rule G2) would run anywhere but by hand. The `corpus/` vs `testdata/`
+boundary itself is pinned by `internal/corpusboundary` in the root sweep
+(and by the NEEDLE close gate, which runs it in a clean extraction). A
+malformed capture or a failing round-trip fails the build; an off-base or
+malformed secret ref in a checked-in fixture fails the module run — by
+hand above, or via the `diffharness module gate` lane — and must be fixed
+before the corpus is committed.
 
 ## Durability triggers
 
@@ -300,7 +303,7 @@ cd tools/diffharness && go test ./...
 
 The module is standalone, so the root sweep never runs it — this re-run is
 the promotion gate, not a formality, and it is the same set enforced as the
-`diffharness fixture validation` lane in DoD `--slow`. Then commit the
+`diffharness module gate` lane in DoD `--slow`. Then commit the
 named paths explicitly:
 
 ```sh
@@ -323,7 +326,7 @@ Last verified: 2026-09-26.
 | Check | Result | Coverage |
 | --- | --- | --- |
 | `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection |
-| `diffharness fixture validation` (DoD `--slow`) | PASS | The same fixture validation, wired into the Definition of Done as `go test ./internal/corpus/` so the root sweep's module boundary cannot silently drop it |
+| `diffharness module gate` (DoD `--slow`) | PASS | The whole nested module — fixtures, comparator, and the replay/cutover tools — built and tested in the Definition of Done, so the root sweep's module boundary cannot silently drop any of it |
 | `internal/corpusboundary` | PASS | Anchored `/corpus/` ignore entry present and effective; guarded fixture and package paths outside every ignore rule; nothing under `corpus/` tracked in a real checkout |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
 | Capture durability suite, `-count=1` | PASS | Autosave threshold boundary, shutdown flush below threshold, toggle-respect and shutdown-failure containment, corpus readability after restart |

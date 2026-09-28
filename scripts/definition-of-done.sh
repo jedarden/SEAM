@@ -149,20 +149,25 @@ if [[ "$LANE" == "slow" ]] || [[ "$LANE" == "all" ]]; then
     echo "Skipping corpus integrity - no corpus directory present"
   fi
 
-  # tools/diffharness is a standalone nested Go module, so the root
-  # `go test -race ./...` above never descends into it. Its corpus
-  # package is the only validator the checked-in fixtures
-  # (tools/diffharness/testdata) receive: schema version, entry-ID
-  # uniqueness, header/method canonicalization, and secrets[].ref
-  # enforcement against the enforced vault base
-  # (docs/capture_testing.md, "Corpus fixture integrity"). Unlike the
-  # runtime-corpus lane above, the fixtures are committed, so this lane
-  # has no directory guard -- it must always run. The
-  # corpus/ vs testdata/ boundary itself is pinned by
-  # internal/corpusboundary in the root sweep.
-  run_check "diffharness fixture validation" bash -c '
+  # tools/diffharness is a standalone nested Go module, so the root sweeps
+  # above (`go vet ./...`, golangci-lint, `go test -race ./...`) never
+  # descend into it: the differential comparison contract and its tools --
+  # internal/compare, seam-capture, seam-replay, seam-cutover -- are built
+  # and tested only here. This lane IS the module's CI gate (contract G2 in
+  # docs/design/differential-replay-contract.md). The corpus package also
+  # validates every checked-in fixture (tools/diffharness/testdata: schema
+  # version, entry-ID uniqueness, header/method canonicalization, and
+  # secrets[].ref enforcement against the enforced vault base --
+  # docs/capture_testing.md, "Corpus fixture integrity"), and the module-root
+  # contract tripwire pins the doc<->test coupling of the contract document.
+  # Unlike the runtime-corpus lane above, the fixtures are committed, so
+  # this lane has no directory guard -- it must always run. The corpus/ vs
+  # testdata/ boundary itself is pinned by internal/corpusboundary in the
+  # root sweep.
+  run_check "diffharness module gate" bash -c '
     cd tools/diffharness
-    go test ./internal/corpus/
+    go build ./...
+    go test ./...
   '
 
   # Capture round-trip, response-pair preservation, and lossless corpus

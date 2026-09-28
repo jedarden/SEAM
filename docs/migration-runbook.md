@@ -555,7 +555,12 @@ The same bundle re-attaches after any soak-window rollback-and-retry.
 
 All three tools live in `tools/diffharness` (standalone Go module,
 stdlib-only; build with `go build ./cmd/<name>` from that directory — full
-usage in its README):
+usage in its README). The comparison rules those tools enforce —
+canonicalization, per-dimension equivalence, nondeterministic-field
+handling, secret references, failure semantics, and the exit codes below —
+are defined in
+[docs/design/differential-replay-contract.md](design/differential-replay-contract.md),
+the canonical contract; this runbook consumes it:
 
 | Tool | Stage | Role |
 |------|-------|------|

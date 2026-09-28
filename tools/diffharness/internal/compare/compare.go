@@ -17,6 +17,11 @@
 // The leak check is the security-critical invariant ("nothing may leak a
 // secret") and is evaluated independently and first, so it can never be masked
 // by an expected-diff allowance.
+//
+// The full contract — canonicalization responsibilities, per-dimension rules,
+// failure semantics, exit codes, and how seam-cutover consumes the replay
+// result, each with the test that pins it — is
+// docs/design/differential-replay-contract.md (repo root).
 package compare
 
 import (

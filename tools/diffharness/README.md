@@ -2,6 +2,15 @@
 
 The differential capture + replay tool for testing SEAM route conformance. This is the highest-value test asset in the SEAM plan: it records real request/response pairs from an incumbent proxy, replays them against both the incumbent and SEAM, and verifies response equivalence modulo the enumerated expected diffs.
 
+> **The contract lives in
+> [docs/design/differential-replay-contract.md](../../docs/design/differential-replay-contract.md).**
+> That document is the canonical statement of the canonicalization rules
+> (C), per-dimension comparison rules (D), nondeterministic-field handling
+> (N), secret-reference rules (S), failure semantics (F), exit codes (X),
+> and how the cutover workflow consumes the replay result (G) — each rule
+> pinned by a named test (the index at the bottom of the document). This
+> README is the operator manual; on any disagreement the contract wins.
+
 ## Overview
 
 The harness consists of three tools:
@@ -42,7 +51,9 @@ seam-replay \
 - Replays each entry against both targets
 - Compares responses for equivalence
 - Outputs JSON report and human-readable summary
-- Exits non-zero on any FAIL
+- Exit codes (contract X1): `0` no FAIL, `1` any FAIL or harness failure
+  (unreadable corpus/secrets, all-skipped corpus, unwritable report), `2`
+  usage error. `seam-cutover` gates on this contract alone (contract G1).
 
 ### `seam-cutover` - Cutover Gate Runner
 

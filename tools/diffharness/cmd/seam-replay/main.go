@@ -14,7 +14,10 @@
 //	            --report argocd-report.json
 //
 // The tool outputs a per-service corpus pass report as JSON and a human-readable
-// summary to stdout. A non-zero exit status indicates at least one FAIL.
+// summary to stdout. Exit codes (docs/design/differential-replay-contract.md
+// X1): 0 = no FAIL (passes and skips both fine); 1 = at least one FAIL or a
+// harness failure (unreadable corpus or secrets file, a corpus with no
+// replayable entries, an unwritable report); 2 = usage error.
 package main
 
 import (
@@ -37,37 +40,48 @@ import (
 )
 
 func main() {
-	incumbentURL := flag.String("incumbent", "", "Base URL of the incumbent proxy (required)")
-	seamURL := flag.String("seam", "", "Base URL of the SEAM gateway (required)")
-	corpusPath := flag.String("corpus", "", "Path to the corpus JSON file (required)")
-	secretsPath := flag.String("secrets", "", "Path to secrets file (optional, falls back to env)")
-	reportPath := flag.String("report", "", "Path to write the JSON report (optional)")
-	verbose := flag.Bool("verbose", false, "Log each replay as it runs")
+	os.Exit(runMain(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func runMain(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("seam-replay", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	incumbentURL := fs.String("incumbent", "", "Base URL of the incumbent proxy (required)")
+	seamURL := fs.String("seam", "", "Base URL of the SEAM gateway (required)")
+	corpusPath := fs.String("corpus", "", "Path to the corpus JSON file (required)")
+	secretsPath := fs.String("secrets", "", "Path to secrets file (optional, falls back to env)")
+	reportPath := fs.String("report", "", "Path to write the JSON report (optional)")
+	verbose := fs.Bool("verbose", false, "Log each replay as it runs")
 
 	var ignoreHeaders stringSlice
-	flag.Var(&ignoreHeaders, "ignore-header", "Header to ignore (may be repeated); defaults to Date, Server, etc.")
+	fs.Var(&ignoreHeaders, "ignore-header", "Header to ignore (may be repeated); defaults to Date, Server, etc.")
 
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
 
 	if *incumbentURL == "" || *seamURL == "" || *corpusPath == "" {
-		fmt.Fprintf(os.Stderr, "seam-replay: missing required flags\n")
-		flag.PrintDefaults()
-		os.Exit(2)
+		fmt.Fprintf(stderr, "seam-replay: missing required flags\n")
+		fs.PrintDefaults()
+		return 2
 	}
 
 	// Load corpus.
 	cp, err := corpus.Load(*corpusPath)
 	if err != nil {
-		log.Fatalf("load corpus: %v", err)
+		fmt.Fprintf(stderr, "seam-replay: load corpus: %v\n", err)
+		return 1
 	}
 	if !cp.HasReplayable() {
-		log.Fatalf("corpus has no replayable entries (all entries have Expect.Skip set)")
+		fmt.Fprintf(stderr, "seam-replay: corpus has no replayable entries (all entries have Expect.Skip set)\n")
+		return 1
 	}
 
 	// Load secrets.
 	resolver, err := secref.NewResolver(*secretsPath)
 	if err != nil {
-		log.Fatalf("load secrets: %v", err)
+		fmt.Fprintf(stderr, "seam-replay: load secrets: %v\n", err)
+		return 1
 	}
 
 	// Default ignore headers (volatile headers that differ call-to-call).
@@ -89,17 +103,19 @@ func main() {
 	// Write JSON report if requested.
 	if *reportPath != "" {
 		if err := writeReport(report, *reportPath); err != nil {
-			log.Fatalf("write report: %v", err)
+			fmt.Fprintf(stderr, "seam-replay: write report: %v\n", err)
+			return 1
 		}
 	}
 
 	// Human-readable summary.
-	printSummary(report, os.Stdout)
+	printSummary(report, stdout)
 
 	// Exit status: FAIL if any entry failed (excluding SKIP).
 	if report.FailCount > 0 {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 type stringSlice []string

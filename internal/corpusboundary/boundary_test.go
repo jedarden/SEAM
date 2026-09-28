@@ -205,21 +205,25 @@ func TestRuntimeCorpusStaysOutOfGit(t *testing.T) {
 }
 
 // TestFixtureValidationStaysWired pins the other half of the boundary: the
-// checked-in fixtures keep receiving their validation. The diffharness
-// module is standalone, so the root `go test ./...` sweep never descends
-// into it — the validation reaches the fixtures only through the
+// checked-in fixtures keep receiving their validation, and the nested module
+// implementing the differential replay comparison contract keeps receiving
+// its gate. The diffharness module is standalone, so the root `go test ./...`
+// sweep never descends into it — nothing in that module (fixtures, the
+// comparator, the replay/cutover tools) is validated anywhere except the
 // definition-of-done lane, and the fixtures only exist if nobody deletes
 // them. docs/capture_testing.md previously recorded the fixture checks as
-// wired into neither gate; this test keeps that from silently regressing.
+// wired into neither gate; this test keeps that from silently regressing,
+// and pins the widened lane the contract document calls G2
+// (docs/design/differential-replay-contract.md).
 func TestFixtureValidationStaysWired(t *testing.T) {
 	root := repoRoot(t)
 
 	dod := string(readFile(t, filepath.Join(root, "scripts", "definition-of-done.sh")))
-	if !strings.Contains(dod, FixtureValidationLane) {
-		t.Errorf("scripts/definition-of-done.sh no longer carries the %q lane; tools/diffharness/testdata fixtures would lose schema, uniqueness, canonicalization, and vault-reference validation", FixtureValidationLane)
+	if !strings.Contains(dod, DiffharnessModuleGateLane) {
+		t.Errorf("scripts/definition-of-done.sh no longer carries the %q lane; the diffharness module (fixtures, comparator, replay/cutover tools) would lose its only automated gate", DiffharnessModuleGateLane)
 	}
-	if !strings.Contains(dod, "go test ./internal/corpus/") {
-		t.Error("scripts/definition-of-done.sh no longer runs the diffharness corpus package; that package is the validator for the checked-in fixtures")
+	if !strings.Contains(dod, "cd tools/diffharness") || !strings.Contains(dod, "go test ./...") {
+		t.Error("scripts/definition-of-done.sh no longer builds and tests the whole diffharness module; a narrowed lane would gate the fixtures but not the comparison contract")
 	}
 
 	nested := string(readFile(t, filepath.Join(root, "tools", "diffharness", "internal", "corpus", "corpus_test.go")))

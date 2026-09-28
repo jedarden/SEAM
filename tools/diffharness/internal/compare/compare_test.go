@@ -250,6 +250,68 @@ func TestExpectedStatusMismatchFails(t *testing.T) {
 	}
 }
 
+func TestJSONBodyIsByteExactNotSemanticallyNormalized(t *testing.T) {
+	// Contract C4 (docs/design/differential-replay-contract.md): the only body
+	// transformation is secret redaction. Two JSON documents that parse to the
+	// same value but differ in bytes — key order here, whitespace or number
+	// formatting in the other cases — are a FAIL, because agents depend on the
+	// incumbent's exact observed bytes. A semantic normalizer would widen the
+	// cutover claim beyond what is proved; a genuinely nondeterministic body
+	// must say so with Expect.ignoreBody instead.
+	inc := resp(http.StatusOK, nil, `{"a":1,"b":2}`)
+	seam := resp(http.StatusOK, nil, `{"b":2,"a":1}`)
+	got := Compare(inc, seam, nil, Options{})
+	if got.Verdict != VerdictFail || got.BodyDiff == nil {
+		t.Fatalf("key-reordered JSON must FAIL (byte-exact contract), got %v %+v", got.Verdict, got.BodyDiff)
+	}
+
+	inc = resp(http.StatusOK, nil, `{"a":1}`)
+	seam = resp(http.StatusOK, nil, `{"a": 1}`)
+	if got := Compare(inc, seam, nil, Options{}); got.Verdict != VerdictFail {
+		t.Fatalf("whitespace-differing JSON must FAIL, got %v: %v", got.Verdict, got.Reasons)
+	}
+
+	inc = resp(http.StatusOK, nil, `{"n":1.0}`)
+	seam = resp(http.StatusOK, nil, `{"n":1}`)
+	if got := Compare(inc, seam, nil, Options{}); got.Verdict != VerdictFail {
+		t.Fatalf("number-format-differing JSON must FAIL, got %v: %v", got.Verdict, got.Reasons)
+	}
+
+	// The flip side of the same rule: byte-identical JSON still PASSes.
+	same := resp(http.StatusOK, nil, `{"a":1,"b":2}`)
+	if got := Compare(same, cloneResp(same), nil, Options{}); got.Verdict != VerdictPass {
+		t.Fatalf("byte-identical JSON must PASS, got %v: %v", got.Verdict, got.Reasons)
+	}
+}
+
+func TestCompareDoesNotCanonicalizeKeys(t *testing.T) {
+	// Contract C1: canonicalization happens at the loader (request headers) and
+	// the replay transport (response headers/trailers); compare deliberately
+	// does not re-canonicalize. Feed it the same header under two casings and
+	// it must report a diff — the false-diff-by-construction is what keeps the
+	// comparator a pure function and forces every producer to canonicalize.
+	inc := resp(http.StatusOK, map[string][]string{"X-Trace-Id": {"abc"}}, `ok`)
+	seam := &Response{
+		Status: http.StatusOK,
+		Headers: map[string][]string{
+			"x-trace-id": {"abc"}, // non-canonical spelling of the same header
+		},
+		Body: []byte(`ok`),
+	}
+	got := Compare(inc, seam, nil, Options{})
+	if got.Verdict != VerdictFail {
+		t.Fatalf("mixed-case keys must FAIL — compare does not canonicalize, got %v: %v", got.Verdict, got.Reasons)
+	}
+	if len(got.HeaderDiffs) != 2 {
+		t.Fatalf("expected the pair reported as dropped+added, got %+v", got.HeaderDiffs)
+	}
+	for _, d := range got.HeaderDiffs {
+		if d.Kind != HeaderDropped && d.Kind != HeaderAdded {
+			t.Fatalf("unexpected kind %q for %+v", d.Kind, d)
+		}
+	}
+}
+
 func TestIgnoreBodySuppressesStructuralDiff(t *testing.T) {
 	// Non-deterministic bodies differ; IgnoreBody must suppress the diff and PASS.
 	inc := resp(http.StatusOK, nil, `{"now":"2026-07-22T10:00:00Z","id":"a"}`)
