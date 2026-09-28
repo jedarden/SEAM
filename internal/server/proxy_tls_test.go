@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -144,6 +145,58 @@ func TestDispatchHandlerTLSConfigErrorFailsClosed(t *testing.T) {
 	}
 	if len(srv.proxyMap) != 0 {
 		t.Fatalf("proxy cache size = %d after TLS config error, want 0", len(srv.proxyMap))
+	}
+}
+
+// TestDispatchTLSConfigErrorNamesMountInLogNotInBody pins the operator-
+// visible failure mode of an unavailable mounted CA control. A route whose
+// x-upstream-tls caBundle is absent from the CA directory — in-cluster, the
+// mounted /etc/gateway/upstream-ca — fails proxy creation, and the two
+// channels split what they disclose: the error chain that reaches the pod
+// log names the exact missing path under the mount (the repair target),
+// while the caller's 503 response carries only the generic
+// proxy_creation_failed code and never echoes the mount path. The mount
+// here is populated, so the failure is the missing named bundle, not an
+// absent mount; clients are created lazily per route and failures are not
+// cached, so restoring the bundle recovers on a later dispatch without a
+// restart.
+func TestDispatchTLSConfigErrorNamesMountInLogNotInBody(t *testing.T) {
+	caDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(caDir, "present-ca.pem"), []byte("placeholder bundle"), 0o600); err != nil {
+		t.Fatalf("populate CA mount: %v", err)
+	}
+
+	table := NewRouteTable(nil)
+	table.AddRoute(RouteEntry{
+		PathTemplate:   "/tls",
+		Method:         http.MethodGet,
+		APIVersion:     "_unversioned",
+		UpstreamTarget: "https://upstream.example.test",
+		TLSConfig:      &UpstreamTLSConfig{CaBundle: "absent-ca.pem"},
+	})
+	srv := newDispatchTLSConfigTestServer(table, caDir)
+
+	missingPath := filepath.Join(caDir, "absent-ca.pem")
+	if _, err := srv.getOrCreateProxyWithError("https://upstream.example.test", &UpstreamTLSConfig{CaBundle: "absent-ca.pem"}); err == nil {
+		t.Fatal("getOrCreateProxyWithError succeeded for a bundle absent from the CA mount, want an error")
+	} else if !strings.Contains(err.Error(), missingPath) {
+		t.Fatalf("proxy creation error = %q, want it to name the missing mount path %q", err, missingPath)
+	}
+
+	response := httptest.NewRecorder()
+	srv.dispatchHandler(response, httptest.NewRequest(http.MethodGet, "/tls", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("missing-bundle dispatch status = %d, want 503; body = %s", response.Code, response.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode missing-bundle response: %v", err)
+	}
+	if body["error"] != "proxy_creation_failed" {
+		t.Fatalf("missing-bundle response error = %v, want proxy_creation_failed", body["error"])
+	}
+	if bodyText := response.Body.String(); strings.Contains(bodyText, caDir) || strings.Contains(bodyText, "absent-ca.pem") {
+		t.Errorf("response body %s discloses the mount path the log is for naming", bodyText)
 	}
 }
 

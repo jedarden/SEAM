@@ -308,6 +308,79 @@ func TestApplyInClusterTrustBoundaryWarningsIdentifyWithoutExposing(t *testing.T
 	}
 }
 
+// The full precedence chain the serve path runs — registerServeFlags,
+// applyEnvOverrides, detectInClusterEnvironment, applyInClusterTrustBoundary,
+// in that order — ordered strongest to weakest for the two upstream-trust
+// paths: the mounted control wins in-cluster over an explicit flag and a set
+// environment variable at once (the flag already beat the environment one
+// step earlier, so what the boundary refuses is the flag's value), the
+// defaults land on the same mounted paths with nothing announced, and
+// outside a cluster the flag beats the environment and both pass through
+// unwarned.
+func TestServeTrustPathPrecedenceMountedBeatsFlagBeatsEnv(t *testing.T) {
+	const (
+		flagCADir     = "/flag/ca-bundles"
+		flagAllowlist = "/flag/allowlist.yaml"
+		envCADir      = "/env/ca-bundles"
+		envAllowlist  = "/env/allowlist.yaml"
+	)
+
+	t.Setenv("KUBERNETES_SERVICE_HOST", "10.96.0.1")
+	t.Setenv("KUBERNETES_PORT", "443")
+
+	f := resolveServeConfig(t,
+		[]string{"--upstream-ca-dir", flagCADir, "--allowlist-file", flagAllowlist},
+		map[string]string{"SEAM_UPSTREAM_CA_DIR": envCADir, "SEAM_UPSTREAM_ALLOWLIST": envAllowlist},
+	)
+	if *f.upstreamCADir != flagCADir || *f.allowlistFile != flagAllowlist {
+		t.Fatalf("flag/env wiring: ca-dir=%q allowlist=%q, want the flag values %q/%q",
+			*f.upstreamCADir, *f.allowlistFile, flagCADir, flagAllowlist)
+	}
+
+	var logs bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(previous) })
+
+	gotCADir, gotAllowlist := applyInClusterTrustBoundary(*f.upstreamCADir, *f.allowlistFile, detectInClusterEnvironment())
+	if gotCADir != server.DefaultUpstreamCADir || gotAllowlist != server.DefaultUpstreamAllowlistFile {
+		t.Fatalf("in-cluster precedence = %q/%q, want the mounted %q/%q",
+			gotCADir, gotAllowlist, server.DefaultUpstreamCADir, server.DefaultUpstreamAllowlistFile)
+	}
+	if warnings := strings.Count(logs.String(), "WARNING"); warnings != 2 {
+		t.Errorf("flag and environment both supplied in-cluster, log carries %d WARNING lines, want 2: %q", warnings, logs.String())
+	}
+	for _, refused := range []string{flagCADir, flagAllowlist, envCADir, envAllowlist} {
+		if strings.Contains(logs.String(), refused) {
+			t.Errorf("refusal log echoes the refused operator value %q", refused)
+		}
+	}
+
+	// In-cluster defaults: the same mounted paths, nothing announced.
+	logs.Reset()
+	gotCADir, gotAllowlist = applyInClusterTrustBoundary("", "", detectInClusterEnvironment())
+	if gotCADir != server.DefaultUpstreamCADir || gotAllowlist != server.DefaultUpstreamAllowlistFile {
+		t.Fatalf("in-cluster defaults = %q/%q, want the mounted %q/%q",
+			gotCADir, gotAllowlist, server.DefaultUpstreamCADir, server.DefaultUpstreamAllowlistFile)
+	}
+	if logs.Len() != 0 {
+		t.Errorf("in-cluster defaults logged %q, want no warnings", logs.String())
+	}
+
+	// Outside a cluster the same wiring hands the flag's win through untouched.
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_PORT", "")
+	logs.Reset()
+	gotCADir, gotAllowlist = applyInClusterTrustBoundary(*f.upstreamCADir, *f.allowlistFile, detectInClusterEnvironment())
+	if gotCADir != flagCADir || gotAllowlist != flagAllowlist {
+		t.Fatalf("out-of-cluster pass-through = %q/%q, want the flag values %q/%q",
+			gotCADir, gotAllowlist, flagCADir, flagAllowlist)
+	}
+	if logs.Len() != 0 {
+		t.Errorf("out-of-cluster pass-through logged %q, want no warnings", logs.String())
+	}
+}
+
 // resolveVaultBaseDir is the CLI half of the vault base directory contract:
 // the flag wins, then SEAM_VAULT_BASE_DIR, and when neither names a prefix the
 // choice falls to spec.DefaultVaultBaseDir, which is where

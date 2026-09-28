@@ -3,6 +3,7 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -613,6 +614,52 @@ func TestIsFailClosed(t *testing.T) {
 			t.Error("IsFailClosed() should return true when allowlist is empty")
 		}
 	})
+}
+
+// TestAllowlistLoadFailureFailsClosed pins the operator-visible failure mode
+// of an unavailable mounted allowlist control. In-cluster the allowlist path
+// is the operator-mounted /etc/gateway/allowlist.yaml; when that mount is
+// absent or unreadable the enforcer must still come back usable-but-fail-
+// closed: NewAllowlistEnforcer does not error, the failure is recorded as a
+// parse error, GetAllowlistStatus reports the allowlist_parse_failed
+// condition, and ValidateUpstreamHost refuses every host with that reason.
+// Startup continues — readiness is what withholds (the /readyz allowlist
+// dependency) — and because the enforcer is built once at startup, restoring
+// the mount takes effect only after a restart.
+func TestAllowlistLoadFailureFailsClosed(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "allowlist.yaml") // never created
+
+	enforcer, err := NewAllowlistEnforcer("seam/routes", missing)
+	if err != nil {
+		t.Fatalf("NewAllowlistEnforcer with an unreadable file returned %v, want a fail-closed enforcer", err)
+	}
+
+	if !enforcer.IsFailClosed() {
+		t.Error("IsFailClosed() = false after a failed allowlist load, want true")
+	}
+
+	status := enforcer.GetAllowlistStatus()
+	upstream, ok := status["upstream_allowlist"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("GetAllowlistStatus() = %v, want an upstream_allowlist entry", status)
+	}
+	if loaded, _ := upstream["loaded"].(bool); loaded {
+		t.Errorf("status loaded = true after a failed load: %v", upstream)
+	}
+	if condition, _ := upstream["condition"].(string); condition != "allowlist_parse_failed" {
+		t.Errorf("status condition = %q, want allowlist_parse_failed: %v", condition, upstream)
+	}
+	if parseError, _ := upstream["parse_error"].(string); parseError == "" {
+		t.Errorf("status parse_error empty after a failed load: %v", upstream)
+	}
+
+	err = enforcer.ValidateUpstreamHost("https://api.example.com")
+	if err == nil {
+		t.Fatal("ValidateUpstreamHost accepted a host after a failed allowlist load, want fail-closed refusal")
+	}
+	if !strings.Contains(err.Error(), "allowlist_parse_failed") {
+		t.Errorf("refusal error = %q, want it to name allowlist_parse_failed as the reason", err)
+	}
 }
 
 // TestGetAllowlistStatus tests the status reporting
