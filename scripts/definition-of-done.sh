@@ -22,7 +22,14 @@ set -euo pipefail
 
 # Script directory for path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Verification also runs from `git archive` extractions, which intentionally do
+# not carry a .git directory. Prefer git's root in a checkout, but fall back to
+# the directory containing this script when there is no repository metadata.
+if REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)"; then
+  :
+else
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 cd "$REPO_ROOT"
 
 # Default to fast lane
