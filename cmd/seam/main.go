@@ -33,6 +33,7 @@ var seamCommands = []seamCommand{
 	{"lint", "Validate SEAM route fragments", lintCommand},
 	{"diff", "Show differences between fragment versions", diffCommand},
 	{"import", "Import fragments into SEAM", importCommand},
+	{"retirement-handoff", "Apply and observe a retirement handoff", retirementHandoffCommand},
 }
 
 // writeUsage prints the top-level help. Kept byte-compatible with the text

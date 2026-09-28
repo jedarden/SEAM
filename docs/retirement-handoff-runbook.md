@@ -162,6 +162,43 @@ rejects the block otherwise.
 
 ## Step 3 — Land the verdict (the human commit)
 
+The operator command below automates the safe preparation boundary: it reads
+the structured finding, inserts the proposed block at the fragment root in a
+named standalone fragment or ConfigMap `data` entry, runs the real `seam lint`
+engine before writing, and can wait for the gateway's hot-reload counter. It
+does not commit, push, call kubectl, mutate a live object, or use a credential.
+The default is a no-write plan; `--apply` is the explicit local working-tree
+write. `fragment_path` from the finding is deliberately not used as a target.
+
+```bash
+seam retirement-handoff \
+  --finding evaluator-finding.jsonl \
+  --target /path/to/declarative-config/k8s/rs-manager/seam/configmap-routes-legacy.yaml \
+  --data-key legacy.yaml \
+  --schema /path/to/SEAM/spec/route-fragment-schema.json
+
+# After reviewing the diff, apply before committing and pushing:
+seam retirement-handoff \
+  --finding evaluator-finding.jsonl \
+  --target /path/to/declarative-config/k8s/rs-manager/seam/configmap-routes-legacy.yaml \
+  --data-key legacy.yaml \
+  --schema /path/to/SEAM/spec/route-fragment-schema.json \
+  --apply
+
+# After the commit is pushed and ArgoCD has reconciled:
+seam retirement-handoff --observe-only \
+  --observe-url http://SEAM_OPERATOR_HOST:8081/health/upstreams
+```
+
+For a standalone fragment, omit `--data-key` and point `--target` at the
+reviewed `owner/fragment.yaml`. The command refuses to overwrite an existing
+marker and leaves the target untouched when lint fails. It prints the
+ordinary `git revert <landing-commit>` action after an apply; that revert is
+the reversible handoff, not a live Kubernetes mutation.
+
+The equivalent manual steps remain useful when the operator wants to inspect
+the ConfigMap edit directly:
+
 1. In `jedarden/declarative-config`, find the route owner's ConfigMap
    manifest under `k8s/rs-manager/seam/` and locate the fragment entry for
    the reported route.
@@ -290,5 +327,13 @@ candidate or double-emit one.
 
 ```bash
 go test -run 'TestRetirementHandoff|TestExtractDeprecation_PropagatedFragmentRootMarker' ./internal/server/
+go test -run 'TestRetirementHandoff' ./cmd/seam/
 cd tools/seam-retirement-evaluator && go test ./...
 ```
+
+The command tests additionally prove the default plan is read-only, a named
+ConfigMap data entry receives the marker at its fragment root, a lint failure
+cannot write, the reload counter is observed, and the printed rollback is an
+ordinary Git revert. The evaluator write-contract tests remain the separate
+proof that proposal generation has no file, process, credential, or git-host
+write primitive.

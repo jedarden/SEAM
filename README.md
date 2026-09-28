@@ -209,6 +209,41 @@ seam lint fragments/github-api/fragment.yaml
 
 Exit codes: `0` fragment written; `1` no paths matched the filter criteria; `2` failure — missing or invalid `--from-url`, a non-http(s) scheme, a fetch/HTTP error, a spec that parses as neither JSON nor YAML, or an unwritable output path.
 
+### `seam retirement-handoff`
+
+Turn one detection-only evaluator finding into a reviewed, linted fragment
+change. The command defaults to a no-write plan. `--apply` writes only the
+explicit `--target` after the real SEAM lint gate passes; it never runs Git,
+kubectl, or a git-host API. A ConfigMap target requires `--data-key`, because
+the evaluator's `fragment_path` is a locator rather than a writable path.
+
+```bash
+seam retirement-handoff \
+  --finding evaluator-finding.jsonl \
+  --target /path/to/declarative-config/k8s/rs-manager/seam/configmap-routes-legacy.yaml \
+  --data-key legacy.yaml \
+  --schema /path/to/SEAM/spec/route-fragment-schema.json
+
+# Review the plan, then apply before committing the declarative-config change.
+seam retirement-handoff \
+  --finding evaluator-finding.jsonl \
+  --target /path/to/declarative-config/k8s/rs-manager/seam/configmap-routes-legacy.yaml \
+  --data-key legacy.yaml \
+  --schema /path/to/SEAM/spec/route-fragment-schema.json \
+  --apply
+
+# After commit/push and ArgoCD reconciliation, wait for the reload counter.
+seam retirement-handoff --observe-only \
+  --observe-url http://seam-operator.example/health/upstreams
+```
+
+The command inserts `x-seam-deprecated` at the fragment root, refuses to
+overwrite an existing marker, and leaves the target unchanged when lint
+fails. After the operator commits and pushes the manifest, ArgoCD reconciles
+it; the observed reload is the proof that SEAM picked up the change. If a
+caller returns, revert that declarative-config landing commit with ordinary
+`git revert`; the same hot-reload observation confirms the marker disappeared.
+
 ### Differential replay (tools/diffharness)
 
 `lint`, `diff` and `import` manage fragments; the **differential replay** harness in `tools/diffharness` is the conformance gate that decides whether a fragment may ship at all. It replays a captured corpus of real request/response pairs against both the incumbent proxy and SEAM, then compares the responses for equivalence — a service's fragment does not ship, and its migration prose is not deleted, until its corpus passes the replay. The tools live in their own Go module and have their own README; this section covers the workflow, [the harness README](tools/diffharness/README.md) covers the full corpus format and comparison rules.
