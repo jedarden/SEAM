@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -521,6 +522,155 @@ func requireUnscannableScope(t *testing.T, file, site, descriptionPath, descript
 
 	if !strings.Contains(strings.ToLower(description), "unscannable") {
 		t.Errorf("%s: %s: acknowledges x-unscrubbable without stating its scope - the acknowledgement covers unscannable responses only (opaque media types, unsupported Content-Encoding, protocol upgrades are passed through instead of refused); scannable responses are still scrubbed. Say so in %s.", file, site, descriptionPath)
+	}
+}
+
+// exampleHistoricalMarker marks a documentation fragment as a historical
+// teaching artifact: its x-seam-deprecated dates depict a completed
+// deprecation lifecycle and are exempt from the live-sunset requirement of
+// TestDocumentationDeprecationExamplesStayLive. The marker is an inert
+// OpenAPI root extension — nothing in the runtime or in seam lint reads it;
+// this gate is its only reader, which is also what makes it a promise the
+// gate can hold the fragment to.
+const exampleHistoricalMarker = "x-seam-example-historical"
+
+// sunsetDayEnd returns the instant the sunset date's calendar day ends in
+// UTC — the same boundary checkDeprecation's range check applies when it
+// judges a brownout instant to lie inside [since, sunset] — so this gate and
+// the linter agree on when a sunset has passed. ok is false for a string
+// that is not an ISO date; the format rules belong to the lint gate
+// (deprecation.sunset-invalid), not here.
+func sunsetDayEnd(sunset string) (time.Time, bool) {
+	day, err := time.Parse("2006-01-02", sunset)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return day.AddDate(0, 0, 1), true
+}
+
+// TestDocumentationDeprecationExamplesStayLive keeps the documentation
+// estates' deprecation examples from silently expiring. Both trees teach by
+// copy-paste: a reader who lifts a "live" example whose sunset has already
+// passed ships a route that is born fully deprecated, and before this gate
+// nothing failed when wall-clock time walked past a checked-in date — the
+// complex-route example sat with a July 2026 sunset and June 2026 brownout
+// windows until a strand noticed in September 2026, and the multi-instance
+// example in examples/fragments had aged the same way. For every
+// x-seam-deprecated block at the two placements the runtime reads (fragment
+// root and path item — the same walk checkDeprecation uses), a parseable
+// sunset must agree with the frame the fragment declares:
+//
+//   - a live fragment (no marker) whose sunset has passed has expired:
+//     refresh the dates, or — if it now teaches a completed lifecycle —
+//     mark the fragment root x-seam-example-historical: true;
+//   - a marked-historical fragment whose sunset is still in the future
+//     contradicts its own marker: a historical artifact's lifecycle is
+//     over, so either drop the marker or move the sunset into the past.
+//
+// since is deliberately unchecked: even a live example normally carries a
+// past since, because a deprecation begins before it sunsets. The failure
+// is deliberately time-dependent — it fires the day the sunset passes.
+// That is the tripwire, not a flake: a documentation example is the one
+// fixture in the repo whose correctness is judged against the calendar, and
+// the gate turns that from silent rot into a maintenance signal
+// (docs/notes/brownout-runtime-semantics.md, "Documentation examples stay
+// live").
+func TestDocumentationDeprecationExamplesStayLive(t *testing.T) {
+	for _, tree := range documentationTrees() {
+		t.Run(tree.name, func(t *testing.T) {
+			checkDeprecationFreshness(t, tree.name, tree.dir)
+		})
+	}
+}
+
+func checkDeprecationFreshness(t *testing.T, name, dir string) {
+	t.Helper()
+
+	files := 0
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".json", ".yaml", ".yml":
+		default:
+			return nil
+		}
+		files++
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Errorf("%s: read: %v", path, err)
+			return nil
+		}
+		var decoded any
+		if err := yaml.Unmarshal(contents, &decoded); err != nil {
+			t.Errorf("%s: parse: %v", path, err)
+			return nil
+		}
+		normalized, err := normalizeDocValue(decoded)
+		if err != nil {
+			t.Errorf("%s: normalize: %v", path, err)
+			return nil
+		}
+		doc, ok := normalized.(map[string]any)
+		if !ok {
+			t.Errorf("%s: top-level document is %T, want an object", path, normalized)
+			return nil
+		}
+		historical := doc[exampleHistoricalMarker] == true
+		checkSunsetFreshness(t, path, "/x-seam-deprecated", historical, doc["x-seam-deprecated"])
+		paths, ok := doc["paths"].(map[string]any)
+		if !ok {
+			return nil
+		}
+		for pathKey, item := range paths {
+			pathItem, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if block, present := pathItem["x-seam-deprecated"]; present {
+				checkSunsetFreshness(t, path, "/paths/"+pathKey+"/x-seam-deprecated", historical, block)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", name, err)
+	}
+	if files == 0 {
+		t.Fatalf("no .json/.yaml/.yml files under %s - the documentation tree is missing", name)
+	}
+}
+
+// checkSunsetFreshness applies the live/historical rule to one
+// x-seam-deprecated block. Blocks that are missing, carry no sunset, or
+// carry an unparseable one are skipped: without a sunset nothing on the
+// block can expire, and the shape rules are the lint gate's job.
+func checkSunsetFreshness(t *testing.T, file, site string, historical bool, block any) {
+	t.Helper()
+
+	blockMap, ok := block.(map[string]any)
+	if !ok {
+		return
+	}
+	sunset, ok := blockMap["sunset"].(string)
+	if !ok || sunset == "" {
+		return
+	}
+	dayEnd, ok := sunsetDayEnd(sunset)
+	if !ok {
+		return
+	}
+	expired := !time.Now().UTC().Before(dayEnd)
+	switch {
+	case expired && !historical:
+		t.Errorf("%s: %s: sunset %s has passed - this example presents itself as live, and a reader who copies it ships a route that is born fully deprecated. Refresh the dates (brownout windows ordered and inside the new [since, sunset]) or, if it now teaches a completed lifecycle, mark the fragment root %s: true", file, site, sunset, exampleHistoricalMarker)
+	case !expired && historical:
+		t.Errorf("%s: %s: sunset %s is still in the future but the fragment is marked %s: true - the marker and the dates contradict each other. A historical artifact's lifecycle is over, so either drop the marker or move the sunset into the past", file, site, sunset, exampleHistoricalMarker)
 	}
 }
 

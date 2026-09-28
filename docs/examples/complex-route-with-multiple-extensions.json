@@ -3,7 +3,7 @@
   "info": {
     "title": "Complex Multi-Feature Route",
     "version": "1.0.0",
-    "description": "Demonstrates multiple SEAM extensions working together: loop guards, deprecation with sunset, per-operation scope overrides, and response scrubbing acknowledgment."
+    "description": "Demonstrates multiple SEAM extensions working together: loop guards, deprecation with sunset, per-operation scope overrides, and response scrubbing acknowledgment. The deprecation dates are illustrative and kept in the future on purpose: the doc examples gate (doc_examples_test.go) fails once the sunset passes, so refresh them rather than copying expired dates."
   },
   "x-seam-schema": "v1",
   "x-seam-owner": "complex-example",
@@ -26,15 +26,15 @@
   },
   "x-seam-deprecated": {
     "since": "2026-01-15",
-    "sunset": "2026-07-01",
+    "sunset": "2027-07-01",
     "brownout": [
       {
-        "start": "2026-06-01T00:00:00Z",
-        "end": "2026-06-07T23:59:59Z"
+        "start": "2027-06-01T00:00:00Z",
+        "end": "2027-06-07T23:59:59Z"
       },
       {
-        "start": "2026-06-15T00:00:00Z",
-        "end": "2026-06-21T23:59:59Z"
+        "start": "2027-06-15T00:00:00Z",
+        "end": "2027-06-21T23:59:59Z"
       }
     ]
   },

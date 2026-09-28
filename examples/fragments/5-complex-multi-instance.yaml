@@ -54,9 +54,12 @@ x-breaker:
   threshold: 10
   openSeconds: 45
   maxOpenSeconds: 600
+# Illustrative deprecation schedule, kept in the future on purpose:
+# TestDocumentationDeprecationExamplesStayLive (docs/examples/doc_examples_test.go)
+# fails once the sunset passes -- refresh the dates rather than copying expired ones.
 x-seam-deprecated:
   since: "2025-12-01"
-  sunset: "2026-06-30"
+  sunset: "2027-06-30"
 x-required-scope: geo-service:query
 
 openapi: 3.1.0
@@ -65,7 +68,7 @@ info:
   version: 1.0.0
   description: |
     Multi-region geo-service with per-instance credentials and controls.
-    DEPRECATED: This API is deprecated as of 2025-12-01 and will sunset on 2026-06-30.
+    DEPRECATED: This API is deprecated as of 2025-12-01 and will sunset on 2027-06-30.
     Migration to geo-v2 service is required.
 
 paths:

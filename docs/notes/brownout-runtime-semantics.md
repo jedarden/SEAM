@@ -233,6 +233,38 @@ string comparison to instant comparison for exactly these two mixed-offset
 cases; the old code both false-flagged legal adjacency and missed real
 overlaps across offsets.
 
+## Documentation examples stay live
+
+Both documentation estates (`docs/examples/` and `examples/fragments/`)
+teach by copy-paste, so a deprecation example is only safe to copy while
+its dates are still ahead of the reader: a "live" example whose sunset has
+passed hands the copier a route that is born fully deprecated. Nothing in
+the lint rules above catches that — they validate shape, not freshness —
+and the runtime cannot either (past sunset a route serves normally, by
+design). The catch is
+`docs/examples/doc_examples_test.go`
+(`TestDocumentationDeprecationExamplesStayLive`), which fails the build the
+day a checked-in example's sunset passes — the same day boundary lint's
+range check uses — at either placement the runtime reads (fragment root or
+path item). The remedy is one of:
+
+- **Refresh the dates.** Keep the shape (brownout windows ordered,
+  non-overlapping, inside `[since, sunset]`); the example teaches the
+  grammar, not a schedule.
+- **Mark it historical.** A fragment that now teaches a completed lifecycle
+  sets the fragment-root extension `x-seam-example-historical: true` and may
+  keep its past dates. The marker is inert — the runtime and seam lint never
+  read it — and the gate enforces that it tells the truth: a
+  marked-historical fragment whose sunset is still in the future fails the
+  same gate.
+
+`since` is deliberately unchecked: even a live example normally carries a
+past `since`, because a deprecation begins before it sunsets. Both
+deprecation-bearing examples were refreshed to 2027 sunsets when the gate
+landed (seam-88a9d336) — the complex-route example had been carrying a
+July 2026 sunset and June 2026 brownout windows, expired for months, with
+nothing to notice.
+
 ## Test map
 
 | Contract | Pinned by |
@@ -262,3 +294,4 @@ overlaps across offsets.
 | Window 410 carries only its own headers (no pass-through layering) | `TestServerDeprecationMiddleware_ActiveWindow410NotDoubleHeadered` |
 | Headers in the gap between windows | `TestServerDeprecationMiddleware_InactiveWindowCarriesHeaders` |
 | Headers persist past sunset (sunset advisory) | `TestServerDeprecationMiddleware_PastSunsetStillAdvertised` |
+| Documentation deprecation examples stay live (or marked historical) | `TestDocumentationDeprecationExamplesStayLive` |
