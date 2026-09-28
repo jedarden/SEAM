@@ -251,6 +251,38 @@ func TestChangesContractUnknownSince(t *testing.T) {
 	}
 }
 
+// TestChangesContractEvictedSince pins the same safe response after the ring
+// buffer has genuinely evicted the requested version. Eviction is distinct
+// from an arbitrary unknown hash: callers can retain a once-valid version
+// token longer than the restart-scoped history, and that request must remain
+// a successful response with no fabricated diff.
+func TestChangesContractEvictedSince(t *testing.T) {
+	s := newControlPlaneContractTestServer(t)
+	s.specRingBuffer = NewSpecRingBuffer(2)
+	s.specRingBuffer.Add("changescontract-evicted-v1", "changesv1-0000000000", []byte(changesContractV1), nil)
+	s.specRingBuffer.Add("changescontract-evicted-v2", "changesv2-0000000000", []byte(changesContractV2), nil)
+	s.specRingBuffer.Add("changescontract-v3hash", "changesv3-0000000000", []byte(changesContractV1), nil)
+
+	resp := serveChangesRequest(t, s, http.MethodGet, "/changes?since=changescontract-evicted-v1")
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (an evicted since is not an error), body: %s", resp.Code, resp.Body.String())
+	}
+	body := decodeChangesResponse(t, resp)
+	if body.SinceSpec != "changescontract-evicted-v1" {
+		t.Errorf("since_spec = %q, want the evicted hash echoed", body.SinceSpec)
+	}
+	if body.SinceKnown {
+		t.Error("since_known = true, want false for an evicted hash")
+	}
+	if len(body.Routes) != 0 || body.RouteCount != 0 {
+		t.Errorf("routes/route_count = %d/%d, want 0/0 for an evicted since", len(body.Routes), body.RouteCount)
+	}
+	if body.CurrentSpec != "changescontract-v3hash" {
+		t.Errorf("current_spec = %q, want the newest buffered version", body.CurrentSpec)
+	}
+}
+
 // TestChangesSubPathIsNotAMigrationEndpoint pins the namespace enumeration:
 // /changes is reserved by exact path and has no versioned sub-paths. A
 // version-shaped sub-path is not a control-plane endpoint — it is not in the
