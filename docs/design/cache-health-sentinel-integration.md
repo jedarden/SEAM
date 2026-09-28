@@ -47,7 +47,7 @@ SEAM provides several health sentinel endpoints:
 |----------|---------|----------|
 | `/_seam/healthz` | Liveness probe | `200 OK` with body `"OK"` and `Cache-Control: no-store` |
 | `/_seam/health` | Liveness probe (served alias) | `200 OK` with body `"OK"` and `Cache-Control: no-store` |
-| `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body |
+| `/_seam/readyz` | Readiness probe | `200 OK` when every readiness dependency passes; `503` with each dependency's state in the body; both verdicts carry `Cache-Control: no-store` |
 | `/health/credentials` | Credential health | `200 OK` JSON with aggregate and per-origin circuit-breaker state |
 | `/health/upstreams` | Upstream health | `200 OK` with per-upstream last-2xx/breaker state plus route-table health |
 
@@ -697,6 +697,10 @@ OK
 7. **`TestBypassObservability_ReservedRequestsEmitNoSignals`** - Pins the reserved-path observability contract through the production metrics→cache→quota order: zero samples in any `seam_http_*`, `seam_cache_*` or `seam_quota_*` family, no bypass or quota headers, fresh execution and $0 accumulated, with a quota-refused sanity path proving the configuration bites
 8. **`TestBypassObservability_CacheHitSignalContract`** - Pins the successful cache-hit contract: bypass headers, stripping of every admission-time quota header (including `X-SEAM-Budget-Remaining`), the hit/miss/bypass/cost metric values, the label-key split between cache and quota families, and that the hit is still counted in `seam_http_requests_total`
 9. **`TestHealthSentinelConfiguredTTLAndCostStayBypassed`** - Pins the configured-TTL bypass for the two operator sentinels with their real handlers: with a cache TTL and a per-call cost (above the quota limit) configured for `/health/credentials` and `/health/upstreams` themselves, requests through the identity→cache→quota order carry the handlers' own `Cache-Control: no-store`, track live breaker state (nothing stale is replayed), store no cache entry and record no cache or quota metric — while the same configuration demonstrably refuses a non-reserved path and serves a cache HIT on another
+10. **`TestHealthSentinelListenerIsolation`** - Walks the sentinel/listener matrix in both directions: each of the five health names answers 200 on its owning listener (caller port for the `/_seam/` trio, operator port for `/health/*`) with its own body shape and `Cache-Control: no-store`, and the other listener refuses with 404 without echoing the serving listener's payload
+11. **`TestHealthUpstreamsOperatorScopeGate`** - Completes `/health/upstreams`'s scope contract through the real registration and operator chain: a resolved caller without `seam:ops:read` is 403'd with the required scope named and no sentinel payload echoed, while a caller carrying the scope is admitted through the same composition
+12. **`TestReadyzVerdictCarriesNoStore`** - Pins the readiness handler's own `Cache-Control: no-store` on both verdicts, the 200 and the empty-route-table 503
+13. **`TestReadyzReservedPathBypassWithRealHandler`** - Extends the configured-TTL bypass pin to readiness with its real handler through the production caller chain: with a TTL and an above-limit cost set for `/_seam/readyz` itself, the verdict flips 200→503 between two requests and stays fresh (nothing replayed from a cache entry), no cache entry is stored, no quota moves — while the same configuration demonstrably caches and refuses non-reserved sanity paths
 
 ### Manual Testing
 

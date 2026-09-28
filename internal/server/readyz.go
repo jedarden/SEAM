@@ -128,6 +128,11 @@ func (s *Server) readyzHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	// Defensive, mirroring the other three health sentinels: the dependency
+	// set is re-evaluated on every request, so a readiness verdict must never
+	// be cacheable even when the handler runs without SEAM's reserved-path
+	// middleware.
+	w.Header().Set("Cache-Control", "no-store")
 
 	checks := s.readinessChecks()
 
