@@ -69,8 +69,11 @@ func TestEmitRetirementFindingCarriesTheDetection(t *testing.T) {
 	assertField(t, fields, "route", "/users")
 	assertField(t, fields, "api_version", "v1")
 	assertField(t, fields, "spec_version", "abc123")
-	assertTimeField(t, fields, "quiet_since", candidate.QuietSince)
-	assertField(t, fields, "eval_window", 14*24*time.Hour)
+	// The record schema (handoff runbook) states the formats: quiet_since is
+	// RFC 3339 and eval_window is a Go duration — both strings, readable at a
+	// kubectl-logs terminal, not zap's epoch defaults.
+	assertField(t, fields, "quiet_since", candidate.QuietSince.UTC().Format(time.RFC3339))
+	assertField(t, fields, "eval_window", (14 * 24 * time.Hour).String())
 	assertField(t, fields, "reason", candidate.Reason)
 	// The route label is a URL path and carries its own leading slash; the
 	// rendered fragment path must not stack a second separator behind it.
@@ -284,9 +287,13 @@ func TestRunEvaluationEmitsDetectionFromVictoriaMetrics(t *testing.T) {
 	// quiet_since must be the earliest instant the 14-day query window can
 	// actually vouch for. The zero time.Time would read as ~292 years of quiet
 	// and make the record a lie.
-	quietSince, ok := fields["quiet_since"].(time.Time)
+	quietSinceRaw, ok := fields["quiet_since"].(string)
 	if !ok {
-		t.Fatalf("quiet_since = %T, want a time.Time", fields["quiet_since"])
+		t.Fatalf("quiet_since = %T, want an RFC 3339 string", fields["quiet_since"])
+	}
+	quietSince, err := time.Parse(time.RFC3339, quietSinceRaw)
+	if err != nil {
+		t.Fatalf("quiet_since %q is not RFC 3339: %v", quietSinceRaw, err)
 	}
 	if quietSince.IsZero() {
 		t.Fatal("quiet_since is the zero time; the record would claim ~292 years of quiet")
@@ -328,19 +335,6 @@ func assertField(t *testing.T, fields map[string]any, key string, want any) {
 // assertTimeField compares times with Equal, because a time captured from
 // time.Now carries a monotonic reading that a round-trip through the logger
 // drops; Sprint would call those unequal.
-func assertTimeField(t *testing.T, fields map[string]any, key string, want time.Time) {
-	t.Helper()
-
-	got, ok := fields[key].(time.Time)
-	if !ok {
-		t.Errorf("field %q = %v (%T), want a time.Time", key, fields[key], fields[key])
-		return
-	}
-	if !got.Equal(want) {
-		t.Errorf("field %q = %v, want %v", key, got, want)
-	}
-}
-
 func fieldNames(fields map[string]any) []string {
 	names := make([]string, 0, len(fields))
 	for k := range fields {

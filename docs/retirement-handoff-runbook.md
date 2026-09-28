@@ -54,18 +54,78 @@ The record carries everything the handoff needs:
 | Field | Meaning |
 |---|---|
 | `route` / `api_version` / `spec_version` | the quiet route version |
-| `quiet_since` | last observed request (RFC 3339) |
-| `eval_window` | `max(3 × observed_max_gap, 7d)` the route exceeded |
-| `reason` | the eligibility verdict, e.g. `Zero traffic for 720h0m0s (exceeds window 168h0m0s)` |
-| `proposed_sunset` | proposed sunset date (declaration + 90 days) |
+| `quiet_since` | last observed request, RFC 3339 (e.g. `2026-08-29T11:35:23Z`) |
+| `eval_window` | `max(3 × observed_max_gap, 7d)` the route exceeded, as a Go duration (e.g. `336h0m0s`) |
+| `reason` | the eligibility verdict, e.g. `Zero traffic for 720h0m0s (exceeds window 336h0m0s)` |
+| `proposed_sunset` | proposed sunset date, strict ISO `YYYY-MM-DD` (declaration + 90 days) |
 | `brownout_windows` | the three proposed windows (indented YAML list items) |
 | `fragment_path` | proposal locator — see the warning below |
 | `x_seam_deprecated_block` | **the proposed block, fragment-shaped and ready to paste** |
 | `body` | the human-readable proposal text |
 
-The counter `seam_retirement_deprecation_candidates_total{route,api_version,spec_version}`
-accumulates per route version across runs: a value stuck at 1 means one
-detection, a climbing value means the route is still quiet every hour.
+### The record schema
+
+The schema is **closed**: the envelope zap's production encoder adds
+(`level`, `ts`, `caller`, `msg`) plus exactly the eleven fields above, and
+nothing else. Formats are part of the contract: `quiet_since` is an RFC 3339
+string and `eval_window` a Go duration string — deliberately not zap's
+production defaults for those types (epoch seconds and float seconds), which
+would put values in front of a human that no one can read at a
+`kubectl logs` terminal. The closed set is pinned by
+`TestFindingRecordSchemaIsClosed`; the formats by
+`TestRunbookRepresentativeRecordMatchesTheContract`.
+
+**No secret values.** The record — and the counter below — may carry
+route-version identifiers (`route`, `api_version`, `spec_version`) and
+content derived from those plus wall-clock time (the reason, the fragment
+path, the proposed block, the proposal body), and nothing else: no
+credential material (the deployment's OpenBao-held query token never enters
+the emit path), no HTTP headers, no query-response content beyond the
+identity labels, and no other source-metric label value. Even if a
+credential-bearing label ever appeared on the source metric, the parser reads
+only `route` and `spec_version`, so the value cannot reach a record. That
+prohibition is pinned by `TestFindingCarriesNoCredentialOrForeignLabelContent`.
+
+A representative record, as `kubectl logs` shows it (the proposed block is
+carried in full; the proposal body is elided):
+
+```json
+{"level":"info","ts":1790595323.9972212,"caller":"seam-retirement-evaluator/evaluator.go:252","msg":"Deprecation candidate detected","route":"/users","api_version":"_unversioned","spec_version":"abc123","quiet_since":"2026-08-29T11:35:23Z","eval_window":"336h0m0s","reason":"Zero traffic for 720h0m0s (exceeds window 336h0m0s)","proposed_sunset":"2026-12-27","brownout_windows":"    - start: \"2026-10-28T11:35:23Z\"\n      end: \"2026-11-04T11:35:23Z\"\n    - start: \"2026-11-27T11:35:23Z\"\n      end: \"2026-12-04T11:35:23Z\"\n    - start: \"2026-12-20T00:00:00Z\"\n      end: \"2026-12-27T00:00:00Z\"","fragment_path":"k8s/rs-manager/seam/routes.d/users/fragment.yaml","x_seam_deprecated_block":"x-seam-deprecated:\n  since: \"2026-09-28\"\n  sunset: \"2026-12-27\"\n  brownout:\n    - start: \"2026-10-28T11:35:23Z\"\n      end: \"2026-11-04T11:35:23Z\"\n    - start: \"2026-11-27T11:35:23Z\"\n      end: \"2026-12-04T11:35:23Z\"\n    - start: \"2026-12-20T00:00:00Z\"\n      end: \"2026-12-27T00:00:00Z\"","body":"<elided — the human-readable proposal text>"}
+```
+
+The example is itself a test fixture:
+`TestRunbookRepresentativeRecordMatchesTheContract` parses it and checks
+every key and format against the emitter's real schema, so the doc cannot
+silently drift from what the evaluator emits.
+
+### The metric contract
+
+`seam_retirement_deprecation_candidates_total{route,api_version,spec_version}`
+is the counter one candidate increments:
+
+- **Type and name**: a Prometheus counter — it only ever goes up.
+- **Labels**: exactly `route`, `api_version`, `spec_version` — the same
+  identity triple as the record. `api_version` carries the version extracted
+  from the route path; that extraction is not implemented yet, so the label
+  carries the sentinel `_unversioned`. The label exists so the identity
+  triple is stable when extraction lands, not as a third cardinality axis.
+- **Cardinality**: bounded by construction — one series per distinct route
+  version that has ever emitted a candidate, so the series population is
+  bounded by the same set of route versions the 14-day traffic query
+  observes (`seam_route_version_requests_total`'s population, never larger).
+  The label set is closed: no per-caller, per-status, or time-bucketed label
+  may be added — an unbounded label would make the metric a liability at
+  scrape time. Series accumulate across runs (a value stuck at 1 means one
+  detection; a climbing value means the route is still quiet every hour) and
+  are never reset by a scrape.
+- **Rendering**: text exposition format 0.0.4, series sorted by label
+  triple, label values quoted and escaped — repeated scrapes of an unchanged
+  registry are byte-identical.
+
+Two companion series report the run itself rather than any candidate:
+`seam_retirement_evaluation_runs_total{result="success"|"error"}` and the
+gauge `seam_retirement_routes_evaluated` (route versions the most recent run
+considered).
 
 > **`fragment_path` is a locator, not a writable target.** It names where the
 > proposal applies (`k8s/rs-manager/seam/routes.d/<route>/fragment.yaml` by

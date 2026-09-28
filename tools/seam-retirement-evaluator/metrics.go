@@ -63,8 +63,8 @@ func (m *retirementMetrics) render() string {
 
 	var b strings.Builder
 
-	fmt.Fprintln(&b, "# HELP seam_retirement_deprecation_candidates_total Deprecation candidates emitted, by route version. Detection-only: the evaluator never writes to a git host.")
-	fmt.Fprintln(&b, "# TYPE seam_retirement_deprecation_candidates_total counter")
+	fmt.Fprintf(&b, "# HELP %s Deprecation candidates emitted, by route version. Detection-only: the evaluator never writes to a git host.\n", candidateMetricName)
+	fmt.Fprintf(&b, "# TYPE %s counter\n", candidateMetricName)
 
 	keys := make([]routeVersionKey, 0, len(m.candidateCounts))
 	for k := range m.candidateCounts {
@@ -80,8 +80,12 @@ func (m *retirementMetrics) render() string {
 		return keys[i].specVersion < keys[j].specVersion
 	})
 	for _, k := range keys {
-		fmt.Fprintf(&b, "seam_retirement_deprecation_candidates_total{route=%s,api_version=%s,spec_version=%s} %d\n",
-			renderLabelValue(k.route), renderLabelValue(k.apiVersion), renderLabelValue(k.specVersion), m.candidateCounts[k])
+		values := []string{k.route, k.apiVersion, k.specVersion}
+		labels := make([]string, len(candidateMetricLabels))
+		for i, name := range candidateMetricLabels {
+			labels[i] = name + "=" + renderLabelValue(values[i])
+		}
+		fmt.Fprintf(&b, "%s{%s} %d\n", candidateMetricName, strings.Join(labels, ","), m.candidateCounts[k])
 	}
 
 	fmt.Fprintln(&b, "# HELP seam_retirement_evaluation_runs_total Retirement evaluation runs, by outcome.")

@@ -16,6 +16,7 @@ type RetirementEvaluator struct {
 	metrics *retirementMetrics
 
 	fragmentPath string
+	now          func() time.Time
 }
 
 // NewRetirementEvaluator creates a new retirement evaluator
@@ -25,6 +26,7 @@ func NewRetirementEvaluator(vmc *VictoriaMetricsClient, config *Config, metrics 
 		config:       config,
 		metrics:      metrics,
 		fragmentPath: config.DeclarativeConfigPath,
+		now:          time.Now,
 	}
 }
 
@@ -121,7 +123,7 @@ func (re *RetirementEvaluator) calculateEvaluationWindow(maxGap, historyLength t
 // isEligibleForRetirement checks if a route version meets retirement criteria
 // Zero observed traffic is a NECESSARY condition
 func (re *RetirementEvaluator) isEligibleForRetirement(stats RouteTrafficStats, quietSince time.Time, window time.Duration) (bool, string) {
-	now := time.Now()
+	now := re.now()
 
 	// CRITICAL: Zero observed traffic is a necessary condition, and zero
 	// means exactly zero. An unreadable sample parses to -1 (traffic), so a
@@ -155,7 +157,7 @@ func (re *RetirementEvaluator) isEligibleForRetirement(stats RouteTrafficStats, 
 // point, over a window, with no caller-appears events, and reports it. Landing
 // the x-seam-deprecated block is a human edit to declarative-config on main.
 func (re *RetirementEvaluator) emitRetirementFinding(candidate *RetirementCandidate) {
-	now := time.Now()
+	now := re.now()
 
 	// Calculate sunset date (typically 90-180 days out)
 	sunsetDate := now.Add(90 * 24 * time.Hour).Format("2006-01-02")
@@ -227,7 +229,7 @@ reversibility is the gate.
 		candidate.RouteStats.APIVersion,
 		candidate.RouteStats.SpecVersion,
 		candidate.QuietSince.Format("2006-01-02T15:04:05Z"),
-		time.Since(candidate.QuietSince).Round(24*time.Hour),
+		now.Sub(candidate.QuietSince).Round(24*time.Hour),
 		candidate.EvalWindow.Round(24*time.Hour),
 		candidate.Reason,
 		now.Format("2006-01-02"),
@@ -236,24 +238,26 @@ reversibility is the gate.
 		fragmentPath,
 	)
 
-	zap.L().Info("Deprecation candidate detected",
-		zap.String("route", candidate.RouteStats.Route),
-		zap.String("api_version", candidate.RouteStats.APIVersion),
-		zap.String("spec_version", candidate.RouteStats.SpecVersion),
-		zap.Time("quiet_since", candidate.QuietSince),
-		zap.Duration("eval_window", candidate.EvalWindow),
-		zap.String("reason", candidate.Reason),
-		zap.String("proposed_sunset", sunsetDate),
-		zap.String("brownout_windows", brownouts),
-		zap.String("fragment_path", fragmentPath),
-		zap.String("x_seam_deprecated_block", deprecationBlock),
-		zap.String("body", body))
-
-	re.metrics.recordCandidate(routeVersionKey{
-		route:       candidate.RouteStats.Route,
-		apiVersion:  candidate.RouteStats.APIVersion,
-		specVersion: candidate.RouteStats.SpecVersion,
-	})
+	// quiet_since and eval_window travel as strings with stated formats (RFC
+	// 3339 and a Go duration), not as zap's production defaults for these
+	// types (epoch seconds and float seconds). The contract's closed field
+	// list also makes it explicit that no credential or foreign metric label
+	// can enter this record.
+	finding := retirementFinding{
+		route:            candidate.RouteStats.Route,
+		apiVersion:       candidate.RouteStats.APIVersion,
+		specVersion:      candidate.RouteStats.SpecVersion,
+		quietSince:       candidate.QuietSince.UTC().Format(time.RFC3339),
+		evaluationWindow: candidate.EvalWindow.String(),
+		reason:           candidate.Reason,
+		proposedSunset:   sunsetDate,
+		brownoutWindows:  brownouts,
+		fragmentPath:     fragmentPath,
+		deprecatedBlock:  deprecationBlock,
+		body:             body,
+	}
+	zap.L().Info(retirementFindingMessage, finding.fields()...)
+	re.metrics.recordCandidate(finding.metricKey())
 }
 
 // calculateBrownouts calculates brownout windows leading up to sunset

@@ -25,19 +25,7 @@ import (
 // carry. The record is the whole proposal — a dropped field is a dropped part
 // of it, so a candidate whose record lacks, say, the block or the fragment
 // path is not actionable and fails here.
-var contractFields = []string{
-	"route",
-	"api_version",
-	"spec_version",
-	"quiet_since",
-	"eval_window",
-	"reason",
-	"proposed_sunset",
-	"brownout_windows",
-	"fragment_path",
-	"x_seam_deprecated_block",
-	"body",
-}
+var contractFields = retirementFindingFields[:]
 
 // TestXSeamDeprecatedBlockIsFragmentShaped proves the proposed block parses
 // as YAML, carries the singular brownout key both consumers read, and passes

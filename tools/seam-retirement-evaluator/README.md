@@ -110,6 +110,14 @@ record and a Prometheus counter:
 - the `x-seam-deprecated` block itself, fragment-shaped and ready to paste
 - the human-readable proposal text
 
+The finding message is `Deprecation candidate detected`. Its payload is a
+closed set of string fields: `route`, `api_version`, `spec_version`,
+`quiet_since` (RFC 3339), `eval_window` (Go duration), `reason`,
+`proposed_sunset` (`YYYY-MM-DD`), `brownout_windows`, `fragment_path`,
+`x_seam_deprecated_block`, and `body`. The production log envelope adds only
+Zap's `level`, `ts`, `caller`, and `msg`. No credential, HTTP header, query
+response, or foreign source-metric label may appear in a finding.
+
 ```
 seam_retirement_deprecation_candidates_total{route=...,api_version=...,spec_version=...}
 seam_retirement_evaluation_runs_total{result="success"|"error"}
@@ -117,7 +125,13 @@ seam_retirement_routes_evaluated
 ```
 
 `seam_retirement_deprecation_candidates_total` accumulates per route version,
-so a route that stays quiet keeps counting up across evaluation runs.
+so a route that stays quiet keeps counting up across evaluation runs. It is a
+counter with exactly the identity labels `route`, `api_version`, and
+`spec_version`; there are no caller, status, timestamp, or source-label
+dimensions. One series is emitted per distinct route-version identity, so
+foreign labels cannot increase cardinality. The complete contract and a
+representative JSON record are pinned in the
+[retirement handoff runbook](../../docs/retirement-handoff-runbook.md).
 
 ### 4. The Verdict Channel
 

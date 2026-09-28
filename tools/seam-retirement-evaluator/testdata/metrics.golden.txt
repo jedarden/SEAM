@@ -1,0 +1,11 @@
+# HELP seam_retirement_deprecation_candidates_total Deprecation candidates emitted, by route version. Detection-only: the evaluator never writes to a git host.
+# TYPE seam_retirement_deprecation_candidates_total counter
+seam_retirement_deprecation_candidates_total{route="/orders",api_version="_unversioned",spec_version="def456"} 1
+seam_retirement_deprecation_candidates_total{route="/users",api_version="_unversioned",spec_version="abc123"} 2
+# HELP seam_retirement_evaluation_runs_total Retirement evaluation runs, by outcome.
+# TYPE seam_retirement_evaluation_runs_total counter
+seam_retirement_evaluation_runs_total{result="error"} 1
+seam_retirement_evaluation_runs_total{result="success"} 1
+# HELP seam_retirement_routes_evaluated Route versions considered by the most recent evaluation run.
+# TYPE seam_retirement_routes_evaluated gauge
+seam_retirement_routes_evaluated 0
