@@ -115,6 +115,7 @@ func (s *Server) changesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set headers and return response
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Scope-Version", s.getCurrentScopeVersion(identity))
 	w.WriteHeader(http.StatusOK)
