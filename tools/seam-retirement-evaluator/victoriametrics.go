@@ -196,13 +196,44 @@ func (vmc *VictoriaMetricsClient) QueryMaxInterRequestGap(ctx context.Context, r
 	return 24 * time.Hour, nil
 }
 
-// parseQueryResults parses VictoriaMetrics query results into RouteTrafficStats
+// parseQueryResults parses VictoriaMetrics query results into RouteTrafficStats.
+// The response is normalized before anything downstream can call it a
+// candidate: a series without both the route and spec_version labels names no
+// route version and is dropped, and a route version reported by more than one
+// series collapses onto the first — one route version is one candidate, never
+// two records and two counter increments.
 func (vmc *VictoriaMetricsClient) parseQueryResults(results []Result) []RouteTrafficStats {
 	stats := make([]RouteTrafficStats, 0, len(results))
+	seen := make(map[string]bool, len(results))
 
 	for _, r := range results {
 		route := r.Metric["route"]
 		specVersion := r.Metric["spec_version"]
+
+		// seam_route_version_requests_total always carries both labels, so a
+		// series missing either is malformed input. A proposal minted from it
+		// would carry an empty route or spec version and point the human
+		// handoff at a fragment that cannot be located.
+		if route == "" || specVersion == "" {
+			zap.L().Warn("Dropping malformed series: a route version needs both the route and spec_version labels",
+				zap.String("route", route),
+				zap.String("spec_version", specVersion))
+			continue
+		}
+
+		// Series that differ only in labels this parser ignores (a future
+		// extra label on the counter, say) parse to the same route version.
+		// The duplicate is dropped so the output contract — one structured
+		// record and one counter per candidate — survives a many-series
+		// route version.
+		identity := route + "\x00" + specVersion
+		if seen[identity] {
+			zap.L().Warn("Dropping duplicate series: one route version is one candidate",
+				zap.String("route", route),
+				zap.String("spec_version", specVersion))
+			continue
+		}
+		seen[identity] = true
 
 		// The sample value is the observed request count. It has to be read:
 		// zero observed traffic is the necessary condition for a retirement

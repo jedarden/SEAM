@@ -123,10 +123,18 @@ func (re *RetirementEvaluator) calculateEvaluationWindow(maxGap, historyLength t
 func (re *RetirementEvaluator) isEligibleForRetirement(stats RouteTrafficStats, quietSince time.Time, window time.Duration) (bool, string) {
 	now := time.Now()
 
-	// CRITICAL: Zero observed traffic is a necessary condition
-	// If we've seen ANY requests, this route version cannot retire
-	if stats.TotalRequests > 0 {
+	// CRITICAL: Zero observed traffic is a necessary condition, and zero
+	// means exactly zero. An unreadable sample parses to -1 (traffic), so a
+	// sign-only check would admit a malformed count as quiet.
+	if stats.TotalRequests != 0 {
 		return false, "Route has active traffic"
+	}
+
+	// A candidate is only as honest as its quiet-since. The parser vouches an
+	// instant for every zero count; a zero time means nobody vouched, and a
+	// record minted from it would claim millennia of quiet.
+	if quietSince.IsZero() {
+		return false, "No vouched quiet period"
 	}
 
 	// Check if quiet period exceeds evaluation window

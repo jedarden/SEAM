@@ -220,7 +220,13 @@ The SEAM-side half of this contract is pinned by
 
 The evaluator-side half — fragment-shaped emission, one record and counter
 per candidate, and no write path — is pinned in
-`tools/seam-retirement-evaluator/{output_contract_test.go,write_contract_test.go}`.
+`tools/seam-retirement-evaluator/{output_contract_test.go,write_contract_test.go,candidate_input_contract_test.go}`.
+The last of those pins the input normalization the one-record-one-counter
+sentence rests on: a series without both the `route` and `spec_version`
+labels is dropped, duplicate series for one route version collapse onto the
+first, and an unreadable count is traffic (exactly-zero is the necessary
+condition), so a duplicate or malformed series can never manufacture a
+candidate or double-emit one.
 
 ```bash
 go test -run 'TestRetirementHandoff|TestExtractDeprecation_PropagatedFragmentRootMarker' ./internal/server/

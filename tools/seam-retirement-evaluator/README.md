@@ -62,7 +62,28 @@ count and derives:
 - **Total history**: Duration of available metrics
 
 An unreadable sample is treated as *traffic*, not as quietness — a count the
-evaluator cannot read is never allowed to make a route eligible.
+evaluator cannot read is never allowed to make a route eligible. Concretely,
+an unreadable count parses to `-1`, and eligibility requires a count of
+**exactly zero** plus a vouched quiet-since, so malformed input fails the
+necessary condition instead of riding past it.
+
+The query result is normalized before anything downstream can call it a
+candidate (pinned by `candidate_input_contract_test.go`):
+
+- **No labels, no candidate.** A series that does not carry both the `route`
+  and `spec_version` labels names no route version — and no fragment for the
+  handoff to land the block on — and is dropped with a warning.
+- **Duplicates collapse.** One route version is one candidate: a route version
+  reported by more than one series (series differing only in labels the parser
+  ignores) is parsed once and the duplicates are dropped with a warning. One
+  run therefore cannot double-emit the record or double-count the counter for
+  one route version. Accumulation *across* runs is unaffected — a route that
+  stays quiet keeps counting up.
+- **Malformed is never quiet.** A series with an unreadable sample is
+  considered and rejected as traffic (`routes_evaluated` still counts it); a
+  series without both labels is dropped before evaluation and is not a route
+  version at all. Either way a run over malformed input is still a successful
+  run.
 
 ### 2. Retirement Eligibility
 
