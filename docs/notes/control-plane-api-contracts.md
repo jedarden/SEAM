@@ -7,6 +7,10 @@ document served at **`/docs/control-plane`** (raw JSON with
 distillation; when they disagree, the served document is wrong and the code
 that pins it (`control_plane_openapi_test.go`) should fail.
 
+For the one-page listener/method/scope/status/shape/cache reference covering
+both caller and operator surfaces, see
+[control-plane-endpoint-matrix.md](control-plane-endpoint-matrix.md).
+
 ## What "control plane" means here
 
 SEAM serves two different APIs and documents them separately:

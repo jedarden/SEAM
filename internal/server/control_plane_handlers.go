@@ -90,6 +90,7 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set headers and return response
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Scope-Version", scopeVersion)
 	w.WriteHeader(http.StatusOK)
@@ -155,6 +156,7 @@ func (s *Server) scopesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set headers and return response
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-SEAM-Scope-Version", s.getCurrentScopeVersion(identity))
 	w.WriteHeader(http.StatusOK)
@@ -405,6 +407,7 @@ func (s *Server) tailscaleEphemeralKeyHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	// Set headers and return response
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
