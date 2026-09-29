@@ -381,6 +381,42 @@ func TestServeTrustPathPrecedenceMountedBeatsFlagBeatsEnv(t *testing.T) {
 	}
 }
 
+// Environment-only trust overrides also pass through the same final boundary
+// outside a cluster. This closes the gap between the environment lookup test
+// and the operator-visible resolution seam: a local deployment may provide
+// both paths through SEAM_* without triggering an in-cluster refusal warning.
+func TestServeTrustPathEnvironmentOverridesOutsideCluster(t *testing.T) {
+	const (
+		envCADir     = "/env/ca-bundles"
+		envAllowlist = "/env/allowlist.yaml"
+	)
+
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_PORT", "")
+	f := resolveServeConfig(t, nil, map[string]string{
+		"SEAM_UPSTREAM_CA_DIR":    envCADir,
+		"SEAM_UPSTREAM_ALLOWLIST": envAllowlist,
+	})
+
+	var logs bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(previous) })
+
+	gotCADir, gotAllowlist := applyInClusterTrustBoundary(
+		*f.upstreamCADir,
+		*f.allowlistFile,
+		detectInClusterEnvironment(),
+	)
+	if gotCADir != envCADir || gotAllowlist != envAllowlist {
+		t.Fatalf("environment-only out-of-cluster resolution = %q/%q, want %q/%q",
+			gotCADir, gotAllowlist, envCADir, envAllowlist)
+	}
+	if logs.Len() != 0 {
+		t.Errorf("environment-only out-of-cluster resolution logged %q, want no warnings", logs.String())
+	}
+}
+
 // resolveVaultBaseDir is the CLI half of the vault base directory contract:
 // the flag wins, then SEAM_VAULT_BASE_DIR, and when neither names a prefix the
 // choice falls to spec.DefaultVaultBaseDir, which is where
