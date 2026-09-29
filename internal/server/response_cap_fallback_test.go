@@ -191,3 +191,89 @@ func TestResponseCapFallbackStreamsBeforeUpstreamCompletes(t *testing.T) {
 		t.Fatalf("marker count = %d, want 1", got)
 	}
 }
+
+func TestResponseCapDeclaredOverLimitStreamsBeforeUpstreamCompletes(t *testing.T) {
+	secret := []byte("declared-over-limit-stream-secret")
+	// A declared body over the cap must never be held for whole-response
+	// scrubbing. Keep the source blocked after a safe prefix; a whole-body
+	// implementation would block the caller's first read as well.
+	lead := bytes.Repeat([]byte{'n'}, 256)
+	rest := append([]byte("-mid-"), secret...)
+	rest = append(rest, bytes.Repeat([]byte{'t'}, 4*1024)...)
+	plain := append(bytes.Clone(lead), rest...)
+
+	bodyReader, bodyWriter := io.Pipe()
+	resp := &http.Response{
+		StatusCode: http.StatusAccepted,
+		Header: http.Header{
+			"Content-Type":   []string{"text/plain"},
+			"Content-Length": []string{itoa(len(plain))},
+			"X-Echo":         []string{string(secret)},
+			"Trailer":        []string{"X-Echo-Trailer"},
+		},
+		ContentLength: int64(len(plain)),
+		Trailer:       http.Header{"X-Echo-Trailer": []string{string(secret)}},
+		Body:          bodyReader,
+	}
+	scrubber := newSecretScrubber([][]byte{secret})
+
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	go func() {
+		defer func() { _ = bodyWriter.Close() }()
+		if _, err := bodyWriter.Write(lead); err != nil {
+			return
+		}
+		select {
+		case <-release:
+		case <-time.After(5 * time.Second):
+			return
+		}
+		_, _ = bodyWriter.Write(rest)
+	}()
+
+	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if err := scrubber.streamResponse(w, resp, int64(len(lead))); err != nil {
+			t.Errorf("streamResponse() error = %v", err)
+		}
+	}))
+	defer served.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	response, err := client.Get(served.URL)
+	if err != nil {
+		t.Fatalf("GET declared-over-limit response: %v", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d preserved on the fallback path", response.StatusCode, http.StatusAccepted)
+	}
+	if got := response.Header.Get("X-Echo"); got != RedactedSecret {
+		t.Fatalf("X-Echo = %q, want %q scrubbed on the fallback path", got, RedactedSecret)
+	}
+	if got := response.Header.Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want it removed on the streaming path", got)
+	}
+
+	first := make([]byte, 64)
+	n, err := response.Body.Read(first)
+	if err != nil || n == 0 {
+		t.Fatalf("first read on the declared-over-limit path = (%d, %v), want bytes before the upstream body completes", n, err)
+	}
+	close(release)
+	released = true
+	remainder, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read declared-over-limit remainder: %v", err)
+	}
+	got := append(append([]byte{}, first[:n]...), remainder...)
+	assertScrubbedExactly(t, secret, got, ScrubBytes(plain, secret))
+	if got := response.Trailer.Get("X-Echo-Trailer"); got != RedactedSecret {
+		t.Fatalf("X-Echo-Trailer = %q, want %q scrubbed on the fallback path", got, RedactedSecret)
+	}
+}
