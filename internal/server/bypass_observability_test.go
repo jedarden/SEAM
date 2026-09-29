@@ -265,6 +265,94 @@ func TestBypassObservability_ReservedRequestsEmitNoSignals(t *testing.T) {
 	}
 }
 
+// TestBypassObservability_RegisteredSentinelsAndControlPlaneHandlers pins the
+// reserved-path bypass against the handlers that are actually registered on
+// the caller mux. The broader interaction test above uses a mock upstream to
+// exercise every reserved-path family; this focused table catches a routing
+// change that accidentally sends a real sentinel or control-plane handler
+// through cache/quota while still returning a superficially valid response.
+//
+// In particular, the three caller-side sentinels must retain their defensive
+// Cache-Control: no-store header even when they are invoked through the same
+// metrics -> cache -> quota composition as ordinary caller traffic.
+func TestBypassObservability_RegisteredSentinelsAndControlPlaneHandlers(t *testing.T) {
+	s := newSentinelIsolationTestServer(t)
+
+	paths := []string{
+		"/_seam/health",
+		"/_seam/healthz",
+		"/_seam/readyz",
+		"/openapi.json",
+		"/docs",
+		"/whoami",
+		"/changes",
+	}
+	for _, path := range paths {
+		s.cacheTTLs[path] = 300
+		s.quotaTracker.SetQuota(path, QuotaConfig{
+			Limit:  0.01,
+			Window: time.Hour,
+			Scope:  "per-route",
+		})
+		s.quotaTracker.SetCostPerCall(path, 1.0)
+	}
+
+	chained := s.metricsMiddleware(s.cacheMiddleware(s.quotaMiddleware(s.callerMux)))
+
+	beforeCache := s.cache.Stats()
+	for _, path := range paths {
+		for requestNumber := 1; requestNumber <= 2; requestNumber++ {
+			rec := httptest.NewRecorder()
+			chained.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+
+			scenario := fmt.Sprintf("%s request #%d", path, requestNumber)
+			if rec.Code < http.StatusOK || rec.Code >= http.StatusMultipleChoices {
+				t.Fatalf("%s: registered handler status = %d, want a 2xx response (body: %s)", scenario, rec.Code, rec.Body.String())
+			}
+			interactionAssertNoBypassHeaders(t, rec, scenario)
+			for _, header := range []string{
+				"X-Quota-Cost-Per-Call",
+				"X-Quota-Remaining",
+				"X-SEAM-Budget-Remaining",
+			} {
+				if got := rec.Header().Get(header); got != "" {
+					t.Errorf("%s: %s = %q, want absent on reserved traffic", scenario, header, got)
+				}
+			}
+			if strings.HasPrefix(path, "/_seam/") {
+				if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+					t.Errorf("%s: Cache-Control = %q, want no-store", scenario, got)
+				}
+			}
+		}
+		if got := interactionAccumulated(s, path); got != 0 {
+			t.Errorf("%s: accumulated quota = $%.2f, want $0", path, got)
+		}
+	}
+
+	afterCache := s.cache.Stats()
+	if afterCache != beforeCache {
+		t.Errorf("reserved handlers changed cache stats: before=%+v after=%+v", beforeCache, afterCache)
+	}
+
+	body := observabilityScrape(t, s)
+	for _, family := range []string{
+		"seam_http_requests_total",
+		"seam_http_request_duration_seconds_bucket",
+		"seam_http_request_duration_seconds_sum",
+		"seam_http_request_duration_seconds_count",
+		"seam_http_requests_in_flight",
+		"seam_route_version_requests_total",
+		"seam_cache_hits_total",
+		"seam_cache_misses_total",
+		"seam_quota_cost_total",
+		"seam_quota_bypassed_total",
+		"seam_quota_exceeded_total",
+	} {
+		observabilityFamilyAbsent(t, body, family)
+	}
+}
+
 // TestBypassObservability_CacheHitSignalContract pins the successful
 // cache-hit observability contract end to end: the hit response carries
 // X-SEAM-Cache: HIT and X-Quota-Bypassed: cache-hit with every admission-time
