@@ -4,8 +4,8 @@
 
 This document describes the complete security isolation model for SEAM and the seam-retirement-evaluator service. It documents all authentication and authorization paths, OpenBao policies, and the security boundaries that enforce the hostile-fragment threat model.
 
-**Last Updated:** 2026-09-24  
-**Bead:** seam-022ee164
+**Last Updated:** 2026-09-28
+**Bead:** seam-7c93a6b3
 
 ## Vault Base In Force
 
@@ -41,8 +41,8 @@ SEAM operates under the hostile-fragment threat model, which assumes:
 Under this threat model, the following requirements MUST be satisfied:
 
 1. **SEAM's OpenBao token** can ONLY read `secret/data/rs-manager/rs-manager/seam/routes/*` and NOTHING else
-2. **Evaluator's OpenBao token** can ONLY read:
-   - `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query` (the query-only VictoriaMetrics bearer token — the single grant; the GitHub-token grant was removed 2026-09-05 when the evaluator went detection-only)
+2. **Evaluator runtime** uses no OpenBao or third-party credential; its
+   ServiceAccount is isolated from SEAM's route paths
 3. **Mutual denial** - SEAM cannot read evaluator paths, evaluator cannot read SEAM paths
 4. **Default-deny** - Both roles explicitly deny all other paths
 5. **Read-only** - Neither role has write capabilities to any secret
@@ -82,17 +82,16 @@ Under this threat model, the following requirements MUST be satisfied:
 │  │ Token TTL: 24h   |   Token Max TTL: 72h                                    ││
 │  │                                                                            ││
 │  │ CAN READ:                                                                  ││
-│  │   secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query   ││
-│  │   (the query-only VM bearer token — the policy's single grant)             ││
+│  │   No OpenBao secret is read by the evaluator binary                       ││
 │  │                                                                            ││
 │  │ DENIED:                                                                    ││
 │  │   secret/data/rs-manager/rs-manager/seam/routes/*  <- SEAM routes          ││
 │  │   secret/data/seam/routes/*                        <- retired base         ││
 │  │   and all other paths (OpenBao default-deny: no grant means no access)     ││
 │  │                                                                            ││
-│  │ The evaluator is detection-only: the binary makes no OpenBao calls.        ││
-│  │ This role bounds whatever runs as its ServiceAccount — in practice the     ││
-│  │ access canaries that prove the boundary every 5 minutes.                   ││
+│  │ The evaluator is detection-only: it makes no OpenBao calls and queries     ││
+│  │ VictoriaMetrics without a credential. Boundary canaries use the            ││
+│  │ ServiceAccount to prove the isolation every 5 minutes.                    ││
 │  └────────────────────────────────────────────────────────────────────────────┘│
 │                                                                                │
 │  ┌────────────────────────────────────────────────────────────────────────────┐│
@@ -135,7 +134,7 @@ Under this threat model, the following requirements MUST be satisfied:
    - OpenBao validates JWT with Kubernetes API server
    - OpenBao returns OpenBao client token with `seam` policy attached
 
-3. **Token Usage:**
+3. **Route Secret Use:**
    - SEAM uses OpenBao token to read route secrets on-demand
    - Token is cached in-memory for TTL duration (24h)
    - Token auto-renews before expiration
@@ -156,41 +155,32 @@ Under this threat model, the following requirements MUST be satisfied:
 
 **Authentication Flow:**
 
-1. **Kubernetes Authentication:**
+1. **Kubernetes Identity:**
    - Evaluator pod runs with ServiceAccount `seam-retirement-evaluator`
    - Pod has projected service account token volume
-   - SA token is automatically injected by Kubernetes
+   - Kubernetes may project an SA token, but the evaluator binary does not
+     read it
 
-2. **OpenBao Login:**
-   - Evaluator reads SA token from mounted volume
-   - Evaluator authenticates to OpenBao via Kubernetes auth method:
-     ```
-     POST /v1/auth/kubernetes/login
-     {
-       "role": "seam-retirement-evaluator",
-       "jwt": "<service-account-token>"
-     }
-     ```
-   - OpenBao validates JWT with Kubernetes API server
-   - OpenBao returns OpenBao client token with `seam-retirement-evaluator-policy` attached
+2. **No OpenBao Login:**
+   - The evaluator does not read the SA token or call the OpenBao Kubernetes
+     auth method
+   - The role and ServiceAccount are retained for deployment isolation and
+     boundary canaries, not for evaluator runtime authentication
 
-3. **Token Usage:**
-   - The evaluator is **detection-only** (since 2026-09-05): it emits
-     deprecation candidates and never writes to a git host. There is no PR,
-     no branch, and no GitHub token to read — the proposed `x-seam-deprecated`
-     edit is landed by a human as an ordinary commit to `main`.
-   - The binary itself makes no OpenBao calls; its only network dependency is
-     the VictoriaMetrics query. The role's single grant covers the query-only
-     VM bearer token (`victoriametrics-query`), read by the access canary —
-     not by the evaluator binary.
-   - Token is cached in-memory for TTL duration (24h)
-   - Token auto-renews before expiration
+3. **Detection Output:**
+   - The evaluator is **detection-only**: it emits deprecation candidates and
+     never writes to a git host. The proposed `x-seam-deprecated` edit is
+     landed by a human as an ordinary commit to `main` in declarative-config.
+   - The binary makes no OpenBao calls and has no runtime credential. Its only
+     network dependency is the configured VictoriaMetrics endpoint.
+   - `loadConfig` reads only `VICTORIAMETRICS_ENDPOINT` and
+     `DECLARATIVE_CONFIG_PATH`; the VictoriaMetrics client sends no
+     Authorization header.
 
 **Access Boundaries:**
-- ✅ CAN read: `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query` (query-only VM bearer token)
+- ✅ CAN query: the configured VictoriaMetrics endpoint over plain HTTP
 - ❌ CANNOT read: `secret/data/rs-manager/rs-manager/seam/routes/*`
-- ❌ CANNOT read: The retired GitHub-token path (`seam-retirement-evaluator/github/token` — now a deny-probe target)
-- ❌ CANNOT read: Any other paths
+- ❌ CANNOT read: Any OpenBao secret; the binary does not authenticate to OpenBao
 - ❌ CANNOT write: Any secrets
 
 ## OpenBao Policies
@@ -241,7 +231,8 @@ path "secret/data/*" {
 
 **File:** `declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl`
 (reference copy — the rs-manager hardening-reconciler writes this policy every
-cycle and is the source of truth)
+cycle and is the source of truth). The role is used by the isolation canaries;
+the evaluator binary does not authenticate to OpenBao or consume this grant.
 
 ```hcl
 # Query-only bearer token. vmauth accepts this token only on Prometheus read
@@ -266,16 +257,15 @@ path "secret/data/seam/routes/*" {
 ```
 
 **Policy Properties:**
-- **Read-only:** Evaluator can only read, never write secrets
-- **Narrowly scoped:** The query-only VM credential is the only grant (the
-  evaluator is detection-only and holds no third-party credential; the
-  GitHub-token grant was removed 2026-09-05, `declarat-b818338b`)
+- **Read-only:** The boundary canary can only read, never write secrets
+- **Narrowly scoped:** The evaluator binary has no runtime credential. The
+  query-only VM grant shown above is used by the boundary canary, not by the
+  evaluator process.
 - **Explicit deny:** SEAM route paths explicitly denied at both prefixes;
   everything else is denied by absence of grant (OpenBao default-deny) —
   the policy carries no explicit `secret/data/*` rule
-- **Isolation enforced:** Mutual denial with SEAM policy; the retired
-  GitHub-token path stays denied and is asserted as a 403 by both the
-  verify script and the `seam` policy's explicit deny
+- **Isolation enforced:** Mutual denial with SEAM policy; the boundary
+  canaries assert the route-path denials every 5 minutes
 
 ## Secret Paths
 
@@ -304,59 +294,20 @@ Each path contains a JSON object with authentication credentials for the externa
 
 ### Evaluator Credentials
 
-**There is no evaluator GitHub token.** The evaluator is detection-only
-(since 2026-09-05, `declarat-b818338b`): it emits one structured log record
-and one Prometheus counter per deprecation candidate, and the proposed
-`x-seam-deprecated` edit is landed by a human as an ordinary commit to `main`
-in declarative-config. There is no PR, no branch, no token, and no write
-path of any kind. The GitHub-token grant was removed from
-`seam-retirement-evaluator-policy`; it had no caller (the sole OpenPR call
-site passed nil files, so the PR path errored every time it ran).
+The evaluator has no runtime credential. It is detection-only: it emits one
+structured log record and one Prometheus counter per deprecation candidate,
+and the proposed `x-seam-deprecated` edit is landed by a human as an ordinary
+commit to `main` in declarative-config. The evaluator does not authenticate to
+OpenBao, read a secret, or write to a git host.
 
-The legacy path name `seam-retirement-evaluator/github/token` survives only
-as a **deny-probe target**: the verify script requires the evaluator itself
-to get 403 on it, and `seam-evaluator-credential-boundary-canary` requires
-the `seam` identity to get 403 on it, every 5 minutes. Removing a grant is
-not the same as retiring the prefix — the deny must outlive it.
+### VictoriaMetrics Query Access
 
-### VictoriaMetrics Query Credential
-
-**Path:** `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query`
-
-**Access:**
-- ✅ Evaluator policy CAN read (its single grant)
-- ❌ SEAM CANNOT read (explicit deny + default-deny)
-- ❌ Nobody can read the vmagent write token (`rs-manager/monitoring/seam-vmagent`) with it
-
-**Contents:**
-```json
-{
-  "endpoint": "<query-only vmauth service URL>",
-  "token": "<vmauth-scoped bearer token>"
-}
-```
-
-**Usage:**
-- vmauth maps this token to Prometheus **read** endpoints only; the write
-  (`/api/v1/write`) and delete (`/api/v1/admin/tsdb/delete_series`) URLs are
-  a disjoint set granted only to the vmagent write token
-- `seam-retirement-evaluator-access-canary` proves this every 5 minutes:
-  read succeeds, write and delete must not return 2xx
-
-**Settled — credentialled or not?** Both historical claims were half right:
-- The **evaluator binary** performs **unauthenticated** VictoriaMetrics
-  queries: `loadConfig` reads only `VICTORIAMETRICS_ENDPOINT` and
-  `DECLARATIVE_CONFIG_PATH`, and `VictoriaMetricsClient`
-  (`tools/seam-retirement-evaluator/victoriametrics.go`) is a plain
-  `http.Client` that sends no Authorization header.
-- The **estate** nonetheless provisions the query-only bearer token above —
-  that credential is the VM-side boundary (vmauth URL scoping), exercised by
-  the access canary. The binary does not consume it today.
-- The older claim that the evaluator reads
-  `secret/data/monitoring/victoriametrics/readonly-credentials` is simply
-  stale: that path is not in the live policy (default-deny covers it) and
-  survives only as a synthetic fixture path inside
-  `internal/server/e2e_isolation_test.go`.
+**Current model:** The evaluator queries VictoriaMetrics over plain HTTP with
+no credential. `loadConfig` reads only `VICTORIAMETRICS_ENDPOINT` and
+`DECLARATIVE_CONFIG_PATH`, and `VictoriaMetricsClient`
+(`tools/seam-retirement-evaluator/victoriametrics.go`) sends no Authorization
+header. The endpoint is the evaluator's only external dependency; the
+OpenBao boundary policy and canaries do not supply a credential to the binary.
 
 ## VictoriaMetrics Access Pattern
 
@@ -364,14 +315,10 @@ not the same as retiring the prefix — the deny must outlive it.
 
 **VictoriaMetrics Endpoint:** `http://victorialogs-single-ardenone-manager-vector-headless.monitoring.svc.cluster.local:8428` (the binary's in-cluster default; `VICTORIAMETRICS_ENDPOINT` overrides)
 
-**Authentication:** Two layers, do not conflate them:
-- The **binary** sends no credential — plain HTTP against the endpoint it is
-  configured with (the in-cluster default needs none).
-- The **credentialled path** goes through the query-only vmauth Service
-  (`victoriametrics-query` in namespace `seam`, a Tailscale-annotated
-  Service fronting ardenone-cluster's vmauth) with the
-  `victoriametrics-query` bearer token, which vmauth scopes to read URLs
-  only. This is the path the access canary exercises.
+**Authentication:** None. The evaluator sends plain HTTP requests to the
+configured endpoint. `loadConfig` has no credential setting, and the client
+sends no Authorization header; the endpoint's network reachability is the
+complete VictoriaMetrics access model for the evaluator.
 
 ### Query Pattern
 
@@ -435,7 +382,7 @@ Token Max TTL: 72h
 ### 1. Path Separation
 
 ✅ **VERIFIED:**
-- Evaluator credential: `secret/data/rs-manager/seam-retirement-evaluator/victoriametrics-query`
+- Evaluator runtime has no OpenBao or third-party credential
 - SEAM routes: `secret/data/rs-manager/rs-manager/seam/routes/*`
 - No overlap between paths
 
@@ -443,7 +390,7 @@ Token Max TTL: 72h
 
 ✅ **VERIFIED:**
 - Evaluator cannot read SEAM routes (explicit deny or default-deny)
-- SEAM cannot read evaluator token (explicit deny or default-deny)
+- SEAM cannot read evaluator paths (explicit deny or default-deny)
 - Each policy allows only its designated paths
 
 ### 3. Service Account Binding
@@ -456,8 +403,8 @@ Token Max TTL: 72h
 ### 4. Bounded Capabilities
 
 ✅ **VERIFIED:**
-- Evaluator: read-only access to the single query-only VM credential; no
-  third-party credential of any kind (detection-only)
+- Evaluator: read-only queries to VictoriaMetrics; no OpenBao or third-party
+  credential of any kind (detection-only)
 - SEAM: read-only access to route secrets only
 - No write capabilities granted to either
 
@@ -478,15 +425,12 @@ denial, not any production path):
 **File:** `internal/server/e2e_isolation_test.go`
 
 Exercises the full isolation shape in one test. Note: its fixture paths
-(`evaluators/seam-retirement-evaluator/github-token`,
-`monitoring/victoriametrics/readonly-credentials`) are synthetic and still
-mirror the withdrawn GitHub-token model — they exist only inside the test's
-own throwaway OpenBao. The assertions that matter are the denials:
-- Evaluator CAN read its own fixture paths
+are synthetic and exist only inside the test's own throwaway OpenBao. The
+assertions that matter are the denials:
 - Evaluator CANNOT access SEAM routes
 - Evaluator CANNOT access other secrets
 - SEAM CAN read own route secrets
-- SEAM CANNOT read the evaluator's credential path
+- SEAM CANNOT read evaluator paths
 
 ### Live Verification (Canary Deployments)
 
@@ -494,15 +438,11 @@ The standing proof is two low-resource canary Deployments in namespace
 `seam` on rs-manager, refreshed every 5 minutes:
 
 - `seam-retirement-evaluator-access-canary` — logs in as the evaluator,
-  is denied on both SEAM route prefixes and on the vmagent write token,
-  reads the `victoriametrics-query` credential, queries VM through vmauth,
-  and requires the write and delete APIs to reject its token
+  is denied on both SEAM route prefixes and unrelated paths, and verifies
+  the read-only metrics boundary without changing the evaluator's
+  unauthenticated runtime query model
 - `seam-evaluator-credential-boundary-canary` — logs in as `seam` and
-  requires 403 on the retired evaluator credential path
-  (`seam-retirement-evaluator/github/token`)
-
-There is no GitHub assertion any more: the evaluator is detection-only and
-has no write capability to verify.
+  verifies that SEAM cannot read evaluator paths
 
 ## Verification Methods
 
@@ -534,9 +474,8 @@ kubectl --server=http://traefik-rs-manager:8001 logs -n seam \
 ```
 
 `scripts/verify-openbao-setup.sh` in declarative-config runs the same
-assertions on demand — including the inverted one: the evaluator itself must
-now get **403** on the retired GitHub credential path (inverted
-2026-09-05, `declarat-b818338b`).
+assertions on demand — including the evaluator's route-path denial and the
+absence of any evaluator runtime credential.
 
 ### Method 3: Manual OpenBao CLI
 
@@ -552,7 +491,7 @@ bao policy read seam-retirement-evaluator-policy
 bao policy read seam
 
 # Check for deny rules
-bao policy read seam | grep 'evaluators'
+bao policy read seam | grep 'seam-retirement-evaluator'
 bao policy read seam-retirement-evaluator-policy | grep 'rs-manager/rs-manager/seam/routes'
 ```
 
@@ -566,8 +505,8 @@ bao policy read seam-retirement-evaluator-policy | grep 'rs-manager/rs-manager/s
 | **OpenBao Policy** | `seam` | `seam-retirement-evaluator-policy` |
 | **Token TTL** | 24h | 24h |
 | **Token Max TTL** | 72h | 72h |
-| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | `rs-manager/seam-retirement-evaluator/victoriametrics-query` (query-only VM credential; no GitHub token) |
-| **Can Read Own Secrets** | ✅ Yes | ✅ Yes |
+| **Primary Secret Access** | `rs-manager/rs-manager/seam/routes/*` | None (plain HTTP VictoriaMetrics query; no runtime credential) |
+| **Can Read Own Secrets** | ✅ Yes | ❌ No runtime secret access |
 | **Can Read Other's Secrets** | ❌ No | ❌ No |
 | **Can Write Secrets** | ❌ No | ❌ No |
 | **Setup Method** | Shell script | Argo WorkflowTemplate |
@@ -588,16 +527,16 @@ bao policy read seam-retirement-evaluator-policy | grep 'rs-manager/rs-manager/s
 ### Secret Verification
 
 - [ ] At least one SEAM route secret exists at `rs-manager/rs-manager/seam/routes/*/token`
-- [ ] The query-only VM credential exists at `rs-manager/seam-retirement-evaluator/victoriametrics-query` (with `endpoint` and `token` fields)
-- [ ] No GitHub token exists anywhere for the evaluator (detection-only; the retired path must stay absent and denied)
+- [ ] Evaluator has no runtime credential and uses its configured VictoriaMetrics endpoint
 
 ### Isolation Verification
 
 - [ ] SEAM can read `rs-manager/rs-manager/seam/routes/*` secrets
-- [ ] SEAM cannot read evaluator paths, including the retired `seam-retirement-evaluator/github/token` (permission denied — asserted by `seam-evaluator-credential-boundary-canary`)
-- [ ] Evaluator can read `rs-manager/seam-retirement-evaluator/victoriametrics-query`
+- [ ] SEAM cannot read evaluator paths (permission denied — asserted by `seam-evaluator-credential-boundary-canary`)
+- [ ] Evaluator can query VictoriaMetrics without an Authorization header
 - [ ] Evaluator cannot read `rs-manager/rs-manager/seam/routes/*` secrets (permission denied)
-- [ ] Evaluator's VM token cannot reach the metrics write or delete APIs (asserted by `seam-retirement-evaluator-access-canary`)
+- [ ] The metrics boundary canary cannot reach the write or delete APIs
+      (asserted by `seam-retirement-evaluator-access-canary`)
 - [ ] Both roles cannot read other paths (armor/, kalshi/, etc.)
 
 ### Test Verification
@@ -623,7 +562,7 @@ may not contain them (see the caveat in `docs/notes/openbao-evaluator-setup.md`)
 - **Bead:** bf-4oa45 (verification and documentation task)
 - **Bead:** bf-38lwm (evaluator documentation task)
 - **Bead:** bf-5rx9 (SEAM documentation task)
-- **Bead:** seam-022ee164 (detection-only doc reconciliation; GitHub-token grant removed 2026-09-05, `declarat-b818338b`)
+- **Bead:** seam-022ee164 (earlier detection-only reconciliation)
 - **SEAM Policy:** `declarative-config/k8s/rs-manager/seam/openbao-policy.hcl` (written every cycle by `k8s/rs-manager/openbao/hardening-reconciler.yml`)
 - **Evaluator Policy:** `declarative-config/k8s/rs-manager/seam-retirement-evaluator/openbao-policy.hcl` (same reconciler)
 - **SEAM Setup:** `declarative-config/k8s/rs-manager/seam/setup-openbao.sh`
