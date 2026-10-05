@@ -20,18 +20,34 @@
 
 This document specifies the data structure for capturing HTTP request/response pairs from the ArgoCD read-only proxy. The corpus serves as the oracle for differential testing during service migration to SEAM.
 
-> **Capture vs. fixture vs. replay.** One schema serves three phases, and
-> keeping them apart resolves most of the confusion around it. A **runtime
-> capture** (either producer) records complete request/response pairs — each
-> entry may carry the incumbent `response` observed at capture time. A
-> **checked-in fixture** (the promoted form under
-> `tools/diffharness/testdata/`) retains request data and replay expectations
-> only: promotion drops the capture-time response. **Replay** collects fresh
-> responses from incumbent and SEAM at replay time and compares those — the
-> stored response is an informational record of what the incumbent returned
-> when the entry was captured, never a comparison oracle. The integrity checks
-> for both tiers, and the capture → fixture promotion runbook, live in
+> **Capture vs. fixture vs. replay.** `seam-diff-corpus/v1` has two persisted
+> lifecycle forms; replay is the execution phase, not a third persisted form.
+> A **runtime capture** (either producer) owns a complete request/response pair:
+> the request sent to the incumbent and the incumbent `response` observed for
+> that request. A **checked-in fixture** (the promoted form under
+> `tools/diffharness/testdata/`) owns the retained request data and replay
+> configuration (`secrets` and `expect`); promotion drops the capture-time
+> `response`. Replay sends the fixture's retained request to both incumbent and
+> SEAM, collects fresh responses, and compares those according to `expect` —
+> it never uses the runtime response as a comparison oracle. The integrity
+> checks for both forms, and the capture → fixture promotion runbook, live in
 > [`docs/capture_testing.md`](../capture_testing.md).
+
+### The two persisted schema forms
+
+Both forms use the same top-level `seam-diff-corpus/v1` envelope. Their entry
+fields have different ownership, so a runtime capture must not be committed as
+a fixture without promotion:
+
+| Form | Stored entry data | Fields that are not owned by this form |
+| --- | --- | --- |
+| **Runtime capture** (`corpus/<service>/corpus.json`, untracked) | `id`, optional capture `timestamp`, `description`, the replayable `request`, and the incumbent `response` observed for that request | `secrets` and `expect` are not populated by either capture producer; the response is not a replay oracle |
+| **Checked-in fixture** (`tools/diffharness/testdata/*.json`, tracked) | `id`, `description`, the retained `request`, and reviewed replay configuration in `secrets` and `expect`; an informational `timestamp` may be retained or omitted | `response` is not present; replay collects fresh incumbent and SEAM responses instead |
+
+Promotion is the boundary between the forms: review the captured request,
+rewrite capture metadata to fixture metadata, add secret references and replay
+expectations, drop `response`, and optionally omit the non-functional
+`timestamp`. The resulting fixture is what a fresh checkout replays.
 
 > **Secret-reference base:** the `ref` values below are written against SEAM's
 > enforced base `rs-manager/rs-manager/seam/routes` (`internal/spec/allowlist.go`
@@ -63,7 +79,11 @@ This document specifies the data structure for capturing HTTP request/response p
 
 ## JSON Schema Definition
 
-### Top-Level Schema
+### Common Top-Level Schema
+
+The envelope is shared, but producer and fixture ownership differs. The example
+below shows the canonical fixture values; the runtime producer defaults and the
+promotion rewrite are listed in the ownership table that follows.
 
 ```json
 {
@@ -81,13 +101,13 @@ This document specifies the data structure for capturing HTTP request/response p
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `schema` | string | Yes | Schema version identifier. Must be `"seam-diff-corpus/v1"` |
-| `service` | string | Yes | Service name token. Must be `"argocd-ro"` — the deployed fragment's `x-seam-owner` (`declarative-config/k8s/rs-manager/seam/routes/argocd-ro/`). The earlier `argocd` / `argocd-proxy` tokens are retired and must not be copied into a new corpus |
-| `incumbent` | string | Yes | Base URL of incumbent proxy captured against |
-| `capturedAt` | string | Yes | RFC3339 timestamp of first capture |
-| `description` | string | Yes | Free-form description of the corpus |
+| `service` | string | Yes | Runtime producer token, rewritten during promotion; a checked-in fixture must use `"argocd-ro"`, the deployed fragment's `x-seam-owner` (`declarative-config/k8s/rs-manager/seam/routes/argocd-ro/`). The earlier `argocd` / `argocd-proxy` tokens are retired and must not be copied into a fixture |
+| `incumbent` | string | Yes | Runtime producer's placeholder or captured-against base URL; a fixture records the actual base URL used for capture |
+| `capturedAt` | string | Yes | Runtime capture save time (middleware) or producer timestamp; promotion rewrites it to the RFC3339 time of the first capture |
+| `description` | string | Yes | Runtime producer description, reviewed or rewritten when the capture becomes a fixture |
 | `entries` | array | Yes | Array of corpus entry objects |
 
-### Entry Schema
+### Runtime Capture Entry Schema
 
 ```json
 {
@@ -111,17 +131,6 @@ This document specifies the data structure for capturing HTTP request/response p
     },
     "bodyB64": "eyJhcHBsaWNhdGlvbnMiOltdfQ==",
     "bodyContentType": "application/json"
-  },
-  "secrets": [
-    {
-      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
-      "injectAs": {
-        "kind": "bearer"
-      }
-    }
-  ],
-  "expect": {
-    "ignoreHeaders": ["Date", "Server"]
   }
 }
 ```
@@ -131,12 +140,12 @@ This document specifies the data structure for capturing HTTP request/response p
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | Yes | Stable, human-readable entry ID (kebab-case) |
-| `timestamp` | string | No | RFC3339 capture time of this individual entry (informational; replay never reads it) |
+| `timestamp` | string | No | RFC3339 capture time of this individual entry (informational; replay never reads it; promotion may retain or omit it) |
 | `description` | string | No | What this entry exercises |
 | `request` | object | Yes | HTTP request object (see below) |
-| `response` | object | No | Incumbent response observed at capture time (see below). Runtime captures carry it; promotion drops it — replay compares fresh responses, never the stored one |
-| `secrets` | array | No | Secret reference objects |
-| `expect` | object | No | Per-entry comparison overrides |
+| `response` | object | Yes in a runtime capture | Incumbent response observed for this request at capture time (see below); promotion drops it |
+| `secrets` | array | No | Not emitted by the capture producers; added as reviewed secret references during promotion |
+| `expect` | object | No | Not emitted by the capture producers; added as reviewed per-entry replay overrides during promotion |
 
 ### Request Object Schema
 
@@ -151,14 +160,13 @@ This document specifies the data structure for capturing HTTP request/response p
 
 ### Response Object Schema
 
-The optional entry-level `response` is what the incumbent returned when the
-entry was captured. Both producers populate it, which makes a runtime capture
-a complete request/response record and preserves the incumbent behavior the
-test case was built from. It is a capture-time record only: replay obtains
-fresh responses from both targets and never compares against the stored one,
-and promotion drops the field — a checked-in fixture carries request data and
-replay expectations, not a frozen response nobody scrubs and replay never
-reads (see [Redaction](#redaction) for why that matters).
+The entry-level `response` belongs to the runtime capture form. It is what the
+incumbent returned for the captured request; both producers populate it, which
+makes the capture a complete request/response record. It is a capture-time
+record only. Promotion drops it, because a checked-in fixture carries request
+data and replay expectations rather than a frozen response. Replay obtains
+fresh responses from both targets and never compares against the stored runtime
+response (see [Redaction](#redaction) for why that matters).
 
 ```json
 {
@@ -182,6 +190,41 @@ Unlike a request's credential headers and query values (scrubbed at capture by
 the gateway middleware — see [Redaction](#redaction)), a response's headers
 and body are recorded **verbatim** by both producers. That is a second reason
 promotion drops the field rather than committing it.
+
+### Checked-in Fixture Entry Schema
+
+A promoted fixture entry retains the request and the configuration needed to
+replay and compare it. It deliberately has no `response`; replay collects a
+fresh response from the incumbent and a fresh response from SEAM for every
+entry:
+
+```json
+{
+  "id": "list-applications-get",
+  "description": "List all ArgoCD applications",
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/applications",
+    "query": "",
+    "headers": {"Accept": ["application/json"]}
+  },
+  "secrets": [
+    {
+      "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
+      "injectAs": {"kind": "bearer"}
+    }
+  ],
+  "expect": {
+    "ignoreHeaders": ["Date", "Server"]
+  }
+}
+```
+
+The entry `timestamp` is optional informational metadata, not replay input; it
+may be carried forward during promotion but is omitted from this fixture-form
+example. `secrets` holds references only, and `expect` holds comparison
+overrides only. The response values themselves belong to replay and are never
+read from a checked-in fixture.
 
 ### Secret Reference Schema
 

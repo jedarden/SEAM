@@ -9,7 +9,7 @@ repository keeps corpus data in two places:
   and replay expectations; response values are collected from the incumbent
   and SEAM at replay time — a runtime capture's per-entry `response` is
   dropped at promotion, never committed. The fixture format, including the
-  optional capture-time `response`/`timestamp` fields promotion strips, the
+  runtime-only `response`, optional informational `timestamp`, the
   `secrets[].ref` grammar, and the three redaction points, is specified in
   [`docs/design/argocd-ro-corpus-data-structure.md`](design/argocd-ro-corpus-data-structure.md).
 - `internal/server` capture files persist complete request/response pairs for
@@ -29,6 +29,33 @@ every ignore rule. Deliberately promoting a capture means moving it into
 `tools/diffharness/testdata/` — where the fixture validation below applies —
 never committing it under `corpus/`; the step-by-step procedure is the
 promotion runbook below.
+
+## Schema forms and lifecycle
+
+The two persisted forms use the same `seam-diff-corpus/v1` envelope but own
+different fields:
+
+| Form | Owns | Does not own |
+| --- | --- | --- |
+| **Runtime capture** under the untracked `corpus/` directory | The request sent to the incumbent and the incumbent response observed for that request; an entry `timestamp` may record when the exchange was captured | Reviewed `secrets` and `expect` configuration; both producers leave them empty or absent, and the captured response is not a replay oracle |
+| **Checked-in fixture** under tracked `tools/diffharness/testdata/` | Retained request data plus reviewed `secrets` references and `expect` replay expectations; the informational `timestamp` may be retained or omitted | The capture-time `response`; replay collects fresh responses from the incumbent and SEAM |
+
+The lifecycle is therefore:
+
+1. **Capture:** a producer records each request together with the incumbent's
+   response as one runtime request/response pair and persists it under
+   `corpus/`.
+2. **Promote:** review the request, rewrite producer metadata, add secret
+   references and replay expectations, drop the capture-time `response`, and
+   optionally omit the informational `timestamp` before moving the result to
+   `tools/diffharness/testdata/`.
+3. **Replay:** load the checked-in fixture, inject referenced secrets, send the
+   retained request to both targets, collect fresh responses, and compare them
+   using the fixture's `expect` values.
+
+The design document's [two persisted schema forms](design/argocd-ro-corpus-data-structure.md#the-two-persisted-schema-forms)
+defines the field-level contract; the promotion runbook below defines the
+operational rewrite.
 
 ## Automated checks
 
@@ -253,7 +280,7 @@ A raw capture carries its producer's defaults, not the fixture contract of
 | `incumbent` | the placeholder `seam-incumbent` (middleware) | the base URL actually captured against |
 | `capturedAt` | re-stamped at **every** middleware `Save` | RFC3339 timestamp of the **first** capture; appends never update it |
 | per-entry `response` | the incumbent response observed at capture — both producers populate it | **dropped.** A fixture retains request data and replay expectations; replay collects fresh responses from both targets, and the checked-in-fixture walk (`TestCheckedInFixturesResolveUnderEnforcedVaultBase`) rejects an entry that still carries one |
-| per-entry `timestamp` | stamped per entry by both producers | optional — informational; replay never reads it |
+| per-entry `timestamp` | stamped per entry by both producers | optional — informational; promotion may retain or omit it; replay never reads it |
 | `secrets[]` | never populated by either producer | one `vault:` ref per credential, written by hand |
 
 - The middleware's `capturedAt` is the *save* time, so a promoted fixture
