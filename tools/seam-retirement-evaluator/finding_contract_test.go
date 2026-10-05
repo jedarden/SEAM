@@ -37,6 +37,31 @@ func fixedContractCandidate() *RetirementCandidate {
 	}
 }
 
+func TestFindingSchemaDeclaresOnlyRequiredStrings(t *testing.T) {
+	if len(retirementFindingSchema) == 0 {
+		t.Fatal("finding schema must declare at least one payload field")
+	}
+	seen := make(map[string]struct{}, len(retirementFindingSchema))
+	for _, field := range retirementFindingSchema {
+		if field.name == "" {
+			t.Error("finding schema contains an unnamed field")
+		}
+		if field.typeName != "string" {
+			t.Errorf("finding field %q has type %q, want string", field.name, field.typeName)
+		}
+		if !field.required {
+			t.Errorf("finding field %q is optional; every payload field is required", field.name)
+		}
+		if _, duplicate := seen[field.name]; duplicate {
+			t.Errorf("finding schema repeats field %q", field.name)
+		}
+		seen[field.name] = struct{}{}
+	}
+	if got, want := len(retirementFindingFields), len(retirementFindingSchema); got != want {
+		t.Fatalf("field-name list has %d fields, schema has %d", got, want)
+	}
+}
+
 func TestFindingRecordSchemaIsClosed(t *testing.T) {
 	observed := observingLogger(t)
 	evaluator := fixedContractEvaluator(t)
@@ -62,11 +87,37 @@ func TestFindingRecordSchemaIsClosed(t *testing.T) {
 		if _, ok := value.(string); !ok {
 			t.Errorf("finding field %q has type %T, want string", name, value)
 		}
+		if value == "" {
+			t.Errorf("finding field %q is empty; required fields must be populated", name)
+		}
 	}
 	for name := range want {
 		if _, ok := fields[name]; !ok {
 			t.Errorf("finding is missing contracted field %q", name)
 		}
+	}
+}
+
+func TestFindingMessageAndPayloadAreDeterministic(t *testing.T) {
+	observed := observingLogger(t)
+	evaluator := fixedContractEvaluator(t)
+	candidate := fixedContractCandidate()
+
+	evaluator.emitRetirementFinding(candidate)
+	evaluator.emitRetirementFinding(candidate)
+
+	entries := observed.FilterMessage(retirementFindingMessage).All()
+	if len(entries) != 2 {
+		t.Fatalf("got %d finding records, want two identical records", len(entries))
+	}
+	for i, entry := range entries {
+		if entry.Message != retirementFindingMessage {
+			t.Errorf("record %d message = %q, want %q", i, entry.Message, retirementFindingMessage)
+		}
+	}
+	if !reflect.DeepEqual(entries[0].ContextMap(), entries[1].ContextMap()) {
+		t.Fatalf("same candidate and evaluation time produced different payloads:\nfirst: %v\nsecond: %v",
+			entries[0].ContextMap(), entries[1].ContextMap())
 	}
 }
 

@@ -98,8 +98,8 @@ A route version is eligible for retirement when:
 
 ### 3. Detection Emission
 
-For each eligible route version the evaluator emits, as a structured zap
-record and a Prometheus counter:
+For each eligible route version the evaluator emits exactly one structured zap
+record and one Prometheus counter increment:
 
 - route, `x-api-version`, spec version
 - quiet-since timestamp and evaluation window
@@ -110,13 +110,39 @@ record and a Prometheus counter:
 - the `x-seam-deprecated` block itself, fragment-shaped and ready to paste
 - the human-readable proposal text
 
-The finding message is `Deprecation candidate detected`. Its payload is a
-closed set of string fields: `route`, `api_version`, `spec_version`,
-`quiet_since` (RFC 3339), `eval_window` (Go duration), `reason`,
-`proposed_sunset` (`YYYY-MM-DD`), `brownout_windows`, `fragment_path`,
-`x_seam_deprecated_block`, and `body`. The production log envelope adds only
-Zap's `level`, `ts`, `caller`, and `msg`. No credential, HTTP header, query
-response, or foreign source-metric label may appear in a finding.
+The finding message is always the exact, stable string `Deprecation candidate
+detected`. A run with no eligible candidate emits no record with that message;
+errors use the evaluator's separate error messages. The payload schema is
+closed: every field below is a required JSON/log string, there are no optional
+fields, and no extension fields are permitted.
+
+| Field | Type | Required | Semantics |
+|---|---|---|---|
+| `route` | string | yes | Route identity from the normalized source metric. |
+| `api_version` | string | yes | API-version identity; `_unversioned` is used when absent from the route version. |
+| `spec_version` | string | yes | Specification identity from the normalized source metric. |
+| `quiet_since` | string | yes | Last observed request, formatted as RFC 3339. |
+| `eval_window` | string | yes | Eligibility window, formatted as a Go duration. |
+| `reason` | string | yes | Deterministic eligibility explanation. |
+| `proposed_sunset` | string | yes | Proposed sunset date, strict `YYYY-MM-DD`, 90 days after declaration. |
+| `brownout_windows` | string | yes | Deterministically formatted YAML window list. |
+| `fragment_path` | string | yes | Human-handoff proposal locator, never a write target. |
+| `x_seam_deprecated_block` | string | yes | Complete fragment-shaped YAML block for a human to review and land. |
+| `body` | string | yes | Deterministically rendered human-readable proposal text. |
+
+The production log envelope adds only Zap's `level`, `ts`, `caller`, and `msg`;
+`ts` is the runtime log timestamp and is not part of the candidate payload.
+Given the same candidate and evaluation time, the message and payload values
+are deterministic. One distinct `(route, api_version, spec_version)` candidate
+produces one record per evaluation run. Duplicate source series are collapsed
+before evaluation, so ignored source labels cannot produce a second record or
+counter series.
+
+This contract is also a security boundary: findings must never contain
+credentials, tokens, cookies, authorization or other HTTP headers, query
+responses, source-metric labels not in the identity tuple, or any other secret
+value. The evaluator's output is a proposal and carries references and
+derived metadata only; it never carries a credential by value.
 
 ```
 seam_retirement_deprecation_candidates_total{route=...,api_version=...,spec_version=...}

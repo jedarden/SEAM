@@ -67,13 +67,16 @@ The record carries everything the handoff needs:
 
 The schema is **closed**: the envelope zap's production encoder adds
 (`level`, `ts`, `caller`, `msg`) plus exactly the eleven fields above, and
-nothing else. Formats are part of the contract: `quiet_since` is an RFC 3339
-string and `eval_window` a Go duration string — deliberately not zap's
-production defaults for those types (epoch seconds and float seconds), which
-would put values in front of a human that no one can read at a
-`kubectl logs` terminal. The closed set is pinned by
+nothing else. Every payload field is a required string; there are no optional
+or extension fields. The message is always exactly `Deprecation candidate
+detected`, and one distinct `(route, api_version, spec_version)` candidate
+produces one record per evaluation run. Formats are part of the contract:
+`quiet_since` is an RFC 3339 string and `eval_window` a Go duration string —
+deliberately not zap's production defaults for those types (epoch seconds and
+float seconds), which would put values in front of a human that no one can
+read at a `kubectl logs` terminal. The closed set is pinned by
 `TestFindingRecordSchemaIsClosed`; the formats by
-`TestRunbookRepresentativeRecordMatchesTheContract`.
+`TestRunbookRepresentativeRecordMatchesContract`.
 
 **No secret values.** The record — and the counter below — may carry
 route-version identifiers (`route`, `api_version`, `spec_version`) and
@@ -84,7 +87,7 @@ the emit path), no HTTP headers, no query-response content beyond the
 identity labels, and no other source-metric label value. Even if a
 credential-bearing label ever appeared on the source metric, the parser reads
 only `route` and `spec_version`, so the value cannot reach a record. That
-prohibition is pinned by `TestFindingCarriesNoCredentialOrForeignLabelContent`.
+prohibition is pinned by `TestFindingIgnoresForeignLabelsAndSecretValues`.
 
 A representative record, as `kubectl logs` shows it (the proposed block is
 carried in full; the proposal body is elided):
@@ -94,7 +97,7 @@ carried in full; the proposal body is elided):
 ```
 
 The example is itself a test fixture:
-`TestRunbookRepresentativeRecordMatchesTheContract` parses it and checks
+`TestRunbookRepresentativeRecordMatchesContract` parses it and checks
 every key and format against the emitter's real schema, so the doc cannot
 silently drift from what the evaluator emits.
 

@@ -9,22 +9,42 @@ const (
 	candidateMetricName      = "seam_retirement_deprecation_candidates_total"
 )
 
-// retirementFindingFields is intentionally a closed list. A finding may
+// retirementFindingField describes one payload field in the stable finding
+// schema. The schema is deliberately all required strings: a partial finding
+// is not actionable, and there are no optional fields or extension fields.
+type retirementFindingField struct {
+	name     string
+	typeName string
+	required bool
+}
+
+// retirementFindingSchema is intentionally a closed list. A finding may
 // contain route-version identity and the proposal derived from it, but it
 // must not grow an HTTP header, query response, credential, or arbitrary
-// source-metric label field.
-var retirementFindingFields = [...]string{
-	"route",
-	"api_version",
-	"spec_version",
-	"quiet_since",
-	"eval_window",
-	"reason",
-	"proposed_sunset",
-	"brownout_windows",
-	"fragment_path",
-	"x_seam_deprecated_block",
-	"body",
+// source-metric label field. Keep this list in the same order as fields so
+// serialized production logs remain stable for operators and consumers.
+var retirementFindingSchema = [...]retirementFindingField{
+	{name: "route", typeName: "string", required: true},
+	{name: "api_version", typeName: "string", required: true},
+	{name: "spec_version", typeName: "string", required: true},
+	{name: "quiet_since", typeName: "string", required: true},
+	{name: "eval_window", typeName: "string", required: true},
+	{name: "reason", typeName: "string", required: true},
+	{name: "proposed_sunset", typeName: "string", required: true},
+	{name: "brownout_windows", typeName: "string", required: true},
+	{name: "fragment_path", typeName: "string", required: true},
+	{name: "x_seam_deprecated_block", typeName: "string", required: true},
+	{name: "body", typeName: "string", required: true},
+}
+
+var retirementFindingFields = findingFieldNames()
+
+func findingFieldNames() [len(retirementFindingSchema)]string {
+	var names [len(retirementFindingSchema)]string
+	for i, field := range retirementFindingSchema {
+		names[i] = field.name
+	}
+	return names
 }
 
 // candidateMetricLabels is the complete label set for the per-candidate
