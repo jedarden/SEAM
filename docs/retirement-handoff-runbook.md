@@ -41,7 +41,10 @@ Reversibility is the gate.
 
 The evaluator runs hourly (`EvaluationInterval`) as a Deployment in
 `k8s/rs-manager/seam-retirement-evaluator/`. Each candidate it finds produces
-exactly one structured zap record and one counter increment.
+exactly one structured zap record and one counter increment. The authoritative
+payload and emission contract lives in the evaluator's
+[finding contract](../tools/seam-retirement-evaluator/finding_contract.go) and
+[output-contract tests](../tools/seam-retirement-evaluator/output_contract_test.go).
 
 ```bash
 kubectl --server=http://traefik-rs-manager:8001 \
@@ -328,8 +331,10 @@ The SEAM-side half of this contract is pinned by
   nothing advertised once the block is gone.
 
 The evaluator-side half — fragment-shaped emission, one record and counter
-per candidate, and no write path — is pinned in
-`tools/seam-retirement-evaluator/{output_contract_test.go,write_contract_test.go,candidate_input_contract_test.go}`.
+per candidate, and no write path — is pinned in the evaluator's
+[output contract](../tools/seam-retirement-evaluator/output_contract_test.go),
+[write contract](../tools/seam-retirement-evaluator/write_contract_test.go),
+and [candidate-input contract](../tools/seam-retirement-evaluator/candidate_input_contract_test.go).
 The last of those pins the input normalization the one-record-one-counter
 sentence rests on: a series without both the `route` and `spec_version`
 labels is dropped, duplicate series for one route version collapse onto the
