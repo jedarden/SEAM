@@ -108,10 +108,19 @@ is the counter one candidate increments:
 
 - **Type and name**: a Prometheus counter — it only ever goes up.
 - **Labels**: exactly `route`, `api_version`, `spec_version` — the same
-  identity triple as the record. `api_version` carries the version extracted
-  from the route path; that extraction is not implemented yet, so the label
-  carries the sentinel `_unversioned`. The label exists so the identity
-  triple is stable when extraction lands, not as a third cardinality axis.
+  identity triple as the record. `route` and `spec_version` come only from
+  those two labels in the normalized `seam_route_version_requests_total`
+  query result. `api_version` comes from the evaluator's route-version
+  identity extractor; until route metadata extraction is implemented it is
+  the fixed sentinel `_unversioned`. The evaluator ignores every other source
+  label, including caller, tenant, authorization, cookie, password, and token
+  labels, so they can neither become dimensions nor leak into values.
+- **Value sanitization**: label values are serialized as quoted Prometheus
+  text values. Backslashes become `\\`, double quotes become `\"`, and
+  newlines become `\n`; this prevents a route or version value from injecting
+  another label or sample line. Sanitization is applied only at exposition;
+  the identity values are not hashed, truncated, or supplemented with
+  untrusted labels.
 - **Cardinality**: bounded by construction — one series per distinct route
   version that has ever emitted a candidate, so the series population is
   bounded by the same set of route versions the 14-day traffic query

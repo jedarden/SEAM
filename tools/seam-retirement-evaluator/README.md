@@ -159,6 +159,14 @@ foreign labels cannot increase cardinality. The complete contract and a
 representative JSON record are pinned in the
 [retirement handoff runbook](../../docs/retirement-handoff-runbook.md).
 
+The label values come only from the normalized route identity: `route` and
+`spec_version` are the corresponding source-metric labels, while
+`api_version` is the route-version extractor's value (`_unversioned` until
+route metadata extraction is available). Other source labels are ignored.
+When rendered, Prometheus text escaping quotes backslashes, double quotes, and
+newlines so identity values cannot inject labels or samples; no credential or
+other secret-bearing label is accepted as a metric dimension.
+
 ### 4. The Verdict Channel
 
 The deprecation verdict travels through SEAM's existing hot-reload path:

@@ -180,12 +180,30 @@ func TestMetricLabelsAreClosedAndCardinalityBounded(t *testing.T) {
 	}
 }
 
+func TestMetricLabelValuesAreEscapedAndIdentityOnly(t *testing.T) {
+	metrics := newRetirementMetrics()
+	metrics.recordCandidate(routeVersionKey{
+		route:       "/users\"\n",
+		apiVersion:  `v1\beta`,
+		specVersion: `sha\"123`,
+	})
+
+	got := metrics.render()
+	want := `seam_retirement_deprecation_candidates_total{route="/users\"\n",api_version="v1\\beta",spec_version="sha\\\"123"} 1`
+	if !strings.Contains(got, want) {
+		t.Fatalf("metric labels were not safely escaped:\n%s\nwant line containing:\n%s", got, want)
+	}
+	if strings.Contains(got, "authorization=") || strings.Contains(got, "cookie=") || strings.Contains(got, "token=") {
+		t.Fatalf("candidate metric has a non-identity or secret-bearing label:\n%s", got)
+	}
+}
+
 func TestFindingIgnoresForeignLabelsAndSecretValues(t *testing.T) {
 	const secretValue = "bearer-secret-value-must-not-appear"
 	observed := observingLogger(t)
 	vm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `{"status":"success","data":{"resultType":"vector","result":[
-			{"metric":{"route":"/users","spec_version":"abc123","authorization":"%s","cookie":"%s","password":"%s","tenant":"%s"},"value":[1757000000,"0"]},
+			{"metric":{"route":"/users","spec_version":"abc123","api_version":"v9","authorization":"%s","cookie":"%s","password":"%s","tenant":"%s"},"value":[1757000000,"0"]},
 			{"metric":{"route":"/users","spec_version":"abc123","authorization":"different","tenant":"other"},"value":[1757000000,"0"]}
 		]}}`, secretValue, secretValue, secretValue, secretValue)
 	}))
@@ -207,8 +225,16 @@ func TestFindingIgnoresForeignLabelsAndSecretValues(t *testing.T) {
 	if strings.Contains(string(rendered), secretValue) {
 		t.Fatalf("finding contains a foreign-label secret value: %s", rendered)
 	}
-	if strings.Count(evaluator.metrics.render(), candidateMetricName+"{") != 1 {
+	metric := evaluator.metrics.render()
+	if strings.Count(metric, candidateMetricName+"{") != 1 {
 		t.Fatalf("foreign labels must not create metric cardinality:\n%s", evaluator.metrics.render())
+	}
+	wantMetric := candidateMetricName + `{route="/users",api_version="_unversioned",spec_version="abc123"} 1`
+	if !strings.Contains(metric, wantMetric) {
+		t.Fatalf("metric identity must use only the normalized route/spec values and the current API-version sentinel:\n%s", metric)
+	}
+	if strings.Contains(metric, secretValue) || strings.Contains(metric, "authorization=") || strings.Contains(metric, "tenant=") {
+		t.Fatalf("metric contains a foreign-label value or label name:\n%s", metric)
 	}
 }
 

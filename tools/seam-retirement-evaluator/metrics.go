@@ -106,10 +106,17 @@ func (m *retirementMetrics) render() string {
 	return b.String()
 }
 
-// renderLabelValue escapes a string for use as a quoted label value.
-func renderLabelValue(v string) string {
+// sanitizeMetricLabelValue applies the Prometheus text exposition escaping
+// required for a quoted label value. The caller supplies only the three
+// route-version identity values; foreign source labels never reach here.
+func sanitizeMetricLabelValue(v string) string {
 	r := strings.NewReplacer(`\`, `\\`, "\n", `\n`, `"`, `\"`)
-	return `"` + r.Replace(v) + `"`
+	return r.Replace(v)
+}
+
+// renderLabelValue returns a safely quoted Prometheus label value.
+func renderLabelValue(v string) string {
+	return `"` + sanitizeMetricLabelValue(v) + `"`
 }
 
 // ServeHTTP exposes the registry for a scraper.
