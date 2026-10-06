@@ -12,6 +12,8 @@ repository keeps corpus data in two places:
   runtime-only `response`, optional informational `timestamp`, the
   `secrets[].ref` grammar, and the three redaction points, is specified in
   [`docs/design/argocd-ro-corpus-data-structure.md`](design/argocd-ro-corpus-data-structure.md).
+  The aligned four-form field contract is
+  [`docs/design/aligned-capture-replay-schema-contract.md`](design/aligned-capture-replay-schema-contract.md).
 - `internal/server` capture files persist complete request/response pairs for
   middleware-level capture tests. Request and response bodies are encoded as
   standard base64 strings.

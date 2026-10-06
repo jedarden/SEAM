@@ -33,6 +33,11 @@ This document specifies the data structure for capturing HTTP request/response p
 > checks for both forms, and the capture → fixture promotion runbook, live in
 > [`docs/capture_testing.md`](../capture_testing.md).
 
+The complete four-form contract, including the private sanitized candidate and
+the `seam-replay` output/report types, is maintained in
+[`aligned-capture-replay-schema-contract.md`](aligned-capture-replay-schema-contract.md).
+This document remains the detailed corpus-format and redaction reference.
+
 ### The two persisted schema forms
 
 Both forms use the same top-level `seam-diff-corpus/v1` envelope. Their entry
