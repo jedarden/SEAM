@@ -172,7 +172,11 @@ func (s *secretScrubber) stream(dst io.Writer, src io.Reader) error {
 				if err := writeAll(dst, redacted); err != nil {
 					return err
 				}
-				if flusher, ok := dst.(interface{ Flush() }); ok {
+				if flusher, ok := dst.(interface{ Flush() error }); ok {
+					if err := flusher.Flush(); err != nil {
+						return err
+					}
+				} else if flusher, ok := dst.(interface{ Flush() }); ok {
 					flusher.Flush()
 				}
 				pending = append([]byte(nil), pending[consumed:]...)
@@ -233,6 +237,35 @@ func writeAll(dst io.Writer, data []byte) error {
 		if n == 0 {
 			return io.ErrShortWrite
 		}
+	}
+	return nil
+}
+
+// responseFlushWriter flushes an encoding writer and then asks net/http to
+// deliver the bytes it produced. Encoding writers such as gzip.Writer expose
+// Flush() error, but that flush alone does not flush the HTTP response, so a
+// re-encoded stream could otherwise be held until its source reached EOF.
+type responseFlushWriter struct {
+	dst      io.Writer
+	response http.ResponseWriter
+}
+
+func (w *responseFlushWriter) Write(data []byte) (int, error) {
+	return w.dst.Write(data)
+}
+
+func (w *responseFlushWriter) Flush() error {
+	if flusher, ok := w.dst.(interface{ Flush() error }); ok {
+		if err := flusher.Flush(); err != nil {
+			return err
+		}
+	} else if flusher, ok := w.dst.(interface{ Flush() }); ok {
+		if _, isResponseWriter := w.dst.(http.ResponseWriter); !isResponseWriter {
+			flusher.Flush()
+		}
+	}
+	if flusher, ok := w.response.(http.Flusher); ok {
+		flusher.Flush()
 	}
 	return nil
 }
@@ -483,7 +516,7 @@ func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Respon
 	}
 	w.Header().Del("Content-Length")
 	w.WriteHeader(resp.StatusCode)
-	streamErr := s.stream(writer, decoded)
+	streamErr := s.stream(&responseFlushWriter{dst: writer, response: w}, decoded)
 	closeErr := closeWriter()
 	if streamErr != nil {
 		return streamErr

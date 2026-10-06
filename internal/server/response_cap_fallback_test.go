@@ -277,3 +277,142 @@ func TestResponseCapDeclaredOverLimitStreamsBeforeUpstreamCompletes(t *testing.T
 		t.Fatalf("X-Echo-Trailer = %q, want %q scrubbed on the fallback path", got, RedactedSecret)
 	}
 }
+
+func TestResponseCapDecodedOversizeReencodesBeforeKnownLengthSourceCompletes(t *testing.T) {
+	secret := []byte("decoded-known-length-stream-secret")
+	const maxBuffered = int64(1024)
+	firstPlain := bytes.Repeat([]byte{'p'}, 8*1024)
+	secondPlain := append([]byte{}, secret...)
+	secondPlain = append(secondPlain, bytes.Repeat([]byte{'q'}, 8*1024)...)
+	plain := append(bytes.Clone(firstPlain), secondPlain...)
+
+	var encoded bytes.Buffer
+	writer := gzip.NewWriter(&encoded)
+	if _, err := writer.Write(firstPlain); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	firstEncodedEnd := encoded.Len()
+	writer = gzip.NewWriter(&encoded)
+	if _, err := writer.Write(secondPlain); err != nil {
+		t.Fatalf("second gzip write: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("second gzip close: %v", err)
+	}
+	if int64(len(plain)) <= maxBuffered {
+		t.Fatalf("decoded fixture length = %d, want over %d", len(plain), maxBuffered)
+	}
+	if int64(encoded.Len()) > maxBuffered {
+		t.Fatalf("encoded fixture length = %d, want at or under %d to exercise decoded-size fallback", encoded.Len(), maxBuffered)
+	}
+
+	// Write one complete gzip member but withhold the second member and EOF. The
+	// decoder can produce more than maxBuffered bytes from the first write, so
+	// streamResponse must switch to its incremental re-encoder before the
+	// declared-length source is complete.
+	firstEncoded := encoded.Bytes()[:firstEncodedEnd]
+	restEncoded := encoded.Bytes()[firstEncodedEnd:]
+	bodyReader, bodyWriter := io.Pipe()
+	resp := &http.Response{
+		StatusCode: http.StatusBadGateway,
+		Header: http.Header{
+			"Content-Type":     []string{"text/plain"},
+			"Content-Encoding": []string{"gzip"},
+			"Content-Length":   []string{itoa(encoded.Len())},
+			"X-Request-Id":     []string{"known-length-42"},
+			"X-Echo":           []string{string(secret)},
+			"Trailer":          []string{"X-Echo-Trailer"},
+		},
+		ContentLength: int64(encoded.Len()),
+		Trailer:       http.Header{"X-Echo-Trailer": []string{string(secret)}},
+		Body:          bodyReader,
+	}
+	scrubber := newSecretScrubber([][]byte{secret})
+
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	go func() {
+		defer func() { _ = bodyWriter.Close() }()
+		if _, err := bodyWriter.Write(firstEncoded); err != nil {
+			return
+		}
+		select {
+		case <-release:
+		case <-time.After(5 * time.Second):
+			return
+		}
+		_, _ = bodyWriter.Write(restEncoded)
+	}()
+
+	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if err := scrubber.streamResponse(w, resp, maxBuffered); err != nil {
+			t.Errorf("streamResponse() error = %v", err)
+		}
+	}))
+	defer served.Close()
+
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: &http.Transport{DisableCompression: true},
+	}
+	response, err := client.Get(served.URL)
+	if err != nil {
+		t.Fatalf("GET decoded-oversize response: %v", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d preserved on the streaming error response", response.StatusCode, http.StatusBadGateway)
+	}
+	if got := response.Header.Get("Content-Type"); got != "text/plain" {
+		t.Fatalf("Content-Type = %q, want text/plain", got)
+	}
+	if got := response.Header.Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip preserved after incremental re-encoding", got)
+	}
+	if got := response.Header.Get("X-Request-Id"); got != "known-length-42" {
+		t.Fatalf("X-Request-Id = %q, want known-length-42", got)
+	}
+	if got := response.Header.Get("X-Echo"); got != RedactedSecret {
+		t.Fatalf("X-Echo = %q, want %q scrubbed", got, RedactedSecret)
+	}
+	if got := response.Header.Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want it removed for the re-encoded stream", got)
+	}
+	if len(response.TransferEncoding) != 1 || response.TransferEncoding[0] != "chunked" {
+		t.Fatalf("TransferEncoding = %v, want chunked for the re-encoded stream", response.TransferEncoding)
+	}
+
+	first := make([]byte, 64)
+	n, err := response.Body.Read(first)
+	if err != nil || n == 0 {
+		t.Fatalf("first read on decoded-oversize response = (%d, %v), want bytes before the known-length source completes", n, err)
+	}
+	close(release)
+	released = true
+	remainder, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read decoded-oversize remainder: %v", err)
+	}
+	reencoded := append(append([]byte{}, first[:n]...), remainder...)
+	decoded, err := gzip.NewReader(bytes.NewReader(reencoded))
+	if err != nil {
+		t.Fatalf("decode incrementally re-encoded response: %v", err)
+	}
+	got, err := io.ReadAll(decoded)
+	if err != nil {
+		t.Fatalf("read decoded incrementally re-encoded response: %v", err)
+	}
+	_ = decoded.Close()
+	assertScrubbedExactly(t, secret, got, ScrubBytes(plain, secret))
+	if got := response.Trailer.Get("X-Echo-Trailer"); got != RedactedSecret {
+		t.Fatalf("X-Echo-Trailer = %q, want %q scrubbed", got, RedactedSecret)
+	}
+}
