@@ -246,7 +246,7 @@ caller returns, revert that declarative-config landing commit with ordinary
 
 ### Differential replay (tools/diffharness)
 
-`lint`, `diff` and `import` manage fragments; the **differential replay** harness in `tools/diffharness` is the conformance gate that decides whether a fragment may ship at all. It replays a captured corpus of real request/response pairs against both the incumbent proxy and SEAM, then compares the responses for equivalence — a service's fragment does not ship, and its migration prose is not deleted, until its corpus passes the replay. The tools live in their own Go module and have their own README; this section covers the workflow, [the harness README](tools/diffharness/README.md) covers the full corpus format and comparison rules.
+`lint`, `diff` and `import` manage fragments; the **differential replay** harness in `tools/diffharness` is the conformance gate that decides whether a fragment may ship at all. It replays requests promoted from a captured corpus against both the incumbent proxy and SEAM, then compares the fresh responses for equivalence — a service's fragment does not ship, and its migration prose is not deleted, until its fixture passes the replay. The tools live in their own Go module and have their own README; this section covers the workflow, [the harness README](tools/diffharness/README.md) covers the full corpus format and comparison rules.
 
 Build both tools from the harness module:
 

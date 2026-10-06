@@ -137,6 +137,11 @@ promoting a runtime capture into that directory is a deliberate, reviewed act
 [`argocd-ro-corpus-data-structure.md`](argocd-ro-corpus-data-structure.md)).
 
 **Structure:**
+
+The example below is a private **runtime capture**. It contains the complete
+request/response pair produced by the capture proxy; promotion removes the
+capture-time `response` before the document becomes a checked-in fixture.
+
 ```json
 {
   "schema": "seam-diff-corpus/v1",
@@ -155,22 +160,27 @@ promoting a runtime capture into that directory is a deliberate, reviewed act
         "headers": {"Accept": ["application/json"]},
         "bodyB64": ""
       },
-      "secrets": [
-        {
-          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd/ro-token",
-          "injectAs": {"kind": "bearer"}
-        }
-      ]
+      "response": {
+        "statusCode": 200,
+        "headers": {"Content-Type": ["application/json"]},
+        "bodyB64": "eyJvayI6dHJ1ZX0=",
+        "bodyContentType": "application/json"
+      }
     }
   ]
 }
 ```
 
+The checked-in fixture uses the same envelope and retained request fields, but
+has no entry-level `response`. It adds reviewed `secrets` references and
+`expect` replay policy instead; replay collects fresh responses from the
+incumbent and SEAM.
+
 **Security Model:**
-- Credentials stored as **references only** (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
-- Never literal values in corpus files
-- Checked-in fixtures (`tools/diffharness/testdata/*.json`) are refs-only and safe to commit after review; runtime captures under `corpus/` are gitignored and never committed
-- Literal values resolved at replay-time from local secrets source
+- Checked-in fixtures store credentials as **references only** (e.g., `vault:rs-manager/rs-manager/seam/routes/argocd/ro-token`)
+- Runtime captures under `corpus/` are private gitignored evidence and may contain unreviewed request or response data; they are never committed or shared as-is
+- Checked-in fixtures (`tools/diffharness/testdata/*.json`) are safe to commit after review
+- Literal values are resolved only at replay time from the local secrets source
 
 #### 3. Control Scripts
 
@@ -423,7 +433,7 @@ history purge removed the original from git
 **Actions:**
 1. Identify missing API routes (sync, manifest, repositories)
 2. Capture additional operations
-3. Add expected response metadata
+3. Add reviewed replay expectations for response comparison
 4. Populate secret references
 
 **Status:** ⏳ Pending — the committed fixture `corpus-argocd.json` holds two
@@ -466,9 +476,9 @@ pass report (hard gate). A live differential run against the deployed
 
 ### Corpus File Security
 
-- ✅ Corpus files contain **only secret references**, not values
-- ✅ Committed fixtures (`tools/diffharness/testdata/*.json`) are safe to commit after review; runtime captures under `corpus/` are gitignored and stay out of git entirely
-- ✅ Can be shared without credential exposure
+- ✅ Checked-in fixtures (`tools/diffharness/testdata/*.json`) contain **only secret references**, not values, after review
+- ⚠️ Runtime captures under `corpus/` are private gitignored evidence and must be reviewed before sharing or promotion
+- ✅ Replay resolves literal values only at replay time
 - ✅ Review process (plus the loader's enforced vault-base validation) ensures no accidental credential leakage
 
 ### Capture Proxy Security

@@ -18,7 +18,10 @@
 
 ## Overview
 
-This document specifies the data structure for capturing HTTP request/response pairs from the ArgoCD read-only proxy. The corpus serves as the oracle for differential testing during service migration to SEAM.
+This document specifies the two persisted forms of the ArgoCD read-only proxy
+corpus. A private runtime capture records request/response evidence from the
+incumbent; a promoted checked-in fixture retains request data and replay
+expectations for differential testing during service migration to SEAM.
 
 > **Capture vs. fixture vs. replay.** `seam-diff-corpus/v1` has two persisted
 > lifecycle forms; replay is the execution phase, not a third persisted form.

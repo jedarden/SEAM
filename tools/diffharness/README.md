@@ -1,6 +1,6 @@
 # SEAM Differential Harness
 
-The differential capture + replay tool for testing SEAM route conformance. This is the highest-value test asset in the SEAM plan: it records real request/response pairs from an incumbent proxy, replays them against both the incumbent and SEAM, and verifies response equivalence modulo the enumerated expected diffs.
+The differential capture + replay tool for testing SEAM route conformance. This is the highest-value test asset in the SEAM plan: it records real request/response pairs from an incumbent proxy, promotes reviewed request data into replay fixtures, then replays those requests against both the incumbent and SEAM to verify response equivalence modulo the enumerated expected diffs.
 
 > **The contract lives in
 > [docs/design/differential-replay-contract.md](../../docs/design/differential-replay-contract.md).**
@@ -23,13 +23,13 @@ A proxy that sits in front of an incumbent proxy and captures request/response p
 seam-capture \
   --incumbent https://argocd.example.com \
   --service argocd \
-  --corpus testdata/corpus-argocd.json \
+  --corpus corpus/argocd-proxy/corpus.json \
   --listen :8080
 ```
 
 - Listens on `--listen` (default `:8080`)
 - Forwards requests to `--incumbent`
-- Captures the full request and forwarded response (status, headers, and body) into `--corpus`
+- Captures the full request and forwarded response (status, headers, and body) into the private runtime capture at `--corpus`
 - Redacts credential-bearing headers before persisting the corpus; add secret references manually for replay
 - Can be disabled with `--capture-enabled=false` or `SEAM_CAPTURE_ENABLED=false` while retaining transparent forwarding
 - Use `X-Seam-Capture-Skip` header to skip capture for health checks
@@ -47,7 +47,7 @@ seam-replay \
   --report testdata/report-argocd.json
 ```
 
-- Loads corpus and secrets
+- Loads a checked-in fixture (or a private runtime capture) and secrets
 - Replays each entry against both targets
 - Compares responses for equivalence
 - Outputs JSON report and human-readable summary
@@ -98,17 +98,34 @@ seam-cutover check \
 
 ## Corpus Format
 
-A corpus is a JSON file containing captured request/response pairs:
+The `seam-diff-corpus/v1` envelope has two persisted forms with different field
+ownership:
 
-> **Ref base note (2026-09-04 consolidation):** the refs shown in this README
-> (`vault:seam/routes/...`) use the pre-consolidation base, matching the
-> checked-in corpus and testdata that were captured under it. SEAM's enforced
-> vault base dir is now `rs-manager/rs-manager/seam/routes`; a secref written
-> for a new capture must use that base. The ref→env-var mapping — derived by
+- A **runtime capture** is private producer output. Each entry is one complete
+  request/response pair: the request sent to the incumbent and the incumbent
+  response observed for that request. Capture producers do not add `secrets`
+  or `expect`.
+- A **checked-in replay fixture** is the reviewed promotion of a runtime
+  capture. It retains request data plus `secrets` references and `expect`
+  replay policy, but has no entry-level `response`. Replay obtains fresh
+  responses from both the incumbent and SEAM; it never reads a capture-time
+  response as an oracle.
+
+Promotion is the boundary: review the request, add only reference-based
+  secrets and explicit replay policy, and drop the capture-time `response`
+  before moving the document to `tools/diffharness/testdata/`. The detailed
+  field contract is in
+  [aligned-capture-replay-schema-contract.md](../../docs/design/aligned-capture-replay-schema-contract.md).
+
+> **Ref base note:** refs in a checked-in fixture must use SEAM's enforced
+> vault base dir, `rs-manager/rs-manager/seam/routes`; a ref written for a
+> new capture must use that base. The ref→env-var mapping — derived by
 > `internal/secref` from the ref string alone — is mechanical for any base.
 > The full reference syntax — scheme handling, base containment, the
 > fragment `x-vault-path` boundary, serialization rules — is defined in
 > [docs/notes/credential-reference-syntax.md](../notes/credential-reference-syntax.md).
+
+### Runtime capture
 
 ```json
 {
@@ -134,10 +151,39 @@ A corpus is a JSON file containing captured request/response pairs:
         "headers": {"Content-Type": ["application/json"]},
         "bodyB64": "eyJvayI6dHJ1ZX0=",
         "bodyContentType": "application/json"
+      }
+    }
+  ]
+}
+```
+
+### Checked-in replay fixture
+
+The promoted fixture keeps the request and adds replay configuration. It does
+not carry the runtime capture's `response`:
+
+```json
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "argocd-ro",
+  "incumbent": "https://argocd.example.com",
+  "capturedAt": "2026-07-27T10:00:00Z",
+  "description": "ArgoCD API corpus",
+  "entries": [
+    {
+      "id": "list-apps-get",
+      "description": "List all applications",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/applications",
+        "query": "",
+        "headers": {"Accept": ["application/json"]},
+        "bodyB64": "",
+        "bodyContentType": ""
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {"kind": "bearer"}
         }
       ],
@@ -152,26 +198,33 @@ A corpus is a JSON file containing captured request/response pairs:
 ### Entry Structure
 
 - `id`: Stable identifier for the entry
-- `timestamp`: RFC3339 timestamp for the captured exchange
+- `timestamp`: RFC3339 timestamp for the captured exchange; informational
+  metadata that replay never reads and promotion may retain or omit
 - `description`: What this entry exercises
-- `request`: The caller's request (replayed verbatim)
+- `request`: The caller's request (retained and replayed verbatim in both forms)
   - `method`: HTTP method
   - `path`: Path only (no query)
   - `query`: Query string without leading `?`
   - `headers`: Request headers (canonicalized keys)
   - `bodyB64`: Base64-encoded body (empty if no body)
   - `bodyContentType`: Content-Type header for body
-- `response`: The incumbent response observed during capture
+- `response`: Runtime-capture-only incumbent response observed during capture;
+  promotion drops it, and replay collects fresh responses from both targets
   - `statusCode`: HTTP status code
   - `headers`: Response headers (credential-bearing values are redacted)
   - `bodyB64`: Base64-encoded response body
   - `bodyContentType`: Content-Type header for body
-- `secrets`: References to injected credentials (never literal values)
-- `expect`: Per-entry comparison overrides
+- `secrets`: Fixture-only references to injected credentials (never literal
+  values), added during promotion
+- `expect`: Fixture-only per-entry comparison overrides, added during promotion
   - `status`: Expected status for SEAM (if different from incumbent)
   - `ignoreHeaders`: Headers to ignore (volatile headers)
   - `ignoreBody`: Skip body comparison (for non-deterministic responses)
   - `skip`: Skip this entry with reason
+
+The response fields describe capture evidence, not fixture expectations. The
+fresh responses collected during replay are transient comparison inputs and
+are summarized only in the replay report.
 
 ## Secrets Resolution
 
@@ -181,8 +234,8 @@ Secrets are resolved at replay time from a local file or environment:
 
 ```json
 {
-  "vault:seam/routes/argocd/ro-token": "my-secret-token",
-  "vault:seam/routes/kalshi/api-key": "kalshi-key-123"
+  "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token": "my-secret-token",
+  "vault:rs-manager/rs-manager/seam/routes/kalshi/api-key": "kalshi-key-123"
 }
 ```
 
@@ -191,7 +244,7 @@ Secrets are resolved at replay time from a local file or environment:
 If a ref isn't in the secrets file, it's resolved from environment:
 
 ```
-vault:seam/routes/argocd/ro-token → SEAM_DIFF_SECRET_VAULT_SEAM_ROUTES_ARGOCD_RO_TOKEN
+vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token → SEAM_DIFF_SECRET_VAULT_RS_MANAGER_RS_MANAGER_SEAM_ROUTES_ARGOCD_RO_RO_TOKEN
 ```
 
 The whole ref is upper-cased — scheme included — and every run of
@@ -276,7 +329,7 @@ vim argocd-corpus.json
 # Create secrets file (git-ignored)
 cat > argocd-secrets.local.json <<EOF
 {
-  "vault:seam/routes/argocd/ro-token": "your-actual-token"
+  "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token": "your-actual-token"
 }
 EOF
 ```

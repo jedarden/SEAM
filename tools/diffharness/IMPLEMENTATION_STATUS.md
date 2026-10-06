@@ -8,7 +8,10 @@ The SEAM differential capture + replay tooling is **fully implemented and operat
 
 ### 1. Capture Tool (`seam-capture`)
 
-**Purpose:** Records real request/response pairs from an incumbent proxy into a corpus format.
+**Purpose:** Records real request/response pairs from an incumbent proxy into a
+private runtime-capture format. Promotion retains the request and adds
+reference-based replay configuration for a checked-in fixture; replay obtains
+fresh responses from both targets rather than reading a stored response.
 
 **Location:** `/home/coding/SEAM/tools/diffharness/cmd/seam-capture/main.go`
 
@@ -58,18 +61,30 @@ seam-replay \
 
 **Schema Version:** `seam-diff-corpus/v1`
 
-> **Ref base note (2026-09-04 consolidation):** the example refs in this
-> document (`vault:seam/routes/...`) use the pre-consolidation base, matching
-> the checked-in corpus and testdata that were captured under it — they are
-> historical, not the live prefix. SEAM's enforced vault base dir is now
-> `rs-manager/rs-manager/seam/routes`; a secref written for a new capture
-> must use that base. The ref→env-var mapping is mechanical for any base.
+The schema has two persisted forms:
+
+- **Runtime capture:** private producer output containing the request sent to
+  the incumbent and the incumbent response observed for that request. Capture
+  producers do not populate `secrets` or `expect`.
+- **Checked-in replay fixture:** reviewed promotion containing request data,
+  `secrets` references, and `expect` replay policy. It has no entry-level
+  `response`; `seam-replay` collects fresh incumbent and SEAM responses at
+  replay time.
+
+The structure example below is the checked-in fixture form. The capture-time
+response is intentionally absent because it is evidence from the private
+capture, not a replay expectation.
+
+> **Ref base note:** refs in a checked-in fixture must use SEAM's enforced vault
+> base dir, `rs-manager/rs-manager/seam/routes`; a ref written for a new
+> capture must use that base. The ref→env-var mapping is mechanical for any
+> base.
 
 **Structure:**
 ```json
 {
   "schema": "seam-diff-corpus/v1",
-  "service": "argocd",
+  "service": "argocd-ro",
   "incumbent": "https://argocd.example.com",
   "capturedAt": "2026-07-27T10:00:00Z",
   "description": "ArgoCD API corpus",
@@ -87,7 +102,7 @@ seam-replay \
       },
       "secrets": [
         {
-          "ref": "vault:seam/routes/argocd/ro-token",
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
           "injectAs": {"kind": "bearer"}
         }
       ],
@@ -99,12 +114,12 @@ seam-replay \
 }
 ```
 
-**Security Design:**
+**Security Design (checked-in fixtures):**
 - Secret references only (never literal values)
 - Values resolved at replay time from local git-ignored file or environment
-- Reviewed fixture corpora under `testdata/` are safe to commit (refs only);
-  runtime captures under the repository-root `corpus/` directory are
-  gitignored and never committed
+- Reviewed fixture corpora under `testdata/` are safe to commit (refs only)
+- Runtime captures under the repository-root `corpus/` directory are private,
+  gitignored, and never committed or shared as-is
 
 ### 4. Comparison Engine
 
@@ -140,13 +155,13 @@ seam-replay \
 1. **Local JSON file:** `--secrets path/to/secrets.json`
    ```json
    {
-     "vault:seam/routes/argocd/ro-token": "my-secret-token"
+     "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token": "my-secret-token"
    }
    ```
 
 2. **Environment variables:** Auto-derived from ref
    ```
-   vault:seam/routes/argocd/ro-token → SEAM_DIFF_SECRET_VAULT_SEAM_ROUTES_ARGOCD_RO_TOKEN
+   vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token → SEAM_DIFF_SECRET_VAULT_RS_MANAGER_RS_MANAGER_SEAM_ROUTES_ARGOCD_RO_RO_TOKEN
    ```
 
 ### 6. Cutover Gate Runner (`seam-cutover`)
@@ -240,7 +255,9 @@ docs/migration-runbook.md §Stage 2 and §Rollback.
 
 ### Bead Requirement: "Record real request/response pairs at an incumbent proxy into a corpus format"
 
-✅ **DONE** - `seam-capture` proxy records request/response pairs to `seam-diff-corpus/v1` JSON format.
+✅ **DONE** - `seam-capture` proxy records runtime request/response pairs to
+`seam-diff-corpus/v1`; promotion drops the capture-time response before a
+reviewed fixture is checked in.
 
 ### Bead Requirement: "Replay against BOTH the incumbent and SEAM"
 
