@@ -274,6 +274,19 @@ the module directory:
 cd tools/diffharness && go test ./...
 ```
 
+For a fast review of only the capture-promotion boundary, run the focused
+workflow contract and lifecycle checks:
+
+```sh
+cd tools/diffharness && go test ./internal/corpus -run '^(TestCapturePromotionWorkflowContract|TestPromotionLifecycleConvertsCaptureToFixture|TestPromotionBoundaryRejectsUnsanitizedRequestAndResponse)$' -count=1
+```
+
+This command checks the ordered request and response handoff steps, the links
+to the aligned capture/replay schema contract, both producer-shaped positive
+redaction cases, and negative request-header/query/body plus response and
+resolved-secret cases. It is intentionally narrower than the module gate; run
+the full module command above when changing other diffharness behavior.
+
 Loading a corpus (`corpus.Load`) and appending an entry
 (`Corpus.AppendEntry`) both validate:
 
@@ -627,11 +640,12 @@ and the fixture-validation lane staying wired.
 
 ## Results
 
-Last verified: 2026-09-26.
+Last verified: 2026-10-05.
 
 | Check | Result | Coverage |
 | --- | --- | --- |
 | `cd tools/diffharness && go test ./...` | PASS | Schema, service, and entry-ID checks plus header/method canonicalization and `secrets[].ref` enforcement against the enforced vault base, including the retired `seam/routes` rejection; the checked-in-fixture walk (no capture-time `response` survives promotion) and the promotion-lifecycle pin (`TestPromotionLifecycleConvertsCaptureToFixture`) that proves the documented capture → fixture conversion |
+| Focused capture-promotion command above | PASS | Ordered request/response workflow and aligned-schema references; marker-safe request/response handling plus negative literal request header/query/body, retained response, and resolved-secret boundary cases |
 | `diffharness module gate` (DoD `--slow`) | PASS | The whole nested module — fixtures, comparator, and the replay/cutover tools — built and tested in the Definition of Done, so the root sweep's module boundary cannot silently drop any of it |
 | `internal/corpusboundary` | PASS | Anchored `/corpus/` ignore entry present and effective; guarded fixture and package paths outside every ignore rule; nothing under `corpus/` tracked in a real checkout |
 | Focused server capture suite, `-count=5` | PASS | Request/response integrity plus successful and error response-pair preservation |
