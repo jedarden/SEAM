@@ -59,10 +59,11 @@ const rawMiddlewareCapture = `{
 }`
 
 // rawStandaloneCapture is the on-disk shape the standalone seam-capture proxy
-// writes: capture-argocd.sh passes the retired `argocd` service token, a real
-// incumbent URL, and — the load-bearing difference — request headers recorded
-// verbatim, because the standalone tool does no redaction at capture time.
-// Secrets are likewise never populated (an explicit TODO in its source).
+// writes: capture-argocd.sh passes the retired `argocd` service token and a
+// real incumbent URL. Its fixed sensitive header names are scrubbed before
+// persistence, but an unrecognised header and query value remain verbatim
+// because the standalone tool has no route-fragment metadata. Secrets are
+// likewise never populated (an explicit TODO in its source).
 const rawStandaloneCapture = `{
   "schema": "seam-diff-corpus/v1",
   "service": "argocd",
@@ -77,16 +78,20 @@ const rawStandaloneCapture = `{
       "request": {
         "method": "GET",
         "path": "/api/v1/clusters",
-        "query": "",
+        "query": "api_key=standalone-capture-query-not-a-credential",
         "headers": {
           "Accept": ["application/json"],
-          "Authorization": ["` + standaloneVerbatimToken + `"]
+          "Authorization": ["[REDACTED-BY-SEAM]"],
+          "X-Capture-Token": ["` + standaloneVerbatimToken + `"]
         },
         "bodyContentType": ""
       },
       "response": {
         "statusCode": 200,
-        "headers": { "Content-Type": ["application/json"] },
+        "headers": {
+          "Content-Type": ["application/json"],
+          "Set-Cookie": ["[REDACTED-BY-SEAM]"]
+        },
         "bodyB64": "e30=",
         "bodyContentType": "application/json"
       }
@@ -134,14 +139,21 @@ func TestPromotionLifecycleConvertsCaptureToFixture(t *testing.T) {
 		t.Fatalf("standalone capture service = %q, want the retired argocd token capture-argocd.sh passes — the loader accepts it (service need only be non-empty), which is why the runbook's rewrite is a documented step rather than a loader rule", standaloneCapture.Service)
 	}
 	standaloneEntry := standaloneCapture.Entries[0]
-	if got := standaloneEntry.Request.Headers["Authorization"]; len(got) != 1 || got[0] != standaloneVerbatimToken {
-		t.Fatalf("standalone capture Authorization = %v, want the verbatim record — the standalone producer does no capture-time redaction", got)
+	if got := standaloneEntry.Request.Headers["Authorization"]; len(got) != 1 || got[0] != captureRedactionMarker {
+		t.Fatalf("standalone capture Authorization = %v, want the fixed-name redaction marker", got)
+	}
+	if got := standaloneEntry.Request.Headers["X-Capture-Token"]; len(got) != 1 || got[0] != standaloneVerbatimToken {
+		t.Fatalf("standalone capture X-Capture-Token = %v, want the unrecognised header's verbatim record", got)
+	}
+	if !strings.Contains(standaloneEntry.Request.Query, "standalone-capture-query-not-a-credential") {
+		t.Fatalf("standalone capture query = %q, want the unrecognised query value recorded verbatim", standaloneEntry.Request.Query)
 	}
 
 	// Stage 2 — the promotion. First the review step the standalone shape
 	// exists to exercise: its verbatim credential is a promotion blocker, so
 	// the review scrubs it to the marker the middleware would have written.
-	standaloneEntry.Request.Headers["Authorization"] = []string{captureRedactionMarker}
+	standaloneEntry.Request.Headers["X-Capture-Token"] = []string{captureRedactionMarker}
+	standaloneCapture.Entries[0].Request.Query = "api_key=%5BREDACTED-BY-SEAM%5D"
 
 	// Then the metadata + convention rewrite (runbook step 2) for both
 	// captures, gated through the fixture validations (step 3): save, and let
@@ -159,7 +171,7 @@ func TestPromotionLifecycleConvertsCaptureToFixture(t *testing.T) {
 		map[string]string{
 			"api-v1-clusters-get": "vault:" + DefaultVaultBaseDir + "/argocd-ro/ro-token",
 		},
-		[]string{"verbatim"})
+		[]string{"verbatim", "standalone-capture-query-not-a-credential"})
 
 	// Stage 3 — the fixture conventions hold on what the documented
 	// conversion produced.

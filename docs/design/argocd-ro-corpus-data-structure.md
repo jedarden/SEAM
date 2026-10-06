@@ -188,8 +188,10 @@ response (see [Redaction](#redaction) for why that matters).
 
 Unlike a request's credential headers and query values (scrubbed at capture by
 the gateway middleware — see [Redaction](#redaction)), a response's headers
-and body are recorded **verbatim** by both producers. That is a second reason
-promotion drops the field rather than committing it.
+and body are recorded **verbatim** by the gateway middleware. The standalone
+producer applies its fixed-name header scrub to response headers but records
+response bodies verbatim. That is a second reason promotion drops the field
+rather than committing it.
 
 ### Checked-in Fixture Entry Schema
 
@@ -439,7 +441,8 @@ All ArgoCD API requests require bearer authentication:
 
 ❌ **Never:**
 - Literal credential values in corpus files
-- Base64-encoded credentials (except request/response bodies)
+- Base64-encoded credentials hidden in a request body; `bodyB64` is allowed
+  only when its decoded contents pass the promotion review
 - Personal access tokens or API keys
 - Committing a runtime capture from `corpus/` without promoting it to a reviewed fixture first
 
@@ -448,7 +451,7 @@ All ArgoCD API requests require bearer authentication:
 Redaction happens at three distinct points, and a corpus moves through all of
 them:
 
-1. **At capture — gateway middleware only.** Before an entry is retained, the
+1. **At capture — gateway middleware.** Before an entry is retained, the
    capture middleware (`internal/server/capture.go`) replaces the *value* of
    every credential-bearing request header — `Authorization`,
    `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`
@@ -458,11 +461,16 @@ them:
    declares injectable, with the marker `[REDACTED-BY-SEAM]` (`RedactedSecret`
    — the same marker the gateway's live response scrubber substitutes for an
    echoed secret).
-2. **Not at capture — standalone `seam-capture`.** The standalone capture
-   proxy records what crossed the wire verbatim; it does no redaction, and it
-   never populates `secrets[]`. Its output therefore depends on the promotion
-   review below: a literal credential in a captured header or body is a
-   promotion blocker, scrubbed to the marker or removed.
+2. **At capture — standalone `seam-capture`.** Before an entry is written,
+   `canonHeaders` replaces the value of the fixed sensitive header names
+   `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`,
+   `Api-Key`, and `X-Auth-Token` with `[REDACTED-BY-SEAM]`. It does not know
+   route fragments, so route-specific injectable headers, all query values, and
+   request bodies are not scrubbed. The same fixed-name header rule applies to
+   captured response headers; response bodies are recorded verbatim. It never
+   populates `secrets[]`. A literal credential or other sensitive value that
+   remains in any of those unsanitized locations is a promotion blocker and
+   must be scrubbed or removed before the fixture candidate is persisted.
 3. **At replay — the comparator.** `seam-replay` substitutes every resolved
    bare secret with `[REDACTED-BY-SEAM]` on both sides of the comparison
    before diffing bodies and headers, so an endpoint that echoes its
@@ -474,11 +482,11 @@ Two consequences worth stating explicitly:
 
 - Request **bodies** are never scrubbed by either producer — a credential in
   a body survives capture, and only the promotion review catches it.
-- **Response** headers and bodies are recorded verbatim by both producers
-  (the middleware's scrub covers request headers and query values only). This
-  is a second reason promotion drops the captured `response` rather than
-  committing it: a fixture should not carry a payload nobody scrubbed and
-  replay never reads.
+- The gateway records **response** headers and bodies verbatim; standalone
+  capture applies only its fixed-name header scrub and records response bodies
+  verbatim. This is a second reason promotion drops the captured `response`
+  rather than committing it: a fixture should not carry a payload nobody
+  scrubbed and replay never reads.
 
 In a promoted fixture the marker is the *expected* state for a credential
 location: it says "the value was scrubbed at capture; the real value resolves
@@ -495,16 +503,18 @@ Before promoting a runtime capture into a committed fixture under
 `tools/diffharness/testdata/`:
 
 1. ✅ Verify all `secrets[].ref` fields use reference format
-2. ✅ Check no literal bearer tokens in headers — a `[REDACTED-BY-SEAM]`
-   marker is the expected scrubbed state, a literal value is a promotion
-   blocker (see [Redaction](#redaction)). The standalone producer records
-   headers verbatim, so this check is never optional for its output.
+2. ✅ Check no literal bearer tokens or other unreviewed sensitive values in
+   request headers or query fields — a `[REDACTED-BY-SEAM]` marker is the
+   expected scrubbed state, and a literal value is a promotion blocker (see
+   [Redaction](#redaction)). The standalone producer only scrubs its fixed
+   header names, so this check is never optional for its output.
 3. ✅ Confirm no entry still carries a capture-time `response` — the fixture
    convention drops it, which also retires the leak surface, since response
    payloads are recorded verbatim and never scrubbed (enforced by
    `TestCheckedInFixturesResolveUnderEnforcedVaultBase`)
-4. ✅ Confirm request bodies carry no credential values — bodies are never
-   scrubbed by either producer, so this review is the only gate
+4. ✅ Decode every non-empty request `bodyB64` and confirm it carries no
+   credential or other sensitive value — bodies are never scrubbed by either
+   producer, so this review is the only gate
 5. ✅ Validate JSON syntax with `jq .`
 6. ✅ Review descriptions for sensitive information
 7. ✅ Run the fixture checks (`cd tools/diffharness && go test ./...`) — the

@@ -316,14 +316,42 @@ section](design/argocd-ro-corpus-data-structure.md#redaction)):
   `[REDACTED-BY-SEAM]` before the entry was retained. In the promoted fixture
   the marker is the *expected* state — it means "value scrubbed at capture;
   the real value resolves at replay through `secrets[].ref`".
-- **The standalone `seam-capture` scrubbed nothing.** It records what crossed
-  the wire verbatim, so its output can carry a literal bearer token in a
-  header. That is a promotion blocker: the review scrubs it to the marker (or
-  removes the header) before the fixture is committed.
-- **Neither producer scrubs bodies.** A credential in a request body (or in
-  the captured response, which is recorded verbatim — and dropped at
-  promotion, per the table above) survives capture; the review checklist's
-  body inspection below is the only gate.
+- **The standalone `seam-capture` has only fixed-name header scrubbing.** It
+  records everything else that crossed the wire verbatim, so its output can
+  carry a literal bearer token in an
+  unrecognised header. That is a promotion blocker: the review scrubs it to
+  the marker (or removes the header) before the fixture is committed. The
+  standalone producer does apply the fixed-name scrub to `Authorization`,
+  `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key`, and
+  `X-Auth-Token`; it has no route-fragment metadata, so it cannot scrub
+  route-specific injectable names or any query parameter.
+- **Neither producer scrubs request bodies or response bodies.** A credential
+  in either body survives capture; the review checklist's decoded-body
+  inspection below is the only gate. The standalone producer also applies its
+  fixed-name header scrub when recording response headers, while the gateway
+  middleware records response headers verbatim. In either case, promotion
+  drops the captured `response` before the candidate reaches the fixture path.
+
+#### The persistence boundary
+
+The runtime file under gitignored `corpus/` is capture data, not a safe
+fixture. It may contain an unsanitized standalone query or body and must be
+treated as sensitive local working data. The boundary before a checked-in
+fixture is absolute:
+
+1. Keep the flushed runtime file under `corpus/`; do not print it, stage it, or
+   copy it directly into `tools/diffharness/testdata/`.
+2. Create a candidate in a private temporary directory. Remove every
+   capture-time `response`, replace every literal credential or other sensitive
+   value in request headers, query, and decoded body with
+   `[REDACTED-BY-SEAM]` or remove that field, then add only `vault:` secret
+   references and reviewed `expect` values. Do not guess when a value is
+   sensitive: stop and discard the candidate until its source and purpose are
+   known.
+3. Inspect only that sanitized candidate, run the fixture checks, and move it
+   into `tools/diffharness/testdata/` only after the checks pass. A candidate
+   containing a literal credential, an unreviewed sensitive value, or a
+   capture-time `response` is not eligible for review, staging, or commit.
 
 The whole conversion — both producer shapes in, fixture-convention corpus
 out, markers preserved, verbatim credentials scrubbed — is pinned end to end
@@ -333,8 +361,10 @@ by `TestPromotionLifecycleConvertsCaptureToFixture`
 
 ### 3. Gate the promotion through the fixture validations
 
-Copy the flushed file into `tools/diffharness/testdata/<name>.json`, then
-let the loader reject what eyeballing misses. `corpus.Load` — and
+Do not copy the flushed file directly into the tracked fixture directory.
+After the persistence-boundary review above, move the sanitized candidate into
+`tools/diffharness/testdata/<name>.json` and let the loader reject what
+eyeballing misses. `corpus.Load` — and
 `Corpus.AppendEntry` at capture time — validate:
 
 - the file parses as JSON and declares `seam-diff-corpus/v1` exactly;
@@ -360,10 +390,11 @@ file to the `fixtures` slice in
 `tools/diffharness/internal/corpus/corpus_test.go` as part of the
 promotion**, so it receives the same walk on every future run. Also work
 through the design doc's corpus review checklist over the candidate:
-`jq .` for syntax, no literal bearer tokens in headers (a
+`jq .` for syntax, no literal bearer tokens or unreviewed sensitive values in
+headers or query fields (a
 `[REDACTED-BY-SEAM]` marker is the expected scrubbed state; the standalone
-producer records headers verbatim), no credential values in captured
-bodies (bodies are never scrubbed by either producer), no capture-time
+producer only scrubs its fixed header names), no credential values in decoded
+request bodies (bodies are never scrubbed by either producer), no capture-time
 `response` left on any entry, descriptions reviewed for sensitive content.
 
 ### 4. Re-run the fixture suite, then commit by pathspec
