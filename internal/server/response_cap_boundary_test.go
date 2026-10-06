@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // The boundary tests for MaxBufferedResponseBytes. The cap bounds only how much
@@ -170,6 +171,150 @@ func TestResponseCapUnknownLengthStreamsIncrementally(t *testing.T) {
 	assertScrubbedExactly(t, secret, got, want)
 	if got := response.Header.Get("Content-Length"); got != "" {
 		t.Fatalf("Content-Length = %q, want it removed on the unknown-length streaming path", got)
+	}
+}
+
+func TestResponseCapUnknownLengthCompressedBoundaryAndOverflow(t *testing.T) {
+	const maxBuffered = int64(1024)
+	secret := []byte("unknown-compressed-overflow-secret")
+
+	for _, test := range []struct {
+		name       string
+		decodedLen int
+	}{
+		{name: "at decoded cap", decodedLen: int(maxBuffered)},
+		{name: "over decoded cap", decodedLen: int(maxBuffered) + 512},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plain := bytes.Repeat([]byte{'x'}, test.decodedLen)
+			secretOffset := test.decodedLen / 2
+			copy(plain[secretOffset:], secret)
+			var encoded bytes.Buffer
+			writer := gzip.NewWriter(&encoded)
+			if _, err := writer.Write(plain); err != nil {
+				t.Fatalf("gzip write: %v", err)
+			}
+			// Keep the deflate stream open after flushing the complete decoded
+			// body. This gives the reader data to deliver before the gzip footer
+			// arrives, which is the compressed equivalent of an unknown-length
+			// upstream that has not finished writing yet.
+			if err := writer.Flush(); err != nil {
+				t.Fatalf("gzip flush: %v", err)
+			}
+			streamPrefix := bytes.Clone(encoded.Bytes())
+			if err := writer.Close(); err != nil {
+				t.Fatalf("gzip close: %v", err)
+			}
+			streamSuffix := bytes.Clone(encoded.Bytes()[len(streamPrefix):])
+			if len(streamPrefix) <= 10 || len(streamSuffix) == 0 {
+				t.Fatalf("streaming gzip fixture did not produce a prefix and footer: prefix=%d suffix=%d", len(streamPrefix), len(streamSuffix))
+			}
+
+			bodyReader, bodyWriter := io.Pipe()
+			resp := &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Header: http.Header{
+					"Content-Type":     []string{"text/plain"},
+					"Content-Encoding": []string{"gzip"},
+					"X-Request-Id":     []string{"unknown-compressed-42"},
+					"X-Echo":           []string{string(secret)},
+					"Trailer":          []string{"X-Echo-Trailer"},
+				},
+				ContentLength: -1,
+				Trailer:       http.Header{"X-Echo-Trailer": []string{string(secret)}},
+				Body:          bodyReader,
+			}
+			scrubber := newSecretScrubber([][]byte{secret})
+			errCh := make(chan error, 1)
+
+			release := make(chan struct{})
+			released := false
+			defer func() {
+				if !released {
+					close(release)
+				}
+			}()
+			go func() {
+				defer func() { _ = bodyWriter.Close() }()
+				// gzip.NewReader initially asks for only its ten-byte header. Split
+				// the pipe write there so the source can make progress without
+				// requiring the decoder to consume the entire compressed body first.
+				if _, err := bodyWriter.Write(streamPrefix[:10]); err != nil {
+					return
+				}
+				if _, err := bodyWriter.Write(streamPrefix[10:]); err != nil {
+					return
+				}
+				<-release
+				_, _ = bodyWriter.Write(streamSuffix)
+			}()
+
+			served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				errCh <- scrubber.streamResponse(w, resp, maxBuffered)
+			}))
+			defer served.Close()
+
+			client := &http.Client{
+				Timeout:   5 * time.Second,
+				Transport: &http.Transport{DisableCompression: true},
+			}
+			response, err := client.Get(served.URL)
+			if err != nil {
+				t.Fatalf("GET unknown-length compressed response: %v", err)
+			}
+			defer func() { _ = response.Body.Close() }()
+			if response.StatusCode != http.StatusBadGateway {
+				t.Fatalf("status = %d, want %d preserved on the compressed streaming path", response.StatusCode, http.StatusBadGateway)
+			}
+			if got := response.Header.Get("Content-Type"); got != "text/plain" {
+				t.Fatalf("Content-Type = %q, want text/plain", got)
+			}
+			if got := response.Header.Get("Content-Encoding"); got != "gzip" {
+				t.Fatalf("Content-Encoding = %q, want gzip preserved", got)
+			}
+			if got := response.Header.Get("X-Request-Id"); got != "unknown-compressed-42" {
+				t.Fatalf("X-Request-Id = %q, want unknown-compressed-42", got)
+			}
+			if got := response.Header.Get("X-Echo"); got != RedactedSecret {
+				t.Fatalf("X-Echo = %q, want %q scrubbed", got, RedactedSecret)
+			}
+			if got := response.Header.Get("Content-Length"); got != "" {
+				t.Fatalf("Content-Length = %q, want it removed for unknown-length streaming", got)
+			}
+			if len(response.TransferEncoding) != 1 || response.TransferEncoding[0] != "chunked" {
+				t.Fatalf("TransferEncoding = %v, want chunked for unknown-length streaming", response.TransferEncoding)
+			}
+
+			first := make([]byte, 64)
+			n, err := response.Body.Read(first)
+			if n == 0 {
+				t.Fatalf("first read on unknown-length compressed response = (%d, %v), want bytes before source completion", n, err)
+			}
+			close(release)
+			released = true
+			remainder, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatalf("read unknown-length compressed remainder: %v", err)
+			}
+			encodedResponse := append(append([]byte{}, first[:n]...), remainder...)
+			decoded, err := gzip.NewReader(bytes.NewReader(encodedResponse))
+			if err != nil {
+				t.Fatalf("decode scrubbed unknown-length response: %v", err)
+			}
+			got, err := io.ReadAll(decoded)
+			if err != nil {
+				t.Fatalf("read scrubbed unknown-length response: %v", err)
+			}
+			_ = decoded.Close()
+			assertScrubbedExactly(t, secret, got, ScrubBytes(plain, secret))
+			if got := response.Trailer.Get("X-Echo-Trailer"); got != RedactedSecret {
+				t.Fatalf("X-Echo-Trailer = %q, want %q scrubbed", got, RedactedSecret)
+			}
+			if err := <-errCh; err != nil {
+				assertNoSecret(t, secret, []byte(err.Error()))
+				t.Fatalf("streamResponse() error = %v", err)
+			}
+		})
 	}
 }
 
