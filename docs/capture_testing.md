@@ -32,6 +32,104 @@ every ignore rule. Deliberately promoting a capture means moving it into
 never committing it under `corpus/`; the step-by-step procedure is the
 promotion runbook below.
 
+## Request-side redaction procedure
+
+This is the ordered, fail-closed handoff from a runtime capture to a reviewed
+fixture. The runtime file is private capture data, not a review artifact. The
+four artifact forms and their allowed fields are defined by the [aligned
+capture and replay schema contract](design/aligned-capture-replay-schema-contract.md);
+the procedure below applies that contract to request-side redaction.
+
+### 1. Capture into a private runtime artifact
+
+Write the producer output only below the gitignored `corpus/` tree (or another
+equally private temporary location). Do not print the capture, put it in a
+ticket, or copy it into `tools/diffharness/testdata/`. Capture-time responses
+are also private: either producer may record response material that has not
+been reviewed for secrets.
+
+The request-side boundary is exact:
+
+| Capture path | Request headers redacted before retention | Query values redacted before retention | Request body boundary |
+| --- | --- | --- | --- |
+| **Gateway middleware** (`internal/server`) | Values for `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, and `X-Api-Key`, case-insensitively; plus every header name declared injectable by the matched route fragment, also case-insensitively. | Values for `api_key`, `api-key`, `apikey`, `access_token`, `access-token`, `auth_token`, and `auth-token`, case-insensitively; plus every query name declared injectable by the matched route, using the configured name. | No body inspection or redaction. The captured `bodyB64` is the request body as read by the middleware (for a positive `Content-Length`), encoded but not sanitized. |
+| **Standalone `seam-capture`** (`tools/diffharness/cmd/seam-capture`) | Values for the fixed names `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key`, and `X-Auth-Token`, case-insensitively. It has no route-fragment metadata. | None. Every query value is recorded as received. | No body inspection or redaction. The captured `bodyB64` is read and encoded verbatim, including chunked request bodies. |
+
+Each value redacted by a producer becomes `[REDACTED-BY-SEAM]`. A route-
+specific header or query value that the gateway does not recognize is not made
+safe by being captured; similarly, an unrecognized standalone header, query
+value, or body can remain literal. That difference is why the next review
+step is mandatory for both paths. Neither producer's request boundary makes
+the capture-time `response` safe, and the response is not part of a fixture.
+
+### 2. Build a private sanitized candidate
+
+Copy the runtime capture into a private temporary directory and create a
+candidate there. Never edit the runtime capture in place and never use the
+fixture directory as scratch space. For each entry, in order:
+
+1. Remove the capture-time `response` entirely.
+2. Review every request header and query value. Preserve the capture marker
+   where the producer already redacted a credential location; replace any
+   literal credential, token, cookie, authorization material, or other
+   secret-like value with the marker or remove the field. A value is not safe
+   merely because it is in an unfamiliar header or URL-encoded.
+3. Decode every non-empty `request.bodyB64` and inspect the decoded bytes.
+   Redact or remove secret-like content, then re-encode only the reviewed
+   body. If it cannot be made safe without changing the request's intended
+   semantics, discard the candidate instead of carrying the body forward.
+4. Rewrite producer metadata to fixture conventions, add only reviewed
+   `secrets[].ref` references and `expect` policy, and ensure no resolved
+   credential value or in-memory `Secret.Bare` value is serialized.
+
+The candidate is a private sanitized candidate, not a new persistence class:
+it uses the `corpus.Corpus` shape and must contain request data only after the
+checks above. A `vault:` reference identifies where replay resolves a secret;
+it never carries the resolved value. The schema contract's [private
+sanitized-candidate definition](design/aligned-capture-replay-schema-contract.md#2-private-sanitized-candidate)
+is the field-level authority.
+
+### 3. Apply the fail-closed gate
+
+The gate is testable and has no permissive fallback:
+
+> If any value that will be persisted in, or shown for review as, the
+> candidate contains a credential, token, cookie, authorization material, or
+> other secret-like value that is not the redaction marker or a `vault:`
+> reference in `secrets[].ref`, stop. Do not persist, circulate, stage, or
+> review that candidate; discard it and restart from the private runtime
+> capture. An undecodable body, unknown sensitive value, or candidate with a
+> capture-time `response` fails the same gate.
+
+This rule deliberately permits the private raw runtime capture to exist as
+capture input, but permits no unsanitized value to cross from that private
+area into the candidate, reviewer channel, or checked-in fixture. The
+promotion lifecycle test (`TestPromotionLifecycleConvertsCaptureToFixture`)
+pins both producer shapes: standalone verbatim request material must be
+scrubbed during promotion, capture markers must survive, responses must be
+dropped, and the resulting candidate must load under the fixture contract.
+
+### 4. Human reviewer checkpoint — before fixture creation
+
+After the candidate passes the mechanical checks, a human reviewer inspects
+the candidate in its private temporary location. The reviewer must confirm
+that request headers, query values, and decoded bodies contain no literal
+credential, token, cookie, authorization material, or other secret-like
+value; that only references appear in `secrets[]`; that no `response` remains;
+and that descriptions and metadata contain no sensitive content. The reviewer
+either rejects and discards the candidate or explicitly approves it for
+fixture creation. There is no path from runtime capture directly to a fixture.
+
+### 5. Create and validate the fixture
+
+Only after reviewer approval, move the candidate to
+`tools/diffharness/testdata/`, run `cd tools/diffharness && go test ./...`, and
+include it in the checked-in fixture walk. `corpus.Load` and
+`TestCheckedInFixturesResolveUnderEnforcedVaultBase` enforce the schema,
+canonicalization, unique IDs, safe in-base `vault:` references, and absence
+of capture-time responses. The content-level secret review remains required:
+the loader cannot infer that an arbitrary body or query value is secret-like.
+
 ## Schema forms and lifecycle
 
 The two persisted forms use the same `seam-diff-corpus/v1` envelope but own
