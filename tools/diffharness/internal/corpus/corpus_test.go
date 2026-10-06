@@ -1103,6 +1103,7 @@ func TestCheckedInFixturesResolveUnderEnforcedVaultBase(t *testing.T) {
 	t.Setenv(VaultBaseDirEnvVar, "") // pin the default base
 	fixtures := []string{
 		"../../testdata/corpus-argocd.json",
+		"../../testdata/capture-promotion-lifecycle.json",
 		"../../testdata/example-corpus.json",
 	}
 	for _, rel := range fixtures {

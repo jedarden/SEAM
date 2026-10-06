@@ -3,6 +3,7 @@ package corpus
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -90,7 +91,8 @@ const rawStandaloneCapture = `{
         "statusCode": 200,
         "headers": {
           "Content-Type": ["application/json"],
-          "Set-Cookie": ["[REDACTED-BY-SEAM]"]
+          "Set-Cookie": ["[REDACTED-BY-SEAM]"],
+          "X-Upstream-Token": ["fixture-promotion-response-sentinel"]
         },
         "bodyB64": "e30=",
         "bodyContentType": "application/json"
@@ -171,7 +173,19 @@ func TestPromotionLifecycleConvertsCaptureToFixture(t *testing.T) {
 		map[string]string{
 			"api-v1-clusters-get": "vault:" + DefaultVaultBaseDir + "/argocd-ro/ro-token",
 		},
-		[]string{"verbatim", "standalone-capture-query-not-a-credential"})
+		[]string{"verbatim", "standalone-capture-query-not-a-credential", "fixture-promotion-response-sentinel"})
+
+	// The checked-in lifecycle fixture is the reviewed result of this exact
+	// standalone capture. Comparing the serialized/reloaded candidate with it
+	// makes the persistence boundary executable: a future fixture can neither
+	// retain the raw response nor silently skip the request redactions above.
+	checkedInFixture, err := Load("../../testdata/capture-promotion-lifecycle.json")
+	if err != nil {
+		t.Fatalf("load checked-in promotion fixture: %v", err)
+	}
+	if !reflect.DeepEqual(standaloneFixture, checkedInFixture) {
+		t.Fatalf("checked-in promotion fixture does not match the sanitized candidate:\nwant=%+v\n got=%+v", standaloneFixture, checkedInFixture)
+	}
 
 	// Stage 3 — the fixture conventions hold on what the documented
 	// conversion produced.

@@ -1,0 +1,45 @@
+{
+  "schema": "seam-diff-corpus/v1",
+  "service": "argocd-ro",
+  "incumbent": "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
+  "capturedAt": "2026-09-28T11:00:00Z",
+  "description": "promoted fixture (promotion lifecycle pin)",
+  "entries": [
+    {
+      "id": "api-v1-clusters-get",
+      "timestamp": "2026-09-28T11:00:00Z",
+      "description": "GET /api/v1/clusters",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/clusters",
+        "query": "api_key=%5BREDACTED-BY-SEAM%5D",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Authorization": [
+            "[REDACTED-BY-SEAM]"
+          ],
+          "X-Capture-Token": [
+            "[REDACTED-BY-SEAM]"
+          ]
+        }
+      },
+      "secrets": [
+        {
+          "ref": "vault:rs-manager/rs-manager/seam/routes/argocd-ro/ro-token",
+          "injectAs": {
+            "kind": "bearer"
+          }
+        }
+      ],
+      "expect": {
+        "ignoreHeaders": [
+          "Date",
+          "Server",
+          "X-Request-Id"
+        ]
+      }
+    }
+  ]
+}
