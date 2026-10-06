@@ -130,6 +130,110 @@ canonicalization, unique IDs, safe in-base `vault:` references, and absence
 of capture-time responses. The content-level secret review remains required:
 the loader cannot infer that an arbitrary body or query value is secret-like.
 
+## Response-side collection, redaction, fixture promotion, and replay
+
+The response side follows a separate, ordered boundary. The aligned [capture
+and replay schema contract](design/aligned-capture-replay-schema-contract.md)
+is the field-level authority: a capture-time response has exactly
+`statusCode`, `headers`, `bodyB64`, and `bodyContentType`, while a checked-in
+fixture has no `response` at all.
+
+### 1. Collect the response into private capture storage
+
+After the incumbent has responded, collect the response paired with the
+captured request:
+
+- `statusCode`, including the response status observed by the caller;
+- every response header and every repeated header value, represented by the
+  canonicalized `headers` map;
+- the complete response payload as `bodyB64`; and
+- `bodyContentType` as metadata, not as a promise that the body is safe.
+
+The payload boundary is the entire decoded body represented by `bodyB64`, not
+just a JSON object, a displayed preview, or the first part of a stream. It
+includes binary, text, compressed, and otherwise opaque bytes. Header values
+are part of the boundary even when their names are not on a known credential
+list. A raw response may be persisted only as private runtime capture data
+under the gitignored `corpus/` tree (or an equally private location). Do not
+print it, put it in a ticket, or send it for review as collected. Base64 is an
+encoding, not redaction.
+
+### 2. Sanitize before any review or non-private persistence
+
+Make a copy in a private temporary directory; never sanitize the only raw
+capture in place. Before the copy is persisted outside private raw capture or
+shown to a reviewer, inspect all response fields in this order:
+
+1. Review every response header value, including repeated values and headers
+   such as `Set-Cookie`, authorization, API-key, proxy-authentication, session,
+   or other opaque token headers. Replace a credential, cookie, signed URL,
+   token, internal secret, personal data, or other sensitive value with
+   `[REDACTED-BY-SEAM]`, or remove the header when preserving it is not needed.
+   Do not assume an unfamiliar header is harmless. The gateway capture path
+   records response headers verbatim; the standalone path only has its fixed
+   header-name scrub, so producer output is not review-ready.
+2. Decode every non-empty `bodyB64` and inspect the complete byte payload,
+   rather than only parsing JSON or checking a preview. Redact or remove
+   credentials and other sensitive values, then re-encode only the reviewed
+   bytes. If the body is binary, compressed, encrypted, malformed base64, or
+   otherwise cannot be inspected and made safe, reject the candidate; do not
+   treat opacity as safety.
+3. Keep `statusCode` and `bodyContentType` only in a private sanitized review
+   record when they are needed to explain the capture. They never authorize
+   retaining the body or headers, and they are not response expectations for a
+   fixture.
+
+The sanitized response is still capture evidence, not a replay oracle. A
+response that cannot be fully sanitized is not eligible for persistence in a
+review artifact, staging, or discussion.
+
+### 3. Promote only request data and explicit expectations
+
+Build the fixture candidate from the reviewed request and metadata, then
+remove `entry.response` entirely. Do not preserve a sanitized response as an
+expected response and do not copy `statusCode`, headers, or body bytes into a
+fixture under another field name. Add only:
+
+- `secrets[].ref` route references and `injectAs` metadata; never a resolved
+  credential or `Secret.Bare`; and
+- reviewed `expect` policy such as an intentional status override, ignored
+  volatile headers, body comparison policy, or a skip reason.
+
+Before moving the candidate to `tools/diffharness/testdata/`, confirm that the
+serialized fixture contains no `response` field, credential, token, cookie,
+authorization material, personal data, or other unreviewed sensitive value in
+any request, description, metadata, or expectation. Checked-in fixtures are
+durable review artifacts and are forbidden from containing those values even
+when they originated in a response that will not be replayed.
+
+### 4. Reject unsanitized response material fail-closed
+
+Reject the candidate, discard the candidate copy, and restart from the private
+raw capture if any response header or decoded payload contains a literal
+credential or other sensitive value, if decoding or inspection fails, or if it
+is unclear whether a value is sensitive. Do not persist, circulate, stage,
+review, or commit the unsanitized response, and do not use a response that
+failed this gate as a fixture expectation. If response material has already
+crossed the review or commit boundary, stop promotion and treat it as a
+possible disclosure; do not silently approve it because the response would
+eventually be dropped.
+
+### 5. Replay against fresh target responses
+
+Load the checked-in fixture, resolve each `secrets[].ref` only in replay
+memory, and send the retained request to both the incumbent and SEAM targets.
+For each target, replay collects a fresh in-memory response with
+`compare.Response` (`Status`, `Headers`, `Body`, and `Trailers`). Those fresh
+responses are the observations compared by `expect`; the old capture-time
+response is neither loaded from the fixture nor used as an oracle.
+
+Keep target responses transient. The replay report may contain comparison
+summaries such as status/header/body differences, but it must not become a
+corpus or fixture and must remain private. A response body or header that is
+not needed for the comparison must not be copied into the report. This keeps
+the [aligned schema contract](design/aligned-capture-replay-schema-contract.md)
+boundary intact across collection, promotion, and replay.
+
 ## Schema forms and lifecycle
 
 The two persisted forms use the same `seam-diff-corpus/v1` envelope but own
