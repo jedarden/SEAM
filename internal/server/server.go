@@ -238,6 +238,9 @@ func New(cfg *Config) *Server {
 		log.Printf("Warning: Failed to initialize allowlist enforcer: %v", err)
 		// Continue without allowlist - will be fail-closed
 		allowlistEnforcer = nil
+	} else if extra := spec.ParseExtraVaultBaseDirs(os.Getenv(spec.VaultExtraBaseDirsEnvVar)); len(extra) > 0 {
+		allowlistEnforcer.SetExtraVaultBaseDirs(extra)
+		log.Printf("Extra vault base directories: %v", extra)
 	}
 
 	if cfg.FragmentMode {

@@ -375,6 +375,16 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 			}
 		}
 
+		// An oauth-refresh credential sends the stored refresh token to its
+		// tokenUrl, so that host is held to the same upstream allowlist.
+		if injectAs, ok := fragment.ParsedFragment["x-inject-as"].(map[string]any); ok {
+			if tokenURL, ok := injectAs["tokenUrl"].(string); ok {
+				if err := fl.allowlistEnforcer.ValidateUpstreamHost(tokenURL); err != nil {
+					return fmt.Errorf("token_url_host_validation_failed: %w", err)
+				}
+			}
+		}
+
 		// Validate upstream hosts in each operation
 		for path, pathItem := range paths {
 			pathItemMap, ok := pathItem.(map[string]any)

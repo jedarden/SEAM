@@ -23,6 +23,7 @@ type CredentialProbeLoop struct {
 	probeRegistry    *CredentialProbeRegistry
 	routeTableHolder *ThreadSafeTableHolder
 	vaultClient      *vault.Client
+	oauthTokens      *oauthTokenCache
 	httpClient       *http.Client
 	stopCh           chan struct{}
 	stopped          bool
@@ -315,6 +316,24 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		result.ConsecutiveFailures++
 		log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
 		return
+	}
+
+	// An oauth-refresh route stores a refresh token; the probe must present the
+	// exchanged bearer, exactly as live traffic does, never the stored value.
+	if target.InjectAs != nil && target.InjectAs.Kind == InjectionOAuthRefresh {
+		// l.mu is already held by probeDueTargets.
+		if l.oauthTokens == nil {
+			l.oauthTokens = newOAuthTokenCache()
+		}
+		bearer, err := l.oauthTokens.bearer(ctx, target.InjectAs, string(credValue), false)
+		if err != nil {
+			result.Status = CredentialUnhealthy
+			result.LastError = fmt.Sprintf("failed to exchange refresh token: %v", err)
+			result.ConsecutiveFailures++
+			log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
+			return
+		}
+		credValue = []byte(bearer)
 	}
 
 	// Build probe request with IN-PROCESS origin tag

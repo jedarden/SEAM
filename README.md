@@ -44,6 +44,8 @@ seam serve [flags]
 
 #### Vault Path & Body Limits
 - `--vault-base-dir` (default: `rs-manager/rs-manager/seam/routes`) - Base directory that `x-vault-path` must nest `x-seam-owner` under
+- `SEAM_VAULT_EXTRA_BASE_DIRS` (env, comma-separated, default: none) - Additional base directories `x-vault-path` may nest `<owner>/<name>` under, for credentials that already live elsewhere in the estate (e.g. `rs-manager/rs-manager/rackspace-spot`). The owner segment must be followed by `/`, so an owner never reaches a sibling whose name it prefixes. SEAM's own OpenBao role still needs read access to the prefix.
+- `x-inject-as: {kind: oauth-refresh, tokenUrl, clientId, tokenField?}` - the stored secret is an OAuth refresh token; SEAM exchanges it at `tokenUrl` (host must be in the upstream allowlist), caches the result until shortly before expiry, and injects it as `Authorization: Bearer`. `tokenField` defaults to `access_token`. The secret may use any of the field names SEAM already accepts (`value`, `token`, `secret`, `api_key`, `api-key`, `key`).
 - `--max-replayable-request-bytes` (default: `1048576`) - Maximum request body size buffered for replay, in bytes
 - `--max-buffered-response-bytes` (default: `1048576`) - Maximum decoded response body size held for whole-response scrubbing, in bytes (see the note below)
 

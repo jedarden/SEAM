@@ -24,6 +24,7 @@ type RouteTable struct {
 	routes []RouteEntry
 
 	secretMu     sync.Mutex
+	oauthTokens  *oauthTokenCache
 	secretClient *vault.Client
 }
 
@@ -672,13 +673,16 @@ func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v
 		return nil, nil
 	}
 	var value struct {
-		Kind InjectionKind `yaml:"kind" json:"kind"`
-		Name string        `yaml:"name" json:"name"`
+		Kind       InjectionKind `yaml:"kind" json:"kind"`
+		Name       string        `yaml:"name" json:"name"`
+		TokenURL   string        `yaml:"tokenUrl" json:"tokenUrl"`
+		ClientID   string        `yaml:"clientId" json:"clientId"`
+		TokenField string        `yaml:"tokenField" json:"tokenField"`
 	}
 	if err := node.Decode(&value); err != nil {
 		return nil, fmt.Errorf("x-inject-as must be an object: %w", err)
 	}
-	injectAs := &InjectAs{Kind: value.Kind, Name: value.Name}
+	injectAs := &InjectAs{Kind: value.Kind, Name: value.Name, TokenURL: value.TokenURL, ClientID: value.ClientID, TokenField: value.TokenField}
 	if err := injectAs.validate(); err != nil {
 		return nil, err
 	}
@@ -1329,7 +1333,7 @@ func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 		switch injectAs.Kind {
 		case InjectionHeader:
 			result[strings.ToLower(injectAs.Name)] = struct{}{}
-		case InjectionBearer:
+		case InjectionBearer, InjectionOAuthRefresh:
 			result["authorization"] = struct{}{}
 		}
 	}
@@ -1406,7 +1410,22 @@ func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([
 	if err != nil {
 		return nil, err
 	}
-	return credentialValue(secret)
+	stored, err := credentialValue(secret)
+	if err != nil || route.InjectAs == nil || route.InjectAs.Kind != InjectionOAuthRefresh {
+		return stored, err
+	}
+
+	t.secretMu.Lock()
+	if t.oauthTokens == nil {
+		t.oauthTokens = newOAuthTokenCache()
+	}
+	cache := t.oauthTokens
+	t.secretMu.Unlock()
+	bearer, err := cache.bearer(ctx, route.InjectAs, string(stored), credentialRetryFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(bearer), nil
 }
 
 func credentialValue(secret vault.Secret) ([]byte, error) {

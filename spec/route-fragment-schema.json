@@ -132,16 +132,20 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["header", "bearer", "query"] },
-        "name": { "type": "string", "minLength": 1 }
+        "kind": { "enum": ["header", "bearer", "query", "oauth-refresh"] },
+        "name": { "type": "string", "minLength": 1 },
+        "tokenUrl": { "type": "string", "pattern": "^https://", "$comment": "oauth-refresh only: the token endpoint the stored refresh token is exchanged at. Host must be in the operator upstream allowlist." },
+        "clientId": { "type": "string", "minLength": 1, "$comment": "oauth-refresh only: public OAuth client_id sent with the refresh_token grant." },
+        "tokenField": { "type": "string", "minLength": 1, "$comment": "oauth-refresh only: JSON field of the token response carrying the bearer value. Defaults to access_token." }
       },
       "additionalProperties": false,
       "allOf": [
+        { "if": { "properties": { "kind": { "const": "oauth-refresh" } } }, "then": { "required": ["tokenUrl", "clientId"], "not": { "required": ["name"] } }, "else": { "not": { "anyOf": [{ "required": ["tokenUrl"] }, { "required": ["clientId"] }, { "required": ["tokenField"] }] } } },
         { "if": { "properties": { "kind": { "const": "header" } } }, "then": { "required": ["name"] } },
         { "if": { "properties": { "kind": { "const": "query" } } }, "then": { "required": ["name"] } },
         { "if": { "properties": { "kind": { "const": "bearer" } } }, "then": { "not": { "required": ["name"] } } }
       ],
-      "$comment": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>)."
+      "$comment": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>); kind:oauth-refresh -> tokenUrl+clientId required, name rejected: the stored secret is a refresh token exchanged for a short-lived bearer."
     },
     "upstreamTls": {
       "type": "object",

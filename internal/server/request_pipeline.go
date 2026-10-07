@@ -15,6 +15,9 @@ const (
 	InjectionHeader InjectionKind = "header"
 	InjectionBearer InjectionKind = "bearer"
 	InjectionQuery  InjectionKind = "query"
+	// InjectionOAuthRefresh stores a refresh token in the secret store and
+	// injects the short-lived bearer obtained by exchanging it at TokenURL.
+	InjectionOAuthRefresh InjectionKind = "oauth-refresh"
 )
 
 // InjectAs describes how a fetched credential is presented upstream. Bearer
@@ -22,6 +25,10 @@ const (
 type InjectAs struct {
 	Kind InjectionKind
 	Name string
+	// oauth-refresh only.
+	TokenURL   string
+	ClientID   string
+	TokenField string
 }
 
 func (i *InjectAs) validate() error {
@@ -36,6 +43,16 @@ func (i *InjectAs) validate() error {
 	case InjectionBearer:
 		if i.Name != "" {
 			return fmt.Errorf("x-inject-as bearer injection must not have name")
+		}
+	case InjectionOAuthRefresh:
+		if i.Name != "" {
+			return fmt.Errorf("x-inject-as oauth-refresh injection must not have name")
+		}
+		if u, err := url.Parse(i.TokenURL); err != nil || u.Scheme != "https" || u.Host == "" {
+			return fmt.Errorf("x-inject-as oauth-refresh requires an https tokenUrl")
+		}
+		if i.ClientID == "" {
+			return fmt.Errorf("x-inject-as oauth-refresh requires clientId")
 		}
 	default:
 		return fmt.Errorf("unsupported x-inject-as kind %q", i.Kind)
@@ -65,7 +82,7 @@ func InjectSecret(req *http.Request, injectAs *InjectAs, secret []byte) error {
 	case InjectionHeader:
 		deleteHeaderFold(req.Header, injectAs.Name)
 		req.Header.Set(injectAs.Name, value)
-	case InjectionBearer:
+	case InjectionBearer, InjectionOAuthRefresh:
 		deleteHeaderFold(req.Header, "Authorization")
 		req.Header.Set("Authorization", "Bearer "+value)
 	case InjectionQuery:

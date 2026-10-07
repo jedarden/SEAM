@@ -13,6 +13,7 @@ import (
 // AllowlistEnforcer enforces dual allowlists for vault-path co-ownership and upstream-host validation
 type AllowlistEnforcer struct {
 	vaultBaseDir      string             // Base directory for vault paths, e.g. rs-manager/rs-manager/seam/routes/
+	extraBaseDirs     []string           // Additional operator-approved base dirs (VaultExtraBaseDirsEnvVar)
 	upstreamAllowlist *UpstreamAllowlist // Upstream host allowlist
 	allowlistSource   string             // Source identifier: "dev-file", "mounted-file", "none"
 }
@@ -49,6 +50,31 @@ const DefaultVaultBaseDir = "rs-manager/rs-manager/seam/routes"
 // DefaultVaultBaseDir. It is read by ResolveVaultBaseDir rather than by this
 // package's constructors, which take the resolved value as an argument.
 const VaultBaseDirEnvVar = "SEAM_VAULT_BASE_DIR"
+
+// VaultExtraBaseDirsEnvVar names a comma-separated list of additional vault base
+// directories a fragment's x-vault-path may nest <owner>/<name> under, besides
+// the primary base. It exists for credentials that already live elsewhere in
+// the estate (e.g. rs-manager/rs-manager/rackspace-spot). It is operator
+// configuration like SEAM_VAULT_BASE_DIR; the owner-segment rule is unchanged.
+const VaultExtraBaseDirsEnvVar = "SEAM_VAULT_EXTRA_BASE_DIRS"
+
+// ParseExtraVaultBaseDirs splits a comma-separated list, trimming blanks and
+// trailing slashes. Empty input yields nil.
+func ParseExtraVaultBaseDirs(raw string) []string {
+	var dirs []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.Trim(strings.TrimSpace(part), "/")
+		if part != "" {
+			dirs = append(dirs, part)
+		}
+	}
+	return dirs
+}
+
+// SetExtraVaultBaseDirs replaces the additional approved base directories.
+func (ae *AllowlistEnforcer) SetExtraVaultBaseDirs(dirs []string) {
+	ae.extraBaseDirs = dirs
+}
 
 // ResolveVaultBaseDir returns the base dir in force for a configured value:
 // VaultBaseDirEnvVar wins when it is non-blank, otherwise the configured value,
@@ -225,28 +251,20 @@ func (ae *AllowlistEnforcer) ValidateVaultPath(vaultPath string, owner string) e
 		return fmt.Errorf("vault_path_contains_templates: x-vault-path cannot contain templated segments: %s", vaultPath)
 	}
 
-	// Construct the expected base path for this owner
-	expectedBase := filepath.Join(ae.vaultBaseDir, owner)
-
-	// Clean both paths for comparison
+	// The vault path must sit strictly inside <base>/<owner>/ for the primary
+	// base or one of the operator-approved extra bases. The trailing separator
+	// is part of the match: without it owner "apexalgo" would also claim
+	// "apexalgo-agent/...", letting one owner read another's secret.
 	cleanVaultPath := filepath.Clean(vaultPath)
-	cleanExpectedBase := filepath.Clean(expectedBase)
-
-	// Ensure vault path is inside the owner's directory
-	// The vault path should be: seam/routes/<owner>/<something>
-	// NOT: seam/routes/<other-owner>/...
-	// NOT: seam/routes (direct access to parent)
-
-	// Check if the vault path starts with the expected base
-	if !strings.HasPrefix(cleanVaultPath, cleanExpectedBase) {
-		return fmt.Errorf("vault_path_outside_owner_directory: x-vault-path %s is not inside owner directory %s", vaultPath, expectedBase)
+	bases := append([]string{ae.vaultBaseDir}, ae.extraBaseDirs...)
+	for _, base := range bases {
+		ownerDir := filepath.Clean(filepath.Join(base, owner))
+		if strings.HasPrefix(cleanVaultPath, ownerDir+"/") {
+			log.Printf("[Allowlist] Vault path validated successfully: %s", vaultPath)
+			return nil
+		}
 	}
-
-	// Verify co-ownership: the vault path's parent directory must be owned by the same service
-	// This is enforced by the path structure itself - we've already verified it's inside the owner's directory
-
-	log.Printf("[Allowlist] Vault path validated successfully: %s", vaultPath)
-	return nil
+	return fmt.Errorf("vault_path_outside_owner_directory: x-vault-path %s is not inside owner directory %s", vaultPath, filepath.Join(ae.vaultBaseDir, owner))
 }
 
 // ValidateUpstreamHost validates that the upstream host matches the allowlist
