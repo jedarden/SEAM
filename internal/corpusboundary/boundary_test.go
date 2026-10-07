@@ -173,7 +173,10 @@ func TestRuntimeCorpusStaysOutOfGit(t *testing.T) {
 	if code, out := gitRun(t, root, "ls-files", "--", "corpus"); code != 0 || strings.TrimSpace(out) != "" {
 		t.Errorf("git ls-files corpus = %q (exit %d); runtime captures must never be tracked — promote a capture by moving it to tools/diffharness/testdata instead", strings.TrimSpace(out), code)
 	}
-	if code, _ := gitRun(t, root, "check-ignore", "-q", "--", "corpus"); code != 0 {
+	// The trailing slash matters: the rule is the directory-only /corpus/, which
+	// git applies to a bare "corpus" only when the directory exists on disk. A
+	// fresh clone has none (the directory is ignored, so never committed).
+	if code, _ := gitRun(t, root, "check-ignore", "-q", "--", "corpus/"); code != 0 {
 		t.Errorf("git check-ignore corpus exit = %d; the repository-root corpus/ directory must stay ignored", code)
 	}
 	if code, _ := gitRun(t, root, "check-ignore", "-q", "--", "corpus/probe.json"); code != 0 {
