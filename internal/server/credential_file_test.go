@@ -152,6 +152,30 @@ func TestFileCredentialRefreshableReopensAfterRotation(t *testing.T) {
 	}
 }
 
+func TestFileCredentialSourceFailsClosedDuringEmptyPartialWrite(t *testing.T) {
+	const name = "SEAM_CRED_TEST_OWNER_API_KEY"
+	root := t.TempDir()
+	path := filepath.Join(root, name)
+	source := newFileCredentialSource(root)
+	route := RouteEntry{CredentialSource: credentialSourceFile, CredentialFile: name}
+
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatalf("write partial empty credential: %v", err)
+	}
+	if value, err := source.Resolve(context.Background(), route); err == nil {
+		t.Fatalf("Resolve() during empty partial write returned %q, want an error", value)
+	}
+
+	const complete = "complete-after-partial-write-fixture"
+	if err := os.WriteFile(path, []byte(complete+"\n"), 0o600); err != nil {
+		t.Fatalf("write completed credential: %v", err)
+	}
+	value, err := source.Resolve(context.Background(), route)
+	if err != nil || string(value) != complete {
+		t.Fatalf("Resolve() after completed write = %q, %v; want the complete value", value, err)
+	}
+}
+
 func buildFileCredentialRouteTable(t *testing.T, upstream, name string) *RouteTable {
 	t.Helper()
 	document, err := libopenapi.NewDocument([]byte(fmt.Sprintf(`{
