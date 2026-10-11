@@ -178,6 +178,52 @@ func TestOpaqueUpstreamErrorStatusAndScrubbingArePreserved(t *testing.T) {
 	}
 }
 
+func TestOpaqueUpstreamRedirectIsForwardedWithoutFollowing(t *testing.T) {
+	targetCalls := 0
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		targetCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", target.URL+"/redirect-target")
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+		_, _ = io.WriteString(w, "provider redirect")
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("create reverse proxy: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/widgets", nil)
+	withRouteMatch(req, &RouteMatch{Route: RouteEntry{
+		PathTemplate: "/v1/widgets",
+		Method:       http.MethodGet,
+		BodyMode:     "opaque",
+	}}, nil)
+	res := httptest.NewRecorder()
+	proxy.ServeHTTP(res, req)
+
+	if res.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("opaque upstream redirect status = %d, want 307: %q", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-SEAM-Upstream-Status"); got != "307" {
+		t.Fatalf("X-SEAM-Upstream-Status = %q, want 307", got)
+	}
+	if got := res.Header().Get("Location"); got != target.URL+"/redirect-target" {
+		t.Fatalf("Location = %q, want upstream redirect target", got)
+	}
+	if res.Body.String() != "provider redirect" {
+		t.Fatalf("opaque upstream redirect body = %q, want provider body", res.Body.String())
+	}
+	if targetCalls != 0 {
+		t.Fatalf("followed upstream redirect %d times, want no follow", targetCalls)
+	}
+}
+
 func TestRequestValidationFixtureReturnsStructured400(t *testing.T) {
 	loader := newRequestValidationFixture(t)
 	malformed, err := os.ReadFile(filepath.Join("testdata", "request-validation", "malformed-request.json"))
