@@ -400,6 +400,35 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 				}
 			}
 		}
+		validateInjectionReferences := func(value any) error {
+			for _, injectAs := range injectionObjects(value) {
+				if vaultPath, ok := injectAs["vaultPath"].(string); ok && vaultPath != "" {
+					if err := fl.allowlistEnforcer.ValidateVaultPath(vaultPath, fragment.Owner); err != nil {
+						return fmt.Errorf("vault_path_validation_failed: %w", err)
+					}
+				}
+				if tokenURL, ok := injectAs["tokenUrl"].(string); ok && tokenURL != "" {
+					if err := fl.allowlistEnforcer.ValidateUpstreamHost(tokenURL); err != nil {
+						return fmt.Errorf("token_url_host_validation_failed: %w", err)
+					}
+				}
+			}
+			return nil
+		}
+		if err := validateInjectionReferences(fragment.ParsedFragment["x-inject-as"]); err != nil {
+			return err
+		}
+		if upstreamMap, ok := fragment.ParsedFragment["x-upstream-map"].(map[string]any); ok {
+			for instance, entryValue := range upstreamMap {
+				entry, _ := entryValue.(map[string]any)
+				if entry == nil {
+					continue
+				}
+				if err := validateInjectionReferences(entry["injectAs"]); err != nil {
+					return fmt.Errorf("x-upstream-map[%q]: %w", instance, err)
+				}
+			}
+		}
 
 		// Validate upstream hosts in each operation
 		for path, pathItem := range paths {

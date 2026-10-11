@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -123,7 +124,7 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 	var raw map[string]struct {
 		URL           string                 `yaml:"url" json:"url"`
 		VaultPath     string                 `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs      *InjectAs              `yaml:"injectAs" json:"injectAs"`
+		InjectAs      json.RawMessage        `yaml:"injectAs" json:"injectAs"`
 		Breaker       map[string]interface{} `yaml:"breaker" json:"breaker"`
 		RequiredScope []string               `yaml:"requiredScope" json:"requiredScope"`
 		ProbeInterval string                 `yaml:"probeInterval" json:"probeInterval"` // Phase 12
@@ -138,10 +139,9 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 		if strings.TrimSpace(value.URL) == "" {
 			return nil, fmt.Errorf("x-upstream-map entry %q is missing url", key)
 		}
-		if value.InjectAs != nil {
-			if err := value.InjectAs.validate(); err != nil {
-				return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
-			}
+		injectAs, injectAsList, err := decodeInjectAsRaw(value.InjectAs)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
 		}
 
 		// Extract per-instance breaker config if present
@@ -167,7 +167,8 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 		result[key] = RouteTarget{
 			URL:            strings.TrimSpace(value.URL),
 			VaultPath:      value.VaultPath,
-			InjectAs:       value.InjectAs,
+			InjectAs:       injectAs,
+			InjectAsList:   injectAsList,
 			BreakerConfig:  breakerConfig,
 			RequiredScopes: value.RequiredScope,
 			ProbeInterval:  probeInterval,
@@ -206,7 +207,8 @@ type CredentialProbeTarget struct {
 	Interval time.Duration
 
 	// InjectAs describes how to inject the credential into the probe request
-	InjectAs *InjectAs
+	InjectAs     *InjectAs
+	InjectAsList []*InjectAs
 }
 
 // CredentialProbeResult is the result of a credential probe.

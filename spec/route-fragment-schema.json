@@ -42,7 +42,8 @@
     "x-credential-source": { "type": "string", "enum": ["vault", "env", "file"], "$comment": "Fragment-root credential source. Omission preserves the legacy vault source; env is read once at process startup; file reopens a Secret-volume key on every request or probe." },
     "x-credential-env": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Required only for x-credential-source: env. The variable must belong to the x-seam-owner namespace; checked by seam lint and runtime quarantine." },
     "x-credential-file": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Required only for x-credential-source: file. This is a filename under the operator-mounted /var/run/seam/credentials directory, never a path; it must belong to the x-seam-owner namespace and is checked by seam lint and runtime quarantine." },
-    "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the selected credential source. Present exactly when one source is declared." },
+    "x-inject-as": { "$ref": "#/$defs/injectAsListOrObject", "$comment": "Fragment-root. How to inject one or more credential sources. The legacy object form remains valid; a list is used for composite credentials." },
+    "x-inject-static": { "$ref": "#/$defs/staticInjectionListOrObject", "$comment": "Fragment-root. Non-secret constant headers or query parameters written after ingress stripping." },
     "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment with no credential source." },
     "x-breaker": { "$ref": "#/$defs/breaker", "$comment": "Fragment-root tuning of the per-upstream circuit breaker. On by default (infrastructure guard); enabled:false is the opt-out. Upstream-facing: forbidden on an x-adapter fragment." },
 
@@ -135,8 +136,13 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["header", "bearer", "query", "oauth-refresh"] },
+        "kind": { "enum": ["header", "bearer", "query", "oauth-refresh", "template"] },
         "name": { "type": "string", "minLength": 1 },
+        "prefix": { "type": "string", "minLength": 1, "$comment": "template only; remains outside the stored credential value." },
+        "source": { "enum": ["vault", "env", "file"], "$comment": "Optional per-entry credential source; absent inherits the route source." },
+        "vaultPath": { "$ref": "#/$defs/vaultPath", "$comment": "Optional per-entry OpenBao source reference." },
+        "credentialEnv": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Optional per-entry env source reference." },
+        "credentialFile": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Optional per-entry file source reference." },
         "tokenUrl": { "type": "string", "pattern": "^https://", "$comment": "oauth-refresh only: the token endpoint the stored refresh token is exchanged at. Host must be in the operator upstream allowlist." },
         "clientId": { "type": "string", "minLength": 1, "$comment": "oauth-refresh only: public OAuth client_id sent with the refresh_token grant." },
         "tokenField": { "type": "string", "minLength": 1, "$comment": "oauth-refresh only: JSON field of the token response carrying the bearer value. Defaults to access_token." }
@@ -146,9 +152,33 @@
         { "if": { "properties": { "kind": { "const": "oauth-refresh" } } }, "then": { "required": ["tokenUrl", "clientId"], "not": { "required": ["name"] } }, "else": { "not": { "anyOf": [{ "required": ["tokenUrl"] }, { "required": ["clientId"] }, { "required": ["tokenField"] }] } } },
         { "if": { "properties": { "kind": { "const": "header" } } }, "then": { "required": ["name"] } },
         { "if": { "properties": { "kind": { "const": "query" } } }, "then": { "required": ["name"] } },
-        { "if": { "properties": { "kind": { "const": "bearer" } } }, "then": { "not": { "required": ["name"] } } }
+        { "if": { "properties": { "kind": { "const": "bearer" } } }, "then": { "not": { "required": ["name"] } } },
+        { "if": { "properties": { "kind": { "const": "template" } } }, "then": { "required": ["name", "prefix"] } },
+        { "if": { "required": ["source"] }, "then": {}, "else": {} }
       ],
-      "$comment": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>); kind:oauth-refresh -> tokenUrl+clientId required, name rejected: the stored secret is a refresh token exchanged for a short-lived bearer."
+      "$comment": "kind:header|query -> name required; kind:bearer -> name omitted/rejected (implies Authorization: Bearer <secret>); kind:oauth-refresh -> tokenUrl+clientId required, name rejected; kind:template -> name+prefix required and emits prefix+secret."
+    },
+    "injectAsListOrObject": {
+      "oneOf": [
+        { "$ref": "#/$defs/injectAs" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/injectAs" } }
+      ]
+    },
+    "staticInjection": {
+      "type": "object",
+      "required": ["kind", "name", "value"],
+      "properties": {
+        "kind": { "enum": ["header", "query"] },
+        "name": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "staticInjectionListOrObject": {
+      "oneOf": [
+        { "$ref": "#/$defs/staticInjection" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/staticInjection" } }
+      ]
     },
     "upstreamTls": {
       "type": "object",
@@ -239,7 +269,7 @@
         "target_host": { "type": "string", "minLength": 1, "$comment": "Optional override for the target host header sent to the upstream." },
         "rewrite_path": { "type": "string", "minLength": 1, "$comment": "Optional path rewrite applied before forwarding to the upstream." },
         "vaultPath": { "$ref": "#/$defs/vaultPath" },
-        "injectAs": { "$ref": "#/$defs/injectAs" },
+        "injectAs": { "$ref": "#/$defs/injectAsListOrObject" },
         "tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Per-instance override of x-upstream-tls." },
         "plaintext": { "$ref": "#/$defs/acknowledged", "$comment": "Required when this entry's url is http:// (plaintext is per-entry, never inherited). Mutually exclusive with inheriting a fragment-level marker — there is none on a map fragment." },
         "probeInterval": { "$ref": "#/$defs/duration", "$comment": "Per-instance override of x-credential-probe.interval." },
@@ -441,6 +471,8 @@
         "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
+        "x-inject-as": { "$ref": "#/$defs/injectAsListOrObject" },
+        "x-inject-static": { "$ref": "#/$defs/staticInjectionListOrObject" },
         "x-requires-approval": { "type": "boolean" }
       },
       "additionalProperties": true,
@@ -533,6 +565,17 @@
           "required": ["x-credential-source", "x-vault-path", "x-inject-as"],
           "properties": { "x-credential-source": { "const": "vault" } },
           "not": { "anyOf": [{ "required": ["x-credential-env"] }, { "required": ["x-credential-file"] }] }
+        },
+        {
+          "required": ["x-inject-as"],
+          "properties": { "x-inject-as": { "type": "array", "minItems": 1 } },
+          "not": { "anyOf": [
+            { "required": ["x-vault-path"] },
+            { "required": ["x-credential-source"] },
+            { "required": ["x-credential-env"] },
+            { "required": ["x-credential-file"] }
+          ] },
+          "$comment": "Composite injection lists may carry source, vaultPath, credentialEnv, or credentialFile on each entry instead of using one fragment-level source. Runtime and seam lint enforce each entry's source pairing."
         },
         {
           "not": { "anyOf": [

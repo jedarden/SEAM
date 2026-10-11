@@ -377,26 +377,34 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trackedWriter := &responseWriterTracker{ResponseWriter: w}
 	ctx := r.Context()
 	match := routeMatchFromRequest(r)
-	if match != nil && match.Route.InjectAs != nil {
-		if isProtocolUpgrade(r) && !match.Route.Unscrubbable {
+	if match != nil && (len(match.Route.injections()) > 0 || len(match.Route.StaticInjections) > 0) {
+		if len(match.Route.injections()) > 0 && isProtocolUpgrade(r) && !match.Route.Unscrubbable {
 			p.handleError(trackedWriter, r, errUnscannableResponse, "refusing credential injection into protocol upgrade")
 			return
 		}
-		resolver := routeSecretResolverFromRequest(r)
-		if resolver == nil {
-			p.handleError(trackedWriter, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
+		var secrets [][]byte
+		if len(match.Route.injections()) > 0 {
+			resolver := routeSecretResolverFromRequest(r)
+			if resolver == nil {
+				p.handleError(trackedWriter, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
+				return
+			}
+			var err error
+			secrets, err = resolveRouteCredentials(ctx, resolver, match.Route)
+			if err != nil {
+				p.handleError(trackedWriter, r, err, "resolving upstream credential")
+				return
+			}
+			if err := InjectSecrets(r, match.Route.injections(), secrets); err != nil {
+				p.handleError(trackedWriter, r, err, "injecting upstream credential")
+				return
+			}
+		}
+		if err := InjectStatic(r, match.Route.StaticInjections); err != nil {
+			p.handleError(trackedWriter, r, err, "injecting static upstream metadata")
 			return
 		}
-		secret, err := resolver.Resolve(ctx, match.Route)
-		if err != nil {
-			p.handleError(trackedWriter, r, err, "resolving upstream credential")
-			return
-		}
-		if err := InjectSecret(r, match.Route.InjectAs, secret); err != nil {
-			p.handleError(trackedWriter, r, err, "injecting upstream credential")
-			return
-		}
-		ctx = withResponseScrub(ctx, secret, match.Route.Unscrubbable)
+		ctx = withResponseScrubSecrets(ctx, secrets, match.Route.Unscrubbable)
 	}
 
 	outgoingURL, err := p.buildUpstreamURLForMatch(r, match)
@@ -547,7 +555,7 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
 		match := routeMatchFromRequest(r)
-		if match != nil && match.Route.InjectAs != nil && (match.Route.CredentialSource == credentialSourceFile || (match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv)) {
+		if match != nil && len(match.Route.injections()) > 0 && (match.Route.CredentialSource == credentialSourceFile || (match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv)) {
 			// We have credential injection - attempt refresh and retry
 			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
 				// Either successful retry (returned nil) or fatal error
@@ -631,7 +639,7 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 
 	// Invalidate and refetch the secret
 	log.Printf("[proxy] 401 detected on route %s - refreshing credential from configured source", route)
-	freshSecret, refreshErr := resolver.Refreshable(ctx, match.Route)
+	freshSecrets, refreshErr := refreshRouteCredentials(ctx, resolver, match.Route)
 	if refreshErr != nil {
 		// Refetch failed - degrade to secret-store-unavailable 503
 		log.Printf("[proxy] 401 credential refresh failed for route %s: %v", route, refreshErr)
@@ -678,13 +686,17 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 	copyRequestMetadata(r, retryReq)
 
 	// Re-inject the fresh credential
-	if err := InjectSecret(retryReq, match.Route.InjectAs, freshSecret); err != nil {
+	if err := InjectSecrets(retryReq, match.Route.injections(), freshSecrets); err != nil {
 		log.Printf("[proxy] 401 retry failed injecting credential for route %s: %v", route, err)
 		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Failed to inject fresh credential")
 	}
+	if err := InjectStatic(retryReq, match.Route.StaticInjections); err != nil {
+		log.Printf("[proxy] 401 retry failed injecting static metadata for route %s: %v", route, err)
+		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Failed to inject fresh static metadata")
+	}
 
 	// Re-attach response scrubber context
-	ctx = withResponseScrub(ctx, freshSecret, match.Route.Unscrubbable)
+	ctx = withResponseScrubSecrets(ctx, freshSecrets, match.Route.Unscrubbable)
 
 	// Discard the replayable body buffer after successful retry
 	defer replayable.Discard()

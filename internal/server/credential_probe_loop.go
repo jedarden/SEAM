@@ -231,6 +231,7 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 			ProbeMethod:      probeConfig.Method,
 			Interval:         defaultInterval,
 			InjectAs:         route.InjectAs,
+			InjectAsList:     route.InjectAsList,
 		}
 		targets = append(targets, target)
 		return targets
@@ -256,6 +257,7 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 			ProbeMethod:      probeConfig.Method,
 			Interval:         interval,
 			InjectAs:         instance.InjectAs,
+			InjectAsList:     instance.InjectAsList,
 		}
 		targets = append(targets, target)
 	}
@@ -309,12 +311,21 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		CredentialEnv:    target.CredentialEnv,
 		CredentialFile:   target.CredentialFile,
 		InjectAs:         target.InjectAs,
+		InjectAsList:     target.InjectAsList,
 	}
 	credentialSource := l.credentialSource
 	if target.CredentialSource == credentialSourceEnv || target.CredentialSource == credentialSourceFile {
 		credentialSource = routeTableCredentialResolver{table: l.routeTableHolder.currentTable()}
 	}
-	credValue, err := credentialSource.Resolve(ctx, route)
+	var credValues [][]byte
+	var err error
+	if len(route.injections()) > 0 {
+		credValues, err = resolveRouteCredentials(ctx, credentialSource, route)
+	} else {
+		var credValue []byte
+		credValue, err = credentialSource.Resolve(ctx, route)
+		credValues = [][]byte{credValue}
+	}
 	if err != nil {
 		result.Status = CredentialUnhealthy
 		result.LastError = fmt.Sprintf("failed to fetch credential: %v", err)
@@ -338,7 +349,7 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 	}
 
 	// Inject credential based on InjectAs configuration
-	if err := InjectSecret(req, target.InjectAs, credValue); err != nil {
+	if err := InjectSecrets(req, route.injections(), credValues); err != nil {
 		result.Status = CredentialUnhealthy
 		result.LastError = fmt.Sprintf("failed to inject credential: %v", err)
 		result.ConsecutiveFailures++

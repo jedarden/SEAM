@@ -81,6 +81,42 @@ func TestLintDirectory9aHardErrorsAndFlags(t *testing.T) {
 	}
 }
 
+func TestLintRejectsDuplicateCredentialAndStaticNames(t *testing.T) {
+	root := t.TempDir()
+	fragment := validLintFragment("owner", "v1", "https://api.example.com")
+	fragment = strings.Replace(fragment, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+
+		"x-vault-path: seam/routes/owner/token\n"+
+		"x-inject-as:\n"+
+		"  - kind: header\n    name: X-Provider-Key\n"+
+		"  - kind: template\n    name: x-provider-key\n    prefix: 'Token '\n"+
+		"x-inject-static:\n"+
+		"  - kind: query\n    name: api-version\n    value: '2025-01'\n"+
+		"  - kind: query\n    name: api-version\n    value: '2025-02'\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	assertFindingCodes(t, report.Errors, []string{"injection.duplicate-name"})
+}
+
+func TestLintAcceptsCompositeInjectionEntriesWithOwnSources(t *testing.T) {
+	root := t.TempDir()
+	fragment := validLintFragment("owner", "v1", "https://api.example.com")
+	fragment = strings.Replace(fragment, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+
+		"x-inject-as:\n"+
+		"  - kind: header\n    name: X-Provider-Key\n    source: env\n    credentialEnv: SEAM_CRED_OWNER_KEY\n"+
+		"  - kind: header\n    name: X-Provider-Org\n    source: file\n    credentialFile: SEAM_CRED_OWNER_ORG\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	if report.HasErrors() {
+		t.Fatalf("composite entries were rejected: %+v", report.Errors)
+	}
+}
+
 // TestLintDirectoryUnscrubbableAcknowledgementContract pins the lint half of
 // the x-unscrubbable contract: every acknowledgement draws the human-review
 // warning at whichever level declares it, and an acknowledgement on a fragment

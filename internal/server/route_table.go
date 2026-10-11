@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -81,6 +82,11 @@ type RouteEntry struct {
 	// the route table.
 	VaultPath string
 	InjectAs  *InjectAs
+	// InjectAsList is the normalized multi-credential form. The legacy
+	// InjectAs field remains populated for the object form so existing callers
+	// and corpus fixtures retain their behavior.
+	InjectAsList     []*InjectAs
+	StaticInjections []*StaticInjection
 
 	// CredentialSource, CredentialEnv, and CredentialFile identify alternate
 	// process or mounted-file credentials. An empty source preserves the legacy
@@ -152,9 +158,11 @@ type RouteEntry struct {
 // RouteTarget is the resolved forwarding and injection metadata for one
 // upstream-map entry.
 type RouteTarget struct {
-	URL       string
-	VaultPath string
-	InjectAs  *InjectAs
+	URL              string
+	VaultPath        string
+	InjectAs         *InjectAs
+	InjectAsList     []*InjectAs
+	StaticInjections []*StaticInjection
 
 	// BreakerConfig is the per-instance override for circuit breaker configuration.
 	// If nil, the fragment-root BreakerConfig is used.
@@ -536,7 +544,11 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if credentialSource == credentialSourceFile && !credentialFileNamePattern.MatchString(credentialFile) {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-file must be a SEAM_CRED_<OWNER>_<NAME> filename", methodOp.method, path)
 			}
-			injectAs, err := extractInjectAs(methodOp.operation, pathItem, spec)
+			injectAs, injectAsList, err := extractInjectAs(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			staticInjections, err := extractStaticInjections(methodOp.operation, pathItem, spec)
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
@@ -611,6 +623,8 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				TLSConfig:             tlsConfig,
 				VaultPath:             vaultPath,
 				InjectAs:              injectAs,
+				InjectAsList:          injectAsList,
+				StaticInjections:      staticInjections,
 				CredentialSource:      credentialSource,
 				CredentialEnv:         credentialEnv,
 				CredentialFile:        credentialFile,
@@ -638,6 +652,18 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 	for _, route := range table.routes {
 		if route.CredentialSource == credentialSourceEnv {
 			envNames = append(envNames, route.CredentialEnv)
+		}
+		for _, injection := range route.injections() {
+			if injection == nil {
+				continue
+			}
+			source := injection.CredentialSource
+			if source == "" && injection.CredentialEnv != "" {
+				source = credentialSourceEnv
+			}
+			if source == credentialSourceEnv {
+				envNames = append(envNames, injection.CredentialEnv)
+			}
 		}
 	}
 	if envSnapshot == nil {
@@ -748,26 +774,133 @@ func extractStringExtension(operation *v3.Operation, pathItem *v3.PathItem, docu
 	return strings.TrimSpace(stringValue), nil
 }
 
-func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*InjectAs, error) {
+func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*InjectAs, []*InjectAs, error) {
 	node, ok := firstExtension(operation, pathItem, document, "x-inject-as")
+	if !ok || node == nil {
+		return nil, nil, nil
+	}
+	var raw any
+	if err := node.Decode(&raw); err != nil {
+		return nil, nil, fmt.Errorf("x-inject-as must be an object or list: %w", err)
+	}
+	values, isList := raw.([]any)
+	if !isList {
+		values = []any{raw}
+	}
+	parsed := make([]*InjectAs, 0, len(values))
+	for index, item := range values {
+		encoded, err := json.Marshal(item)
+		if err != nil {
+			return nil, nil, fmt.Errorf("x-inject-as entry %d is invalid: %w", index, err)
+		}
+		var value struct {
+			Kind             InjectionKind `yaml:"kind" json:"kind"`
+			Name             string        `yaml:"name" json:"name"`
+			Prefix           string        `yaml:"prefix" json:"prefix"`
+			TokenURL         string        `yaml:"tokenUrl" json:"tokenUrl"`
+			ClientID         string        `yaml:"clientId" json:"clientId"`
+			TokenField       string        `yaml:"tokenField" json:"tokenField"`
+			CredentialSource string        `yaml:"source" json:"source"`
+			VaultPath        string        `yaml:"vaultPath" json:"vaultPath"`
+			CredentialEnv    string        `yaml:"credentialEnv" json:"credentialEnv"`
+			CredentialFile   string        `yaml:"credentialFile" json:"credentialFile"`
+		}
+		if err := json.Unmarshal(encoded, &value); err != nil {
+			return nil, nil, fmt.Errorf("x-inject-as entry %d must be an object: %w", index, err)
+		}
+		injectAs := &InjectAs{Kind: value.Kind, Name: value.Name, Prefix: value.Prefix,
+			TokenURL: value.TokenURL, ClientID: value.ClientID, TokenField: value.TokenField,
+			CredentialSource: value.CredentialSource, VaultPath: value.VaultPath,
+			CredentialEnv: value.CredentialEnv, CredentialFile: value.CredentialFile}
+		if err := injectAs.validate(); err != nil {
+			return nil, nil, fmt.Errorf("x-inject-as entry %d: %w", index, err)
+		}
+		parsed = append(parsed, injectAs)
+	}
+	if isList {
+		return nil, parsed, nil
+	}
+	return parsed[0], nil, nil
+}
+
+func decodeInjectAsRaw(raw json.RawMessage) (*InjectAs, []*InjectAs, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil, nil
+	}
+	var values []json.RawMessage
+	if len(raw) > 0 && raw[0] == '[' {
+		if err := json.Unmarshal(raw, &values); err != nil {
+			return nil, nil, fmt.Errorf("injectAs must be an object or list: %w", err)
+		}
+	} else {
+		values = []json.RawMessage{raw}
+	}
+	parsed := make([]*InjectAs, 0, len(values))
+	for index, encoded := range values {
+		var value struct {
+			Kind             InjectionKind `json:"kind"`
+			Name             string        `json:"name"`
+			Prefix           string        `json:"prefix"`
+			TokenURL         string        `json:"tokenUrl"`
+			ClientID         string        `json:"clientId"`
+			TokenField       string        `json:"tokenField"`
+			CredentialSource string        `json:"source"`
+			VaultPath        string        `json:"vaultPath"`
+			CredentialEnv    string        `json:"credentialEnv"`
+			CredentialFile   string        `json:"credentialFile"`
+		}
+		if err := json.Unmarshal(encoded, &value); err != nil {
+			return nil, nil, fmt.Errorf("injectAs entry %d must be an object: %w", index, err)
+		}
+		injection := &InjectAs{Kind: value.Kind, Name: value.Name, Prefix: value.Prefix,
+			TokenURL: value.TokenURL, ClientID: value.ClientID, TokenField: value.TokenField,
+			CredentialSource: value.CredentialSource, VaultPath: value.VaultPath,
+			CredentialEnv: value.CredentialEnv, CredentialFile: value.CredentialFile}
+		if err := injection.validate(); err != nil {
+			return nil, nil, fmt.Errorf("injectAs entry %d: %w", index, err)
+		}
+		parsed = append(parsed, injection)
+	}
+	if len(raw) > 0 && raw[0] == '[' {
+		return nil, parsed, nil
+	}
+	return parsed[0], nil, nil
+}
+
+func extractStaticInjections(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) ([]*StaticInjection, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-inject-static")
 	if !ok || node == nil {
 		return nil, nil
 	}
-	var value struct {
-		Kind       InjectionKind `yaml:"kind" json:"kind"`
-		Name       string        `yaml:"name" json:"name"`
-		TokenURL   string        `yaml:"tokenUrl" json:"tokenUrl"`
-		ClientID   string        `yaml:"clientId" json:"clientId"`
-		TokenField string        `yaml:"tokenField" json:"tokenField"`
+	var raw any
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-inject-static must be an object or list: %w", err)
 	}
-	if err := node.Decode(&value); err != nil {
-		return nil, fmt.Errorf("x-inject-as must be an object: %w", err)
+	values, isList := raw.([]any)
+	if !isList {
+		values = []any{raw}
 	}
-	injectAs := &InjectAs{Kind: value.Kind, Name: value.Name, TokenURL: value.TokenURL, ClientID: value.ClientID, TokenField: value.TokenField}
-	if err := injectAs.validate(); err != nil {
-		return nil, err
+	result := make([]*StaticInjection, 0, len(values))
+	for index, item := range values {
+		encoded, err := json.Marshal(item)
+		if err != nil {
+			return nil, fmt.Errorf("x-inject-static entry %d is invalid: %w", index, err)
+		}
+		var value struct {
+			Kind  InjectionKind `json:"kind"`
+			Name  string        `json:"name"`
+			Value string        `json:"value"`
+		}
+		if err := json.Unmarshal(encoded, &value); err != nil {
+			return nil, fmt.Errorf("x-inject-static entry %d must be an object: %w", index, err)
+		}
+		injection := &StaticInjection{Kind: value.Kind, Name: value.Name, Value: value.Value}
+		if err := injection.validate(); err != nil {
+			return nil, fmt.Errorf("x-inject-static entry %d: %w", index, err)
+		}
+		result = append(result, injection)
 	}
-	return injectAs, nil
+	return result, nil
 }
 
 func extractAcknowledgedExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, name string) (bool, error) {
@@ -794,7 +927,7 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 	var raw map[string]struct {
 		URL           string                 `yaml:"url" json:"url"`
 		VaultPath     string                 `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs      *InjectAs              `yaml:"injectAs" json:"injectAs"`
+		InjectAs      json.RawMessage        `yaml:"injectAs" json:"injectAs"`
 		Breaker       map[string]interface{} `yaml:"breaker" json:"breaker"`
 		RequiredScope []string               `yaml:"requiredScope" json:"requiredScope"`
 	}
@@ -806,10 +939,9 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		if strings.TrimSpace(value.URL) == "" {
 			return nil, fmt.Errorf("x-upstream-map entry %q is missing url", key)
 		}
-		if value.InjectAs != nil {
-			if err := value.InjectAs.validate(); err != nil {
-				return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
-			}
+		injectAs, injectAsList, err := decodeInjectAsRaw(value.InjectAs)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
 		}
 
 		// Extract per-instance breaker config if present
@@ -825,7 +957,8 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		result[key] = RouteTarget{
 			URL:            strings.TrimSpace(value.URL),
 			VaultPath:      value.VaultPath,
-			InjectAs:       value.InjectAs,
+			InjectAs:       injectAs,
+			InjectAsList:   injectAsList,
 			BreakerConfig:  breakerConfig,
 			RequiredScopes: value.RequiredScope,
 		}
@@ -1434,19 +1567,17 @@ func (t *RouteTable) InjectableNames(r *http.Request) (map[string]bool, map[stri
 func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 	result := make(map[string]struct{})
 	add := func(injectAs *InjectAs) {
-		if injectAs == nil {
-			return
-		}
-		switch injectAs.Kind {
-		case InjectionHeader:
-			result[strings.ToLower(injectAs.Name)] = struct{}{}
-		case InjectionBearer, InjectionOAuthRefresh:
-			result["authorization"] = struct{}{}
+		if name := injectAs.headerName(); name != "" {
+			result[strings.ToLower(name)] = struct{}{}
 		}
 	}
-	add(route.InjectAs)
+	for _, injectAs := range route.injections() {
+		add(injectAs)
+	}
 	for _, target := range route.UpstreamMap {
-		add(target.InjectAs)
+		for _, injectAs := range target.injections() {
+			add(injectAs)
+		}
 	}
 	return result
 }
@@ -1454,13 +1585,71 @@ func (route RouteEntry) injectableHeaderNames() map[string]struct{} {
 func (route RouteEntry) injectableQueryNames() map[string]struct{} {
 	result := make(map[string]struct{})
 	add := func(injectAs *InjectAs) {
-		if injectAs != nil && injectAs.Kind == InjectionQuery {
-			result[injectAs.Name] = struct{}{}
+		if name := injectAs.queryName(); name != "" {
+			result[name] = struct{}{}
 		}
 	}
-	add(route.InjectAs)
+	for _, injectAs := range route.injections() {
+		add(injectAs)
+	}
 	for _, target := range route.UpstreamMap {
-		add(target.InjectAs)
+		for _, injectAs := range target.injections() {
+			add(injectAs)
+		}
+	}
+	return result
+}
+
+func (route RouteEntry) injections() []*InjectAs {
+	if route.InjectAsList != nil {
+		return route.InjectAsList
+	}
+	if route.InjectAs == nil {
+		return nil
+	}
+	return []*InjectAs{route.InjectAs}
+}
+
+func (target RouteTarget) injections() []*InjectAs {
+	if target.InjectAsList != nil {
+		return target.InjectAsList
+	}
+	if target.InjectAs == nil {
+		return nil
+	}
+	return []*InjectAs{target.InjectAs}
+}
+
+func (route RouteEntry) staticHeaderNames() map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, injection := range route.StaticInjections {
+		if injection != nil && injection.Kind == InjectionHeader {
+			result[injection.Name] = struct{}{}
+		}
+	}
+	for _, target := range route.UpstreamMap {
+		for _, injection := range target.StaticInjections {
+			if injection != nil && injection.Kind == InjectionHeader {
+				result[injection.Name] = struct{}{}
+			}
+		}
+	}
+	return result
+}
+
+func (route RouteEntry) staticQueryNames() map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, injection := range route.StaticInjections {
+		if injection != nil && injection.Kind == InjectionQuery {
+			result[injection.Name] = struct{}{}
+		}
+	}
+	for _, target := range route.UpstreamMap {
+		for _, injection := range target.StaticInjections {
+			if injection != nil && injection.Kind == InjectionQuery {
+				result[injection.Name] = struct{}{}
+			}
+		}
 	}
 	return result
 }
@@ -1493,12 +1682,33 @@ func (route RouteEntry) effectiveTarget(pathParams map[string]string) RouteEntry
 	if target.InjectAs != nil {
 		route.InjectAs = target.InjectAs
 	}
+	if target.InjectAsList != nil {
+		route.InjectAs = nil
+		route.InjectAsList = target.InjectAsList
+	}
+	if target.StaticInjections != nil {
+		route.StaticInjections = target.StaticInjections
+	}
 	return route
 }
 
 type routeTableCredentialResolver struct{ table *RouteTable }
 
 type routeTableHolderCredentialResolver struct{ holder *ThreadSafeTableHolder }
+
+func (r routeTableHolderCredentialResolver) ResolveAll(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	if r.holder == nil {
+		return nil, fmt.Errorf("route table holder is not initialized")
+	}
+	return r.holder.currentTable().resolveCredentials(ctx, route)
+}
+
+func (r routeTableHolderCredentialResolver) RefreshableAll(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	if r.holder == nil {
+		return nil, fmt.Errorf("route table holder is not initialized")
+	}
+	return r.holder.currentTable().refreshCredentials(ctx, route)
+}
 
 func (r routeTableHolderCredentialResolver) Resolve(ctx context.Context, route RouteEntry) ([]byte, error) {
 	if r.holder == nil {
@@ -1521,11 +1731,25 @@ func (r routeTableCredentialResolver) Resolve(ctx context.Context, route RouteEn
 	return r.table.resolveCredential(ctx, route)
 }
 
+func (r routeTableCredentialResolver) ResolveAll(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	if r.table == nil {
+		return nil, fmt.Errorf("route table is not initialized")
+	}
+	return r.table.resolveCredentials(ctx, route)
+}
+
 func (r routeTableCredentialResolver) Refreshable(ctx context.Context, route RouteEntry) ([]byte, error) {
 	if r.table == nil {
 		return nil, fmt.Errorf("route table is not initialized")
 	}
 	return r.table.refreshCredential(ctx, route)
+}
+
+func (r routeTableCredentialResolver) RefreshableAll(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	if r.table == nil {
+		return nil, fmt.Errorf("route table is not initialized")
+	}
+	return r.table.refreshCredentials(ctx, route)
 }
 
 func (t *RouteTable) sourceForRoute(route RouteEntry) (CredentialSource, error) {
@@ -1587,12 +1811,72 @@ func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([
 	return source.Resolve(ctx, route)
 }
 
+func routeForInjection(route RouteEntry, injection *InjectAs) RouteEntry {
+	if injection == nil {
+		return route
+	}
+	resolved := route
+	resolved.InjectAs = injection
+	resolved.InjectAsList = nil
+	if injection.CredentialSource != "" {
+		resolved.CredentialSource = injection.CredentialSource
+	} else if injection.CredentialEnv != "" {
+		resolved.CredentialSource = credentialSourceEnv
+	} else if injection.CredentialFile != "" {
+		resolved.CredentialSource = credentialSourceFile
+	} else if injection.VaultPath != "" {
+		resolved.CredentialSource = credentialSourceVault
+	}
+	if injection.VaultPath != "" {
+		resolved.VaultPath = injection.VaultPath
+	}
+	if injection.CredentialEnv != "" {
+		resolved.CredentialEnv = injection.CredentialEnv
+	}
+	if injection.CredentialFile != "" {
+		resolved.CredentialFile = injection.CredentialFile
+	}
+	return resolved
+}
+
+func (t *RouteTable) resolveCredentials(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	injections := route.injections()
+	if len(injections) == 0 {
+		return nil, nil
+	}
+	secrets := make([][]byte, 0, len(injections))
+	for _, injection := range injections {
+		secret, err := t.resolveCredential(ctx, routeForInjection(route, injection))
+		if err != nil {
+			return nil, err
+		}
+		secrets = append(secrets, secret)
+	}
+	return secrets, nil
+}
+
 func (t *RouteTable) refreshCredential(ctx context.Context, route RouteEntry) ([]byte, error) {
 	source, err := t.sourceForRoute(route)
 	if err != nil {
 		return nil, err
 	}
 	return source.Refreshable(ctx, route)
+}
+
+func (t *RouteTable) refreshCredentials(ctx context.Context, route RouteEntry) ([][]byte, error) {
+	injections := route.injections()
+	if len(injections) == 0 {
+		return nil, nil
+	}
+	secrets := make([][]byte, 0, len(injections))
+	for _, injection := range injections {
+		secret, err := t.refreshCredential(ctx, routeForInjection(route, injection))
+		if err != nil {
+			return nil, err
+		}
+		secrets = append(secrets, secret)
+	}
+	return secrets, nil
 }
 
 func routeVersionRank(version string) int {

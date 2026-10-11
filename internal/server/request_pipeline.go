@@ -12,9 +12,10 @@ import (
 type InjectionKind string
 
 const (
-	InjectionHeader InjectionKind = "header"
-	InjectionBearer InjectionKind = "bearer"
-	InjectionQuery  InjectionKind = "query"
+	InjectionHeader   InjectionKind = "header"
+	InjectionBearer   InjectionKind = "bearer"
+	InjectionQuery    InjectionKind = "query"
+	InjectionTemplate InjectionKind = "template"
 	// InjectionOAuthRefresh stores a refresh token in the secret store and
 	// injects the short-lived bearer obtained by exchanging it at TokenURL.
 	InjectionOAuthRefresh InjectionKind = "oauth-refresh"
@@ -25,6 +26,15 @@ const (
 type InjectAs struct {
 	Kind InjectionKind
 	Name string
+	// Prefix is used by template injection. It is deliberately configuration,
+	// never part of the stored credential value (for example, "Token ").
+	Prefix string
+	// The following fields make a list entry self-contained when a route needs
+	// more than one credential. Empty values inherit the route-level source.
+	CredentialSource string
+	VaultPath        string
+	CredentialEnv    string
+	CredentialFile   string
 	// oauth-refresh only.
 	TokenURL   string
 	ClientID   string
@@ -54,47 +64,164 @@ func (i *InjectAs) validate() error {
 		if i.ClientID == "" {
 			return fmt.Errorf("x-inject-as oauth-refresh requires clientId")
 		}
+	case InjectionTemplate:
+		if i.Name == "" {
+			return fmt.Errorf("x-inject-as template injection requires name")
+		}
+		if i.Prefix == "" {
+			return fmt.Errorf("x-inject-as template injection requires prefix")
+		}
 	default:
 		return fmt.Errorf("unsupported x-inject-as kind %q", i.Kind)
 	}
+	if i.CredentialSource != "" && i.CredentialSource != credentialSourceVault && i.CredentialSource != credentialSourceEnv && i.CredentialSource != credentialSourceFile {
+		return fmt.Errorf("x-inject-as source %q is not supported", i.CredentialSource)
+	}
+	if i.CredentialEnv != "" && (i.CredentialSource != "" && i.CredentialSource != credentialSourceEnv) {
+		return fmt.Errorf("x-inject-as env source requires source: env")
+	}
+	if i.CredentialFile != "" && (i.CredentialSource != "" && i.CredentialSource != credentialSourceFile) {
+		return fmt.Errorf("x-inject-as file source requires source: file")
+	}
+	if i.VaultPath != "" && (i.CredentialSource != "" && i.CredentialSource != credentialSourceVault) {
+		return fmt.Errorf("x-inject-as vault source requires source: vault")
+	}
+	switch i.CredentialSource {
+	case credentialSourceVault:
+		if i.VaultPath == "" {
+			return fmt.Errorf("x-inject-as source: vault requires vaultPath")
+		}
+		if i.CredentialEnv != "" || i.CredentialFile != "" {
+			return fmt.Errorf("x-inject-as vault source cannot include env or file reference")
+		}
+	case credentialSourceEnv:
+		if i.CredentialEnv == "" || i.VaultPath != "" || i.CredentialFile != "" {
+			return fmt.Errorf("x-inject-as source: env requires credentialEnv only")
+		}
+	case credentialSourceFile:
+		if i.CredentialFile == "" || i.VaultPath != "" || i.CredentialEnv != "" {
+			return fmt.Errorf("x-inject-as source: file requires credentialFile only")
+		}
+	}
 	return nil
+}
+
+// StaticInjection describes a non-secret constant written to an upstream
+// request. Static values never enter the response scrub union.
+type StaticInjection struct {
+	Kind  InjectionKind
+	Name  string
+	Value string
+}
+
+func (i *StaticInjection) validate() error {
+	if i == nil {
+		return nil
+	}
+	if i.Kind != InjectionHeader && i.Kind != InjectionQuery {
+		return fmt.Errorf("x-inject-static kind %q must be header or query", i.Kind)
+	}
+	if i.Name == "" {
+		return fmt.Errorf("x-inject-static %q injection requires name", i.Kind)
+	}
+	return nil
+}
+
+func (i *InjectAs) headerName() string {
+	if i == nil {
+		return ""
+	}
+	switch i.Kind {
+	case InjectionBearer, InjectionOAuthRefresh:
+		return "Authorization"
+	case InjectionHeader, InjectionTemplate:
+		return i.Name
+	default:
+		return ""
+	}
+}
+
+func (i *InjectAs) queryName() string {
+	if i != nil && i.Kind == InjectionQuery {
+		return i.Name
+	}
+	return ""
 }
 
 // InjectSecret applies one credential after inbound sanitation. It is kept
 // independent of the secret store so callers can test the security boundary
 // without ever putting a credential value in route metadata.
 func InjectSecret(req *http.Request, injectAs *InjectAs, secret []byte) error {
+	return InjectSecrets(req, []*InjectAs{injectAs}, [][]byte{secret})
+}
+
+// InjectSecrets applies several credentials after inbound sanitation. The
+// slices must have matching lengths; a secret is resolved for each entry so a
+// route can use distinct vault, env, or file references.
+func InjectSecrets(req *http.Request, injectAs []*InjectAs, secrets [][]byte) error {
 	if req == nil || req.URL == nil {
 		return fmt.Errorf("request is nil")
 	}
-	if err := injectAs.validate(); err != nil {
-		return err
+	if len(injectAs) != len(secrets) {
+		return fmt.Errorf("injection and secret counts differ: %d != %d", len(injectAs), len(secrets))
 	}
-	if injectAs == nil {
-		return nil
-	}
-	if len(secret) == 0 {
-		return fmt.Errorf("injected secret is empty")
-	}
-
-	value := string(secret)
-	switch injectAs.Kind {
-	case InjectionHeader:
-		deleteHeaderFold(req.Header, injectAs.Name)
-		req.Header.Set(injectAs.Name, value)
-	case InjectionBearer, InjectionOAuthRefresh:
-		deleteHeaderFold(req.Header, "Authorization")
-		req.Header.Set("Authorization", "Bearer "+value)
-	case InjectionQuery:
-		// Sanitation removes every caller occurrence. Keep all unrelated raw
-		// query bytes untouched and append exactly one encoded credential. Do
-		// the same-name removal here too so this helper remains safe when used
-		// outside the normal RouteTable.Match pipeline.
-		req.URL.RawQuery = stripQueryNames(req.URL.RawQuery, map[string]bool{injectAs.Name: true})
-		if req.URL.RawQuery != "" {
-			req.URL.RawQuery += "&"
+	for index, entry := range injectAs {
+		if entry == nil {
+			continue
 		}
-		req.URL.RawQuery += url.QueryEscape(injectAs.Name) + "=" + url.QueryEscape(value)
+		if err := entry.validate(); err != nil {
+			return err
+		}
+		if len(secrets[index]) == 0 {
+			return fmt.Errorf("injected secret is empty")
+		}
+		value := string(secrets[index])
+		switch entry.Kind {
+		case InjectionHeader:
+			deleteHeaderFold(req.Header, entry.Name)
+			req.Header.Set(entry.Name, value)
+		case InjectionBearer, InjectionOAuthRefresh:
+			deleteHeaderFold(req.Header, "Authorization")
+			req.Header.Set("Authorization", "Bearer "+value)
+		case InjectionTemplate:
+			deleteHeaderFold(req.Header, entry.Name)
+			req.Header.Set(entry.Name, entry.Prefix+value)
+		case InjectionQuery:
+			// Sanitation removes every caller occurrence. Keep all unrelated raw
+			// query bytes untouched and append exactly one encoded credential.
+			req.URL.RawQuery = stripQueryNames(req.URL.RawQuery, map[string]bool{entry.Name: true})
+			if req.URL.RawQuery != "" {
+				req.URL.RawQuery += "&"
+			}
+			req.URL.RawQuery += url.QueryEscape(entry.Name) + "=" + url.QueryEscape(value)
+		}
+	}
+	return nil
+}
+
+// InjectStatic applies non-secret constants after sanitation.
+func InjectStatic(req *http.Request, injections []*StaticInjection) error {
+	if req == nil || req.URL == nil {
+		return fmt.Errorf("request is nil")
+	}
+	for _, injection := range injections {
+		if injection == nil {
+			continue
+		}
+		if err := injection.validate(); err != nil {
+			return err
+		}
+		switch injection.Kind {
+		case InjectionHeader:
+			deleteHeaderFold(req.Header, injection.Name)
+			req.Header.Set(injection.Name, injection.Value)
+		case InjectionQuery:
+			req.URL.RawQuery = stripQueryNames(req.URL.RawQuery, map[string]bool{injection.Name: true})
+			if req.URL.RawQuery != "" {
+				req.URL.RawQuery += "&"
+			}
+			req.URL.RawQuery += url.QueryEscape(injection.Name) + "=" + url.QueryEscape(injection.Value)
+		}
 	}
 	return nil
 }
@@ -134,6 +261,12 @@ func (t *RouteTable) injectableNames(req *http.Request) (map[string]bool, map[st
 		for name := range route.injectableQueryNames() {
 			queries[name] = true
 		}
+		for name := range route.staticHeaderNames() {
+			headers[strings.ToLower(name)] = true
+		}
+		for name := range route.staticQueryNames() {
+			queries[name] = true
+		}
 	}
 	return headers, queries
 }
@@ -169,6 +302,33 @@ func deleteHeaderFold(headers http.Header, wanted string) {
 type routeMatchContextKey struct{}
 
 type routeSecretResolver func(context.Context, RouteEntry) ([]byte, error)
+
+type routeCredentialSetResolver interface {
+	ResolveAll(context.Context, RouteEntry) ([][]byte, error)
+	RefreshableAll(context.Context, RouteEntry) ([][]byte, error)
+}
+
+func resolveRouteCredentials(ctx context.Context, resolver CredentialSource, route RouteEntry) ([][]byte, error) {
+	if multi, ok := resolver.(routeCredentialSetResolver); ok {
+		return multi.ResolveAll(ctx, route)
+	}
+	secret, err := resolver.Resolve(ctx, route)
+	if err != nil {
+		return nil, err
+	}
+	return [][]byte{secret}, nil
+}
+
+func refreshRouteCredentials(ctx context.Context, resolver CredentialSource, route RouteEntry) ([][]byte, error) {
+	if multi, ok := resolver.(routeCredentialSetResolver); ok {
+		return multi.RefreshableAll(ctx, route)
+	}
+	secret, err := resolver.Refreshable(ctx, route)
+	if err != nil {
+		return nil, err
+	}
+	return [][]byte{secret}, nil
+}
 
 type legacyCredentialSource routeSecretResolver
 

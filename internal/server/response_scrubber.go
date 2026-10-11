@@ -35,7 +35,7 @@ type responseScrubConfig struct {
 	allowUnscannable bool
 }
 
-func withResponseScrub(ctx context.Context, secret []byte, allowUnscannable bool) context.Context {
+func withResponseScrubSecrets(ctx context.Context, secrets [][]byte, allowUnscannable bool) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -47,8 +47,10 @@ func withResponseScrub(ctx context.Context, secret []byte, allowUnscannable bool
 		copyConfig.secrets = append([][]byte(nil), config.secrets...)
 		config = &copyConfig
 	}
-	if len(secret) > 0 {
-		config.secrets = append(config.secrets, bytes.Clone(secret))
+	for _, secret := range secrets {
+		if len(secret) > 0 {
+			config.secrets = append(config.secrets, bytes.Clone(secret))
+		}
 	}
 	config.allowUnscannable = config.allowUnscannable || allowUnscannable
 	return context.WithValue(ctx, responseScrubContextKey{}, config)

@@ -175,6 +175,70 @@ func TestInjectSecretQueryRemovesCallerDuplicates(t *testing.T) {
 	}
 }
 
+func TestCompositeTemplateAndStaticInjectionStripThenInject(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/items?api-version=caller&keep=1", nil)
+	req.Header["X-Partner-Token"] = []string{"caller", "duplicate"}
+	req.Header["X-Api-Version"] = []string{"caller"}
+	table := &RouteTable{routes: []RouteEntry{{
+		PathTemplate: "/items", Method: http.MethodGet,
+		InjectAsList:     []*InjectAs{{Kind: InjectionTemplate, Name: "X-Partner-Token", Prefix: "Token "}},
+		StaticInjections: []*StaticInjection{{Kind: InjectionHeader, Name: "X-Api-Version", Value: "2025-01"}, {Kind: InjectionQuery, Name: "api-version", Value: "2025-01"}},
+	}}}
+	if err := table.SanitizeRequest(req); err != nil {
+		t.Fatal(err)
+	}
+	if err := InjectSecrets(req, table.routes[0].injections(), [][]byte{[]byte("secret-REPLACE")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := InjectStatic(req, table.routes[0].StaticInjections); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := req.Header.Get("X-Partner-Token"), "Token secret-REPLACE"; got != want {
+		t.Fatalf("template header = %q, want %q", got, want)
+	}
+	if got, want := req.Header.Get("X-Api-Version"), "2025-01"; got != want {
+		t.Fatalf("static header = %q, want %q", got, want)
+	}
+	if got, want := req.URL.RawQuery, "keep=1&api-version=2025-01"; got != want {
+		t.Fatalf("static query = %q, want %q", got, want)
+	}
+}
+
+func TestCompositeInjectionListUsesDistinctSecrets(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/items?org=caller", nil)
+	req.Header.Set("X-Api-Key", "caller")
+	injections := []*InjectAs{
+		{Kind: InjectionHeader, Name: "X-Api-Key"},
+		{Kind: InjectionQuery, Name: "org"},
+	}
+	if err := InjectSecrets(req, injections, [][]byte{[]byte("key-REPLACE"), []byte("org-REPLACE")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.Header.Get("X-Api-Key"); got != "key-REPLACE" {
+		t.Fatalf("header credential = %q", got)
+	}
+	if got, want := req.URL.RawQuery, "org=org-REPLACE"; got != want {
+		t.Fatalf("query credential = %q, want %q", got, want)
+	}
+}
+
+func TestPerInstanceCompositeInjectAsOverride(t *testing.T) {
+	root := RouteEntry{
+		InjectAsList:  []*InjectAs{{Kind: InjectionHeader, Name: "X-Root-Key"}},
+		InstanceParam: "instance",
+		UpstreamMap: map[string]RouteTarget{
+			"west": {URL: "https://west.example", InjectAsList: []*InjectAs{{Kind: InjectionTemplate, Name: "Authorization", Prefix: "Token "}}},
+		},
+	}
+	selected := root.effectiveTarget(map[string]string{"instance": "west"})
+	if len(selected.InjectAsList) != 1 || selected.InjectAsList[0].Kind != InjectionTemplate {
+		t.Fatalf("per-instance injection override = %+v", selected.InjectAsList)
+	}
+	if selected.InjectAs != nil {
+		t.Fatalf("legacy injection field should be cleared for list override: %+v", selected.InjectAs)
+	}
+}
+
 func TestBuildRouteTableExtractsInjectionAndPathItemRewrite(t *testing.T) {
 	pathItem := &v3.PathItem{
 		Extensions: orderedmap.New[string, *yaml.Node](),
@@ -197,6 +261,27 @@ func TestBuildRouteTableExtractsInjectionAndPathItemRewrite(t *testing.T) {
 	route := table.GetRoutes()[0]
 	if route.UpstreamPathTemplate != "/api/{name}" || route.InjectAs == nil || route.InjectAs.Name != "X-Api-Key" {
 		t.Fatalf("route metadata was not extracted: %+v", route)
+	}
+}
+
+func TestBuildRouteTableExtractsCompositeInjectionList(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Extensions: orderedmap.New[string, *yaml.Node](),
+		Get:        &v3.Operation{Responses: &v3.Responses{Codes: orderedmap.New[string, *v3.Response]()}},
+	}
+	pathItem.Get.Extensions = orderedmap.New[string, *yaml.Node]()
+	pathItem.Get.Extensions.Set("x-upstream", scalarNode("https://upstream.example"))
+	pathItem.Get.Extensions.Set("x-inject-as", objectNode("- kind: header\n  name: X-Key\n- kind: template\n  name: X-Org\n  prefix: 'Token '"))
+	pathItem.Get.Responses.Codes.Set("200", &v3.Response{Description: "ok"})
+	document := &v3.Document{Paths: &v3.Paths{PathItems: orderedmap.New[string, *v3.PathItem]()}}
+	document.Paths.PathItems.Set("/items", pathItem)
+
+	table, err := BuildRouteTable(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(table.GetRoutes()[0].InjectAsList); got != 2 {
+		t.Fatalf("composite injection count = %d, want 2", got)
 	}
 }
 

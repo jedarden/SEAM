@@ -6,6 +6,37 @@
 
 ## Overview
 
+## Composite credential and static injection
+
+The legacy object form of `x-inject-as` remains valid. Providers that need
+several credentials use a list; each entry may name its own credential source
+and source reference. A template prefix is configuration, not part of the
+stored secret. Static entries are non-secret constants and support headers or
+query parameters.
+
+```yaml
+x-inject-as:
+  - kind: template
+    name: Authorization
+    prefix: "Token "
+    source: env
+    credentialEnv: SEAM_CRED_PROVIDER_TOKEN
+  - kind: header
+    name: X-Provider-Org
+    source: file
+    credentialFile: SEAM_CRED_PROVIDER_ORG
+x-inject-static:
+  - kind: query
+    name: api-version
+    value: "2025-01"
+```
+
+Stage 2 removes all occurrences of every configured header/query name before
+stage 10 injects the fresh secret or static value. The secret values from all
+list entries form the response scrub union. Duplicate names in one route are a
+lint error, including header case variants and collisions between static and
+secret entries. Request signing remains outside this schema.
+
 This document provides comprehensive test cases for the SEAM route fragment schema. Test fragments are organized into three categories:
 - **Valid fragments:** Minimal, typical, and comprehensive examples that should pass validation
 - **Invalid fragments:** Deliberately malformed fragments testing specific constraint violations

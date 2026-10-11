@@ -1994,6 +1994,13 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 			if target.InjectAs != nil {
 				route.InjectAs = target.InjectAs
 			}
+			if target.InjectAsList != nil {
+				route.InjectAs = nil
+				route.InjectAsList = target.InjectAsList
+			}
+			if target.StaticInjections != nil {
+				route.StaticInjections = target.StaticInjections
+			}
 		} else if target, ok := route.UpstreamMap["_default"]; ok && target.URL != "" {
 			selectedInstance = "_default"
 			selectedTarget = target
@@ -2003,6 +2010,13 @@ func (s *Server) dispatchHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if target.InjectAs != nil {
 				route.InjectAs = target.InjectAs
+			}
+			if target.InjectAsList != nil {
+				route.InjectAs = nil
+				route.InjectAsList = target.InjectAsList
+			}
+			if target.StaticInjections != nil {
+				route.StaticInjections = target.StaticInjections
 			}
 		} else {
 			s.handleNoUpstream(w, r)

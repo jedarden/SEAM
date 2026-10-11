@@ -85,6 +85,36 @@ value. Empty files and detectable in-place changes during a read fail closed. Th
 resolved bytes are used for that request's response scrubbing and probes; a
 file-backed 401 retry reopens the file before retrying.
 
+### Composite and static injection
+
+`x-inject-as` may remain the legacy object or become a list. List entries can
+select their own `source: vault|env|file` and matching `vaultPath`,
+`credentialEnv`, or `credentialFile` reference; entries without those fields
+inherit the route-level credential source. `kind: template` writes a header as
+`prefix + credential` while keeping the prefix out of the stored secret.
+
+```yaml
+x-inject-as:
+  - kind: template
+    name: Authorization
+    prefix: "Token "
+    source: env
+    credentialEnv: SEAM_CRED_PROVIDER_TOKEN
+  - kind: header
+    name: X-Provider-Org
+    source: file
+    credentialFile: SEAM_CRED_PROVIDER_ORG
+x-inject-static:
+  - kind: header
+    name: X-API-Version
+    value: "2025-01"
+```
+
+Static entries support `header` and `query` only. SEAM strips every configured
+header/query name before applying the secret or static value. Secret list
+entries all contribute to response scrubbing; static values never do. Duplicate
+names within one route are rejected by `seam lint`.
+
 The rs-manager deployment uses this source for the Subquadratic provider. Its
 public preview route is exposed at `/subq/v1/models` and
 `/subq/v1/systemone`; `/subq` is stripped before forwarding to

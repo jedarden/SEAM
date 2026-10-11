@@ -325,11 +325,102 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkURLs(report, allowlist)
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
+	f.checkInjectionNames(report)
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
 	f.checkBreakerDisagreements(report)
 	f.checkDeprecation(report)
 	f.checkAdapter(report)
+}
+
+// checkInjectionNames rejects ambiguous routes before they reach the runtime
+// injector. Header names share a case-insensitive namespace; query names are
+// exact and case-sensitive, matching the ingress strip rules.
+func (f *lintFragment) checkInjectionNames(report *LintReport) {
+	checkRoute := func(route map[string]any, where string) {
+		seenHeaders := make(map[string]string)
+		seenQueries := make(map[string]string)
+		add := func(kind, name, source string) {
+			if name == "" {
+				return
+			}
+			switch kind {
+			case "bearer", "oauth-refresh":
+				name = "authorization"
+			case "header", "template":
+				name = strings.ToLower(name)
+			}
+			seen := seenQueries
+			if kind != "query" {
+				seen = seenHeaders
+			}
+			if previous, exists := seen[name]; exists {
+				f.addError(report, "injection.duplicate-name", fmt.Sprintf("%s has duplicate injection name %q (%s and %s)", where, name, previous, source))
+				return
+			}
+			seen[name] = source
+		}
+		injectAsValue := route["x-inject-as"]
+		if injectAsValue == nil {
+			injectAsValue = route["injectAs"]
+		}
+		for index, entry := range injectionObjects(injectAsValue) {
+			kind, _ := entry["kind"].(string)
+			name, _ := entry["name"].(string)
+			if kind == "bearer" || kind == "oauth-refresh" {
+				name = "Authorization"
+			}
+			add(kind, name, fmt.Sprintf("x-inject-as[%d]", index))
+		}
+		for index, entry := range injectionObjects(route["x-inject-static"]) {
+			kind, _ := entry["kind"].(string)
+			name, _ := entry["name"].(string)
+			add(kind, name, fmt.Sprintf("x-inject-static[%d]", index))
+		}
+	}
+
+	checkRoute(f.data, "fragment route")
+	paths, _ := f.data["paths"].(map[string]any)
+	for path, pathValue := range paths {
+		pathItem, _ := pathValue.(map[string]any)
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, _ := operationValue.(map[string]any)
+			if operation != nil {
+				checkRoute(operation, fmt.Sprintf("%s %s", strings.ToUpper(method), path))
+			}
+		}
+	}
+	if entries, ok := f.data["x-upstream-map"].(map[string]any); ok {
+		for instance, entryValue := range entries {
+			entry, _ := entryValue.(map[string]any)
+			if entry != nil {
+				checkRoute(entry, fmt.Sprintf("x-upstream-map[%q]", instance))
+			}
+		}
+	}
+}
+
+func injectionObjects(value any) []map[string]any {
+	if value == nil {
+		return nil
+	}
+	if object, ok := value.(map[string]any); ok {
+		return []map[string]any{object}
+	}
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if object, ok := item.(map[string]any); ok {
+			result = append(result, object)
+		}
+	}
+	return result
 }
 
 func (f *lintFragment) checkCredentialOwnership(report *LintReport, owners []string) {
@@ -344,6 +435,46 @@ func (f *lintFragment) checkCredentialOwnership(report *LintReport, owners []str
 		name, _ := f.data["x-credential-file"].(string)
 		if err := credentialFileOwnerError(name, owner, owners); err != nil {
 			f.addError(report, "credential.file-owner-mismatch", err.Error())
+		}
+	}
+	checkEntry := func(entry map[string]any, where string) {
+		source, _ := entry["source"].(string)
+		envName, _ := entry["credentialEnv"].(string)
+		fileName, _ := entry["credentialFile"].(string)
+		vaultPath, _ := entry["vaultPath"].(string)
+		if source == "" {
+			switch {
+			case envName != "":
+				source = "env"
+			case fileName != "":
+				source = "file"
+			case vaultPath != "":
+				source = "vault"
+			}
+		}
+		if source == "env" {
+			if err := credentialEnvOwnerError(envName, owner, owners); err != nil {
+				f.addError(report, "credential.env-owner-mismatch", fmt.Sprintf("%s: %v", where, err))
+			}
+		}
+		if source == "file" {
+			if err := credentialFileOwnerError(fileName, owner, owners); err != nil {
+				f.addError(report, "credential.file-owner-mismatch", fmt.Sprintf("%s: %v", where, err))
+			}
+		}
+	}
+	for index, entry := range injectionObjects(f.data["x-inject-as"]) {
+		checkEntry(entry, fmt.Sprintf("x-inject-as[%d]", index))
+	}
+	if entries, ok := f.data["x-upstream-map"].(map[string]any); ok {
+		for instance, value := range entries {
+			entry, _ := value.(map[string]any)
+			if entry == nil {
+				continue
+			}
+			for index, injection := range injectionObjects(entry["injectAs"]) {
+				checkEntry(injection, fmt.Sprintf("x-upstream-map[%q].injectAs[%d]", instance, index))
+			}
 		}
 	}
 }
