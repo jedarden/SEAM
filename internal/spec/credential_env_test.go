@@ -13,6 +13,12 @@ func envCredentialFragment(owner, variable string) string {
 	return strings.Replace(fragment, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+injection, 1)
 }
 
+func fileCredentialFragment(owner, filename string) string {
+	fragment := validLintFragment(owner, "v1", "https://api.example.com")
+	injection := "x-credential-source: file\nx-credential-file: " + filename + "\nx-inject-as:\n  kind: bearer\n"
+	return strings.Replace(fragment, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+injection, 1)
+}
+
 func TestCredentialEnvOwnershipLintAndLoader(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -85,6 +91,57 @@ func TestCredentialEnvOwnershipRejectsConfigurationNames(t *testing.T) {
 	}
 }
 
+func TestCredentialFileOwnershipLintAndLoader(t *testing.T) {
+	root := t.TempDir()
+	writeLintTestFragment(t, root, "service-a", "route.yaml", fileCredentialFragment("service-a", "SEAM_CRED_OTHER_API_KEY"))
+
+	lint, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory() error = %v", err)
+	}
+	found := false
+	for _, finding := range lint.Errors {
+		if finding.Code == "credential.file-owner-mismatch" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("lint did not reject file outside owner namespace: %+v", lint.Errors)
+	}
+
+	loader, err := NewFragmentLoader()
+	if err != nil {
+		t.Fatalf("NewFragmentLoader() error = %v", err)
+	}
+	if err := loader.LoadDirectory(root); err != nil {
+		t.Fatalf("LoadDirectory() error = %v", err)
+	}
+	if err := loader.ValidateFragments(lintTestSchemaPath(t)); err != nil {
+		t.Fatalf("ValidateFragments() error = %v", err)
+	}
+	quarantined := loader.GetQuarantined()
+	if len(quarantined) != 1 || !strings.Contains(strings.Join(quarantined[0].QuarantineReasons, "\n"), "credential_file_ownership_failed") {
+		t.Fatalf("loader did not quarantine the invalid file owner: %+v", quarantined)
+	}
+}
+
+func TestCredentialFileOwnershipRejectsSpecificSiblingOwner(t *testing.T) {
+	root := t.TempDir()
+	writeLintTestFragment(t, root, "ab", "route.yaml", fileCredentialFragment("ab", "SEAM_CRED_AB_CD_API_KEY"))
+	writeLintTestFragment(t, root, "ab-cd", "route.yaml", fileCredentialFragment("ab-cd", "SEAM_CRED_AB_CD_API_KEY"))
+
+	lint, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory() error = %v", err)
+	}
+	for _, finding := range lint.Errors {
+		if finding.Code == "credential.file-owner-mismatch" && strings.Contains(finding.Message, `"ab-cd"`) {
+			return
+		}
+	}
+	t.Fatalf("lint did not identify the more specific file owner: %+v", lint.Errors)
+}
+
 func TestLintSchemaCredentialSourcePairing(t *testing.T) {
 	base := validLintFragment("owner", "v1", "https://api.example.com")
 	tests := []struct {
@@ -93,10 +150,13 @@ func TestLintSchemaCredentialSourcePairing(t *testing.T) {
 		valid    bool
 	}{
 		{name: "env source", metadata: "x-credential-source: env\nx-credential-env: SEAM_CRED_OWNER_API_KEY\nx-inject-as:\n  kind: bearer\n", valid: true},
+		{name: "file source", metadata: "x-credential-source: file\nx-credential-file: SEAM_CRED_OWNER_API_KEY\nx-inject-as:\n  kind: bearer\n", valid: true},
 		{name: "legacy vault source", metadata: "x-vault-path: rs-manager/seam/routes/owner/api-key\nx-inject-as:\n  kind: bearer\n", valid: true},
 		{name: "env without injection", metadata: "x-credential-source: env\nx-credential-env: SEAM_CRED_OWNER_API_KEY\n"},
+		{name: "file without injection", metadata: "x-credential-source: file\nx-credential-file: SEAM_CRED_OWNER_API_KEY\n"},
 		{name: "injection without source", metadata: "x-inject-as:\n  kind: bearer\n"},
 		{name: "two sources", metadata: "x-vault-path: rs-manager/seam/routes/owner/api-key\nx-credential-source: env\nx-credential-env: SEAM_CRED_OWNER_API_KEY\nx-inject-as:\n  kind: bearer\n"},
+		{name: "env and file sources", metadata: "x-credential-source: file\nx-credential-env: SEAM_CRED_OWNER_API_KEY\nx-credential-file: SEAM_CRED_OWNER_FILE_KEY\nx-inject-as:\n  kind: bearer\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

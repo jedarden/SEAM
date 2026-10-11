@@ -187,9 +187,11 @@ type CredentialProbeTarget struct {
 	// VaultPath is the OpenBao path to the credential
 	VaultPath string
 
-	// CredentialSource and CredentialEnv identify non-vault route credentials.
+	// CredentialSource, CredentialEnv, and CredentialFile identify non-vault
+	// route credentials.
 	CredentialSource string
 	CredentialEnv    string
+	CredentialFile   string
 
 	// ProbeURL is the full URL to probe (including scheme and host)
 	ProbeURL string

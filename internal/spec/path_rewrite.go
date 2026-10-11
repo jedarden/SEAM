@@ -18,6 +18,7 @@ var internalRouteMetadata = map[string]string{
 	"x-vault-path":            internalRouteMetadataPrefix + "vault-path",
 	"x-credential-source":     internalRouteMetadataPrefix + "credential-source",
 	"x-credential-env":        internalRouteMetadataPrefix + "credential-env",
+	"x-credential-file":       internalRouteMetadataPrefix + "credential-file",
 	"x-inject-as":             internalRouteMetadataPrefix + "inject-as",
 	"x-unscrubbable":          internalRouteMetadataPrefix + "unscrubbable",
 	"x-instance-param":        internalRouteMetadataPrefix + "instance-param",

@@ -319,7 +319,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	}
 
 	f.checkOwnerChain(report)
-	f.checkCredentialEnvOwnership(report, owners)
+	f.checkCredentialOwnership(report, owners)
 	f.checkAPIVersion(report)
 	f.checkReservedPaths(report)
 	f.checkURLs(report, allowlist)
@@ -332,14 +332,19 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkAdapter(report)
 }
 
-func (f *lintFragment) checkCredentialEnvOwnership(report *LintReport, owners []string) {
-	if f.data["x-credential-source"] != "env" {
-		return
-	}
-	name, _ := f.data["x-credential-env"].(string)
+func (f *lintFragment) checkCredentialOwnership(report *LintReport, owners []string) {
 	owner := filepath.Base(filepath.Dir(f.file))
-	if err := credentialEnvOwnerError(name, owner, owners); err != nil {
-		f.addError(report, "credential.env-owner-mismatch", err.Error())
+	switch f.data["x-credential-source"] {
+	case "env":
+		name, _ := f.data["x-credential-env"].(string)
+		if err := credentialEnvOwnerError(name, owner, owners); err != nil {
+			f.addError(report, "credential.env-owner-mismatch", err.Error())
+		}
+	case "file":
+		name, _ := f.data["x-credential-file"].(string)
+		if err := credentialFileOwnerError(name, owner, owners); err != nil {
+			f.addError(report, "credential.file-owner-mismatch", err.Error())
+		}
 	}
 }
 
@@ -1214,7 +1219,7 @@ func (f *lintFragment) checkAdapter(report *LintReport) {
 	upstreamFields := []string{
 		"x-upstream", "x-upstream-map", "x-instance-param",
 		"x-upstream-strip-prefix", "x-upstream-tls", "x-upstream-plaintext",
-		"x-vault-path", "x-credential-source", "x-credential-env", "x-inject-as", "x-credential-probe", "x-breaker",
+		"x-vault-path", "x-credential-source", "x-credential-env", "x-credential-file", "x-inject-as", "x-credential-probe", "x-breaker",
 	}
 
 	for _, field := range upstreamFields {

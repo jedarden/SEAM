@@ -547,7 +547,7 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
 		match := routeMatchFromRequest(r)
-		if match != nil && match.Route.InjectAs != nil && match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv {
+		if match != nil && match.Route.InjectAs != nil && (match.Route.CredentialSource == credentialSourceFile || (match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv)) {
 			// We have credential injection - attempt refresh and retry
 			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
 				// Either successful retry (returned nil) or fatal error
@@ -606,7 +606,8 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 }
 
 // handle401CredentialRefresh handles 401 responses with credential refresh and retry logic
-// Phase 12.4: On upstream 401, eagerly invalidate cached secret, refetch from OpenBao,
+// Phase 12.4: On upstream 401, refetch from the configured source (invalidating
+// the OpenBao cache or reopening a file projection),
 // RE-STRIP inbound headers, re-inject fresh value, retry exactly ONCE over Phase 2 tee
 // (body within maxReplayableRequestBytes). Above cap or unreplayable: still invalidate+refetch,
 // do NOT retry, answer with credential-refresh-not-retried envelope.
@@ -629,7 +630,7 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 	}
 
 	// Invalidate and refetch the secret
-	log.Printf("[proxy] 401 detected on route %s - invalidating and refetching credential from %s", route, match.Route.VaultPath)
+	log.Printf("[proxy] 401 detected on route %s - refreshing credential from configured source", route)
 	freshSecret, refreshErr := resolver.Refreshable(ctx, match.Route)
 	if refreshErr != nil {
 		// Refetch failed - degrade to secret-store-unavailable 503

@@ -27,6 +27,7 @@ type RouteTable struct {
 	credentialSource         CredentialSource
 	credentialSourceOverride bool
 	envCredentials           *envCredentialSource
+	fileCredentials          *fileCredentialSource
 	// secretClient remains an opaque source-construction hook for existing
 	// in-package metrics tests. It is adapted to CredentialSource by the
 	// vault-backed implementation before any read occurs.
@@ -81,10 +82,12 @@ type RouteEntry struct {
 	VaultPath string
 	InjectAs  *InjectAs
 
-	// CredentialSource and CredentialEnv identify an alternate, process-start
-	// environment credential. An empty source preserves the legacy vault route.
+	// CredentialSource, CredentialEnv, and CredentialFile identify alternate
+	// process or mounted-file credentials. An empty source preserves the legacy
+	// vault route.
 	CredentialSource string
 	CredentialEnv    string
+	CredentialFile   string
 
 	// Unscrubbable is true only when the route explicitly acknowledges that an
 	// injected response cannot be scanned. The acknowledgement is enumerable
@@ -508,17 +511,30 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
-			if credentialSource != "" && credentialSource != credentialSourceVault && credentialSource != credentialSourceEnv {
+			credentialFile, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-credential-file")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			if credentialSource != "" && credentialSource != credentialSourceVault && credentialSource != credentialSourceEnv && credentialSource != credentialSourceFile {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-source %q is not supported", methodOp.method, path, credentialSource)
 			}
-			if credentialSource == credentialSourceEnv && (credentialEnv == "" || vaultPath != "") {
-				return nil, fmt.Errorf("OpenAPI operation %s %s: env credentials require x-credential-env and cannot declare x-vault-path", methodOp.method, path)
+			if credentialSource == credentialSourceEnv && (credentialEnv == "" || credentialFile != "" || vaultPath != "") {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: env credentials require x-credential-env and cannot declare x-credential-file or x-vault-path", methodOp.method, path)
 			}
-			if credentialSource == credentialSourceVault && vaultPath == "" {
-				return nil, fmt.Errorf("OpenAPI operation %s %s: vault credentials require x-vault-path", methodOp.method, path)
+			if credentialSource == credentialSourceFile && (credentialFile == "" || credentialEnv != "" || vaultPath != "") {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: file credentials require x-credential-file and cannot declare x-credential-env or x-vault-path", methodOp.method, path)
+			}
+			if credentialSource == credentialSourceVault && (vaultPath == "" || credentialEnv != "" || credentialFile != "") {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: vault credentials require x-vault-path and cannot declare x-credential-env or x-credential-file", methodOp.method, path)
 			}
 			if credentialSource == "" && credentialEnv != "" {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-env requires x-credential-source: env", methodOp.method, path)
+			}
+			if credentialSource == "" && credentialFile != "" {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-file requires x-credential-source: file", methodOp.method, path)
+			}
+			if credentialSource == credentialSourceFile && !credentialFileNamePattern.MatchString(credentialFile) {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-file must be a SEAM_CRED_<OWNER>_<NAME> filename", methodOp.method, path)
 			}
 			injectAs, err := extractInjectAs(methodOp.operation, pathItem, spec)
 			if err != nil {
@@ -597,6 +613,7 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				InjectAs:              injectAs,
 				CredentialSource:      credentialSource,
 				CredentialEnv:         credentialEnv,
+				CredentialFile:        credentialFile,
 				Unscrubbable:          unscrubbable,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
@@ -1519,6 +1536,7 @@ func (t *RouteTable) sourceForRoute(route RouteEntry) (CredentialSource, error) 
 	source := t.credentialSource
 	override := t.credentialSourceOverride
 	envSource := t.envCredentials
+	fileSource := t.fileCredentials
 	if override && source != nil {
 		t.secretMu.Unlock()
 		return source, nil
@@ -1530,6 +1548,14 @@ func (t *RouteTable) sourceForRoute(route RouteEntry) (CredentialSource, error) 
 		}
 		t.secretMu.Unlock()
 		return envSource, nil
+	}
+	if route.CredentialSource == credentialSourceFile {
+		if fileSource == nil {
+			fileSource = newFileCredentialSource(fileCredentialMountDir)
+			t.fileCredentials = fileSource
+		}
+		t.secretMu.Unlock()
+		return fileSource, nil
 	}
 	if source == nil && t.secretClient != nil {
 		source = newVaultCredentialSourceFromLegacyClient(t.secretClient)

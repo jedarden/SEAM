@@ -71,6 +71,20 @@ to load the replacement; a rejected env credential is not refreshed or retried
 in place, and its configured sentinel probe reports the 401 at
 `/health/credentials`.
 
+For Secret-volume rotation without a pod restart, a fragment can instead use
+`x-credential-source: file` and
+`x-credential-file: SEAM_CRED_<OWNER>_<NAME>`. This field is a filename, not
+a path; SEAM reads it only beneath the operator-mounted
+`/var/run/seam/credentials` directory, backed by the separate
+`seam-provider-file-credentials` Secret target. The same owner naming rule is enforced
+by `seam lint` and runtime fragment quarantine. SEAM opens the projected file
+for each request and sentinel probe. Kubernetes Secret volumes publish a new
+revision by atomically swapping the `..data` symlink, so each open reads one
+complete old or new value and the first request after the swap sees the new
+value. Empty files and detectable in-place changes during a read fail closed. The
+resolved bytes are used for that request's response scrubbing and probes; a
+file-backed 401 retry reopens the file before retrying.
+
 The rs-manager deployment uses this source for the Subquadratic provider. Its
 public preview route is exposed at `/subq/v1/models` and
 `/subq/v1/systemone`; `/subq` is stripped before forwarding to

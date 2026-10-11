@@ -332,6 +332,11 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 		if err := credentialEnvOwnerError(name, fragment.Owner, owners); err != nil {
 			return fmt.Errorf("credential_env_ownership_failed: %w", err)
 		}
+	} else if source == "file" {
+		name, _ := fragment.ParsedFragment["x-credential-file"].(string)
+		if err := credentialFileOwnerError(name, fragment.Owner, owners); err != nil {
+			return fmt.Errorf("credential_file_ownership_failed: %w", err)
+		}
 	}
 
 	// Check for reserved path collisions

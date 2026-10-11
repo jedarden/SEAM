@@ -39,8 +39,9 @@
 
     "x-upstream-tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Fragment-root upstream transport policy; absent means verify against system trust store with hostname checking. Upstream-facing: taken from targetVersion on an x-adapter fragment." },
     "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch for the default or explicit vault credential source. Paired with x-inject-as. Co-ownership with x-seam-owner and allowlist membership are validator-side." },
-    "x-credential-source": { "type": "string", "enum": ["vault", "env"], "$comment": "Fragment-root credential source. Omission preserves the legacy vault source; env is populated from a Kubernetes Secret and read once at process startup." },
+    "x-credential-source": { "type": "string", "enum": ["vault", "env", "file"], "$comment": "Fragment-root credential source. Omission preserves the legacy vault source; env is read once at process startup; file reopens a Secret-volume key on every request or probe." },
     "x-credential-env": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Required only for x-credential-source: env. The variable must belong to the x-seam-owner namespace; checked by seam lint and runtime quarantine." },
+    "x-credential-file": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Required only for x-credential-source: file. This is a filename under the operator-mounted /var/run/seam/credentials directory, never a path; it must belong to the x-seam-owner namespace and is checked by seam lint and runtime quarantine." },
     "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the selected credential source. Present exactly when one source is declared." },
     "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment with no credential source." },
     "x-breaker": { "$ref": "#/$defs/breaker", "$comment": "Fragment-root tuning of the per-upstream circuit breaker. On by default (infrastructure guard); enabled:false is the opt-out. Upstream-facing: forbidden on an x-adapter fragment." },
@@ -479,6 +480,7 @@
             { "required": ["x-vault-path"] },
             { "required": ["x-credential-source"] },
             { "required": ["x-credential-env"] },
+            { "required": ["x-credential-file"] },
             { "required": ["x-inject-as"] },
             { "required": ["x-credential-probe"] },
             { "required": ["x-breaker"] }
@@ -515,31 +517,37 @@
       "oneOf": [
         {
           "required": ["x-vault-path", "x-inject-as"],
-          "not": { "anyOf": [{ "required": ["x-credential-source"] }, { "required": ["x-credential-env"] }] }
+          "not": { "anyOf": [{ "required": ["x-credential-source"] }, { "required": ["x-credential-env"] }, { "required": ["x-credential-file"] }] }
         },
         {
           "required": ["x-credential-source", "x-credential-env", "x-inject-as"],
           "properties": { "x-credential-source": { "const": "env" } },
-          "not": { "required": ["x-vault-path"] }
+          "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-credential-file"] }] }
+        },
+        {
+          "required": ["x-credential-source", "x-credential-file", "x-inject-as"],
+          "properties": { "x-credential-source": { "const": "file" } },
+          "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-credential-env"] }] }
         },
         {
           "required": ["x-credential-source", "x-vault-path", "x-inject-as"],
           "properties": { "x-credential-source": { "const": "vault" } },
-          "not": { "required": ["x-credential-env"] }
+          "not": { "anyOf": [{ "required": ["x-credential-env"] }, { "required": ["x-credential-file"] }] }
         },
         {
           "not": { "anyOf": [
             { "required": ["x-vault-path"] },
             { "required": ["x-inject-as"] },
             { "required": ["x-credential-source"] },
-            { "required": ["x-credential-env"] }
+            { "required": ["x-credential-env"] },
+            { "required": ["x-credential-file"] }
           ] }
         }
       ],
-      "$comment": "x-inject-as is present exactly when one credential source is declared. Legacy x-vault-path means vault by default; env requires x-credential-source, x-credential-env and x-inject-as. A fragment declaring neither source is a legal pass-through route."
+      "$comment": "x-inject-as is present exactly when one credential source is declared. Legacy x-vault-path means vault by default; env and file each require their matching reference and x-inject-as. A fragment declaring neither source is a legal pass-through route."
     },
     "constraint-passthrough-has-no-probe": {
-      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-credential-source"] }, { "required": ["x-inject-as"] }] } },
+      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-credential-source"] }, { "required": ["x-inject-as"] }, { "required": ["x-credential-file"] }] } },
       "then": { "not": { "required": ["x-credential-probe"] } },
       "$comment": "There is no credential to validate against the upstream on a pass-through route."
     },

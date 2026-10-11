@@ -54,8 +54,9 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-upstream-tls` | `upstreamTls` | no | `{caBundle, serverName, insecureSkipVerify}`. Absent = verify against system trust store + hostname. Upstream-facing → forbidden on adapter (taken from target). |
 | `x-upstream-plaintext` | `acknowledged` | conditional | Required when `x-upstream` is `http://`. Mutually exclusive with `x-upstream-map` (plaintext is per-entry there). |
 | `x-vault-path` | `vaultPath` | paired | Which OpenBao secret to fetch. Paired with `x-inject-as`; omission of `x-credential-source` keeps the legacy vault source. |
-| `x-credential-source` | `vault\|env` | conditional | Optional explicit source. `env` requires `x-credential-env`; explicit `vault` requires `x-vault-path`. |
+| `x-credential-source` | `vault\|env\|file` | conditional | Optional explicit source. `env` requires `x-credential-env`; `file` requires `x-credential-file`; explicit `vault` requires `x-vault-path`. |
 | `x-credential-env` | `SEAM_CRED_<OWNER>_<NAME>` | conditional | Required for `env`. Owner is upper-cased `x-seam-owner` with hyphens changed to underscores; suffix matches `[A-Z0-9_]+`. Lint and runtime quarantine enforce owner isolation. |
+| `x-credential-file` | `SEAM_CRED_<OWNER>_<NAME>` | conditional | Required for `file`. This is a filename below the operator-owned `/var/run/seam/credentials` mount, never a path. It uses the env owner rule and is reopened on each request or probe to observe Kubernetes Secret `..data` symlink swaps without restart. |
 | `x-inject-as` | `injectAs` | paired | How to inject: `{kind: header\|bearer\|query, name}`. Present exactly when one credential source is declared. |
 | `x-credential-probe` | `credentialProbe` | no | `{path, method, interval}` for the sentinel. Forbidden on a pass-through fragment with no credential source. |
 | `x-breaker` | `breaker` | no | Per-upstream circuit-breaker tuning. On by default (infrastructure guard); `enabled:false` is the opt-out. Upstream-facing → forbidden on adapter. |

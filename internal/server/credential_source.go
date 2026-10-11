@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"sync"
 
@@ -26,9 +29,14 @@ type CredentialSource interface {
 var ErrCredentialSourceNotRefreshable = errors.New("credential source is not refreshable")
 
 const (
-	credentialSourceVault = "vault"
-	credentialSourceEnv   = "env"
+	credentialSourceVault  = "vault"
+	credentialSourceEnv    = "env"
+	credentialSourceFile   = "file"
+	fileCredentialMountDir = "/var/run/seam/credentials"
+	maxCredentialFileBytes = 1 << 20
 )
+
+var credentialFileNamePattern = regexp.MustCompile(`^SEAM_CRED_[A-Z0-9_]+$`)
 
 // envCredentialSource is an immutable process-start snapshot. Secret values
 // are never formatted or logged; the only value-derived log field is length.
@@ -97,6 +105,76 @@ func (s *envCredentialSource) Resolve(_ context.Context, route RouteEntry) ([]by
 
 func (s *envCredentialSource) Refreshable(context.Context, RouteEntry) ([]byte, error) {
 	return nil, ErrCredentialSourceNotRefreshable
+}
+
+// fileCredentialSource reads a key from the operator-owned Secret volume.
+// It deliberately opens the path for each resolution: Kubernetes atomically
+// switches the volume's ..data symlink on Secret updates, so the next request
+// or sentinel probe sees one complete old or new payload without a watcher
+// race or a process restart.
+type fileCredentialSource struct {
+	dir string
+}
+
+func newFileCredentialSource(dir string) *fileCredentialSource {
+	if dir == "" {
+		dir = fileCredentialMountDir
+	}
+	return &fileCredentialSource{dir: dir}
+}
+
+func (s *fileCredentialSource) Resolve(_ context.Context, route RouteEntry) (resolved []byte, retErr error) {
+	if s == nil {
+		return nil, fmt.Errorf("file credential source is nil")
+	}
+	name := route.CredentialFile
+	if route.CredentialSource != credentialSourceFile || !credentialFileNamePattern.MatchString(name) {
+		return nil, fmt.Errorf("route has no valid file credential reference")
+	}
+	path := filepath.Join(s.dir, name)
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("credential file %q is unavailable: %w", name, err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil && retErr == nil {
+			resolved = nil
+			retErr = fmt.Errorf("close credential file %q: %w", name, err)
+		}
+	}()
+
+	before, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat credential file %q: %w", name, err)
+	}
+	if !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("credential file %q is not a regular file", name)
+	}
+	value, err := io.ReadAll(io.LimitReader(file, maxCredentialFileBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read credential file %q: %w", name, err)
+	}
+	if len(value) > maxCredentialFileBytes {
+		return nil, fmt.Errorf("credential file %q exceeds %d bytes", name, maxCredentialFileBytes)
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("restat credential file %q: %w", name, err)
+	}
+	if before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
+		return nil, fmt.Errorf("credential file %q changed while being read", name)
+	}
+	value = bytes.TrimRight(value, "\r\n")
+	if len(value) == 0 {
+		return nil, fmt.Errorf("credential file %q is empty after trimming CR/LF", name)
+	}
+	return bytes.Clone(value), nil
+}
+
+// Refreshable reopens the projected path, allowing a Secret rotation to
+// replace a credential rejected with 401 before SEAM retries the request.
+func (s *fileCredentialSource) Refreshable(ctx context.Context, route RouteEntry) ([]byte, error) {
+	return s.Resolve(ctx, route)
 }
 
 type credentialCacheStatsProvider interface {

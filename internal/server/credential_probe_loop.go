@@ -225,6 +225,7 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 			VaultPath:        route.VaultPath,
 			CredentialSource: route.CredentialSource,
 			CredentialEnv:    route.CredentialEnv,
+			CredentialFile:   route.CredentialFile,
 			ProbeURL:         route.UpstreamTarget + probeConfig.Path,
 			ProbePath:        probeConfig.Path,
 			ProbeMethod:      probeConfig.Method,
@@ -249,6 +250,7 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 			VaultPath:        instance.VaultPath,
 			CredentialSource: route.CredentialSource,
 			CredentialEnv:    route.CredentialEnv,
+			CredentialFile:   route.CredentialFile,
 			ProbeURL:         instance.URL + probeConfig.Path,
 			ProbePath:        probeConfig.Path,
 			ProbeMethod:      probeConfig.Method,
@@ -305,10 +307,11 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		VaultPath:        target.VaultPath,
 		CredentialSource: target.CredentialSource,
 		CredentialEnv:    target.CredentialEnv,
+		CredentialFile:   target.CredentialFile,
 		InjectAs:         target.InjectAs,
 	}
 	credentialSource := l.credentialSource
-	if target.CredentialSource == credentialSourceEnv {
+	if target.CredentialSource == credentialSourceEnv || target.CredentialSource == credentialSourceFile {
 		credentialSource = routeTableCredentialResolver{table: l.routeTableHolder.currentTable()}
 	}
 	credValue, err := credentialSource.Resolve(ctx, route)
