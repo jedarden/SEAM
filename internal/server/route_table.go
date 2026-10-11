@@ -25,9 +25,10 @@ type RouteTable struct {
 
 	secretMu         sync.Mutex
 	credentialSource CredentialSource
-	// secretClient remains a source-construction hook for existing in-package
-	// metrics tests. It is adapted to CredentialSource before any read occurs.
-	secretClient *vault.Client
+	// secretClient remains an opaque source-construction hook for existing
+	// in-package metrics tests. It is adapted to CredentialSource by the
+	// vault-backed implementation before any read occurs.
+	secretClient any
 }
 
 // UpstreamTLSConfig represents TLS configuration for upstream connections.
@@ -1116,7 +1117,7 @@ func (t *RouteTable) OpenBaoCacheStats() vault.CacheStats {
 	t.secretMu.Lock()
 	source := t.credentialSource
 	if source == nil && t.secretClient != nil {
-		source = newVaultCredentialSource(t.secretClient)
+		source = newVaultCredentialSourceFromLegacyClient(t.secretClient)
 		t.credentialSource = source
 	}
 	t.secretMu.Unlock()
@@ -1411,7 +1412,7 @@ func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([
 	t.secretMu.Lock()
 	source := t.credentialSource
 	if source == nil && t.secretClient != nil {
-		source = newVaultCredentialSource(t.secretClient)
+		source = newVaultCredentialSourceFromLegacyClient(t.secretClient)
 		t.credentialSource = source
 	}
 	t.secretMu.Unlock()

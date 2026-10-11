@@ -42,6 +42,18 @@ func newVaultCredentialSource(client *vault.Client) *vaultCredentialSource {
 	return &vaultCredentialSource{client: client}
 }
 
+// newVaultCredentialSourceFromLegacyClient keeps the old in-package metrics
+// test hook working without exposing the vault client type to request-routing
+// code. The adapter is deliberately kept with the vault implementation so all
+// OpenBao client knowledge remains behind CredentialSource.
+func newVaultCredentialSourceFromLegacyClient(client any) *vaultCredentialSource {
+	vaultClient, ok := client.(*vault.Client)
+	if !ok || vaultClient == nil {
+		return nil
+	}
+	return newVaultCredentialSource(vaultClient)
+}
+
 func newVaultCredentialSourceFromEnv() (*vaultCredentialSource, error) {
 	client, err := vault.NewFromEnv()
 	if err != nil {
