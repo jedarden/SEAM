@@ -599,15 +599,16 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	}
 
 	responseCostConfig := matchCostFromResponse(match)
+	usageMetricsConfig := matchUsageMetrics(match)
 	var responseCostBodyReader *responseCostBody
-	if responseCostConfig != nil {
+	if responseCostConfig != nil || usageMetricsConfig != nil {
 		if streamingRoute {
 			// Streaming responses must remain incremental. Keep only a bounded
 			// tail, which is enough to inspect the final SSE event after EOF.
 			responseCostBodyReader = newResponseCostBody(upstreamResp.Body)
 			upstreamResp.Body = responseCostBodyReader
 			w.Header().Add("Trailer", "X-SEAM-Budget-Remaining")
-		} else {
+		} else if responseCostConfig != nil {
 			body, readErr := io.ReadAll(upstreamResp.Body)
 			_ = upstreamResp.Body.Close()
 			if readErr != nil {
@@ -617,6 +618,12 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 				return err
 			}
 			upstreamResp.Body = io.NopCloser(bytes.NewReader(body))
+		} else {
+			// Token metrics on a buffered route need only a bounded tail. Keep
+			// the established pass-through behavior and avoid turning metrics
+			// into an unbounded response buffer.
+			responseCostBodyReader = newResponseCostBody(upstreamResp.Body)
+			upstreamResp.Body = responseCostBodyReader
 		}
 	}
 
@@ -691,8 +698,33 @@ func matchCostFromResponse(match *RouteMatch) *ResponseCostConfig {
 	return match.Route.CostFromResponse
 }
 
+func matchUsageMetrics(match *RouteMatch) *UsageMetricsConfig {
+	if match == nil {
+		return nil
+	}
+	if match.Route.UsageMetrics != nil {
+		return match.Route.UsageMetrics
+	}
+	return usageMetricsFromResponseCost(match.Route.CostFromResponse)
+}
+
 func (p *ReverseProxy) finalizeResponseCost(w http.ResponseWriter, r *http.Request, match *RouteMatch, body []byte, streaming bool) error {
 	config := matchCostFromResponse(match)
+	usageMetrics := matchUsageMetrics(match)
+	if config == nil && usageMetrics == nil {
+		return nil
+	}
+	if usageMetrics != nil && p.Metrics != nil {
+		model := otherModelLabel
+		if capture := metricRequestBodyCaptureFromRequest(r); capture != nil {
+			model = usageMetrics.modelLabel(capture.captured())
+		}
+		route := unmatchedMetricRoute
+		if match != nil {
+			route = match.Route.PathTemplate
+		}
+		p.Metrics.recordUsageTokens(route, model, usageMetrics, body, streaming)
+	}
 	if config == nil {
 		return nil
 	}

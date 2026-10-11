@@ -67,6 +67,8 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-unscrubbable` | `acknowledged` | no | Root **or** operation level. Acknowledgement that a route runs unscrubbed. |
 | `x-streaming` | boolean | no | Root default or operation override. Forces incremental response delivery and overlap-window scrubbing; it never whole-response buffers. |
 | `x-cost-from-response` | `costFromResponse` | no | Root default for usage-based metering. One or more `{pointer, price}` entries (array, `charges`/`pointers` wrapper, or keyed `input`/`output` form). Pointers target the final JSON body or last SSE event; any miss uses the effective flat `x-cost-per-call`. |
+| `x-metrics` | `routeMetrics` | no | Root default for response input/output token counters and latency histograms. Usage pointers target the final JSON body or last SSE event; `model.pointer` targets the request JSON body and only values in `model.allowlist` become labels. All other model values are emitted as `other`. |
+| `x-usage` | `routeMetrics` | no | Readable alias for `x-metrics`; operation-level placement is also supported. |
 | `x-requires-approval` | boolean | no | **RESERVED** (approval-gated routes, accepted but unphased). Declared so the first fragment can carry it without a schema change; not yet enforced. |
 
 ### 3.2 Path-item-level fields
@@ -83,6 +85,8 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-loop-guard` | `loopGuard` | `{maxRepeats, window}`. `maxRepeats` is a positive integer; `window` matches `^[0-9]+(s|m|h|d)$` and is tumbling/restart-scoped. A 2xx response clears the same request hash's counter at runtime. Absent = no loop guard on that route. |
 | `x-cost-per-call` | `costPerCall` | `{amount, unit}`. `amount` is a number >= 0; `unit` is a non-empty opaque string such as `credits`, `USD`, or `requests`. SEAM never converts units. |
 | `x-cost-from-response` | `costFromResponse` | Operation override for response usage pointers and per-unit prices. The operation may inherit the root `x-cost-per-call` fallback. |
+| `x-metrics` | `routeMetrics` | Operation override for response token and latency metrics. A declared model pointer requires this operation to declare a JSON `requestBody`; the pointer is never read from query or path parameters. |
+| `x-usage` | `routeMetrics` | Alias for operation-level `x-metrics`. |
 | `x-quota` | `quota` | `{amount, unit, window}`. `amount` is a number >= 0; `unit` is non-empty and must byte-match the effective `x-cost-per-call.unit`; `window` uses the shared duration grammar. Requires `x-cost-per-call` (schema-encoded at operation level). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-streaming` | boolean | Operation override for incremental response delivery. A response adapter transform that needs buffering is invalid when this is true. |
@@ -116,6 +120,7 @@ The schema validates shape + intra-object relations. **Every constraint below ne
 
 - **`x-quota.unit` must be byte-identical to the same route's `x-cost-per-call.unit`.** Root/root and operation/operation pairs compare directly; an operation-level quota with no operation-level cost compares against the fragment-root cost default. A mixed pair draws a credit balance down in dollars. The schema declares this invariant as `constraint-quota-unit-matches-cost`, but draft 2020-12 cannot compare arbitrary instance strings, so the Go validator performs the equality check.
 - **`x-cost-from-response` must have an effective `x-cost-per-call` fallback.** A response can be empty, malformed, or omit a provider usage field; the deterministic flat charge prevents an unmetered call. The schema checks the fragment-root pair and the Go validator checks operation-level overrides against the root default.
+- **`x-metrics.model.pointer` must point into the request body of the effective operation.** The schema constrains the pointer and allowlist shape; `seam lint` rejects a model declaration on an operation without `requestBody`. Runtime reads are bounded by the request capture and values outside the per-route allowlist collapse to `other`, keeping the Prometheus label set finite.
 
 ### 4.3 Effective per-instance resolution (on a map fragment)
 

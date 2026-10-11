@@ -21,6 +21,7 @@ type metricRouteLabels struct {
 	Route       string
 	Version     string
 	SpecVersion string // Phase 8.4: Spec hash (truncated to 16 chars) for per-route-version metrics
+	Usage       *UsageMetricsConfig
 }
 
 type metricRouteContextKey struct{}
@@ -47,6 +48,11 @@ type Metrics struct {
 
 	responseCostTotal    *prometheus.CounterVec
 	responseCostFallback *prometheus.CounterVec
+
+	inputTokens  *prometheus.CounterVec
+	outputTokens *prometheus.CounterVec
+	requestTTFB  *prometheus.HistogramVec
+	requestTotal *prometheus.HistogramVec
 
 	// Starvation recovery metrics
 	recoveryAttempts   *prometheus.CounterVec
@@ -131,6 +137,24 @@ func newMetrics(
 			Name: "seam_cost_from_response_fallback_total",
 			Help: "Total responses that used the flat x-cost-per-call fallback because response usage was absent or unusable.",
 		}, []string{"route"}),
+		inputTokens: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_input_tokens_total",
+			Help: "Total provider-reported input tokens by route and allowlisted model.",
+		}, []string{"route", "model"}),
+		outputTokens: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_output_tokens_total",
+			Help: "Total provider-reported output tokens by route and allowlisted model.",
+		}, []string{"route", "model"}),
+		requestTTFB: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_time_to_first_byte_seconds",
+			Help:    "Time from request admission until the response headers are first written, by route and allowlisted model.",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"route", "model"}),
+		requestTotal: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "seam_request_latency_seconds",
+			Help:    "Total caller request latency by route and allowlisted model.",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60},
+		}, []string{"route", "model"}),
 		routeVersionRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "seam_route_version_requests_total",
 			Help: "Total requests by OpenAPI route template and spec version hash (Phase 8.4: probe-free, origin-tag matched). A probe-inclusive counter means no probed fragment ever retires.",
@@ -209,6 +233,10 @@ func newMetrics(
 		metrics.quotaBypassed,
 		metrics.responseCostTotal,
 		metrics.responseCostFallback,
+		metrics.inputTokens,
+		metrics.outputTokens,
+		metrics.requestTTFB,
+		metrics.requestTotal,
 		metrics.recoveryAttempts,
 		metrics.recoverySuccesses,
 		metrics.recoveryStageUsed,
@@ -293,6 +321,42 @@ func (m *Metrics) recordResponseCost(route string, cost float64) {
 func (m *Metrics) recordResponseCostFallback(route string) {
 	if m != nil {
 		m.responseCostFallback.WithLabelValues(route).Inc()
+	}
+}
+
+func (m *Metrics) recordUsageTokens(route, model string, config *UsageMetricsConfig, body []byte, streaming bool) {
+	if m == nil || config == nil {
+		return
+	}
+	document, ok := responseUsageDocument(body, streaming)
+	if !ok {
+		return
+	}
+	if config.InputTokensPointer != "" {
+		if value, ok := jsonPointerValue(document, config.InputTokensPointer); ok {
+			if tokens, ok := jsonNumber(value); ok && tokens >= 0 {
+				m.inputTokens.WithLabelValues(route, model).Add(tokens)
+			}
+		}
+	}
+	if config.OutputTokensPointer != "" {
+		if value, ok := jsonPointerValue(document, config.OutputTokensPointer); ok {
+			if tokens, ok := jsonNumber(value); ok && tokens >= 0 {
+				m.outputTokens.WithLabelValues(route, model).Add(tokens)
+			}
+		}
+	}
+}
+
+func (m *Metrics) recordRouteTiming(route, model string, ttfb, total time.Duration) {
+	if m == nil {
+		return
+	}
+	if ttfb > 0 {
+		m.requestTTFB.WithLabelValues(route, model).Observe(ttfb.Seconds())
+	}
+	if total > 0 {
+		m.requestTotal.WithLabelValues(route, model).Observe(total.Seconds())
 	}
 }
 

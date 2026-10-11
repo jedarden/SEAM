@@ -276,6 +276,31 @@ admission, but the quota ledger is updated only once the final body/event is
 available. Existing routes without this extension retain their admission-time
 flat-cost behavior.
 
+### Per-route usage and latency metrics
+
+Provider routes can expose token and latency metrics with `x-metrics`. Usage
+pointers read input and output token counts from the final JSON response (or
+the final SSE event), while `model.pointer` reads the request JSON body:
+
+```yaml
+x-metrics:
+  usage:
+    inputTokens: /usage/prompt_tokens
+    outputTokens: /usage/completion_tokens
+  model:
+    pointer: /model
+    allowlist: [provider-model-a, provider-model-b]
+```
+
+The existing metrics surface emits `seam_input_tokens_total`,
+`seam_output_tokens_total`, `seam_time_to_first_byte_seconds`, and
+`seam_request_latency_seconds`, each labelled by the OpenAPI route template
+and `model`. A model value missing from the route's allowlist, or an invalid
+request body, is labelled `other`; arbitrary caller strings therefore cannot
+create unbounded Prometheus series. The same metrics are recorded for
+buffered and `x-streaming: true` responses. `x-usage` is accepted as a
+readable alias for `x-metrics`.
+
 ### `seam lint`
 
 Validate route fragments against `route-fragment-schema.json` plus SEAM's structural checks: the `x-seam-owner` chain (owner must match the fragment's parent directory and be nested by `x-vault-path`), authored `x-api-version` shape and placement, reserved control-plane paths, upstream URLs (well-formed absolute http(s), no IP-literal hosts, membership of the operator allowlist when one is supplied), transport acknowledgements (plaintext upstreams, `insecureSkipVerify`, unscrubbable responses), and route guards (quota unit mismatches, breaker disagreements across same-origin routes). Spec and structural violations are **errors**; acknowledgement items that need human review are **warnings**.

@@ -117,6 +117,11 @@ type RouteEntry struct {
 	// final SSE event. A nil value preserves the legacy flat-cost behavior.
 	CostFromResponse *ResponseCostConfig
 
+	// UsageMetrics describes optional response usage counters and the bounded
+	// request model label exposed on the metrics surface. When absent, named
+	// input/output entries in CostFromResponse still provide token counters.
+	UsageMetrics *UsageMetricsConfig
+
 	// InstanceParam identifies the path binding consumed by an upstream map.
 	// It is removed from the upstream path before any remaining bindings are
 	// substituted.
@@ -648,6 +653,10 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			usageMetrics, err := extractUsageMetricsConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 
 			// Extract deprecation information (Phase 8.3)
 			deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
@@ -672,6 +681,7 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				Streaming:             streaming,
 				CostPerCall:           costPerCall,
 				CostFromResponse:      costFromResponse,
+				UsageMetrics:          usageMetrics,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
 				Deprecated:            deprecated,
@@ -855,6 +865,23 @@ func extractCostPerCallConfig(operation *v3.Operation, pathItem *v3.PathItem, do
 		return nil, fmt.Errorf("x-cost-per-call must be an object: %w", err)
 	}
 	return parseCostPerCallConfig(raw)
+}
+
+func extractUsageMetricsConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*UsageMetricsConfig, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-metrics")
+	if !ok || node == nil {
+		// x-usage is retained as a readable alias for fragments that want to
+		// describe response usage without the model label in the same block.
+		node, ok = firstExtension(operation, pathItem, document, "x-usage")
+	}
+	if !ok || node == nil {
+		return nil, nil
+	}
+	var raw any
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-metrics must be an object: %w", err)
+	}
+	return parseUsageMetricsConfig(raw)
 }
 
 func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*InjectAs, []*InjectAs, error) {

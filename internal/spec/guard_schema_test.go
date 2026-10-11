@@ -52,6 +52,31 @@ func TestResponseCostRequiresFlatFallback(t *testing.T) {
 	assertGuardFinding(t, report.Errors, "cost-from-response.requires-cost-per-call")
 }
 
+func TestRouteMetricsSchemaAndRequestBodyRule(t *testing.T) {
+	metrics := map[string]any{
+		"usage": map[string]any{
+			"input_tokens":  "/usage/prompt_tokens",
+			"output_tokens": "/usage/completion_tokens",
+		},
+		"model": map[string]any{
+			"pointer":   "/model",
+			"allowlist": []any{"provider-model-a", "provider-model-b"},
+		},
+	}
+
+	accepted := lintGuardTestFragment(t, map[string]any{"x-metrics": metrics}, map[string]any{
+		"requestBody": map[string]any{
+			"content": map[string]any{
+				"application/json": map[string]any{"schema": map[string]any{"type": "object"}},
+			},
+		},
+	})
+	assertGuardLintAccepted(t, accepted)
+
+	rejected := lintGuardTestFragment(t, map[string]any{"x-metrics": metrics}, nil)
+	assertGuardFinding(t, rejected.Errors, "metrics.model-pointer")
+}
+
 func TestRouteGuardSchemaRejectsUnitMismatch(t *testing.T) {
 	tests := []struct {
 		name      string

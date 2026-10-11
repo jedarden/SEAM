@@ -53,6 +53,11 @@ func (b *responseCostBody) captured() []byte {
 type ResponseCostCharge struct {
 	Pointer string
 	Price   float64
+	// Name preserves the keyed vocabulary (for example input/output) when a
+	// response-cost declaration uses its provider-facing object form. It also
+	// lets the metrics layer identify token counters without changing the
+	// existing charge semantics.
+	Name string
 }
 
 // ResponseCostConfig is the provider-agnostic response metering contract.
@@ -242,7 +247,7 @@ func parseResponseCostConfig(raw any) (*ResponseCostConfig, error) {
 		if !ok {
 			return fmt.Errorf("x-cost-from-response entry %q requires price", key)
 		}
-		config.Charges = append(config.Charges, ResponseCostCharge{Pointer: pointer, Price: price})
+		config.Charges = append(config.Charges, ResponseCostCharge{Pointer: pointer, Price: price, Name: key})
 		return nil
 	}
 

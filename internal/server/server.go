@@ -2609,6 +2609,11 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 		metrics := s.ensureMetrics()
 		labels := s.metricLabels(r)
 		ctx := context.WithValue(r.Context(), metricRouteContextKey{}, labels)
+		bodyCapture := newMetricRequestBodyCapture(r.Body)
+		if bodyCapture != nil {
+			r.Body = bodyCapture
+			ctx = context.WithValue(ctx, metricRequestBodyContextKey{}, bodyCapture)
+		}
 		*r = *r.WithContext(ctx)
 
 		metrics.incrementInFlight(labels, r.Method)
@@ -2620,8 +2625,18 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 			statusCode:     http.StatusOK,
 		}
 		defer func() {
+			model := otherModelLabel
+			if labels.Usage != nil {
+				model = labels.Usage.modelLabel(bodyCapture.captured())
+			}
+			totalLatency := time.Since(startTime)
+			ttfb := time.Duration(0)
+			if !wrapped.firstByteAt.IsZero() {
+				ttfb = wrapped.firstByteAt.Sub(startTime)
+			}
 			metrics.decrementInFlight(labels, r.Method)
 			metrics.recordHTTPRequest(labels, r.Method, wrapped.statusCode, time.Since(startTime))
+			metrics.recordRouteTiming(labels.Route, model, ttfb, totalLatency)
 			// Phase 8.4: Record per-route-version metric
 			metrics.recordRouteVersionRequest(labels.Route, labels.SpecVersion)
 		}()
@@ -2646,6 +2661,12 @@ func (s *Server) metricLabels(r *http.Request) metricRouteLabels {
 				Route:       match.Route.PathTemplate,
 				Version:     match.Route.APIVersion,
 				SpecVersion: specVersion,
+				Usage: func() *UsageMetricsConfig {
+					if match.Route.UsageMetrics != nil {
+						return match.Route.UsageMetrics
+					}
+					return usageMetricsFromResponseCost(match.Route.CostFromResponse)
+				}(),
 			}
 		}
 	}
@@ -2671,6 +2692,7 @@ type metricsResponseWriter struct {
 	http.ResponseWriter
 	statusCode  int
 	wroteHeader bool
+	firstByteAt time.Time
 }
 
 // WriteHeader captures the status code
@@ -2680,6 +2702,9 @@ func (w *metricsResponseWriter) WriteHeader(statusCode int) {
 	}
 	w.wroteHeader = true
 	w.statusCode = statusCode
+	if w.firstByteAt.IsZero() {
+		w.firstByteAt = time.Now()
+	}
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 

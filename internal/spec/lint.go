@@ -326,6 +326,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
 	f.checkBodyMode(report)
+	f.checkRouteMetrics(report)
 	f.checkInjectionNames(report)
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
@@ -376,6 +377,55 @@ func (f *lintFragment) checkBodyMode(report *LintReport) {
 			}
 		}
 	}
+}
+
+// checkRouteMetrics keeps the request-side model label honest. The JSON
+// Schema owns the pointer and allowlist shapes; this cross-field check makes
+// sure a model label is only declared on an operation that has a request
+// body from which that pointer can be read.
+func (f *lintFragment) checkRouteMetrics(report *LintReport) {
+	root := f.data["x-metrics"]
+	if root == nil {
+		root = f.data["x-usage"]
+	}
+	paths, _ := f.data["paths"].(map[string]any)
+	for path, pathValue := range paths {
+		pathItem, _ := pathValue.(map[string]any)
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, _ := operationValue.(map[string]any)
+			if operation == nil {
+				continue
+			}
+			metricsValue := operation["x-metrics"]
+			if metricsValue == nil {
+				metricsValue = operation["x-usage"]
+			}
+			if metricsValue == nil {
+				metricsValue = root
+			}
+			if !metricsDeclaresModel(metricsValue) {
+				continue
+			}
+			if _, hasBody := operation["requestBody"]; !hasBody {
+				f.addError(report, "metrics.model-pointer", fmt.Sprintf("%s %s declares a model metric but has no requestBody", strings.ToUpper(method), path))
+			}
+		}
+	}
+}
+
+func metricsDeclaresModel(value any) bool {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	model, ok := object["model"].(map[string]any)
+	if !ok {
+		model, ok = object["modelLabel"].(map[string]any)
+	}
+	return ok && model["pointer"] != nil
 }
 
 func opaqueRequestBodyContent(document, requestBody map[string]any) (map[string]any, bool) {

@@ -58,6 +58,8 @@
     "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for repeated-identical-request loop protection. Applied to all operations unless overridden at operation level." },
     "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default unit-bearing cost per call. Applied to all operations unless overridden at operation level. SEAM never converts between units." },
     "x-cost-from-response": { "$ref": "#/$defs/costFromResponse", "$comment": "Fragment-root default response usage metering. Each JSON Pointer is evaluated against the final JSON body or final SSE event; any miss uses the effective x-cost-per-call fallback." },
+    "x-metrics": { "$ref": "#/$defs/routeMetrics", "$comment": "Fragment-root default response usage counters and bounded request model label. Operation-level x-metrics overrides it." },
+    "x-usage": { "$ref": "#/$defs/routeMetrics", "$comment": "Readable alias for x-metrics when a route only declares response usage pointers." },
     "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default unit-bearing budget in a tumbling, restart-scoped window. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." },
     "x-cache-ttl": { "$ref": "#/$defs/cacheTtl", "$comment": "Fragment-root field marking GET responses as cacheable. Specified as non-negative integer seconds. Absence means no caching. Only GET requests are cached; other methods bypass cache. Enables single-flight coalescing regardless of TTL value." }
   },
@@ -261,6 +263,52 @@
         { "type": "object", "required": ["pointers"], "properties": { "pointers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/responseCostPointer" } } }, "additionalProperties": false },
         { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/responseCostPointer" } }
       ]
+    },
+    "metricPointer": {
+      "oneOf": [
+        { "type": "string", "pattern": "^(|/.*)$" },
+        { "type": "object", "required": ["pointer"], "properties": { "pointer": { "type": "string", "pattern": "^(|/.*)$" } }, "additionalProperties": false }
+      ],
+      "$comment": "An RFC 6901 pointer into a response usage object. The object form is accepted for provider-readable declarations."
+    },
+    "modelMetric": {
+      "type": "object",
+      "required": ["pointer", "allowlist"],
+      "properties": {
+        "pointer": { "type": "string", "pattern": "^/.*$", "description": "RFC 6901 pointer into the request JSON body." },
+        "allowlist": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      },
+      "additionalProperties": false
+    },
+    "routeMetrics": {
+      "type": "object",
+      "properties": {
+        "usage": {
+          "type": "object",
+          "properties": {
+            "inputTokens": { "$ref": "#/$defs/metricPointer" },
+            "outputTokens": { "$ref": "#/$defs/metricPointer" },
+            "input_tokens": { "$ref": "#/$defs/metricPointer" },
+            "output_tokens": { "$ref": "#/$defs/metricPointer" },
+            "input": { "$ref": "#/$defs/metricPointer" },
+            "output": { "$ref": "#/$defs/metricPointer" },
+            "promptTokens": { "$ref": "#/$defs/metricPointer" },
+            "prompt_tokens": { "$ref": "#/$defs/metricPointer" },
+            "prompt": { "$ref": "#/$defs/metricPointer" },
+            "completionTokens": { "$ref": "#/$defs/metricPointer" },
+            "completion_tokens": { "$ref": "#/$defs/metricPointer" },
+            "completion": { "$ref": "#/$defs/metricPointer" }
+          },
+          "additionalProperties": false
+        },
+        "inputTokens": { "$ref": "#/$defs/metricPointer" },
+        "outputTokens": { "$ref": "#/$defs/metricPointer" },
+        "input_tokens": { "$ref": "#/$defs/metricPointer" },
+        "output_tokens": { "$ref": "#/$defs/metricPointer" },
+        "model": { "$ref": "#/$defs/modelMetric" }
+      },
+      "additionalProperties": false,
+      "$comment": "Usage pointers name response fields. model.pointer names a request-body field and only allowlisted values become Prometheus labels; every other value is other."
     },
     "quota": {
       "type": "object",
@@ -499,6 +547,8 @@
         "x-loop-guard": { "$ref": "#/$defs/loopGuard" },
         "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
         "x-cost-from-response": { "$ref": "#/$defs/costFromResponse" },
+        "x-metrics": { "$ref": "#/$defs/routeMetrics" },
+        "x-usage": { "$ref": "#/$defs/routeMetrics" },
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
         "x-streaming": { "type": "boolean", "default": false, "$comment": "Deliver the response incrementally and flush each available event; overrides the fragment-root default." },
