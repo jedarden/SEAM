@@ -121,6 +121,63 @@ func TestRouteMetricsAppearForBufferedAndStreamedResponses(t *testing.T) {
 	}
 }
 
+// TestUsageMetricsCardinalityCollapsesArbitraryModelsToOther exercises the
+// full request path, not just modelLabel: a caller-invented model string must
+// land on the single bounded "other" series instead of minting a new
+// Prometheus label value per caller.
+func TestUsageMetricsCardinalityCollapsesArbitraryModelsToOther(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"usage":{"input_tokens":2,"output_tokens":4}}`)
+	}))
+	defer upstream.Close()
+
+	route := RouteEntry{
+		PathTemplate: "/metered",
+		Method:       http.MethodPost,
+		APIVersion:   "v1",
+		CostPerCall:  &CostPerCallConfig{Amount: 0.25, Unit: "USD"},
+		UsageMetrics: &UsageMetricsConfig{
+			InputTokensPointer:  "/usage/input_tokens",
+			OutputTokensPointer: "/usage/output_tokens",
+			Model:               ModelMetricConfig{Pointer: "/model", Allowlist: []string{"safe-model"}},
+		},
+	}
+	table := NewRouteTable(nil)
+	table.AddRoute(route)
+	server := &Server{
+		cache:            NewResponseCache(),
+		routeTableHolder: NewThreadSafeTableHolder(table),
+		circuitBreakers:  NewCircuitBreakerStateRegistry(),
+	}
+	server.metrics = newMetrics(server.cache, table, server.circuitBreakers, buildinfo.Read())
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("NewReverseProxy: %v", err)
+	}
+	proxy.Metrics = server.metrics
+
+	// Lowercase alphanumeric plus dashes keeps the value safe to assert
+	// against Prometheus text exposition without escaping.
+	arbitrary := "caller-invented-model-" + strings.ToLower(strings.NewReplacer("/", "-", "_", "-").Replace(t.Name()))
+	req := httptest.NewRequest(http.MethodPost, "http://seam.test/metered", strings.NewReader(`{"model":"`+arbitrary+`"}`))
+	withRouteMatch(req, &RouteMatch{Route: route}, nil)
+	recorder := httptest.NewRecorder()
+	server.metricsMiddleware(proxy).ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+
+	body := scrapePrometheusMetrics(t, server)
+	otherLabels := `model="other",route="/metered"`
+	if !strings.Contains(body, "seam_input_tokens_total{"+otherLabels+"}") || !strings.Contains(body, "seam_output_tokens_total{"+otherLabels+"}") {
+		t.Fatalf("token counters did not collapse to %s:\n%s", otherLabels, body)
+	}
+	if strings.Contains(body, arbitrary) {
+		t.Fatalf("arbitrary model string leaked onto the metrics surface:\n%s", body)
+	}
+}
+
 func TestMetricsResponseWriterRecordsFirstByteAtHeaderWrite(t *testing.T) {
 	writer := &metricsResponseWriter{ResponseWriter: httptest.NewRecorder()}
 	start := time.Now()
