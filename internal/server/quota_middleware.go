@@ -51,9 +51,34 @@ func (s *Server) quotaMiddleware(next http.Handler) http.Handler {
 
 		// Get the route for cost lookup
 		route := r.URL.Path
+		match := routeMatchFromRequest(r)
 
 		// Get the cost per call for this route
 		costPerCall := s.getCostPerCall(route)
+		if match != nil && match.Route.CostPerCall != nil {
+			costPerCall = match.Route.CostPerCall.Amount
+		}
+		if match != nil && match.Route.CostFromResponse != nil {
+			// Response-derived routes still use the flat price as an admission
+			// brake, but the ledger is updated only after the final body/event is
+			// available. A pointer miss falls back to this same amount.
+			allowed, remaining, err := s.quotaTracker.CheckQuotaOnly(r.Context(), route, costPerCall, token, user)
+			if err != nil {
+				requestErr := WrapRequestError(ErrCodeInternalServer, "Error checking quota", err).
+					WithDetail("route", route)
+				logRequestError(r, "quota-check", requestErr)
+				requestErr.Write(w, r)
+				return
+			}
+			if !allowed {
+				s.writeQuotaExceededResponse(w, r, route, remaining, costPerCall)
+				return
+			}
+			ctx := contextWithQuotaDeferred(r.Context())
+			r = r.WithContext(ctx)
+			next.ServeHTTP(w, r)
+			return
+		}
 		log.Printf("[Quota] Route %s has cost per call: $%.2f", route, costPerCall)
 
 		// If cache hit, bypass quota entirely - Phase 13.2

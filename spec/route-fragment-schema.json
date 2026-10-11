@@ -57,6 +57,7 @@
 
     "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for repeated-identical-request loop protection. Applied to all operations unless overridden at operation level." },
     "x-cost-per-call": { "$ref": "#/$defs/costPerCall", "$comment": "Fragment-root default unit-bearing cost per call. Applied to all operations unless overridden at operation level. SEAM never converts between units." },
+    "x-cost-from-response": { "$ref": "#/$defs/costFromResponse", "$comment": "Fragment-root default response usage metering. Each JSON Pointer is evaluated against the final JSON body or final SSE event; any miss uses the effective x-cost-per-call fallback." },
     "x-quota": { "$ref": "#/$defs/quota", "$comment": "Fragment-root default unit-bearing budget in a tumbling, restart-scoped window. Applied to all operations unless overridden at operation level. Requires x-cost-per-call when specified." },
     "x-cache-ttl": { "$ref": "#/$defs/cacheTtl", "$comment": "Fragment-root field marking GET responses as cacheable. Specified as non-negative integer seconds. Absence means no caching. Only GET requests are cached; other methods bypass cache. Enables single-flight coalescing regardless of TTL value." }
   },
@@ -72,7 +73,8 @@
     { "$ref": "#/$defs/constraint-passthrough-has-no-probe" },
     { "$ref": "#/$defs/constraint-plaintext-required-on-http" },
     { "$ref": "#/$defs/constraint-plaintext-excludes-map" },
-    { "$ref": "#/$defs/constraint-quota-unit-matches-cost" }
+    { "$ref": "#/$defs/constraint-quota-unit-matches-cost" },
+    { "$ref": "#/$defs/constraint-response-cost-requires-flat-cost" }
   ],
 
   "$defs": {
@@ -233,6 +235,32 @@
         "unit": { "type": "string", "minLength": 1, "description": "Opaque non-empty unit label, for example credits, USD, or requests." }
       },
       "additionalProperties": false
+    },
+    "responseCostPointer": {
+      "type": "object",
+      "required": ["pointer"],
+      "properties": {
+        "pointer": { "type": "string", "pattern": "^(|/.*)$", "description": "RFC 6901 JSON Pointer into the final response body or final SSE event." },
+        "price": { "type": "number", "minimum": 0, "description": "Price per unit in the effective x-cost-per-call unit." },
+        "unitPrice": { "type": "number", "minimum": 0, "description": "Alias for price, for provider profile readability." },
+        "perUnitPrice": { "type": "number", "minimum": 0, "description": "Alias for price." }
+      },
+      "anyOf": [
+        { "required": ["price"] },
+        { "required": ["unitPrice"] },
+        { "required": ["perUnitPrice"] }
+      ],
+      "additionalProperties": false
+    },
+    "costFromResponse": {
+      "description": "One or more response usage counters. Array and keyed forms normalize to the same pointer/price list.",
+      "oneOf": [
+        { "$ref": "#/$defs/responseCostPointer" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/responseCostPointer" } },
+        { "type": "object", "required": ["charges"], "properties": { "charges": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/responseCostPointer" } } }, "additionalProperties": false },
+        { "type": "object", "required": ["pointers"], "properties": { "pointers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/responseCostPointer" } } }, "additionalProperties": false },
+        { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/responseCostPointer" } }
+      ]
     },
     "quota": {
       "type": "object",
@@ -470,6 +498,7 @@
         "x-required-scope": { "$ref": "#/$defs/scopeArray", "$comment": "Operation-level authority; REPLACES any fragment-root default (validator-side), never merges." },
         "x-loop-guard": { "$ref": "#/$defs/loopGuard" },
         "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
+        "x-cost-from-response": { "$ref": "#/$defs/costFromResponse" },
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
         "x-streaming": { "type": "boolean", "default": false, "$comment": "Deliver the response incrementally and flush each available event; overrides the fragment-root default." },
@@ -494,6 +523,11 @@
       "if": { "required": ["x-quota", "x-cost-per-call"] },
       "then": {},
       "$comment": "Declares the byte-identical x-quota.unit == x-cost-per-call.unit invariant at fragment-root and operation levels. Draft 2020-12 cannot compare arbitrary instance strings, so internal/spec enforces this declaration, including an operation x-quota against a fragment-root x-cost-per-call default."
+    },
+    "constraint-response-cost-requires-flat-cost": {
+      "if": { "required": ["x-cost-from-response"] },
+      "then": { "required": ["x-cost-per-call"] },
+      "$comment": "Response usage metering always has a deterministic flat x-cost-per-call fallback for missing usage or a missing pointer."
     },
     "constraint-entry-vault-inject-paired": {
       "if": { "anyOf": [{}] },

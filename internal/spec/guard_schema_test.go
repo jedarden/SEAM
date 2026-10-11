@@ -32,6 +32,26 @@ func TestRouteGuardSchemaRejectsBareNumberCostPerCall(t *testing.T) {
 	assertGuardFinding(t, report.Errors, "fragment.schema")
 }
 
+func TestResponseCostSchemaAndFallbackCoherence(t *testing.T) {
+	report := lintGuardTestFragment(t, map[string]any{
+		"x-cost-per-call": guardCost(0.25, "USD"),
+		"x-cost-from-response": map[string]any{
+			"input": map[string]any{"pointer": "/usage/input_tokens", "price": 0.01},
+		},
+	}, nil)
+	assertGuardLintAccepted(t, report)
+}
+
+func TestResponseCostRequiresFlatFallback(t *testing.T) {
+	report := lintGuardTestFragment(t, map[string]any{
+		"x-cost-from-response": map[string]any{
+			"pointer": "/usage/input_tokens",
+			"price":   0.01,
+		},
+	}, nil)
+	assertGuardFinding(t, report.Errors, "cost-from-response.requires-cost-per-call")
+}
+
 func TestRouteGuardSchemaRejectsUnitMismatch(t *testing.T) {
 	tests := []struct {
 		name      string

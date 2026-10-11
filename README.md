@@ -249,6 +249,33 @@ Issues `GET http://127.0.0.1:<port>/_seam/healthz` and requires HTTP `200`. `SEA
 
 Exit codes: `0` the gateway answered `200`; `1` the probe failed or timed out; `2` invalid usage.
 
+### Response-derived usage metering
+
+Provider routes may declare `x-cost-from-response` alongside the existing
+unit-bearing `x-cost-per-call` fallback. Each entry names an RFC 6901 JSON
+Pointer and a price per reported unit. SEAM evaluates the final JSON response,
+or the last JSON SSE event for `x-streaming` routes, then records the resulting
+charge after the response has been consumed. A missing/unparseable response or
+pointer uses the flat cost and increments
+`seam_cost_from_response_fallback_total{route=...}`. The
+`X-SEAM-Budget-Remaining` value on a buffered response (and its trailer on a
+stream) reflects the post-response charge.
+
+Both array and keyed forms are accepted; the keyed form is convenient for
+provider vocabulary such as `input` and `output`:
+
+```yaml
+x-cost-per-call: {amount: 0.25, unit: USD}
+x-cost-from-response:
+  input: {pointer: /usage/prompt_tokens, price: 0.000005}
+  output: {pointer: /usage/completion_tokens, price: 0.000015}
+```
+
+Response-derived routes are checked against the flat fallback at quota
+admission, but the quota ledger is updated only once the final body/event is
+available. Existing routes without this extension retain their admission-time
+flat-cost behavior.
+
 ### `seam lint`
 
 Validate route fragments against `route-fragment-schema.json` plus SEAM's structural checks: the `x-seam-owner` chain (owner must match the fragment's parent directory and be nested by `x-vault-path`), authored `x-api-version` shape and placement, reserved control-plane paths, upstream URLs (well-formed absolute http(s), no IP-literal hosts, membership of the operator allowlist when one is supplied), transport acknowledgements (plaintext upstreams, `insecureSkipVerify`, unscrubbable responses), and route guards (quota unit mismatches, breaker disagreements across same-origin routes). Spec and structural violations are **errors**; acknowledgement items that need human review are **warnings**.

@@ -915,6 +915,9 @@ func (f *lintFragment) checkRouteGuards(report *LintReport) {
 	for _, message := range quotaUnitMismatchMessages(f.data) {
 		f.addError(report, "quota.unit-mismatch", message)
 	}
+	for _, message := range responseCostFallbackMessages(f.data) {
+		f.addError(report, "cost-from-response.requires-cost-per-call", message)
+	}
 	f.warnLongGuardWindow(report, f.data, "x-loop-guard", "fragment-root x-loop-guard.window")
 	f.warnLongGuardWindow(report, f.data, "x-quota", "fragment-root x-quota.window")
 
@@ -937,10 +940,45 @@ func (f *lintFragment) checkRouteGuards(report *LintReport) {
 			}
 
 			context := strings.ToUpper(method) + " " + path
+			for _, message := range responseCostOperationMessages(operation, f.data) {
+				f.addError(report, "cost-from-response.requires-cost-per-call", context+": "+message)
+			}
 			f.warnLongGuardWindow(report, operation, "x-loop-guard", context+" x-loop-guard.window")
 			f.warnLongGuardWindow(report, operation, "x-quota", context+" x-quota.window")
 		}
 	}
+}
+
+// responseCostFallbackMessages keeps the response-metering and Phase 13
+// flat-cost contracts coherent. An operation may inherit the fragment-root
+// fallback, so callers pass an effective map when checking operations.
+func responseCostFallbackMessages(container map[string]any) []string {
+	if container == nil {
+		return nil
+	}
+	if _, metered := container["x-cost-from-response"]; !metered {
+		return nil
+	}
+	if _, fallback := container["x-cost-per-call"]; fallback {
+		return nil
+	}
+	return []string{"x-cost-from-response requires x-cost-per-call as the flat fallback when response usage is absent or a pointer misses"}
+}
+
+func responseCostOperationMessages(operation, root map[string]any) []string {
+	if operation == nil {
+		return nil
+	}
+	if _, metered := operation["x-cost-from-response"]; !metered {
+		return nil
+	}
+	if _, fallback := operation["x-cost-per-call"]; fallback {
+		return nil
+	}
+	if _, fallback := root["x-cost-per-call"]; fallback {
+		return nil
+	}
+	return responseCostFallbackMessages(operation)
 }
 
 // checkBreakerDisagreements validates that same-origin instances in x-upstream-map

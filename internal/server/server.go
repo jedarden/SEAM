@@ -2374,6 +2374,7 @@ func (s *Server) getOrCreateProxyWithError(upstreamURL string, tlsConfigs ...*Up
 
 	// Phase 13.2: Wire up quota tracker for dispatch-time accounting
 	proxy.QuotaTracker = s.quotaTracker
+	proxy.Metrics = s.metrics
 
 	s.proxyMap[proxyKey] = proxy
 	log.Printf("[dispatch] Created new proxy for upstream %s (TLS identity %s)", upstreamURL, clientKey)

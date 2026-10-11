@@ -109,6 +109,14 @@ type RouteEntry struct {
 	// buffered, while legacy routes retain their existing buffering behavior.
 	Streaming bool
 
+	// CostPerCall is the flat fallback for response-derived metering and the
+	// legacy admission-time charge when CostFromResponse is nil.
+	CostPerCall *CostPerCallConfig
+
+	// CostFromResponse describes usage counters in the final JSON response or
+	// final SSE event. A nil value preserves the legacy flat-cost behavior.
+	CostFromResponse *ResponseCostConfig
+
 	// InstanceParam identifies the path binding consumed by an upstream map.
 	// It is removed from the upstream path before any remaining bindings are
 	// substituted.
@@ -632,6 +640,14 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			costFromResponse, err := extractResponseCostConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			costPerCall, err := extractCostPerCallConfig(methodOp.operation, pathItem, spec)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 
 			// Extract deprecation information (Phase 8.3)
 			deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
@@ -654,6 +670,8 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				Unscrubbable:          unscrubbable,
 				BodyMode:              bodyMode,
 				Streaming:             streaming,
+				CostPerCall:           costPerCall,
+				CostFromResponse:      costFromResponse,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
 				Deprecated:            deprecated,
@@ -809,6 +827,34 @@ func extractBoolExtension(operation *v3.Operation, pathItem *v3.PathItem, docume
 		return false, fmt.Errorf("%s must be a boolean: %w", name, err)
 	}
 	return value, nil
+}
+
+func extractResponseCostConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*ResponseCostConfig, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-cost-from-response")
+	if !ok || node == nil {
+		return nil, nil
+	}
+	var raw any
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-cost-from-response must be an object or list: %w", err)
+	}
+	config, err := parseResponseCostConfig(raw)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func extractCostPerCallConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*CostPerCallConfig, error) {
+	node, ok := firstExtension(operation, pathItem, document, "x-cost-per-call")
+	if !ok || node == nil {
+		return nil, nil
+	}
+	var raw any
+	if err := node.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("x-cost-per-call must be an object: %w", err)
+	}
+	return parseCostPerCallConfig(raw)
 }
 
 func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*InjectAs, []*InjectAs, error) {

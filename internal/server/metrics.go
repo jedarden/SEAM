@@ -45,6 +45,9 @@ type Metrics struct {
 	quotaExceeded  *prometheus.CounterVec
 	quotaBypassed  *prometheus.CounterVec
 
+	responseCostTotal    *prometheus.CounterVec
+	responseCostFallback *prometheus.CounterVec
+
 	// Starvation recovery metrics
 	recoveryAttempts   *prometheus.CounterVec
 	recoverySuccesses  *prometheus.CounterVec
@@ -119,6 +122,14 @@ func newMetrics(
 		quotaBypassed: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "seam_quota_bypassed_total",
 			Help: "Total quota checks bypassed by response-cache hits.",
+		}, []string{"route"}),
+		responseCostTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_cost_from_response_total",
+			Help: "Total response-derived usage cost by route.",
+		}, []string{"route"}),
+		responseCostFallback: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "seam_cost_from_response_fallback_total",
+			Help: "Total responses that used the flat x-cost-per-call fallback because response usage was absent or unusable.",
 		}, []string{"route"}),
 		routeVersionRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "seam_route_version_requests_total",
@@ -196,6 +207,8 @@ func newMetrics(
 		metrics.quotaRemaining,
 		metrics.quotaExceeded,
 		metrics.quotaBypassed,
+		metrics.responseCostTotal,
+		metrics.responseCostFallback,
 		metrics.recoveryAttempts,
 		metrics.recoverySuccesses,
 		metrics.recoveryStageUsed,
@@ -268,6 +281,18 @@ func (m *Metrics) recordQuotaExceeded(route string) {
 func (m *Metrics) recordQuotaBypassed(route string) {
 	if m != nil {
 		m.quotaBypassed.WithLabelValues(route).Inc()
+	}
+}
+
+func (m *Metrics) recordResponseCost(route string, cost float64) {
+	if m != nil {
+		m.responseCostTotal.WithLabelValues(route).Add(cost)
+	}
+}
+
+func (m *Metrics) recordResponseCostFallback(route string) {
+	if m != nil {
+		m.responseCostFallback.WithLabelValues(route).Inc()
 	}
 }
 

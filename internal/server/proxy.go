@@ -49,6 +49,7 @@ const (
 	dryRunKey
 	credentialRetryKey // Phase 12: Track if we've already attempted credential refresh
 	quotaChargedKey    // quotaMiddleware already charged this request at admission
+	quotaDeferredKey   // response-derived cost is charged after the response body
 )
 
 // contextWithReplayableBody stores a replayable body in the context
@@ -119,6 +120,15 @@ func contextWithQuotaCharged(ctx context.Context) context.Context {
 func quotaChargedFromContext(ctx context.Context) bool {
 	charged, ok := ctx.Value(quotaChargedKey).(bool)
 	return ok && charged
+}
+
+func contextWithQuotaDeferred(ctx context.Context) context.Context {
+	return context.WithValue(ctx, quotaDeferredKey, true)
+}
+
+func quotaDeferredFromContext(ctx context.Context) bool {
+	deferred, ok := ctx.Value(quotaDeferredKey).(bool)
+	return ok && deferred
 }
 
 // contextWithCredentialRetry tracks whether we've attempted credential refresh
@@ -311,6 +321,10 @@ type ReverseProxy struct {
 	// QuotaTracker is the quota tracker for dispatch-time cost deduction
 	// Phase 13.2: Quota is deducted at dispatch time, not before
 	QuotaTracker *QuotaTracker
+
+	// Metrics receives response-derived metering observations. It is optional
+	// so standalone proxies remain useful in package tests.
+	Metrics *Metrics
 }
 
 // NewReverseProxy creates a reverse proxy for upstreamURL.
@@ -551,7 +565,8 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	// A request that came through the quota middleware is the exception: that
 	// middleware already charged it at admission (quotaChargedKey), and this
 	// second deduction would bill the caller twice for one call.
-	if quotaCost > 0 && p.QuotaTracker != nil && !quotaChargedFromContext(ctx) {
+	if quotaCost > 0 && p.QuotaTracker != nil && !quotaChargedFromContext(ctx) &&
+		!quotaDeferredFromContext(ctx) && matchCostFromResponse(match) == nil {
 		// Extract token and user for quota tracking
 		token := r.Header.Get("X-Auth-Token")
 		user := r.Header.Get("X-User-ID")
@@ -581,6 +596,28 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	}
 	if opaqueBodyMode && (upstreamResp.StatusCode < http.StatusOK || upstreamResp.StatusCode >= http.StatusMultipleChoices) {
 		upstreamResp.Header.Set("X-SEAM-Upstream-Status", strconv.Itoa(upstreamResp.StatusCode))
+	}
+
+	responseCostConfig := matchCostFromResponse(match)
+	var responseCostBodyReader *responseCostBody
+	if responseCostConfig != nil {
+		if streamingRoute {
+			// Streaming responses must remain incremental. Keep only a bounded
+			// tail, which is enough to inspect the final SSE event after EOF.
+			responseCostBodyReader = newResponseCostBody(upstreamResp.Body)
+			upstreamResp.Body = responseCostBodyReader
+			w.Header().Add("Trailer", "X-SEAM-Budget-Remaining")
+		} else {
+			body, readErr := io.ReadAll(upstreamResp.Body)
+			_ = upstreamResp.Body.Close()
+			if readErr != nil {
+				return fmt.Errorf("reading response for usage metering: %w", readErr)
+			}
+			if err := p.finalizeResponseCost(w, r, match, body, false); err != nil {
+				return err
+			}
+			upstreamResp.Body = io.NopCloser(bytes.NewReader(body))
+		}
 	}
 
 	// Update X-SEAM-Budget-Remaining header with actual remaining after deduction
@@ -613,10 +650,20 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 			if err := scrubber.serveUnscannable(w, upstreamResp, streamingRoute); err != nil {
 				return fmt.Errorf("streaming acknowledged unscannable response: %w", err)
 			}
+			if responseCostBodyReader != nil {
+				if err := p.finalizeResponseCost(w, r, match, responseCostBodyReader.captured(), streamingRoute); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		if err := scrubber.streamResponse(w, upstreamResp, p.MaxBufferedResponseBytes, streamingRoute); err != nil {
 			return fmt.Errorf("scrubbing upstream response: %w", err)
+		}
+		if responseCostBodyReader != nil {
+			if err := p.finalizeResponseCost(w, r, match, responseCostBodyReader.captured(), true); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -628,6 +675,57 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	w.WriteHeader(upstreamResp.StatusCode)
 	if err := p.streamResponse(w, upstreamResp.Body, streamingRoute); err != nil {
 		return fmt.Errorf("streaming upstream response: %w", err)
+	}
+	if responseCostBodyReader != nil {
+		if err := p.finalizeResponseCost(w, r, match, responseCostBodyReader.captured(), true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func matchCostFromResponse(match *RouteMatch) *ResponseCostConfig {
+	if match == nil {
+		return nil
+	}
+	return match.Route.CostFromResponse
+}
+
+func (p *ReverseProxy) finalizeResponseCost(w http.ResponseWriter, r *http.Request, match *RouteMatch, body []byte, streaming bool) error {
+	config := matchCostFromResponse(match)
+	if config == nil {
+		return nil
+	}
+	cost, metered := config.responseCost(body, streaming)
+	route := r.URL.Path
+	fallback := float64(0)
+	if p.QuotaTracker != nil {
+		fallback = p.QuotaTracker.GetCostPerCall(route)
+	}
+	unit := "call"
+	if match != nil && match.Route.CostPerCall != nil {
+		fallback = match.Route.CostPerCall.Amount
+		unit = match.Route.CostPerCall.Unit
+	}
+	if !metered {
+		cost = fallback
+		if p.Metrics != nil {
+			p.Metrics.recordResponseCostFallback(route)
+		}
+	}
+	if p.Metrics != nil {
+		p.Metrics.recordResponseCost(route, cost)
+	}
+	if p.QuotaTracker != nil {
+		token := r.Header.Get("X-Auth-Token")
+		user := r.Header.Get("X-User-ID")
+		if err := p.QuotaTracker.RecordQuotaCost(route, cost, token, user); err != nil {
+			return fmt.Errorf("recording response-derived quota cost: %w", err)
+		}
+		remaining := p.QuotaTracker.GetRemaining(route, token, user)
+		w.Header().Set("X-SEAM-Budget-Remaining", formatBudgetRemainingUnit(remaining, unit, p.QuotaTracker.GetWindowDuration()))
+		w.Header().Set("X-Quota-Cost-Per-Call", formatCost(cost))
+		w.Header().Set("X-Quota-Remaining", formatCost(remaining))
 	}
 	return nil
 }
@@ -1248,9 +1346,17 @@ func (p *ReverseProxy) GetUpstreamURL() string {
 // formatBudgetRemaining formats the X-SEAM-Budget-Remaining header value
 // Phase 13.2: Format is "amount=X unit=Y window=Z resets=R"
 func formatBudgetRemaining(remaining, costPerCall float64, windowDuration time.Duration) string {
+	return formatBudgetRemainingUnit(remaining, "call", windowDuration)
+}
+
+func formatBudgetRemainingUnit(remaining float64, unit string, windowDuration time.Duration) string {
 	resetTime := time.Now().Add(windowDuration)
-	return fmt.Sprintf("amount=%s unit=call window=%s resets=%s",
+	if unit == "" {
+		unit = "call"
+	}
+	return fmt.Sprintf("amount=%s unit=%s window=%s resets=%s",
 		formatCost(remaining),
+		unit,
 		formatDuration(windowDuration),
 		resetTime.Format(time.RFC3339))
 }

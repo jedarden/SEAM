@@ -66,6 +66,7 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-adapter` | `adapter` | no | Declarative request/response transforms delegating to `targetVersion`. Mutually exclusive with every upstream-facing field. |
 | `x-unscrubbable` | `acknowledged` | no | Root **or** operation level. Acknowledgement that a route runs unscrubbed. |
 | `x-streaming` | boolean | no | Root default or operation override. Forces incremental response delivery and overlap-window scrubbing; it never whole-response buffers. |
+| `x-cost-from-response` | `costFromResponse` | no | Root default for usage-based metering. One or more `{pointer, price}` entries (array, `charges`/`pointers` wrapper, or keyed `input`/`output` form). Pointers target the final JSON body or last SSE event; any miss uses the effective flat `x-cost-per-call`. |
 | `x-requires-approval` | boolean | no | **RESERVED** (approval-gated routes, accepted but unphased). Declared so the first fragment can carry it without a schema change; not yet enforced. |
 
 ### 3.2 Path-item-level fields
@@ -81,6 +82,7 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-required-scope` | `scopeArray` | **The authority** wherever both root and operation are present; *replaces* the root default. Per-method granularity is what makes the visible-but-not-invocable 403 expressible. |
 | `x-loop-guard` | `loopGuard` | `{maxRepeats, window}`. `maxRepeats` is a positive integer; `window` matches `^[0-9]+(s|m|h|d)$` and is tumbling/restart-scoped. A 2xx response clears the same request hash's counter at runtime. Absent = no loop guard on that route. |
 | `x-cost-per-call` | `costPerCall` | `{amount, unit}`. `amount` is a number >= 0; `unit` is a non-empty opaque string such as `credits`, `USD`, or `requests`. SEAM never converts units. |
+| `x-cost-from-response` | `costFromResponse` | Operation override for response usage pointers and per-unit prices. The operation may inherit the root `x-cost-per-call` fallback. |
 | `x-quota` | `quota` | `{amount, unit, window}`. `amount` is a number >= 0; `unit` is non-empty and must byte-match the effective `x-cost-per-call.unit`; `window` uses the shared duration grammar. Requires `x-cost-per-call` (schema-encoded at operation level). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-streaming` | boolean | Operation override for incremental response delivery. A response adapter transform that needs buffering is invalid when this is true. |
@@ -113,6 +115,7 @@ The schema validates shape + intra-object relations. **Every constraint below ne
 ### 4.2 Cross-object value equality (on the effective route)
 
 - **`x-quota.unit` must be byte-identical to the same route's `x-cost-per-call.unit`.** Root/root and operation/operation pairs compare directly; an operation-level quota with no operation-level cost compares against the fragment-root cost default. A mixed pair draws a credit balance down in dollars. The schema declares this invariant as `constraint-quota-unit-matches-cost`, but draft 2020-12 cannot compare arbitrary instance strings, so the Go validator performs the equality check.
+- **`x-cost-from-response` must have an effective `x-cost-per-call` fallback.** A response can be empty, malformed, or omit a provider usage field; the deterministic flat charge prevents an unmetered call. The schema checks the fragment-root pair and the Go validator checks operation-level overrides against the root default.
 
 ### 4.3 Effective per-instance resolution (on a map fragment)
 
@@ -157,6 +160,7 @@ For completeness, these are the named cross-field constraints exposed by the sch
 | `constraint-plaintext-required-on-http` | an `http://` `x-upstream` without `x-upstream-plaintext` |
 | `constraint-plaintext-excludes-map` | `x-upstream-plaintext` alongside `x-upstream-map` |
 | `constraint-quota-requires-cost` (operation) | `x-quota` without `x-cost-per-call` on the same route |
+| `constraint-response-cost-requires-flat-cost` (root; effective operation check in Go) | `x-cost-from-response` without a deterministic flat fallback |
 | `constraint-quota-unit-matches-cost` (root + operation; validator-evaluated) | byte-different effective `x-quota.unit` / `x-cost-per-call.unit` values |
 
 The `acknowledged` singleton (no `false` form) for `insecureSkipVerify` / `x-upstream-plaintext` / `x-unscrubbable`, the `apiVersion` grammar, the `duration` grammar, the IP-literal rejection on `upstreamUrl`, and the `injectAs` kind↔name conditionals are all encoded inline in their `$def`s.
