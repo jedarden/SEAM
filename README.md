@@ -71,6 +71,14 @@ to load the replacement; a rejected env credential is not refreshed or retried
 in place, and its configured sentinel probe reports the 401 at
 `/health/credentials`.
 
+The rs-manager deployment uses this source for the Subquadratic provider. Its
+public preview route is exposed at `/subq/v1/models` and
+`/subq/v1/systemone`; `/subq` is stripped before forwarding to
+`https://api.subq.ai`. The provider credential is mirrored into
+`SEAM_CRED_SUBQ_API_KEY` by an ExternalSecret, so SEAM does not need an
+OpenBao read grant for that key. The public preview currently does not accept
+the OpenAI-compatible chat-completions endpoint.
+
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path. The precedence is mounted control &gt; flag &gt; environment variable &gt; default: an explicit flag already beats `SEAM_UPSTREAM_CA_DIR` / `SEAM_UPSTREAM_ALLOWLIST` before the boundary runs, so what gets refused in-cluster is the flag's value.
 
 **Operator-visible failure modes (in-cluster upstream trust).**
