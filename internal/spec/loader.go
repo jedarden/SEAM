@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -494,7 +495,7 @@ func (l *Loader) GetRawDocument() []byte {
 // ValidateRequest validates an HTTP request against the OpenAPI spec
 // Returns nil if valid, or a ValidationError if invalid
 func (l *Loader) ValidateRequest(r *http.Request) *ValidationError {
-	if l == nil || l.validator == nil || l.model == nil || r == nil {
+	if l == nil || l.validator == nil || l.model == nil || r == nil || r.URL == nil {
 		return nil
 	}
 
@@ -502,9 +503,15 @@ func (l *Loader) ValidateRequest(r *http.Request) *ValidationError {
 	// SpecPath on most errors, but that value is not guaranteed for decoder and
 	// schema errors. Keeping the template here is also what lets a pointer for
 	// /widgets/123 name /widgets/{id} rather than the concrete request path.
-	_, _, pathTemplate := validatorpaths.FindPath(r, &l.model.Model, nil)
+	pathItem, pathErrors, pathTemplate := validatorpaths.FindPath(r, &l.model.Model, nil)
 	if pathTemplate == "" {
 		pathTemplate = r.URL.Path
+	}
+	if operation := operationForMethod(pathItem, r.Method); operation != nil && operationBodyMode(operation) == "opaque" {
+		if len(pathErrors) > 0 {
+			return &ValidationError{Errors: pathErrors, PathTemplate: pathTemplate}
+		}
+		return validateOpaqueRequestContentType(r, operation, pathTemplate)
 	}
 
 	// Validate the request
@@ -519,6 +526,100 @@ func (l *Loader) ValidateRequest(r *http.Request) *ValidationError {
 	return &ValidationError{
 		Errors:       validationErrors,
 		PathTemplate: pathTemplate,
+	}
+}
+
+func operationForMethod(pathItem *v3.PathItem, method string) *v3.Operation {
+	if pathItem == nil {
+		return nil
+	}
+	operation, _ := pathItem.GetOperations().Get(strings.ToLower(method))
+	return operation
+}
+
+func operationBodyMode(operation *v3.Operation) string {
+	if operation == nil || operation.Extensions == nil {
+		return "validated"
+	}
+	node, ok := operation.Extensions.Get("x-body-mode")
+	if !ok || node == nil {
+		return "validated"
+	}
+	var mode string
+	if err := node.Decode(&mode); err != nil || mode == "" {
+		return "validated"
+	}
+	return mode
+}
+
+func validateOpaqueRequestContentType(r *http.Request, operation *v3.Operation, pathTemplate string) *ValidationError {
+	requestBody := operation.RequestBody
+	bodyPresent := r.Body != nil && r.Body != http.NoBody && (r.ContentLength != 0 || r.ContentLength < 0)
+	if requestBody == nil {
+		if bodyPresent {
+			return opaqueRequestValidationError(pathTemplate, "Content-Type", "this operation does not accept a request body")
+		}
+		return nil
+	}
+	if !bodyPresent {
+		if requestBody.Required != nil && *requestBody.Required {
+			return opaqueRequestValidationError(pathTemplate, "request body", "a request body is required")
+		}
+		return nil
+	}
+	if requestBody.Content == nil || requestBody.Content.Len() == 0 {
+		return opaqueRequestValidationError(pathTemplate, "Content-Type", "the operation declares no request content types")
+	}
+
+	contentType := strings.TrimSpace(r.Header.Get("Content-Type"))
+	if contentType == "" {
+		return opaqueRequestValidationError(pathTemplate, "Content-Type", "a Content-Type declared by the operation is required")
+	}
+	actualType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return opaqueRequestValidationError(pathTemplate, "Content-Type", "the request Content-Type is not a valid media type")
+	}
+	for declared := requestBody.Content.First(); declared != nil; declared = declared.Next() {
+		if mediaTypeMatches(declared.Key(), actualType) {
+			return nil
+		}
+	}
+	return opaqueRequestValidationError(pathTemplate, "Content-Type", fmt.Sprintf("Content-Type %q is not declared by the operation", actualType))
+}
+
+func mediaTypeMatches(declared, actual string) bool {
+	declared = strings.ToLower(strings.TrimSpace(declared))
+	actual = strings.ToLower(strings.TrimSpace(actual))
+	if declared == "*/*" || declared == actual {
+		return true
+	}
+	declaredParts := strings.SplitN(declared, "/", 2)
+	actualParts := strings.SplitN(actual, "/", 2)
+	if len(declaredParts) != 2 || len(actualParts) != 2 || declaredParts[0] != actualParts[0] {
+		return false
+	}
+	if declaredParts[1] == "*" {
+		return true
+	}
+	if strings.HasSuffix(declaredParts[1], "*+json") {
+		return strings.HasSuffix(actualParts[1], "+json")
+	}
+	return false
+}
+
+func opaqueRequestValidationError(pathTemplate, field, reason string) *ValidationError {
+	return &ValidationError{
+		PathTemplate: pathTemplate,
+		Errors: []*errors.ValidationError{{
+			Message:           reason,
+			Reason:            reason,
+			ValidationType:    "request",
+			ValidationSubType: "content-type",
+			SpecLine:          -1,
+			SpecCol:           -1,
+			HowToFix:          "Use a request body and Content-Type declared by the operation",
+			ParameterName:     field,
+		}},
 	}
 }
 

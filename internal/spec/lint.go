@@ -325,12 +325,70 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkURLs(report, allowlist)
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
+	f.checkBodyMode(report)
 	f.checkInjectionNames(report)
 	f.checkPathRewrite(report)
 	f.checkRouteGuards(report)
 	f.checkBreakerDisagreements(report)
 	f.checkDeprecation(report)
 	f.checkAdapter(report)
+}
+
+func (f *lintFragment) checkBodyMode(report *LintReport) {
+	paths, _ := f.data["paths"].(map[string]any)
+	pathNames := make([]string, 0, len(paths))
+	for path := range paths {
+		pathNames = append(pathNames, path)
+	}
+	sort.Strings(pathNames)
+	for _, path := range pathNames {
+		pathItem, _ := paths[path].(map[string]any)
+		methods := make([]string, 0, len(pathItem))
+		for method := range pathItem {
+			if isLintOperationMethod(method) {
+				methods = append(methods, method)
+			}
+		}
+		sort.Strings(methods)
+		for _, method := range methods {
+			operation, _ := pathItem[method].(map[string]any)
+			if operation == nil || operation["x-body-mode"] != "opaque" {
+				continue
+			}
+			requestBody, _ := operation["requestBody"].(map[string]any)
+			content, _ := requestBody["content"].(map[string]any)
+			mediaTypes := make([]string, 0, len(content))
+			for mediaType := range content {
+				mediaTypes = append(mediaTypes, mediaType)
+			}
+			sort.Strings(mediaTypes)
+			for _, mediaType := range mediaTypes {
+				media, _ := content[mediaType].(map[string]any)
+				if schema, exists := media["schema"]; exists && schemaHasValidationConstraints(schema) {
+					f.addError(report, "body.opaque-schema", fmt.Sprintf("%s %s declares a constraining request schema while x-body-mode is opaque", strings.ToUpper(method), path))
+				}
+			}
+		}
+	}
+}
+
+func schemaHasValidationConstraints(value any) bool {
+	if boolean, ok := value.(bool); ok {
+		return !boolean
+	}
+	schema, ok := value.(map[string]any)
+	if !ok {
+		return true
+	}
+	for key := range schema {
+		switch key {
+		case "title", "description", "$comment", "examples", "default", "deprecated", "readOnly", "writeOnly":
+			continue
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // checkInjectionNames rejects ambiguous routes before they reach the runtime

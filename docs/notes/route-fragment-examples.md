@@ -37,6 +37,29 @@ list entries form the response scrub union. Duplicate names in one route are a
 lint error, including header case variants and collisions between static and
 secret entries. Request signing remains outside this schema.
 
+## Opaque request body
+
+Request bodies use OpenAPI schema validation by default. An operation can set
+`x-body-mode: opaque` to forward provider-native bytes without schema
+validation. Keep the declared media type and a useful description, and omit a
+constraining schema so `seam lint` can catch accidental validation:
+
+```yaml
+paths:
+  /v1/responses:
+    post:
+      x-body-mode: opaque
+      requestBody:
+        required: true
+        description: Provider-native request body; forwarded without validation.
+        content:
+          application/json: {}
+```
+
+`/docs/route` includes an explicit body-validation description. Opaque routes
+preserve upstream non-2xx status and response shape while applying the usual
+credential scrubber; `X-SEAM-Upstream-Status` carries the upstream status.
+
 This document provides comprehensive test cases for the SEAM route fragment schema. Test fragments are organized into three categories:
 - **Valid fragments:** Minimal, typical, and comprehensive examples that should pass validation
 - **Invalid fragments:** Deliberately malformed fragments testing specific constraint violations

@@ -471,6 +471,7 @@
         "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
+        "x-body-mode": { "enum": ["validated", "opaque"], "default": "validated", "$comment": "validated is the default. opaque forwards request-body bytes without schema validation; the operation must not declare a constraining request schema." },
         "x-inject-as": { "$ref": "#/$defs/injectAsListOrObject" },
         "x-inject-static": { "$ref": "#/$defs/staticInjectionListOrObject" },
         "x-requires-approval": { "type": "boolean" }

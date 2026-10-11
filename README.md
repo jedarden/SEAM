@@ -115,6 +115,32 @@ header/query name before applying the secret or static value. Secret list
 entries all contribute to response scrubbing; static values never do. Duplicate
 names within one route are rejected by `seam lint`.
 
+### Opaque request bodies
+
+Request bodies are validated against their OpenAPI schema by default. Set
+`x-body-mode: opaque` on an operation when the provider owns a schema that
+changes faster than its SEAM fragment. SEAM still matches the route and checks
+the declared request media type, but it forwards the body bytes without
+schema validation. Do not include a constraining `requestBody` schema on an
+opaque operation; describe the body and its media type instead:
+
+```yaml
+paths:
+  /v1/responses:
+    post:
+      x-body-mode: opaque
+      requestBody:
+        required: true
+        description: Provider-native request body; forwarded without validation.
+        content:
+          application/json: {}
+```
+
+`/docs/route` marks the operation's body validation mode and states that an
+opaque body is not validated. Opaque upstream non-2xx responses keep the
+provider's status and scrubbed body; `X-SEAM-Upstream-Status` records that
+status, and SEAM does not wrap the provider error in its own error shape.
+
 The rs-manager deployment uses this source for the Subquadratic provider. Its
 public preview route is exposed at `/subq/v1/models` and
 `/subq/v1/systemone`; `/subq` is stripped before forwarding to

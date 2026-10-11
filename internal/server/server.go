@@ -1281,6 +1281,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			methodData["method"] = op.Method
+			annotateBodyValidation(methodData)
 			methods[op.Method] = methodData
 			if exampleOperation == nil {
 				exampleMethod = op.Method
@@ -1297,6 +1298,7 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		methodData["method"] = method
+		annotateBodyValidation(methodData)
 		response["operation"] = methodData
 		exampleMethod = method
 		exampleOperation = methodData
@@ -1323,6 +1325,16 @@ func (s *Server) docsRouteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-SEAM-API-Version", s.specLoader.GetAPIVersion())
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+func annotateBodyValidation(operation map[string]interface{}) {
+	if operation == nil || operation["x-body-mode"] != "opaque" {
+		return
+	}
+	operation["bodyValidation"] = map[string]string{
+		"mode":        "opaque",
+		"description": "The request body is forwarded as bytes and is not validated against a schema.",
+	}
 }
 
 // docsPathsHandler returns all paths with their last-2xx status.

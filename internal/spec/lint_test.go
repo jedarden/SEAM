@@ -117,6 +117,57 @@ func TestLintAcceptsCompositeInjectionEntriesWithOwnSources(t *testing.T) {
 	}
 }
 
+func TestLintOpaqueBodyModeRejectsConstrainingRequestSchema(t *testing.T) {
+	root := t.TempDir()
+	fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+		"      responses:\n", "      x-body-mode: opaque\n"+
+			"      requestBody:\n"+
+			"        content:\n"+
+			"          application/json:\n"+
+			"            schema:\n"+
+			"              type: object\n"+
+			"      responses:\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	assertFindingCodes(t, report.Errors, []string{"body.opaque-schema"})
+}
+
+func TestLintRejectsUnsupportedBodyMode(t *testing.T) {
+	root := t.TempDir()
+	fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+		"      responses:\n", "      x-body-mode: raw\n      responses:\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	assertFindingCodes(t, report.Errors, []string{"fragment.schema"})
+}
+
+func TestLintOpaqueBodyModeAcceptsUnconstrainedRequestSchema(t *testing.T) {
+	for name, body := range map[string]string{
+		"no-schema":    "        content:\n          application/json: {}\n",
+		"empty-schema": "        content:\n          application/json:\n            schema: {}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+				"      responses:\n", "      x-body-mode: opaque\n      requestBody:\n"+body+"      responses:\n", 1)
+			writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			if report.HasErrors() {
+				t.Fatalf("unconstrained opaque body schema was rejected: %+v", report.Errors)
+			}
+		})
+	}
+}
+
 // TestLintDirectoryUnscrubbableAcknowledgementContract pins the lint half of
 // the x-unscrubbable contract: every acknowledgement draws the human-review
 // warning at whichever level declares it, and an acknowledgement on a fragment

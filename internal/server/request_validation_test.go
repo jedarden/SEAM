@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -22,6 +23,159 @@ func newRequestValidationFixture(t *testing.T) *spec.Loader {
 		t.Fatalf("load request validation fixture: %v", err)
 	}
 	return loader
+}
+
+func TestOpaqueBodyModeForwardsSchemaInvalidBytesWhileValidatedModeRejects(t *testing.T) {
+	loader := newRequestValidationFixture(t)
+	s := &Server{specLoader: loader}
+	body := []byte(`{"name":42}`)
+
+	validated := httptest.NewRequest(http.MethodPost, "/widgets/widget-123", bytes.NewReader(body))
+	validated.Header.Set("Content-Type", "application/json")
+	validatedResponse := httptest.NewRecorder()
+	s.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})).ServeHTTP(validatedResponse, validated)
+	if validatedResponse.Code != http.StatusBadRequest {
+		t.Fatalf("validated route status = %d, want 400: %s", validatedResponse.Code, validatedResponse.Body.String())
+	}
+	if !strings.Contains(validatedResponse.Body.String(), "validation_failed") {
+		t.Fatalf("validated route returned an unstructured error: %s", validatedResponse.Body.String())
+	}
+
+	var forwarded []byte
+	opaque := httptest.NewRequest(http.MethodPost, "/opaque-widgets/widget-123", bytes.NewReader(body))
+	opaque.Header.Set("Content-Type", "application/json; charset=utf-8")
+	opaqueResponse := httptest.NewRecorder()
+	s.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		forwarded, err = io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read opaque request body: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	})).ServeHTTP(opaqueResponse, opaque)
+	if opaqueResponse.Code != http.StatusAccepted {
+		t.Fatalf("opaque route status = %d, want 202: %s", opaqueResponse.Code, opaqueResponse.Body.String())
+	}
+	if !bytes.Equal(forwarded, body) {
+		t.Fatalf("opaque route forwarded %q, want exact bytes %q", forwarded, body)
+	}
+}
+
+func TestOpaqueBodyModeStillChecksDeclaredContentType(t *testing.T) {
+	loader := newRequestValidationFixture(t)
+	s := &Server{specLoader: loader}
+	req := httptest.NewRequest(http.MethodPost, "/opaque-widgets/widget-123", strings.NewReader("opaque bytes"))
+	req.Header.Set("Content-Type", "text/plain")
+	res := httptest.NewRecorder()
+	s.validationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Fatal("request with an undeclared content type reached the next handler")
+	})).ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("opaque route with text/plain status = %d, want 400: %s", res.Code, res.Body.String())
+	}
+	var response SpecValidationResponse
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		t.Fatalf("decode content-type validation response: %v", err)
+	}
+	if response.Error != "validation_failed" || len(response.ValidationErrors) == 0 {
+		t.Fatalf("content-type failure was not structured: %+v", response)
+	}
+}
+
+func TestOpaqueBodyModeAppearsInRouteDocsAndRouteTable(t *testing.T) {
+	loader := newRequestValidationFixture(t)
+	server := &Server{
+		specLoader:       loader,
+		identityResolver: newLoopbackTestIdentityResolver(),
+	}
+	path := url.QueryEscape("/opaque-widgets/{id}")
+	req := httptest.NewRequest(http.MethodGet, "/docs/route?path="+path+"&method=POST", nil)
+	res := httptest.NewRecorder()
+	server.identityResolutionMiddleware(http.HandlerFunc(server.docsRouteHandler)).ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("route docs status = %d, want 200: %s", res.Code, res.Body.String())
+	}
+	var docs map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&docs); err != nil {
+		t.Fatalf("decode route docs: %v", err)
+	}
+	operation, ok := docs["operation"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("route docs operation = %T, want object", docs["operation"])
+	}
+	bodyValidation, ok := operation["bodyValidation"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("route docs bodyValidation = %T, want object", operation["bodyValidation"])
+	}
+	description, _ := bodyValidation["description"].(string)
+	if bodyValidation["mode"] != "opaque" || !strings.Contains(description, "not validated") {
+		t.Fatalf("opaque body documentation = %#v", bodyValidation)
+	}
+
+	var found bool
+	for _, route := range NewRouteTable(loader).GetRoutes() {
+		if route.PathTemplate == "/opaque-widgets/{id}" && route.Method == http.MethodPost {
+			found = route.BodyMode == "opaque"
+		}
+	}
+	if !found {
+		t.Fatal("route table did not load x-body-mode: opaque")
+	}
+}
+
+func TestOpaqueUpstreamErrorStatusAndScrubbingArePreserved(t *testing.T) {
+	const secret = "opaque-provider-secret"
+	body := []byte(`{"name":42}`)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read upstream request body: %v", err)
+		}
+		if !bytes.Equal(gotBody, body) {
+			t.Errorf("upstream received %q, want exact bytes %q", gotBody, body)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+secret {
+			t.Errorf("upstream Authorization = %q, want configured bearer injection", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = io.WriteString(w, "provider error echoed "+secret)
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("create reverse proxy: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/widgets", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	route := RouteEntry{
+		PathTemplate: "/v1/widgets",
+		Method:       http.MethodPost,
+		BodyMode:     "opaque",
+		VaultPath:    "providers/opaque/token",
+		InjectAs:     &InjectAs{Kind: InjectionBearer},
+	}
+	withRouteMatch(req, &RouteMatch{Route: route}, func(_ context.Context, _ RouteEntry) ([]byte, error) {
+		return []byte(secret), nil
+	})
+	res := httptest.NewRecorder()
+	proxy.ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("opaque upstream status = %d, want 422: %s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-SEAM-Upstream-Status"); got != "422" {
+		t.Fatalf("X-SEAM-Upstream-Status = %q, want 422", got)
+	}
+	if strings.Contains(res.Body.String(), secret) {
+		t.Fatalf("opaque upstream response leaked injected secret: %q", res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "provider error echoed") || strings.Contains(res.Body.String(), `"error"`) {
+		t.Fatalf("opaque upstream error was normalized or lost: %q", res.Body.String())
+	}
 }
 
 func TestRequestValidationFixtureReturnsStructured400(t *testing.T) {

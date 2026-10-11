@@ -100,6 +100,10 @@ type RouteEntry struct {
 	// through /config/status and is never inferred from a runtime failure.
 	Unscrubbable bool
 
+	// BodyMode controls whether request bodies are validated against their
+	// OpenAPI schema. Empty preserves the validated default for legacy routes.
+	BodyMode string
+
 	// InstanceParam identifies the path binding consumed by an upstream map.
 	// It is removed from the upstream path before any remaining bindings are
 	// substituted.
@@ -609,6 +613,16 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			bodyMode, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-body-mode")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			if bodyMode == "" {
+				bodyMode = "validated"
+			}
+			if bodyMode != "validated" && bodyMode != "opaque" {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: x-body-mode must be validated or opaque", methodOp.method, path)
+			}
 
 			// Extract deprecation information (Phase 8.3)
 			deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
@@ -629,6 +643,7 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				CredentialEnv:         credentialEnv,
 				CredentialFile:        credentialFile,
 				Unscrubbable:          unscrubbable,
+				BodyMode:              bodyMode,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
 				Deprecated:            deprecated,

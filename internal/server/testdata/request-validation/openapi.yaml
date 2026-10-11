@@ -71,3 +71,22 @@ paths:
                 properties:
                   id:
                     type: string
+  /opaque-widgets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: createOpaqueWidget
+      summary: Forward an opaque widget request
+      x-body-mode: opaque
+      requestBody:
+        required: true
+        description: The body is forwarded as bytes and is not validated by SEAM.
+        content:
+          application/json: {}
+      responses:
+        '202':
+          description: Request accepted by the provider

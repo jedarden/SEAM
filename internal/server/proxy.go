@@ -551,10 +551,12 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	// Phase 12.4: Handle 401 responses with credential refresh and retry
-	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
+	match := routeMatchFromRequest(r)
+	opaqueBodyMode := match != nil && match.Route.BodyMode == "opaque"
+	// Validated routes retain the established 401 refresh-and-retry behavior.
+	// Opaque routes preserve provider error responses verbatim instead.
+	if upstreamResp.StatusCode == http.StatusUnauthorized && !opaqueBodyMode && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
-		match := routeMatchFromRequest(r)
 		if match != nil && len(match.Route.injections()) > 0 && (match.Route.CredentialSource == credentialSourceFile || (match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv)) {
 			// We have credential injection - attempt refresh and retry
 			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
@@ -565,6 +567,9 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 			// Retry was attempted and response was sent, return nil
 			return nil
 		}
+	}
+	if opaqueBodyMode && (upstreamResp.StatusCode < http.StatusOK || upstreamResp.StatusCode >= http.StatusMultipleChoices) {
+		upstreamResp.Header.Set("X-SEAM-Upstream-Status", strconv.Itoa(upstreamResp.StatusCode))
 	}
 
 	// Update X-SEAM-Budget-Remaining header with actual remaining after deduction
