@@ -57,6 +57,20 @@ directly; tests can install an in-memory source at the route-table or probe
 loop boundary. This is an internal behavior boundary, so existing fragments
 remain unchanged.
 
+Fragments may opt into an environment-backed credential with
+`x-credential-source: env` and `x-credential-env: SEAM_CRED_<OWNER>_<NAME>`.
+`<OWNER>` is the upper-cased `x-seam-owner` with hyphens changed to
+underscores; `<NAME>` contains only uppercase letters, digits, and underscores.
+The variable must use that fragment owner's namespace, so it cannot reference
+another owner's key or a `SEAM_OPENBAO_*` / `SEAM_VAULT_*` configuration
+variable. Supply the value to the SEAM process from a Kubernetes Secret (for
+example, a Secret mirrored by ExternalSecret). SEAM snapshots each referenced
+value when building its route table, trims trailing CR/LF bytes, and logs only
+the byte length. It never logs the value. Rotate the Secret and restart the pod
+to load the replacement; a rejected env credential is not refreshed or retried
+in place, and its configured sentinel probe reports the 401 at
+`/health/credentials`.
+
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path. The precedence is mounted control &gt; flag &gt; environment variable &gt; default: an explicit flag already beats `SEAM_UPSTREAM_CA_DIR` / `SEAM_UPSTREAM_ALLOWLIST` before the boundary runs, so what gets refused in-cluster is the flag's value.
 
 **Operator-visible failure modes (in-cluster upstream trust).**

@@ -191,6 +191,7 @@ type Server struct {
 	cloudflareJWTValidator *CloudflareJWTValidator         // Phase 14: Cloudflare Access JWT validator
 	exclusionTracker       *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
 	credentialProbes       *CredentialProbeRegistry        // Credential-probe results the readyz gate evaluates (nil = no probes configured)
+	credentialProbeLoop    *CredentialProbeLoop            // Leader-elected sentinel probes for configured credential routes
 	credentialSource       CredentialSource                // Shared source for control-plane credential reads
 }
 
@@ -1703,7 +1704,69 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
+	s.startCredentialProbeLoop(ctx)
+
 	return nil
+}
+
+// startCredentialProbeLoop attaches live probe results to readiness and the
+// credential health sentinel when at least one route configures a probe.
+func (s *Server) startCredentialProbeLoop(ctx context.Context) {
+	if s.routeTableHolder == nil {
+		return
+	}
+	table := s.routeTableHolder.currentTable()
+	if table == nil {
+		return
+	}
+	hasProbes := false
+	for _, route := range table.GetRoutes() {
+		if route.CredentialProbeConfig != nil {
+			hasProbes = true
+			break
+		}
+	}
+	if !hasProbes {
+		return
+	}
+
+	namespace := strings.TrimSpace(os.Getenv("POD_NAMESPACE"))
+	if namespace == "" {
+		namespace = "seam"
+	}
+	leader, err := NewLeaseLeader(LeaseConfig{
+		LeaseName:      "seam-credential-probe",
+		LeaseNamespace: namespace,
+	})
+	if err != nil {
+		log.Printf("Credential probes are configured but leader election could not start: %v", err)
+		return
+	}
+
+	registry := NewCredentialProbeRegistry()
+	source := routeTableHolderCredentialResolver{holder: s.routeTableHolder}
+	loop, err := NewCredentialProbeLoop(ProbeLoopConfig{
+		LeaseLeader:      leader,
+		ProbeRegistry:    registry,
+		RouteTableHolder: s.routeTableHolder,
+		CredentialSource: source,
+	})
+	if err != nil {
+		log.Printf("Credential probes are configured but the probe loop could not start: %v", err)
+		return
+	}
+	s.setCredentialProbes(registry)
+	s.mu.Lock()
+	s.credentialProbeLoop = loop
+	s.mu.Unlock()
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		if err := loop.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("Credential probe loop stopped: %v", err)
+		}
+	}()
 }
 
 // isOpenBaoConfigured reports whether this process is expected to use the
@@ -1783,6 +1846,13 @@ func (s *Server) startOpenBaoLogin(ctx context.Context) {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Println("Shutting down server...")
+
+	s.mu.RLock()
+	probeLoop := s.credentialProbeLoop
+	s.mu.RUnlock()
+	if probeLoop != nil {
+		probeLoop.Stop()
+	}
 
 	// Save corpus before shutdown if capture is enabled
 	if s.captureMiddleware != nil && s.captureMiddleware.IsEnabled() {

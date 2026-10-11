@@ -206,7 +206,10 @@ func TestCredentialHealthSentinelResponseCarriesNoCredentialValues(t *testing.T)
 	allowed := map[string]bool{
 		"status": true, "timestamp": true, "credentials": true, "available": true,
 		"last_refresh": true, "circuit_breaker": true, "circuit_breakers": true,
-		"enabled": true, "state": true, "consecutive_failures": true,
+		"credential_probes": true, "fragment_id": true, "instance_id": true,
+		"last_verified": true, "probe_interval": true, "known_expiry": true,
+		"probe_spend_rate_ms": true,
+		"enabled":             true, "state": true, "consecutive_failures": true,
 		"opened_at": true, "last_error": true, "retry_after_seconds": true,
 		"origin": true, "source": true,
 	}

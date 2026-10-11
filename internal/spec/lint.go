@@ -162,8 +162,12 @@ func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allow
 		Warnings: make([]LintFinding, 0),
 	}
 	report.Files = len(files)
+	owners := make([]string, 0, len(files))
 	for _, fragment := range files {
-		fragment.validate(&report, schema, allowlist)
+		owners = append(owners, filepath.Base(filepath.Dir(fragment.file)))
+	}
+	for _, fragment := range files {
+		fragment.validate(&report, schema, allowlist, owners)
 	}
 	detectLintCollisions(&report, files)
 	sortLintFindings(&report)
@@ -302,7 +306,7 @@ func normalizeLintValue(value any) (any, error) {
 	}
 }
 
-func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, allowlist *hostAllowlist) {
+func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, allowlist *hostAllowlist, owners []string) {
 	if f.data == nil {
 		f.addError(report, "fragment.parse", "file could not be parsed as a YAML/JSON object")
 		return
@@ -315,6 +319,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	}
 
 	f.checkOwnerChain(report)
+	f.checkCredentialEnvOwnership(report, owners)
 	f.checkAPIVersion(report)
 	f.checkReservedPaths(report)
 	f.checkURLs(report, allowlist)
@@ -325,6 +330,17 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkBreakerDisagreements(report)
 	f.checkDeprecation(report)
 	f.checkAdapter(report)
+}
+
+func (f *lintFragment) checkCredentialEnvOwnership(report *LintReport, owners []string) {
+	if f.data["x-credential-source"] != "env" {
+		return
+	}
+	name, _ := f.data["x-credential-env"].(string)
+	owner := filepath.Base(filepath.Dir(f.file))
+	if err := credentialEnvOwnerError(name, owner, owners); err != nil {
+		f.addError(report, "credential.env-owner-mismatch", err.Error())
+	}
 }
 
 func (f *lintFragment) addError(report *LintReport, code, message string) {
@@ -651,16 +667,17 @@ func (f *lintFragment) checkUnscrubbable(report *LintReport) {
 		}
 	}
 	// Scrubbing only happens for routes that inject a credential, so an
-	// acknowledgement on a fragment with no x-vault-path/x-inject-as pair
+	// acknowledgement on a fragment with no credential source/injection pair
 	// guards nothing. Absence of the pair is what "vacuous" means here —
 	// the schema enforces both-or-neither, but the lint check must not
 	// depend on the schema having run.
 	if acknowledged {
 		_, hasVaultPath := f.data["x-vault-path"]
+		_, hasCredentialSource := f.data["x-credential-source"]
 		_, hasInjectAs := f.data["x-inject-as"]
-		if !hasVaultPath || !hasInjectAs {
+		if (!hasVaultPath && !hasCredentialSource) || !hasInjectAs {
 			f.addWarning(report, "scrubbing.unscrubbable-vacuous",
-				"x-unscrubbable: acknowledged has no effect without credential injection (x-vault-path + x-inject-as)")
+				"x-unscrubbable: acknowledged has no effect without credential injection (credential source + x-inject-as)")
 		}
 	}
 }
@@ -1197,7 +1214,7 @@ func (f *lintFragment) checkAdapter(report *LintReport) {
 	upstreamFields := []string{
 		"x-upstream", "x-upstream-map", "x-instance-param",
 		"x-upstream-strip-prefix", "x-upstream-tls", "x-upstream-plaintext",
-		"x-vault-path", "x-inject-as", "x-credential-probe", "x-breaker",
+		"x-vault-path", "x-credential-source", "x-credential-env", "x-inject-as", "x-credential-probe", "x-breaker",
 	}
 
 	for _, field := range upstreamFields {

@@ -220,14 +220,16 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 	if len(route.UpstreamMap) == 0 {
 		// Single-instance route
 		target := &CredentialProbeTarget{
-			FragmentID:  fragmentID,
-			InstanceID:  "_default",
-			VaultPath:   route.VaultPath,
-			ProbeURL:    route.UpstreamTarget + probeConfig.Path,
-			ProbePath:   probeConfig.Path,
-			ProbeMethod: probeConfig.Method,
-			Interval:    defaultInterval,
-			InjectAs:    route.InjectAs,
+			FragmentID:       fragmentID,
+			InstanceID:       "_default",
+			VaultPath:        route.VaultPath,
+			CredentialSource: route.CredentialSource,
+			CredentialEnv:    route.CredentialEnv,
+			ProbeURL:         route.UpstreamTarget + probeConfig.Path,
+			ProbePath:        probeConfig.Path,
+			ProbeMethod:      probeConfig.Method,
+			Interval:         defaultInterval,
+			InjectAs:         route.InjectAs,
 		}
 		targets = append(targets, target)
 		return targets
@@ -242,14 +244,16 @@ func (l *CredentialProbeLoop) buildTargetsForRoute(fragmentID string, route Rout
 		}
 
 		target := &CredentialProbeTarget{
-			FragmentID:  fragmentID,
-			InstanceID:  instanceID,
-			VaultPath:   instance.VaultPath,
-			ProbeURL:    instance.URL + probeConfig.Path,
-			ProbePath:   probeConfig.Path,
-			ProbeMethod: probeConfig.Method,
-			Interval:    interval,
-			InjectAs:    instance.InjectAs,
+			FragmentID:       fragmentID,
+			InstanceID:       instanceID,
+			VaultPath:        instance.VaultPath,
+			CredentialSource: route.CredentialSource,
+			CredentialEnv:    route.CredentialEnv,
+			ProbeURL:         instance.URL + probeConfig.Path,
+			ProbePath:        probeConfig.Path,
+			ProbeMethod:      probeConfig.Method,
+			Interval:         interval,
+			InjectAs:         instance.InjectAs,
 		}
 		targets = append(targets, target)
 	}
@@ -297,10 +301,17 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 	}()
 
 	// Resolve the credential through the configured source.
-	credValue, err := l.credentialSource.Resolve(ctx, RouteEntry{
-		VaultPath: target.VaultPath,
-		InjectAs:  target.InjectAs,
-	})
+	route := RouteEntry{
+		VaultPath:        target.VaultPath,
+		CredentialSource: target.CredentialSource,
+		CredentialEnv:    target.CredentialEnv,
+		InjectAs:         target.InjectAs,
+	}
+	credentialSource := l.credentialSource
+	if target.CredentialSource == credentialSourceEnv {
+		credentialSource = routeTableCredentialResolver{table: l.routeTableHolder.currentTable()}
+	}
+	credValue, err := credentialSource.Resolve(ctx, route)
 	if err != nil {
 		result.Status = CredentialUnhealthy
 		result.LastError = fmt.Sprintf("failed to fetch credential: %v", err)

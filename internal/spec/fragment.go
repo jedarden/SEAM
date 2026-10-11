@@ -262,10 +262,14 @@ func (fl *FragmentLoader) ValidateFragments(schemaPath string) error {
 
 	validCount := 0
 	quarantinedCount := 0
+	owners := make([]string, 0, len(fl.fragments))
+	for _, fragment := range fl.fragments {
+		owners = append(owners, fragment.Owner)
+	}
 
 	// Validate each fragment
 	for _, fragment := range fl.fragments {
-		if err := fl.validateFragment(fragment, schema); err != nil {
+		if err := fl.validateFragment(fragment, schema, owners); err != nil {
 			fragment.QueuedForQuarantine = true
 			fragment.QuarantineReasons = append(fragment.QuarantineReasons, err.Error())
 			quarantinedCount++
@@ -293,7 +297,7 @@ func (fl *FragmentLoader) ValidateFragments(schemaPath string) error {
 }
 
 // validateFragment validates a single fragment against the schema
-func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschema.Schema) error {
+func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschema.Schema, owners []string) error {
 	// JSON Schema draft 2020-12 cannot compare arbitrary instance strings.
 	// Evaluate the declared quota-unit constraint before shape validation so an
 	// operation quota can still be compared with its fragment-root cost default.
@@ -320,6 +324,13 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 		// Quarantine if x-seam-owner doesn't match parent directory
 		if ownerStr != "" && ownerStr != fragment.Owner {
 			return fmt.Errorf("x-seam-owner mismatch: fragment declares '%s' but parent directory is '%s'", ownerStr, fragment.Owner)
+		}
+	}
+
+	if source, _ := fragment.ParsedFragment["x-credential-source"].(string); source == "env" {
+		name, _ := fragment.ParsedFragment["x-credential-env"].(string)
+		if err := credentialEnvOwnerError(name, fragment.Owner, owners); err != nil {
+			return fmt.Errorf("credential_env_ownership_failed: %w", err)
 		}
 	}
 

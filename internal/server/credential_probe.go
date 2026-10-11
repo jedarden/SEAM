@@ -179,13 +179,17 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 // CredentialProbeTarget represents a single (fragment, instance) probe target.
 type CredentialProbeTarget struct {
 	// FragmentID is the fragment identifier (owner/schema)
-	FragmentID string
+	FragmentID string `json:"fragment_id"`
 
 	// InstanceID is the instance identifier (_default for single-instance)
-	InstanceID string
+	InstanceID string `json:"instance_id"`
 
 	// VaultPath is the OpenBao path to the credential
 	VaultPath string
+
+	// CredentialSource and CredentialEnv identify non-vault route credentials.
+	CredentialSource string
+	CredentialEnv    string
 
 	// ProbeURL is the full URL to probe (including scheme and host)
 	ProbeURL string
@@ -212,7 +216,7 @@ type CredentialProbeResult struct {
 	InstanceID string
 
 	// LastVerified is when the last successful probe completed
-	LastVerified *time.Time
+	LastVerified *time.Time `json:"last_verified,omitempty"`
 
 	// Status is the current credential health status
 	Status CredentialHealthStatus `json:"status"`

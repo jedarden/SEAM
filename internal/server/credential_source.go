@@ -1,9 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"sort"
 	"sync"
 
 	"github.com/ardenone/seam/internal/vault"
@@ -20,6 +24,80 @@ type CredentialSource interface {
 // ErrCredentialSourceNotRefreshable is returned by sources that cannot replace
 // a credential after an upstream 401.
 var ErrCredentialSourceNotRefreshable = errors.New("credential source is not refreshable")
+
+const (
+	credentialSourceVault = "vault"
+	credentialSourceEnv   = "env"
+)
+
+// envCredentialSource is an immutable process-start snapshot. Secret values
+// are never formatted or logged; the only value-derived log field is length.
+type envCredentialSource struct {
+	values map[string][]byte
+	errors map[string]error
+}
+
+func (s *envCredentialSource) hasReference(name string) bool {
+	if s == nil {
+		return false
+	}
+	_, hasValue := s.values[name]
+	_, hasError := s.errors[name]
+	return hasValue || hasError
+}
+
+func newEnvCredentialSource(names []string) *envCredentialSource {
+	source := &envCredentialSource{
+		values: make(map[string][]byte, len(names)),
+		errors: make(map[string]error),
+	}
+	unique := make(map[string]struct{}, len(names))
+	ordered := make([]string, 0, len(names))
+	for _, name := range names {
+		if _, ok := unique[name]; ok || name == "" {
+			continue
+		}
+		unique[name] = struct{}{}
+		ordered = append(ordered, name)
+	}
+	sort.Strings(ordered)
+	for _, name := range ordered {
+		value, ok := os.LookupEnv(name)
+		if !ok {
+			source.errors[name] = fmt.Errorf("credential environment variable %q is not set", name)
+			continue
+		}
+		trimmed := bytes.TrimRight([]byte(value), "\r\n")
+		if len(trimmed) == 0 {
+			source.errors[name] = fmt.Errorf("credential environment variable %q is empty after trimming CR/LF", name)
+			continue
+		}
+		source.values[name] = bytes.Clone(trimmed)
+		log.Printf("[CredentialSource] loaded env credential (%d bytes)", len(trimmed))
+	}
+	return source
+}
+
+func (s *envCredentialSource) Resolve(_ context.Context, route RouteEntry) ([]byte, error) {
+	if s == nil {
+		return nil, fmt.Errorf("env credential source is nil")
+	}
+	if route.CredentialSource != credentialSourceEnv || route.CredentialEnv == "" {
+		return nil, fmt.Errorf("route has no env credential reference")
+	}
+	if err := s.errors[route.CredentialEnv]; err != nil {
+		return nil, err
+	}
+	value, ok := s.values[route.CredentialEnv]
+	if !ok {
+		return nil, fmt.Errorf("credential environment variable %q was not captured at process start", route.CredentialEnv)
+	}
+	return bytes.Clone(value), nil
+}
+
+func (s *envCredentialSource) Refreshable(context.Context, RouteEntry) ([]byte, error) {
+	return nil, ErrCredentialSourceNotRefreshable
+}
 
 type credentialCacheStatsProvider interface {
 	CacheStats() vault.CacheStats

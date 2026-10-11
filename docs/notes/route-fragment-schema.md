@@ -53,9 +53,11 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-upstream-strip-prefix` | `upstreamStripPrefix` | no | Literal prefix removed from every matched template (step 3 shorthand). Must be a prefix of every path (validator-side). Upstream-facing → forbidden on adapter. |
 | `x-upstream-tls` | `upstreamTls` | no | `{caBundle, serverName, insecureSkipVerify}`. Absent = verify against system trust store + hostname. Upstream-facing → forbidden on adapter (taken from target). |
 | `x-upstream-plaintext` | `acknowledged` | conditional | Required when `x-upstream` is `http://`. Mutually exclusive with `x-upstream-map` (plaintext is per-entry there). |
-| `x-vault-path` | `vaultPath` | paired | Which OpenBao secret to fetch. **Both-or-neither** with `x-inject-as`. |
-| `x-inject-as` | `injectAs` | paired | How to inject: `{kind: header\|bearer\|query, name}`. **Both-or-neither** with `x-vault-path`. |
-| `x-credential-probe` | `credentialProbe` | no | `{path, method, interval}` for the sentinel. Forbidden on a pass-through fragment (one declaring neither vault nor inject). |
+| `x-vault-path` | `vaultPath` | paired | Which OpenBao secret to fetch. Paired with `x-inject-as`; omission of `x-credential-source` keeps the legacy vault source. |
+| `x-credential-source` | `vault\|env` | conditional | Optional explicit source. `env` requires `x-credential-env`; explicit `vault` requires `x-vault-path`. |
+| `x-credential-env` | `SEAM_CRED_<OWNER>_<NAME>` | conditional | Required for `env`. Owner is upper-cased `x-seam-owner` with hyphens changed to underscores; suffix matches `[A-Z0-9_]+`. Lint and runtime quarantine enforce owner isolation. |
+| `x-inject-as` | `injectAs` | paired | How to inject: `{kind: header\|bearer\|query, name}`. Present exactly when one credential source is declared. |
+| `x-credential-probe` | `credentialProbe` | no | `{path, method, interval}` for the sentinel. Forbidden on a pass-through fragment with no credential source. |
 | `x-breaker` | `breaker` | no | Per-upstream circuit-breaker tuning. On by default (infrastructure guard); `enabled:false` is the opt-out. Upstream-facing → forbidden on adapter. |
 | `x-required-scope` | `scopeArray` | no | **Fragment-root default**; an operation-level value *replaces* it, never merges. Conjunctive; bare string = one-element array. |
 | `x-fanout-scope` | `scopeArray` | no | Gates the `_all` fan-out, in addition to operation-level scope. Parsed from Phase 10; enforced from Phase 7. |
@@ -147,14 +149,22 @@ For completeness, these are the named cross-field constraints exposed by the sch
 | `constraint-map-requires-instance-param` | `x-upstream-map` without `x-instance-param` |
 | `constraint-instance-param-only-with-map` | `x-instance-param` without `x-upstream-map` |
 | `constraint-upstream-excludes-instance-param` | `x-instance-param` on a single-`x-upstream` route |
-| `constraint-vault-inject-paired` | `x-vault-path` without `x-inject-as` or vice-versa |
-| `constraint-passthrough-has-no-probe` | `x-credential-probe` on a pass-through (no vault/inject) fragment |
+| `constraint-credential-source-inject-paired` | `x-inject-as` without exactly one credential source, or a credential source without `x-inject-as` |
+| `constraint-passthrough-has-no-probe` | `x-credential-probe` on a pass-through fragment with no credential source |
 | `constraint-plaintext-required-on-http` | an `http://` `x-upstream` without `x-upstream-plaintext` |
 | `constraint-plaintext-excludes-map` | `x-upstream-plaintext` alongside `x-upstream-map` |
 | `constraint-quota-requires-cost` (operation) | `x-quota` without `x-cost-per-call` on the same route |
 | `constraint-quota-unit-matches-cost` (root + operation; validator-evaluated) | byte-different effective `x-quota.unit` / `x-cost-per-call.unit` values |
 
 The `acknowledged` singleton (no `false` form) for `insecureSkipVerify` / `x-upstream-plaintext` / `x-unscrubbable`, the `apiVersion` grammar, the `duration` grammar, the IP-literal rejection on `upstreamUrl`, and the `injectAs` kind↔name conditionals are all encoded inline in their `$def`s.
+
+Environment credentials are read from the process when the route table is
+built, trimmed only for trailing CR/LF bytes, and held in memory. Provide them
+from a Kubernetes Secret, commonly one mirrored by ExternalSecret. Rotation
+requires a pod restart; SEAM does not refresh or retry an env credential after
+an upstream 401. It logs only the captured byte length, scrubs the value from
+response bodies and headers, and reports failed sentinel probes at
+`/health/credentials`.
 
 ---
 

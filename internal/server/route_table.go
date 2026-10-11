@@ -23,8 +23,10 @@ import (
 type RouteTable struct {
 	routes []RouteEntry
 
-	secretMu         sync.Mutex
-	credentialSource CredentialSource
+	secretMu                 sync.Mutex
+	credentialSource         CredentialSource
+	credentialSourceOverride bool
+	envCredentials           *envCredentialSource
 	// secretClient remains an opaque source-construction hook for existing
 	// in-package metrics tests. It is adapted to CredentialSource by the
 	// vault-backed implementation before any read occurs.
@@ -78,6 +80,11 @@ type RouteEntry struct {
 	// the route table.
 	VaultPath string
 	InjectAs  *InjectAs
+
+	// CredentialSource and CredentialEnv identify an alternate, process-start
+	// environment credential. An empty source preserves the legacy vault route.
+	CredentialSource string
+	CredentialEnv    string
 
 	// Unscrubbable is true only when the route explicitly acknowledges that an
 	// injected response cannot be scanned. The acknowledgement is enumerable
@@ -358,6 +365,15 @@ func (h *ThreadSafeTableHolder) Snapshot() []RouteEntry {
 	return h.current.GetRoutes()
 }
 
+func (h *ThreadSafeTableHolder) currentTable() *RouteTable {
+	if h == nil {
+		return nil
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.current
+}
+
 // RouteCount returns the number of routes in the current route table. A nil
 // holder or an uninitialized table reports zero, which is the readiness
 // gate's not-ready signal for a server that has no valid fragments.
@@ -413,6 +429,12 @@ func (h *ThreadSafeTableHolder) GetVersionsForPath(path string, method string) [
 // The route table contains the five HTTP methods SEAM currently proxies. A
 // missing operation-level x-api-version extension is represented as v1.
 func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
+	return buildRouteTable(spec, nil)
+}
+
+// buildRouteTable optionally reuses the process-start environment snapshot.
+// Hot reload must not reread credentials from the process environment.
+func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*RouteTable, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("OpenAPI spec cannot be nil")
 	}
@@ -477,6 +499,26 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 			vaultPath, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-vault-path")
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			credentialSource, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-credential-source")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			credentialEnv, err := extractStringExtension(methodOp.operation, pathItem, spec, "x-credential-env")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			if credentialSource != "" && credentialSource != credentialSourceVault && credentialSource != credentialSourceEnv {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-source %q is not supported", methodOp.method, path, credentialSource)
+			}
+			if credentialSource == credentialSourceEnv && (credentialEnv == "" || vaultPath != "") {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: env credentials require x-credential-env and cannot declare x-vault-path", methodOp.method, path)
+			}
+			if credentialSource == credentialSourceVault && vaultPath == "" {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: vault credentials require x-vault-path", methodOp.method, path)
+			}
+			if credentialSource == "" && credentialEnv != "" {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: x-credential-env requires x-credential-source: env", methodOp.method, path)
 			}
 			injectAs, err := extractInjectAs(methodOp.operation, pathItem, spec)
 			if err != nil {
@@ -553,6 +595,8 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				TLSConfig:             tlsConfig,
 				VaultPath:             vaultPath,
 				InjectAs:              injectAs,
+				CredentialSource:      credentialSource,
+				CredentialEnv:         credentialEnv,
 				Unscrubbable:          unscrubbable,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
@@ -571,6 +615,23 @@ func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
 				return nil, err
 			}
 		}
+	}
+
+	envNames := make([]string, 0)
+	for _, route := range table.routes {
+		if route.CredentialSource == credentialSourceEnv {
+			envNames = append(envNames, route.CredentialEnv)
+		}
+	}
+	if envSnapshot == nil {
+		table.envCredentials = newEnvCredentialSource(envNames)
+	} else {
+		for _, name := range envNames {
+			if !envSnapshot.hasReference(name) {
+				return nil, fmt.Errorf("route references env credential %q that was not captured at process start; restart SEAM to load it", name)
+			}
+		}
+		table.envCredentials = envSnapshot
 	}
 
 	return table, nil
@@ -1136,7 +1197,17 @@ func (t *RouteTable) SetCredentialSource(source CredentialSource) {
 	}
 	t.secretMu.Lock()
 	t.credentialSource = source
+	t.credentialSourceOverride = source != nil
 	t.secretMu.Unlock()
+}
+
+func (t *RouteTable) envCredentialSnapshot() *envCredentialSource {
+	if t == nil {
+		return nil
+	}
+	t.secretMu.Lock()
+	defer t.secretMu.Unlock()
+	return t.envCredentials
 }
 
 // Match returns the route matching req and extracts values for path
@@ -1179,7 +1250,7 @@ func (t *RouteTable) Match(req *http.Request) (*RouteMatch, error) {
 			if err := t.SanitizeRequest(req); err != nil {
 				return nil, err
 			}
-			withRouteMatch(req, match, t.resolveCredential)
+			withRouteMatch(req, match, routeTableCredentialResolver{table: t})
 			return match, nil
 		}
 
@@ -1197,7 +1268,7 @@ func (t *RouteTable) Match(req *http.Request) (*RouteMatch, error) {
 	if err := t.SanitizeRequest(req); err != nil {
 		return nil, err
 	}
-	withRouteMatch(req, selected, t.resolveCredential)
+	withRouteMatch(req, selected, routeTableCredentialResolver{table: t})
 	return selected, nil
 }
 
@@ -1408,9 +1479,58 @@ func (route RouteEntry) effectiveTarget(pathParams map[string]string) RouteEntry
 	return route
 }
 
-func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([]byte, error) {
+type routeTableCredentialResolver struct{ table *RouteTable }
+
+type routeTableHolderCredentialResolver struct{ holder *ThreadSafeTableHolder }
+
+func (r routeTableHolderCredentialResolver) Resolve(ctx context.Context, route RouteEntry) ([]byte, error) {
+	if r.holder == nil {
+		return nil, fmt.Errorf("route table holder is not initialized")
+	}
+	return routeTableCredentialResolver{table: r.holder.currentTable()}.Resolve(ctx, route)
+}
+
+func (r routeTableHolderCredentialResolver) Refreshable(ctx context.Context, route RouteEntry) ([]byte, error) {
+	if r.holder == nil {
+		return nil, fmt.Errorf("route table holder is not initialized")
+	}
+	return routeTableCredentialResolver{table: r.holder.currentTable()}.Refreshable(ctx, route)
+}
+
+func (r routeTableCredentialResolver) Resolve(ctx context.Context, route RouteEntry) ([]byte, error) {
+	if r.table == nil {
+		return nil, fmt.Errorf("route table is not initialized")
+	}
+	return r.table.resolveCredential(ctx, route)
+}
+
+func (r routeTableCredentialResolver) Refreshable(ctx context.Context, route RouteEntry) ([]byte, error) {
+	if r.table == nil {
+		return nil, fmt.Errorf("route table is not initialized")
+	}
+	return r.table.refreshCredential(ctx, route)
+}
+
+func (t *RouteTable) sourceForRoute(route RouteEntry) (CredentialSource, error) {
+	if t == nil {
+		return nil, fmt.Errorf("route table is nil")
+	}
 	t.secretMu.Lock()
 	source := t.credentialSource
+	override := t.credentialSourceOverride
+	envSource := t.envCredentials
+	if override && source != nil {
+		t.secretMu.Unlock()
+		return source, nil
+	}
+	if route.CredentialSource == credentialSourceEnv {
+		if envSource == nil {
+			envSource = newEnvCredentialSource([]string{route.CredentialEnv})
+			t.envCredentials = envSource
+		}
+		t.secretMu.Unlock()
+		return envSource, nil
+	}
 	if source == nil && t.secretClient != nil {
 		source = newVaultCredentialSourceFromLegacyClient(t.secretClient)
 		t.credentialSource = source
@@ -1430,7 +1550,23 @@ func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([
 		}
 		t.secretMu.Unlock()
 	}
+	return source, nil
+}
+
+func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([]byte, error) {
+	source, err := t.sourceForRoute(route)
+	if err != nil {
+		return nil, err
+	}
 	return source.Resolve(ctx, route)
+}
+
+func (t *RouteTable) refreshCredential(ctx context.Context, route RouteEntry) ([]byte, error) {
+	source, err := t.sourceForRoute(route)
+	if err != nil {
+		return nil, err
+	}
+	return source.Refreshable(ctx, route)
 }
 
 func routeVersionRank(version string) int {

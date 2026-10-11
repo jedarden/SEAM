@@ -194,7 +194,11 @@ func (hrm *HotReloadManager) reloadRouteTable() error {
 	}
 
 	// Step 2: Build new route table from the re-merged OpenAPI document
-	newRouteTable, err := BuildRouteTable(hrm.server.specLoader.OpenAPIModel())
+	var envSnapshot *envCredentialSource
+	if activeTable := hrm.server.routeTableHolder.currentTable(); activeTable != nil {
+		envSnapshot = activeTable.envCredentialSnapshot()
+	}
+	newRouteTable, err := buildRouteTable(hrm.server.specLoader.OpenAPIModel(), envSnapshot)
 	if err != nil {
 		hrm.failCount++
 		return fmt.Errorf("failed to build new route table from re-merged spec: %w", err)
@@ -225,6 +229,14 @@ func (hrm *HotReloadManager) reloadRouteTable() error {
 	if err := hrm.server.routeTableHolder.Swap(newRouteTable); err != nil {
 		hrm.failCount++
 		return fmt.Errorf("failed to swap route table: %w", err)
+	}
+
+	// Rebuild the sentinel's target set against the newly active table.
+	hrm.server.mu.RLock()
+	probeLoop := hrm.server.credentialProbeLoop
+	hrm.server.mu.RUnlock()
+	if probeLoop != nil {
+		probeLoop.OnReload()
 	}
 
 	// Update cache TTLs from the re-merged fragments

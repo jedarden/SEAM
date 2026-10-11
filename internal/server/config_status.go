@@ -163,11 +163,15 @@ func (s *Server) runtimeConfigStatus() map[string]interface{} {
 		status["hot_reload"] = s.hotReloadManager.Status()
 	}
 
-	// Keep the original fragment status keys available for existing operators
-	// while exposing the richer, stable sections above.
+	// Surface complete fragment status, including whole-fragment quarantine
+	// reasons, so operators can see why an env credential reference was held.
 	if s.specLoader != nil {
 		fragmentStatus := s.specLoader.GetFragmentStatus()
-		for _, key := range []string{"fragments_loaded", "fragment_mode", "conditions"} {
+		for _, key := range []string{
+			"fragments_loaded", "fragment_mode", "conditions", "fragments",
+			"valid_count", "quarantined_count", "total_count",
+			"last_loaded_timestamp", "server_continues",
+		} {
 			if value, ok := fragmentStatus[key]; ok {
 				status[key] = value
 			}

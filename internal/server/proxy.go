@@ -547,7 +547,7 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
 		match := routeMatchFromRequest(r)
-		if match != nil && match.Route.InjectAs != nil && match.Route.VaultPath != "" {
+		if match != nil && match.Route.InjectAs != nil && match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv {
 			// We have credential injection - attempt refresh and retry
 			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
 				// Either successful retry (returned nil) or fatal error

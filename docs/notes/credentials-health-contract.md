@@ -8,11 +8,10 @@ endpoint's wire contract; the tests named in "Test inventory" enforce every
 clause of it.
 
 `/health/credentials` answers one question for the operator: **can SEAM reach
-the credentials its routes inject?** It answers purely from the per-origin
-breaker state that request handling publishes — the sentinel performs no probe
-of its own and therefore cannot mutate breaker state. The probe that discovers
-credential death independently of traffic is a different signal and reports to
-`/_seam/readyz` (`credential_probe`, see `readyz-contract.md`).
+the credentials its routes inject?** It reports the per-origin breaker state
+published by request handling and, when configured, leader-elected credential
+sentinel probe results. Rendering the response performs no probe and does not
+mutate breaker state.
 
 ## Request
 
@@ -57,7 +56,8 @@ current fragment fleet — the path is in the spec loader's reserved set
 ## Response
 
 `Content-Type: application/json`. A single JSON object whose key set is
-**closed**:
+**closed**, with `credential_probes` present only when probe results have been
+published:
 
 | Key | Reports |
 |---|---|
@@ -66,6 +66,7 @@ current fragment fleet — the path is in the spec loader's reserved set
 | `credentials` | availability statement for the credential subsystem (below) |
 | `circuit_breaker` | aggregate over every published per-origin breaker |
 | `circuit_breakers` | per-origin records, sorted by origin; **omitted entirely** while no breaker has published state |
+| `credential_probes` | per-(fragment, instance) probe results; omitted until at least one result is published |
 
 `credentials` (availability metadata only):
 
@@ -90,6 +91,13 @@ Each `circuit_breakers[]` entry: `origin`, `state`, `enabled`,
 `source` when published. The state spelling (`closed` / `open` / `half_open`)
 is wire-stable — health tooling consumes it.
 
+Each `credential_probes[]` entry contains `fragment_id`, `instance_id`,
+`status`, `probe_spend_rate_ms`, and `consecutive_failures`, with optional
+`last_verified`, `probe_interval`, `known_expiry`, and `last_error`. Probe
+statuses map to the top-level verdict: `unhealthy` makes the response
+`unhealthy`; `degraded` or `unknown` makes it `degraded` unless a breaker or
+probe is already `unhealthy`.
+
 ## Breaker-state mapping
 
 | Published per-origin state | `status` | aggregate `circuit_breaker.state` |
@@ -107,6 +115,9 @@ is wire-stable — health tooling consumes it.
   `retry_after_seconds`.
 - **No latching**: the snapshot is rebuilt on every call. A breaker recovering
   to `closed` restores `healthy` on the next observation.
+- A configured credential probe returning 401 publishes `unhealthy` for its
+  `(fragment, instance)` and makes the top-level verdict `unhealthy`. Env
+  credentials are never refreshed or retried in place.
 
 ## Cache headers
 
@@ -119,14 +130,16 @@ on the second response, and nothing enters the cache in between.
 
 ## No-secret-value guarantee
 
-The sentinel's **only** input is the breaker-state registry snapshot. It reads
-no vault path, no credential value, no injection metadata. Concretely:
+The sentinel's inputs are breaker-state and credential-probe registry
+snapshots. It reads no vault path, credential value, or injection metadata.
+Concretely:
 
 - The response key set is closed and pinned by test — a field added for a
   credential value, its vault path, or any other secret-bearing metadata fails
   the pin.
 - `credentials` carries availability metadata only; it never carries a value.
-- `last_error` carries upstream transport error text only.
+- `last_error` carries upstream transport or probe status text only; it never
+  includes credential material.
 - The 403 bodies name the scope or the resolution failure, never payload.
 
 ## Relationship to readiness
@@ -135,14 +148,16 @@ no vault path, no credential value, no injection metadata. Concretely:
 `/health/credentials` is observability. An `unhealthy` verdict here never
 removes the pod from the Service — by design, since one dead origin must not
 take down the gateway for every other route (`readyz-contract.md`,
-"Relationship to liveness"). Readiness's `credential_probe` key tracks probe
-verification freshness, a different signal from live breaker state.
+"Relationship to liveness"). Readiness's `credential_probe` key tracks
+verification freshness; `/health/credentials` reports the latest per-route
+probe verdict.
 
 ## Test inventory
 
 | Test | Contract clause pinned |
 |---|---|
 | `internal/server/credentials_health_contract_test.go` — `TestCredentialsHealthStateMatrix` | one row per breaker state: 200 + `application/json` + `no-store` + no `X-SEAM-Cache`, exact closed top-level key set, `credentials` availability shape, exact aggregate key set and status/aggregate mapping per state, `open` outranking `half_open`, per-origin entry count |
+| `internal/server/credential_env_test.go` — `TestEnvCredentialIntegrationScrubsResponsesAndDoesNotRetry401` | injected env credential is scrubbed; a 401 is attempted once, marks its probe unhealthy, and appears in `/health/credentials` without the credential value |
 | `internal/server/credentials_health_contract_test.go` — `TestCredentialsHealthCallerAccessRejected` | caller listener → `route_not_found` 404 echoing no operator payload; resolved caller without `seam:ops:read` → 403 naming the scope; unresolved caller → stage-3 403; neither 403 echoes payload |
 | `internal/server/health_sentinel_test.go` — `...ResponseCarriesNoCredentialValues` | closed key-set walk over the whole body (no-secret guarantee) |
 | `internal/server/health_sentinel_test.go` — `...CacheBypassIsFresh` | reserved-path cache bypass; state flip visible; counters untouched |

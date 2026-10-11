@@ -38,9 +38,11 @@
     "x-upstream-plaintext": { "$ref": "#/$defs/acknowledged", "$comment": "Fragment-root. Required when x-upstream is http://. Mutually exclusive with x-upstream-map (per-entry plaintext is used there instead)." },
 
     "x-upstream-tls": { "$ref": "#/$defs/upstreamTls", "$comment": "Fragment-root upstream transport policy; absent means verify against system trust store with hostname checking. Upstream-facing: taken from targetVersion on an x-adapter fragment." },
-    "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch. Paired with x-inject-as (both or neither). Co-ownership with x-seam-owner (<base>/<owner>/<name>) and allowlist membership are validator-side; the base itself is deployment configuration (SEAM_VAULT_BASE_DIR), not schema vocabulary." },
-    "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the secret. Paired with x-vault-path (both or neither)." },
-    "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment (one declaring neither x-vault-path nor x-inject-as)." },
+    "x-vault-path": { "$ref": "#/$defs/vaultPath", "$comment": "Fragment-root. Which OpenBao secret to fetch for the default or explicit vault credential source. Paired with x-inject-as. Co-ownership with x-seam-owner and allowlist membership are validator-side." },
+    "x-credential-source": { "type": "string", "enum": ["vault", "env"], "$comment": "Fragment-root credential source. Omission preserves the legacy vault source; env is populated from a Kubernetes Secret and read once at process startup." },
+    "x-credential-env": { "type": "string", "pattern": "^SEAM_CRED_[A-Z0-9_]+$", "$comment": "Required only for x-credential-source: env. The variable must belong to the x-seam-owner namespace; checked by seam lint and runtime quarantine." },
+    "x-inject-as": { "$ref": "#/$defs/injectAs", "$comment": "Fragment-root. How to inject the selected credential source. Present exactly when one source is declared." },
+    "x-credential-probe": { "$ref": "#/$defs/credentialProbe", "$comment": "Fragment-root. A designated safe request + per-fragment probe interval. Forbidden on a pass-through fragment with no credential source." },
     "x-breaker": { "$ref": "#/$defs/breaker", "$comment": "Fragment-root tuning of the per-upstream circuit breaker. On by default (infrastructure guard); enabled:false is the opt-out. Upstream-facing: forbidden on an x-adapter fragment." },
 
     "x-required-scope": { "$ref": "#/$defs/scopeArray", "$comment": "Optional fragment-root DEFAULT; any operation-level x-required-scope REPLACES it (validator-side), never merges. Conjunctive array; bare string sugar for one element." },
@@ -63,7 +65,7 @@
     { "$ref": "#/$defs/constraint-map-requires-instance-param" },
     { "$ref": "#/$defs/constraint-instance-param-only-with-map" },
     { "$ref": "#/$defs/constraint-upstream-excludes-instance-param" },
-    { "$ref": "#/$defs/constraint-vault-inject-paired" },
+    { "$ref": "#/$defs/constraint-credential-source-inject-paired" },
     { "$ref": "#/$defs/constraint-passthrough-has-no-probe" },
     { "$ref": "#/$defs/constraint-plaintext-required-on-http" },
     { "$ref": "#/$defs/constraint-plaintext-excludes-map" },
@@ -475,6 +477,8 @@
             { "required": ["x-upstream-tls"] },
             { "required": ["x-upstream-plaintext"] },
             { "required": ["x-vault-path"] },
+            { "required": ["x-credential-source"] },
+            { "required": ["x-credential-env"] },
             { "required": ["x-inject-as"] },
             { "required": ["x-credential-probe"] },
             { "required": ["x-breaker"] }
@@ -507,15 +511,35 @@
       "then": { "not": { "required": ["x-instance-param"] } },
       "$comment": "A single-instance route has no instance-selector segment."
     },
-    "constraint-vault-inject-paired": {
+    "constraint-credential-source-inject-paired": {
       "oneOf": [
-        { "required": ["x-vault-path", "x-inject-as"] },
-        { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } }
+        {
+          "required": ["x-vault-path", "x-inject-as"],
+          "not": { "anyOf": [{ "required": ["x-credential-source"] }, { "required": ["x-credential-env"] }] }
+        },
+        {
+          "required": ["x-credential-source", "x-credential-env", "x-inject-as"],
+          "properties": { "x-credential-source": { "const": "env" } },
+          "not": { "required": ["x-vault-path"] }
+        },
+        {
+          "required": ["x-credential-source", "x-vault-path", "x-inject-as"],
+          "properties": { "x-credential-source": { "const": "vault" } },
+          "not": { "required": ["x-credential-env"] }
+        },
+        {
+          "not": { "anyOf": [
+            { "required": ["x-vault-path"] },
+            { "required": ["x-inject-as"] },
+            { "required": ["x-credential-source"] },
+            { "required": ["x-credential-env"] }
+          ] }
+        }
       ],
-      "$comment": "Both or neither. A fragment declaring neither is a legal pass-through proxy route. On an x-adapter fragment both are already forbidden, so this is consistent."
+      "$comment": "x-inject-as is present exactly when one credential source is declared. Legacy x-vault-path means vault by default; env requires x-credential-source, x-credential-env and x-inject-as. A fragment declaring neither source is a legal pass-through route."
     },
     "constraint-passthrough-has-no-probe": {
-      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-inject-as"] }] } },
+      "if": { "not": { "anyOf": [{ "required": ["x-vault-path"] }, { "required": ["x-credential-source"] }, { "required": ["x-inject-as"] }] } },
       "then": { "not": { "required": ["x-credential-probe"] } },
       "$comment": "There is no credential to validate against the upstream on a pass-through route."
     },

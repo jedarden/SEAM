@@ -291,7 +291,7 @@ SEAM provides multiple health endpoints for different monitoring scenarios:
 |----------|---------|--------|-----------------|
 | `/_seam/healthz` | Liveness probe | Caller port | Plain text "OK" |
 | `/_seam/readyz` | Readiness probe | Caller port | JSON `{"ready": true}` |
-| `/health/credentials` | Credential status | Operator port | JSON with circuit breaker state |
+| `/health/credentials` | Credential status | Operator port | JSON with circuit breaker and configured credential-probe results |
 | `/health/upstreams` | Upstream connectivity | Caller port | JSON with upstream health |
 | `/_seam/metrics` | Prometheus metrics | Operator port | Prometheus text format |
 
@@ -348,7 +348,9 @@ This is a read-only operator endpoint. It is a reserved path, bypasses the
 cache and quota middleware, and sends `Cache-Control: no-store`, so an open or
 half-open breaker is visible without waiting for a cached health response.
 The aggregate `circuit_breaker` field is accompanied by per-origin
-`circuit_breakers` entries when breaker state has been published.
+`circuit_breakers` entries when breaker state has been published. Configured
+sentinel checks are listed in `credential_probes`; a rejected env credential
+appears as `unhealthy` after one probe interval and is not retried in place.
 
 **Expected Response:**
 

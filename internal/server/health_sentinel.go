@@ -7,14 +7,15 @@ import (
 )
 
 // CredentialHealthResponse is the read-only health-sentinel view of the
-// credential subsystem. It contains breaker metadata only; credential values
-// are never included.
+// credential subsystem. It contains breaker and probe metadata only;
+// credential values are never included.
 type CredentialHealthResponse struct {
-	Status          string                 `json:"status"`
-	Timestamp       time.Time              `json:"timestamp"`
-	Credentials     CredentialAvailability `json:"credentials"`
-	CircuitBreaker  CircuitBreakerHealth   `json:"circuit_breaker"`
-	CircuitBreakers []CircuitBreakerStatus `json:"circuit_breakers,omitempty"`
+	Status           string                  `json:"status"`
+	Timestamp        time.Time               `json:"timestamp"`
+	Credentials      CredentialAvailability  `json:"credentials"`
+	CircuitBreaker   CircuitBreakerHealth    `json:"circuit_breaker"`
+	CircuitBreakers  []CircuitBreakerStatus  `json:"circuit_breakers,omitempty"`
+	CredentialProbes []CredentialProbeResult `json:"credential_probes,omitempty"`
 }
 
 // CredentialAvailability describes whether the credential subsystem is
@@ -39,6 +40,7 @@ type CircuitBreakerHealth struct {
 // does not perform a probe and therefore cannot mutate breaker state.
 type CredentialHealthSentinel struct {
 	breakers CircuitBreakerStateProvider
+	probes   *CredentialProbeRegistry
 }
 
 // CircuitBreakerStates returns the registry used by the server's health
@@ -57,13 +59,20 @@ func (s *Server) CircuitBreakerStates() *CircuitBreakerStateRegistry {
 }
 
 func (s *Server) credentialsHealthHandler(w http.ResponseWriter, r *http.Request) {
-	NewCredentialHealthSentinel(s.CircuitBreakerStates()).ServeHTTP(w, r)
+	s.mu.RLock()
+	probes := s.credentialProbes
+	s.mu.RUnlock()
+	NewCredentialHealthSentinel(s.CircuitBreakerStates(), probes).ServeHTTP(w, r)
 }
 
 // NewCredentialHealthSentinel creates a health sentinel backed by breaker
 // state. A nil provider is treated as an empty registry.
-func NewCredentialHealthSentinel(breakers CircuitBreakerStateProvider) *CredentialHealthSentinel {
-	return &CredentialHealthSentinel{breakers: breakers}
+func NewCredentialHealthSentinel(breakers CircuitBreakerStateProvider, probes ...*CredentialProbeRegistry) *CredentialHealthSentinel {
+	sentinel := &CredentialHealthSentinel{breakers: breakers}
+	if len(probes) > 0 {
+		sentinel.probes = probes[0]
+	}
+	return sentinel
 }
 
 // Snapshot builds a fresh response on every call. In particular, callers must
@@ -73,13 +82,29 @@ func (h *CredentialHealthSentinel) Snapshot() CredentialHealthResponse {
 	if h != nil && h.breakers != nil {
 		states = h.breakers.Snapshot()
 	}
+	var probeResults []CredentialProbeResult
+	if h != nil && h.probes != nil {
+		probeResults = h.probes.Snapshot()
+	}
+	status := credentialHealthStatus(states)
+	for _, probe := range probeResults {
+		switch probe.Status {
+		case CredentialUnhealthy:
+			status = "unhealthy"
+		case CredentialDegraded, CredentialUnknown:
+			if status != "unhealthy" {
+				status = "degraded"
+			}
+		}
+	}
 
 	return CredentialHealthResponse{
-		Status:          credentialHealthStatus(states),
-		Timestamp:       time.Now().UTC(),
-		Credentials:     CredentialAvailability{Available: true},
-		CircuitBreaker:  aggregateCircuitBreakerHealth(states),
-		CircuitBreakers: states,
+		Status:           status,
+		Timestamp:        time.Now().UTC(),
+		Credentials:      CredentialAvailability{Available: true},
+		CircuitBreaker:   aggregateCircuitBreakerHealth(states),
+		CircuitBreakers:  states,
+		CredentialProbes: probeResults,
 	}
 }
 
