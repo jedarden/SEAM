@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/ardenone/seam/internal/vault"
 )
 
 // CredentialProbeLoop runs the background credential health probe loop.
@@ -22,8 +20,7 @@ type CredentialProbeLoop struct {
 	leaseLeader      *LeaseLeader
 	probeRegistry    *CredentialProbeRegistry
 	routeTableHolder *ThreadSafeTableHolder
-	vaultClient      *vault.Client
-	oauthTokens      *oauthTokenCache
+	credentialSource CredentialSource
 	httpClient       *http.Client
 	stopCh           chan struct{}
 	stopped          bool
@@ -44,8 +41,9 @@ type ProbeLoopConfig struct {
 	// RouteTableHolder provides access to current route table
 	RouteTableHolder *ThreadSafeTableHolder
 
-	// VaultClient fetches credentials from OpenBao
-	VaultClient *vault.Client
+	// CredentialSource resolves credentials for probes. Production uses the
+	// vault-backed source; tests may inject an in-memory implementation.
+	CredentialSource CredentialSource
 
 	// HTTPClient makes probe requests
 	HTTPClient *http.Client
@@ -65,8 +63,8 @@ func NewCredentialProbeLoop(cfg ProbeLoopConfig) (*CredentialProbeLoop, error) {
 	if cfg.RouteTableHolder == nil {
 		return nil, fmt.Errorf("route table holder is required")
 	}
-	if cfg.VaultClient == nil {
-		return nil, fmt.Errorf("vault client is required")
+	if cfg.CredentialSource == nil {
+		return nil, fmt.Errorf("credential source is required")
 	}
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = &http.Client{
@@ -78,7 +76,7 @@ func NewCredentialProbeLoop(cfg ProbeLoopConfig) (*CredentialProbeLoop, error) {
 		leaseLeader:      cfg.LeaseLeader,
 		probeRegistry:    cfg.ProbeRegistry,
 		routeTableHolder: cfg.RouteTableHolder,
-		vaultClient:      cfg.VaultClient,
+		credentialSource: cfg.CredentialSource,
 		httpClient:       cfg.HTTPClient,
 		stopCh:           make(chan struct{}),
 		probeTargets:     make(map[string]*CredentialProbeTarget),
@@ -298,42 +296,17 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		l.lastProbeTimes[key] = now
 	}()
 
-	// Fetch credential from OpenBao
-	secret, err := l.vaultClient.GetSecret(ctx, target.VaultPath)
+	// Resolve the credential through the configured source.
+	credValue, err := l.credentialSource.Resolve(ctx, RouteEntry{
+		VaultPath: target.VaultPath,
+		InjectAs:  target.InjectAs,
+	})
 	if err != nil {
 		result.Status = CredentialUnhealthy
 		result.LastError = fmt.Sprintf("failed to fetch credential: %v", err)
 		result.ConsecutiveFailures++
 		log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
 		return
-	}
-
-	// Extract credential value
-	credValue, err := credentialValue(secret)
-	if err != nil {
-		result.Status = CredentialUnhealthy
-		result.LastError = fmt.Sprintf("failed to extract credential value: %v", err)
-		result.ConsecutiveFailures++
-		log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
-		return
-	}
-
-	// An oauth-refresh route stores a refresh token; the probe must present the
-	// exchanged bearer, exactly as live traffic does, never the stored value.
-	if target.InjectAs != nil && target.InjectAs.Kind == InjectionOAuthRefresh {
-		// l.mu is already held by probeDueTargets.
-		if l.oauthTokens == nil {
-			l.oauthTokens = newOAuthTokenCache()
-		}
-		bearer, err := l.oauthTokens.bearer(ctx, target.InjectAs, string(credValue), false)
-		if err != nil {
-			result.Status = CredentialUnhealthy
-			result.LastError = fmt.Sprintf("failed to exchange refresh token: %v", err)
-			result.ConsecutiveFailures++
-			log.Printf("[ProbeLoop] Probe failed for %s:%s: %v", target.FragmentID, target.InstanceID, err)
-			return
-		}
-		credValue = []byte(bearer)
 	}
 
 	// Build probe request with IN-PROCESS origin tag

@@ -23,8 +23,10 @@ import (
 type RouteTable struct {
 	routes []RouteEntry
 
-	secretMu     sync.Mutex
-	oauthTokens  *oauthTokenCache
+	secretMu         sync.Mutex
+	credentialSource CredentialSource
+	// secretClient remains a source-construction hook for existing in-package
+	// metrics tests. It is adapted to CredentialSource before any read occurs.
 	secretClient *vault.Client
 }
 
@@ -1112,12 +1114,28 @@ func (t *RouteTable) OpenBaoCacheStats() vault.CacheStats {
 		return vault.CacheStats{}
 	}
 	t.secretMu.Lock()
-	client := t.secretClient
+	source := t.credentialSource
+	if source == nil && t.secretClient != nil {
+		source = newVaultCredentialSource(t.secretClient)
+		t.credentialSource = source
+	}
 	t.secretMu.Unlock()
-	if client == nil {
+	stats, ok := source.(credentialCacheStatsProvider)
+	if !ok {
 		return vault.CacheStats{}
 	}
-	return client.CacheStats()
+	return stats.CacheStats()
+}
+
+// SetCredentialSource injects the source used by future request matches. It is
+// primarily a test seam; production tables lazily construct the vault source.
+func (t *RouteTable) SetCredentialSource(source CredentialSource) {
+	if t == nil {
+		return
+	}
+	t.secretMu.Lock()
+	t.credentialSource = source
+	t.secretMu.Unlock()
 }
 
 // Match returns the route matching req and extracts values for path
@@ -1390,73 +1408,28 @@ func (route RouteEntry) effectiveTarget(pathParams map[string]string) RouteEntry
 }
 
 func (t *RouteTable) resolveCredential(ctx context.Context, route RouteEntry) ([]byte, error) {
-	if route.VaultPath == "" {
-		return nil, fmt.Errorf("route has no x-vault-path")
-	}
 	t.secretMu.Lock()
-	client := t.secretClient
-	if client == nil {
+	source := t.credentialSource
+	if source == nil && t.secretClient != nil {
+		source = newVaultCredentialSource(t.secretClient)
+		t.credentialSource = source
+	}
+	t.secretMu.Unlock()
+	if source == nil {
 		var err error
-		client, err = vault.NewFromEnv()
+		source, err = newVaultCredentialSourceFromEnv()
 		if err != nil {
-			t.secretMu.Unlock()
 			return nil, err
 		}
-		t.secretClient = client
-	}
-	t.secretMu.Unlock()
-
-	secret, err := client.GetSecret(ctx, route.VaultPath)
-	if err != nil {
-		return nil, err
-	}
-	stored, err := credentialValue(secret)
-	if err != nil || route.InjectAs == nil || route.InjectAs.Kind != InjectionOAuthRefresh {
-		return stored, err
-	}
-
-	t.secretMu.Lock()
-	if t.oauthTokens == nil {
-		t.oauthTokens = newOAuthTokenCache()
-	}
-	cache := t.oauthTokens
-	t.secretMu.Unlock()
-	bearer, err := cache.bearer(ctx, route.InjectAs, string(stored), credentialRetryFromContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-	return []byte(bearer), nil
-}
-
-func credentialValue(secret vault.Secret) ([]byte, error) {
-	for _, key := range []string{"value", "token", "secret", "api_key", "api-key", "key"} {
-		if value, ok := secret[key]; ok {
-			return secretValueString(value)
+		t.secretMu.Lock()
+		if t.credentialSource == nil {
+			t.credentialSource = source
+		} else {
+			source = t.credentialSource
 		}
+		t.secretMu.Unlock()
 	}
-	if len(secret) == 1 {
-		for _, value := range secret {
-			return secretValueString(value)
-		}
-	}
-	return nil, fmt.Errorf("secret has no usable credential field")
-}
-
-func secretValueString(value any) ([]byte, error) {
-	switch typed := value.(type) {
-	case string:
-		if typed == "" {
-			return nil, fmt.Errorf("secret credential is empty")
-		}
-		return []byte(typed), nil
-	case []byte:
-		if len(typed) == 0 {
-			return nil, fmt.Errorf("secret credential is empty")
-		}
-		return append([]byte(nil), typed...), nil
-	default:
-		return nil, fmt.Errorf("secret credential is not a string")
-	}
+	return source.Resolve(ctx, route)
 }
 
 func routeVersionRank(version string) int {

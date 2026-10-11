@@ -191,6 +191,7 @@ type Server struct {
 	cloudflareJWTValidator *CloudflareJWTValidator         // Phase 14: Cloudflare Access JWT validator
 	exclusionTracker       *pluckfallback.ExclusionTracker // Phase 13: Exclusion tracking for bead visibility analysis
 	credentialProbes       *CredentialProbeRegistry        // Credential-probe results the readyz gate evaluates (nil = no probes configured)
+	credentialSource       CredentialSource                // Shared source for control-plane credential reads
 }
 
 // Circuit breaker context constants (using contextKey type from proxy.go)
@@ -515,11 +516,7 @@ func (s *Server) getTailscaleAPIKeyFromVault() string {
 		return ""
 	}
 
-	s.openBaoMu.Lock()
-	defer s.openBaoMu.Unlock()
-
-	// Create vault client from environment
-	client, err := vault.NewFromEnv()
+	source, err := s.getCredentialSource()
 	if err != nil {
 		log.Printf("Failed to create vault client for Tailscale API key: %v", err)
 		return ""
@@ -528,27 +525,28 @@ func (s *Server) getTailscaleAPIKeyFromVault() string {
 	// Read from OpenBao
 	// Path: secret/rs-manager/tailscale/api-key
 	vaultPath := "rs-manager/tailscale/api-key"
-	secret, err := client.GetSecret(context.Background(), vaultPath)
+	apiKeyBytes, err := source.Resolve(context.Background(), RouteEntry{VaultPath: vaultPath})
 	if err != nil {
 		log.Printf("Failed to read Tailscale API key from OpenBao path %s: %v", vaultPath, err)
 		return ""
 	}
 
-	// Extract the API key from the secret
-	apiKey, ok := secret["api-key"]
-	if !ok {
-		log.Printf("Tailscale API key not found in secret at path %s", vaultPath)
-		return ""
-	}
-
-	apiKeyStr, ok := apiKey.(string)
-	if !ok {
-		log.Printf("Tailscale API key is not a string in secret at path %s", vaultPath)
-		return ""
-	}
-
 	log.Printf("Successfully retrieved Tailscale API key from OpenBao")
-	return apiKeyStr
+	return string(apiKeyBytes)
+}
+
+func (s *Server) getCredentialSource() (CredentialSource, error) {
+	s.openBaoMu.Lock()
+	defer s.openBaoMu.Unlock()
+	if s.credentialSource != nil {
+		return s.credentialSource, nil
+	}
+	source, err := newVaultCredentialSourceFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	s.credentialSource = source
+	return source, nil
 }
 
 // buildRouteSnapshots builds route snapshots for the current spec version
@@ -1750,10 +1748,16 @@ func (s *Server) startOpenBaoLogin(ctx context.Context) {
 	s.setOpenBaoReady(false)
 	go func() {
 		for {
-			client, err := vault.NewFromEnv()
+			source, sourceErr := s.getCredentialSource()
+			err := sourceErr
 			if err == nil {
 				loginCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				err = client.Login(loginCtx)
+				loginSource, ok := source.(credentialLoginSource)
+				if !ok {
+					err = fmt.Errorf("credential source does not support startup login")
+				} else {
+					err = loginSource.Login(loginCtx)
+				}
 				cancel()
 			}
 			if err == nil {

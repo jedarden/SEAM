@@ -170,13 +170,34 @@ type routeMatchContextKey struct{}
 
 type routeSecretResolver func(context.Context, RouteEntry) ([]byte, error)
 
-func withRouteMatch(req *http.Request, match *RouteMatch, resolver routeSecretResolver) {
+type legacyCredentialSource routeSecretResolver
+
+func (f legacyCredentialSource) Resolve(ctx context.Context, route RouteEntry) ([]byte, error) {
+	return f(ctx, route)
+}
+
+func (f legacyCredentialSource) Refreshable(ctx context.Context, route RouteEntry) ([]byte, error) {
+	return f(ctx, route)
+}
+
+func withRouteMatch(req *http.Request, match *RouteMatch, resolver any) {
 	if req == nil {
 		return
 	}
 	ctx := context.WithValue(req.Context(), routeMatchContextKey{}, match)
 	if resolver != nil {
-		ctx = context.WithValue(ctx, routeSecretResolverContextKey{}, resolver)
+		var source CredentialSource
+		switch value := resolver.(type) {
+		case CredentialSource:
+			source = value
+		case routeSecretResolver:
+			source = legacyCredentialSource(value)
+		case func(context.Context, RouteEntry) ([]byte, error):
+			source = legacyCredentialSource(value)
+		}
+		if source != nil {
+			ctx = context.WithValue(ctx, routeSecretResolverContextKey{}, source)
+		}
 	}
 	*req = *req.WithContext(ctx)
 }
@@ -191,11 +212,11 @@ func routeMatchFromRequest(req *http.Request) *RouteMatch {
 	return match
 }
 
-func routeSecretResolverFromRequest(req *http.Request) routeSecretResolver {
+func routeSecretResolverFromRequest(req *http.Request) CredentialSource {
 	if req == nil {
 		return nil
 	}
-	resolver, _ := req.Context().Value(routeSecretResolverContextKey{}).(routeSecretResolver)
+	resolver, _ := req.Context().Value(routeSecretResolverContextKey{}).(CredentialSource)
 	return resolver
 }
 

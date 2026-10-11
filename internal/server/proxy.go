@@ -387,7 +387,7 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			p.handleError(trackedWriter, r, fmt.Errorf("credential resolver is not configured"), "injecting upstream credential")
 			return
 		}
-		secret, err := resolver(ctx, match.Route)
+		secret, err := resolver.Resolve(ctx, match.Route)
 		if err != nil {
 			p.handleError(trackedWriter, r, err, "resolving upstream credential")
 			return
@@ -630,7 +630,7 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 
 	// Invalidate and refetch the secret
 	log.Printf("[proxy] 401 detected on route %s - invalidating and refetching credential from %s", route, match.Route.VaultPath)
-	freshSecret, refreshErr := resolver(ctx, match.Route)
+	freshSecret, refreshErr := resolver.Refreshable(ctx, match.Route)
 	if refreshErr != nil {
 		// Refetch failed - degrade to secret-store-unavailable 503
 		log.Printf("[proxy] 401 credential refresh failed for route %s: %v", route, refreshErr)

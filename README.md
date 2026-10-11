@@ -49,6 +49,14 @@ seam serve [flags]
 - `--max-replayable-request-bytes` (default: `1048576`) - Maximum request body size buffered for replay, in bytes
 - `--max-buffered-response-bytes` (default: `1048576`) - Maximum decoded response body size held for whole-response scrubbing, in bytes (see the note below)
 
+Credential reads are routed through one internal `CredentialSource` seam. The
+default vault source preserves OpenBao caching, eager invalidation/refetch after
+an upstream 401, and OAuth refresh-token exchange. Request injection, the
+credential sentinel, and control-plane reads do not call the vault client
+directly; tests can install an in-memory source at the route-table or probe
+loop boundary. This is an internal behavior boundary, so existing fragments
+remain unchanged.
+
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path. The precedence is mounted control &gt; flag &gt; environment variable &gt; default: an explicit flag already beats `SEAM_UPSTREAM_CA_DIR` / `SEAM_UPSTREAM_ALLOWLIST` before the boundary runs, so what gets refused in-cluster is the flag's value.
 
 **Operator-visible failure modes (in-cluster upstream trust).**
