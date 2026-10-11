@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ardenone/seam/internal/limits"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/vault"
 	"github.com/ardenone/seam/internal/version"
@@ -108,6 +110,11 @@ type RouteEntry struct {
 	// carried per route so providers that emit SSE are never whole-response
 	// buffered, while legacy routes retain their existing buffering behavior.
 	Streaming bool
+	// Zero values inherit the process defaults. These overrides may only
+	// select values at or below the operator-owned ceilings.
+	MaxRequestBytes  int64
+	MaxResponseBytes int64
+	Timeout          time.Duration
 
 	// CostPerCall is the flat fallback for response-derived metering and the
 	// legacy admission-time charge when CostFromResponse is nil.
@@ -462,12 +469,17 @@ func (h *ThreadSafeTableHolder) GetVersionsForPath(path string, method string) [
 // The route table contains the five HTTP methods SEAM currently proxies. A
 // missing operation-level x-api-version extension is represented as v1.
 func BuildRouteTable(spec *v3.Document) (*RouteTable, error) {
-	return buildRouteTable(spec, nil)
+	return buildRouteTableWithCeilings(spec, nil, limits.Ceilings{})
 }
 
 // buildRouteTable optionally reuses the process-start environment snapshot.
 // Hot reload must not reread credentials from the process environment.
 func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*RouteTable, error) {
+	return buildRouteTableWithCeilings(spec, envSnapshot, limits.Ceilings{})
+}
+
+func buildRouteTableWithCeilings(spec *v3.Document, envSnapshot *envCredentialSource, ceilings limits.Ceilings) (*RouteTable, error) {
+	ceilings = ceilings.WithDefaults()
 	if spec == nil {
 		return nil, fmt.Errorf("OpenAPI spec cannot be nil")
 	}
@@ -491,6 +503,13 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 		}
 		if pathItem == nil {
 			return nil, fmt.Errorf("OpenAPI path %q has a nil path item", path)
+		}
+		if pathItem.Extensions != nil {
+			for _, name := range []string{"x-max-request-bytes", "x-max-response-bytes", "x-timeout"} {
+				if _, present := pathItem.Extensions.Get(name); present {
+					return nil, fmt.Errorf("OpenAPI path %q: %s is allowed at fragment root or operation level, not path-item level", path, name)
+				}
+			}
 		}
 
 		// Keep this list explicit. Additional OpenAPI operations such as HEAD and
@@ -645,6 +664,18 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
 			}
+			maxRequestBytes, err := extractBoundedBytesExtension(methodOp.operation, pathItem, spec, "x-max-request-bytes", ceilings.RequestBytes)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			maxResponseBytes, err := extractBoundedBytesExtension(methodOp.operation, pathItem, spec, "x-max-response-bytes", ceilings.ResponseBytes)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
+			timeout, err := extractBoundedTimeoutExtension(methodOp.operation, pathItem, spec, ceilings.Timeout)
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 			costFromResponse, err := extractResponseCostConfig(methodOp.operation, pathItem, spec)
 			if err != nil {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
@@ -679,6 +710,9 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				Unscrubbable:          unscrubbable,
 				BodyMode:              bodyMode,
 				Streaming:             streaming,
+				MaxRequestBytes:       maxRequestBytes,
+				MaxResponseBytes:      maxResponseBytes,
+				Timeout:               timeout,
 				CostPerCall:           costPerCall,
 				CostFromResponse:      costFromResponse,
 				UsageMetrics:          usageMetrics,
@@ -837,6 +871,50 @@ func extractBoolExtension(operation *v3.Operation, pathItem *v3.PathItem, docume
 		return false, fmt.Errorf("%s must be a boolean: %w", name, err)
 	}
 	return value, nil
+}
+
+var routeTimeoutPattern = regexp.MustCompile(`^[0-9]+(ms|s|m|h)$`)
+
+func extractBoundedBytesExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, name string, ceiling int64) (int64, error) {
+	node, ok := firstExtension(operation, pathItem, document, name)
+	if !ok || node == nil {
+		return 0, nil
+	}
+	var value any
+	if err := node.Decode(&value); err != nil {
+		return 0, fmt.Errorf("%s must be a positive integer: %w", name, err)
+	}
+	var bytes int64
+	switch n := value.(type) {
+	case int:
+		bytes = int64(n)
+	case int64:
+		bytes = n
+	default:
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	if bytes <= 0 || bytes > ceiling {
+		return 0, fmt.Errorf("%s must be between 1 and operator ceiling %d bytes", name, ceiling)
+	}
+	return bytes, nil
+}
+
+func extractBoundedTimeoutExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, ceiling time.Duration) (time.Duration, error) {
+	if _, present := firstExtension(operation, pathItem, document, "x-timeout"); !present {
+		return 0, nil
+	}
+	value, err := extractStringExtension(operation, pathItem, document, "x-timeout")
+	if err != nil {
+		return 0, err
+	}
+	if !routeTimeoutPattern.MatchString(value) {
+		return 0, fmt.Errorf("x-timeout must be a positive duration using ms, s, m, or h")
+	}
+	timeout, err := time.ParseDuration(value)
+	if err != nil || timeout <= 0 || timeout > ceiling {
+		return 0, fmt.Errorf("x-timeout must be between 1ms and operator ceiling %s", ceiling)
+	}
+	return timeout, nil
 }
 
 func extractResponseCostConfig(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*ResponseCostConfig, error) {

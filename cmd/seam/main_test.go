@@ -527,16 +527,19 @@ var serveEnvVarNames = []string{
 	"SEAM_VAULT_BASE_DIR",
 	"SEAM_MAX_REPLAYABLE_REQUEST_BYTES",
 	"SEAM_MAX_BUFFERED_RESPONSE_BYTES",
+	"SEAM_MAX_REQUEST_BYTES_CEILING",
+	"SEAM_MAX_RESPONSE_BYTES_CEILING",
+	"SEAM_MAX_TIMEOUT_CEILING",
 	"SEAM_HOT_RELOAD_ENABLED",
 }
 
 // serveFlagEnvPairs is the complete flag-to-environment mapping the README's
 // environment-variable table documents: one entry per serve flag, paired with
-// the SEAM_* variable applyEnvOverrides consults for it. Thirteen pairs follow
+// the SEAM_* variable applyEnvOverrides consults for it. Sixteen pairs follow
 // the mechanical rule — SEAM_ plus the flag name upper-cased with dashes as
 // underscores — and the two paired by meaning instead are marked derived:
 // false. TestServeFlagEnvMapping fails when a serve flag is added without an
-// entry here, which is what keeps the README's "all fifteen have a SEAM_*
+// entry here, which is what keeps the README's "all eighteen have a SEAM_*
 // environment counterpart" promise true.
 var serveFlagEnvPairs = []struct {
 	flag    string
@@ -557,6 +560,9 @@ var serveFlagEnvPairs = []struct {
 	{"vault-base-dir", "SEAM_VAULT_BASE_DIR", true},
 	{"max-replayable-request-bytes", "SEAM_MAX_REPLAYABLE_REQUEST_BYTES", true},
 	{"max-buffered-response-bytes", "SEAM_MAX_BUFFERED_RESPONSE_BYTES", true},
+	{"max-request-bytes-ceiling", "SEAM_MAX_REQUEST_BYTES_CEILING", true},
+	{"max-response-bytes-ceiling", "SEAM_MAX_RESPONSE_BYTES_CEILING", true},
+	{"max-timeout-ceiling", "SEAM_MAX_TIMEOUT_CEILING", true},
 	{"enable-hot-reload", "SEAM_HOT_RELOAD_ENABLED", false},
 }
 
@@ -637,6 +643,15 @@ func TestServeDefaultsWithoutFlagsOrEnv(t *testing.T) {
 	}
 	if got := *f.maxBufferedResponseBytes; got != 1024*1024 {
 		t.Errorf("max-buffered-response-bytes default = %d, want %d", got, 1024*1024)
+	}
+	if got := *f.maxRequestBytesCeiling; got != 8*1024*1024 {
+		t.Errorf("max-request-bytes-ceiling default = %d, want %d", got, 8*1024*1024)
+	}
+	if got := *f.maxResponseBytesCeiling; got != 8*1024*1024 {
+		t.Errorf("max-response-bytes-ceiling default = %d, want %d", got, 8*1024*1024)
+	}
+	if got := *f.maxTimeoutCeiling; got != 120*time.Second {
+		t.Errorf("max-timeout-ceiling default = %s, want 120s", got)
 	}
 	if got := *f.hotReloadEnabled; got {
 		t.Error("enable-hot-reload default = true, want false")
@@ -777,6 +792,36 @@ func TestServeFlagOverridesEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "request bytes ceiling",
+			args: []string{"--max-request-bytes-ceiling", "4194304"},
+			env:  map[string]string{"SEAM_MAX_REQUEST_BYTES_CEILING": "8388608"},
+			check: func(t *testing.T, f *serveFlags) {
+				if *f.maxRequestBytesCeiling != 4194304 {
+					t.Errorf("request ceiling = %d, want flag value", *f.maxRequestBytesCeiling)
+				}
+			},
+		},
+		{
+			name: "response bytes ceiling",
+			args: []string{"--max-response-bytes-ceiling", "4194304"},
+			env:  map[string]string{"SEAM_MAX_RESPONSE_BYTES_CEILING": "8388608"},
+			check: func(t *testing.T, f *serveFlags) {
+				if *f.maxResponseBytesCeiling != 4194304 {
+					t.Errorf("response ceiling = %d, want flag value", *f.maxResponseBytesCeiling)
+				}
+			},
+		},
+		{
+			name: "timeout ceiling",
+			args: []string{"--max-timeout-ceiling", "30s"},
+			env:  map[string]string{"SEAM_MAX_TIMEOUT_CEILING": "120s"},
+			check: func(t *testing.T, f *serveFlags) {
+				if *f.maxTimeoutCeiling != 30*time.Second {
+					t.Errorf("timeout ceiling = %s, want flag value", *f.maxTimeoutCeiling)
+				}
+			},
+		},
+		{
 			name: "capture enabled flag beats false env",
 			args: []string{"--capture-enabled"},
 			env:  map[string]string{"SEAM_CAPTURE_ENABLED": "false"},
@@ -838,8 +883,8 @@ func TestServeFlagOverridesEnv(t *testing.T) {
 // The mapping must describe the serve flag set exactly — every documented
 // flag exists, every flag is documented, the derived pairs really follow the
 // mechanical rule, and the only rule-breakers are the two the README names.
-// Pinning the count at fifteen is the point: the README promises all fifteen
-// serve flags have SEAM_* counterparts, so a sixteenth flag must arrive with
+// Pinning the count at eighteen is the point: the README promises all eighteen
+// serve flags have SEAM_* counterparts, so a nineteenth flag must arrive with
 // a mapping entry and a README update or this fails.
 func TestServeFlagEnvMapping(t *testing.T) {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
@@ -882,8 +927,8 @@ func TestServeFlagEnvMapping(t *testing.T) {
 		}
 	}
 
-	if got := len(serveFlagEnvPairs); got != 15 {
-		t.Errorf("serveFlagEnvPairs documents %d flags, want 15 — the README promises all fifteen serve flags have SEAM_* counterparts; update the mapping and the README together", got)
+	if got := len(serveFlagEnvPairs); got != 18 {
+		t.Errorf("serveFlagEnvPairs documents %d flags, want 18 — update the mapping and README together", got)
 	}
 	if exceptions != 2 {
 		t.Errorf("%d pairs break the mechanical derivation, want exactly the 2 documented exceptions", exceptions)
@@ -975,6 +1020,9 @@ func TestServeEnvFillsOmittedFlag(t *testing.T) {
 		"SEAM_VAULT_BASE_DIR":               {value: "tenants/env", get: func(f *serveFlags) string { return *f.vaultBaseDir }},
 		"SEAM_MAX_REPLAYABLE_REQUEST_BYTES": {value: "2097152", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxReplayableRequestBytes) }},
 		"SEAM_MAX_BUFFERED_RESPONSE_BYTES":  {value: "2097152", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxBufferedResponseBytes) }},
+		"SEAM_MAX_REQUEST_BYTES_CEILING":    {value: "4194304", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxRequestBytesCeiling) }},
+		"SEAM_MAX_RESPONSE_BYTES_CEILING":   {value: "4194304", get: func(f *serveFlags) string { return fmt.Sprint(*f.maxResponseBytesCeiling) }},
+		"SEAM_MAX_TIMEOUT_CEILING":          {value: "30s", get: func(f *serveFlags) string { return f.maxTimeoutCeiling.String() }},
 		"SEAM_HOT_RELOAD_ENABLED":           {value: "true", get: func(f *serveFlags) string { return fmt.Sprint(*f.hotReloadEnabled) }},
 	}
 
@@ -1065,7 +1113,7 @@ func TestServeSpecDirNeverSelectsFragments(t *testing.T) {
 // README ("Precedence (serve)") states the empty-value rule for every
 // variable, not just the fragments directory: "A variable set to the empty
 // string counts as unset". This sweep makes that general statement auditable
-// for all fifteen documented pairs, in both directions — with the flag omitted
+// for all eighteen documented pairs, in both directions — with the flag omitted
 // the documented default survives, and over an explicit flag the flag value
 // survives. The expectations are the documented defaults themselves (the same
 // literals TestServeDefaultsWithoutFlagsOrEnv pins) rather than a second
@@ -1165,6 +1213,18 @@ func TestServeEmptyEnvValueCountsAsUnsetForEveryPair(t *testing.T) {
 			wantDefault: "1048576",
 			args:        []string{"--max-buffered-response-bytes", "12345"},
 			wantFlag:    "12345",
+		},
+		"SEAM_MAX_REQUEST_BYTES_CEILING": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.maxRequestBytesCeiling) },
+			wantDefault: "8388608", args: []string{"--max-request-bytes-ceiling", "4194304"}, wantFlag: "4194304",
+		},
+		"SEAM_MAX_RESPONSE_BYTES_CEILING": {
+			get:         func(f *serveFlags) string { return fmt.Sprint(*f.maxResponseBytesCeiling) },
+			wantDefault: "8388608", args: []string{"--max-response-bytes-ceiling", "4194304"}, wantFlag: "4194304",
+		},
+		"SEAM_MAX_TIMEOUT_CEILING": {
+			get:         func(f *serveFlags) string { return f.maxTimeoutCeiling.String() },
+			wantDefault: "2m0s", args: []string{"--max-timeout-ceiling", "30s"}, wantFlag: "30s",
 		},
 		"SEAM_HOT_RELOAD_ENABLED": {
 			get:         func(f *serveFlags) string { return fmt.Sprint(*f.hotReloadEnabled) },

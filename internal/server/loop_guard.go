@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
@@ -328,6 +329,30 @@ func (rh *RequestHasher) ComputeHash(method, pathTemplate string, pathParams map
 	// 3. Query params name-then-value sorted, percent-decoded
 	// 4. Canonical JSON body (RFC 8785-style) OR raw bytes if above maxReplayableRequestBytes
 
+	hash := rh.newBaseHash(method, pathTemplate, pathParams, query)
+
+	// 4. Body: canonical JSON if small enough, raw bytes if large
+	if len(body) > 0 {
+		if int64(len(body)) > rh.maxReplayableRequestBytes {
+			// Hash raw bytes (strictly coarser, under-match only)
+			hash.Write(body)
+		} else {
+			// Try to canonicalize as JSON (RFC 8785-style)
+			canonical, err := canonicalJSON(body)
+			if err != nil {
+				// If not JSON or canonicalization fails, hash raw bytes
+				hash.Write(body)
+			} else {
+				hash.Write(canonical)
+			}
+		}
+	}
+	return shortRequestHash(hash)
+}
+
+// newBaseHash prepares the canonical request fields so a large body can be
+// added byte by byte as it is sent upstream, without holding a replay buffer.
+func (rh *RequestHasher) newBaseHash(method, pathTemplate string, pathParams map[string]string, query url.Values) hash.Hash {
 	hash := sha256.New()
 
 	// 1. Upper-cased method
@@ -384,26 +409,11 @@ func (rh *RequestHasher) ComputeHash(method, pathTemplate string, pathParams map
 	}
 	hash.Write([]byte("\x00"))
 
-	// 4. Body: canonical JSON if small enough, raw bytes if large
-	if len(body) > 0 {
-		if int64(len(body)) > rh.maxReplayableRequestBytes {
-			// Hash raw bytes (strictly coarser, under-match only)
-			hash.Write(body)
-		} else {
-			// Try to canonicalize as JSON (RFC 8785-style)
-			canonical, err := canonicalJSON(body)
-			if err != nil {
-				// If not JSON or canonicalization fails, hash raw bytes
-				hash.Write(body)
-			} else {
-				hash.Write(canonical)
-			}
-		}
-	}
+	return hash
+}
 
-	// Return hex-encoded hash (first 16 chars for efficiency, like spec hash)
-	hashBytes := hash.Sum(nil)
-	return hex.EncodeToString(hashBytes)[:16]
+func shortRequestHash(h hash.Hash) string {
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // canonicalJSON produces RFC 8785-style canonical JSON:
@@ -423,8 +433,13 @@ func canonicalJSON(data []byte) ([]byte, error) {
 // ReadReplayableBody reads the request body in a replayable manner.
 // This uses the Phase 2 tee if available.
 func ReadReplayableBody(r *http.Request, maxSize int64) ([]byte, error) {
+	body, _, err := readReplayableBodyWithOverflow(r, maxSize)
+	return body, err
+}
+
+func readReplayableBodyWithOverflow(r *http.Request, maxSize int64) ([]byte, bool, error) {
 	if r.Body == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Read one byte past the limit so an over-limit body is detectable
@@ -434,7 +449,7 @@ func ReadReplayableBody(r *http.Request, maxSize int64) ([]byte, error) {
 		// Hand back whatever was read before the failure, followed by the
 		// unread remainder, so a downstream handler still sees every byte.
 		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
-		return nil, fmt.Errorf("failed to read request body: %w", err)
+		return nil, false, fmt.Errorf("failed to read request body: %w", err)
 	}
 
 	if int64(len(body)) > maxSize {
@@ -442,11 +457,11 @@ func ReadReplayableBody(r *http.Request, maxSize int64) ([]byte, error) {
 		// only, per Phase 13.1) but put back every byte read plus the unread
 		// remainder, so the upstream still receives the complete body.
 		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
-		return body[:maxSize], nil
+		return body[:maxSize], true, nil
 	}
 
 	// Restore the body for re-reading
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
-	return body, nil
+	return body, false, nil
 }

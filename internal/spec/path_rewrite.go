@@ -24,6 +24,9 @@ var internalRouteMetadata = map[string]string{
 	"x-instance-param":        internalRouteMetadataPrefix + "instance-param",
 	"x-upstream-strip-prefix": internalRouteMetadataPrefix + "upstream-strip-prefix",
 	"x-fanout-scope":          internalRouteMetadataPrefix + "fanout-scope",
+	"x-max-request-bytes":     internalRouteMetadataPrefix + "max-request-bytes",
+	"x-max-response-bytes":    internalRouteMetadataPrefix + "max-response-bytes",
+	"x-timeout":               internalRouteMetadataPrefix + "timeout",
 	// x-required-scope is the fragment-root DEFAULT scope requirement for
 	// every operation on the route; an operation-level x-required-scope
 	// REPLACES it, never merges (route-fragment-schema.md). The route-table

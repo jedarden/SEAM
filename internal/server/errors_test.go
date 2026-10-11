@@ -23,6 +23,7 @@ func TestErrorTaxonomyWritesDocumentedEnvelopeAndStatus(t *testing.T) {
 		{ErrCodeInvalidVersion, http.StatusBadRequest},
 		{ErrCodeMissingParameter, http.StatusBadRequest},
 		{ErrCodeInvalidPayload, http.StatusBadRequest},
+		{ErrCodeRequestTooLarge, http.StatusRequestEntityTooLarge},
 		{ErrCodeRouteNotFound, http.StatusNotFound},
 		{ErrCodeValidationFailed, http.StatusBadRequest},
 		{ErrCodeQuotaExceeded, http.StatusTooManyRequests},

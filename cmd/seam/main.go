@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -169,6 +170,9 @@ type serveFlags struct {
 	vaultBaseDir              *string
 	maxReplayableRequestBytes *int64
 	maxBufferedResponseBytes  *int64
+	maxRequestBytesCeiling    *int64
+	maxResponseBytesCeiling   *int64
+	maxTimeoutCeiling         *time.Duration
 	hotReloadEnabled          *bool
 }
 
@@ -189,6 +193,9 @@ func registerServeFlags(fs *flag.FlagSet) *serveFlags {
 		vaultBaseDir:              fs.String("vault-base-dir", "", "Base directory that x-vault-path must nest x-seam-owner under (default: rs-manager/rs-manager/seam/routes)"),
 		maxReplayableRequestBytes: fs.Int64("max-replayable-request-bytes", 1024*1024, "Phase 2.5: Maximum request body size to buffer for replay in bytes (default 1 MiB)"),
 		maxBufferedResponseBytes:  fs.Int64("max-buffered-response-bytes", 1024*1024, "Phase 2.6: Maximum decoded response body size to hold for whole-response scrubbing in bytes (default 1 MiB)"),
+		maxRequestBytesCeiling:    fs.Int64("max-request-bytes-ceiling", 8*1024*1024, "Operator-owned absolute request limit and maximum route replay cap in bytes"),
+		maxResponseBytesCeiling:   fs.Int64("max-response-bytes-ceiling", 8*1024*1024, "Operator-owned maximum route response buffering cap in bytes"),
+		maxTimeoutCeiling:         fs.Duration("max-timeout-ceiling", 120*time.Second, "Operator-owned maximum route timeout"),
 		hotReloadEnabled:          fs.Bool("enable-hot-reload", false, "Phase 3.1: Enable file-watch hot reload of route fragments"),
 	}
 }
@@ -274,6 +281,27 @@ func (f *serveFlags) applyEnvOverrides(getenv func(string) string, fs *flag.Flag
 			log.Printf("[config] invalid SEAM_MAX_BUFFERED_RESPONSE_BYTES %q, keeping %d: %v", val, *f.maxBufferedResponseBytes, err)
 		}
 	}
+	if val := getenv("SEAM_MAX_REQUEST_BYTES_CEILING"); val != "" && !flagWasSet(fs, "max-request-bytes-ceiling") {
+		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+			*f.maxRequestBytesCeiling = parsed
+		} else {
+			log.Printf("[config] invalid SEAM_MAX_REQUEST_BYTES_CEILING %q, keeping %d", val, *f.maxRequestBytesCeiling)
+		}
+	}
+	if val := getenv("SEAM_MAX_RESPONSE_BYTES_CEILING"); val != "" && !flagWasSet(fs, "max-response-bytes-ceiling") {
+		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil && parsed > 0 {
+			*f.maxResponseBytesCeiling = parsed
+		} else {
+			log.Printf("[config] invalid SEAM_MAX_RESPONSE_BYTES_CEILING %q, keeping %d", val, *f.maxResponseBytesCeiling)
+		}
+	}
+	if val := getenv("SEAM_MAX_TIMEOUT_CEILING"); val != "" && !flagWasSet(fs, "max-timeout-ceiling") {
+		if parsed, err := time.ParseDuration(val); err == nil && parsed > 0 {
+			*f.maxTimeoutCeiling = parsed
+		} else {
+			log.Printf("[config] invalid SEAM_MAX_TIMEOUT_CEILING %q, keeping %s", val, *f.maxTimeoutCeiling)
+		}
+	}
 	if val := getenv("SEAM_HOT_RELOAD_ENABLED"); val != "" && !flagWasSet(fs, "enable-hot-reload") {
 		if val == "true" || val == "1" {
 			*f.hotReloadEnabled = true
@@ -308,6 +336,9 @@ func serveCommand(args []string) {
 	vaultBaseDir := f.vaultBaseDir
 	maxReplayableRequestBytes := f.maxReplayableRequestBytes
 	maxBufferedResponseBytes := f.maxBufferedResponseBytes
+	maxRequestBytesCeiling := f.maxRequestBytesCeiling
+	maxResponseBytesCeiling := f.maxResponseBytesCeiling
+	maxTimeoutCeiling := f.maxTimeoutCeiling
 	hotReloadEnabled := f.hotReloadEnabled
 
 	// Detect if running in-cluster and refuse operator overrides of the two
@@ -345,6 +376,9 @@ func serveCommand(args []string) {
 	}
 	log.Printf("  Max replayable request bytes: %d", *maxReplayableRequestBytes)
 	log.Printf("  Max buffered response bytes: %d", *maxBufferedResponseBytes)
+	log.Printf("  Max request bytes ceiling: %d", *maxRequestBytesCeiling)
+	log.Printf("  Max response bytes ceiling: %d", *maxResponseBytesCeiling)
+	log.Printf("  Max timeout ceiling: %s", *maxTimeoutCeiling)
 	log.Printf("  Hot reload enabled: %v", *hotReloadEnabled)
 
 	cfg := &server.Config{
@@ -362,6 +396,9 @@ func serveCommand(args []string) {
 		VaultBaseDir:              *vaultBaseDir,
 		MaxReplayableRequestBytes: *maxReplayableRequestBytes,
 		MaxBufferedResponseBytes:  *maxBufferedResponseBytes,
+		MaxRequestBytesCeiling:    *maxRequestBytesCeiling,
+		MaxResponseBytesCeiling:   *maxResponseBytesCeiling,
+		MaxTimeoutCeiling:         *maxTimeoutCeiling,
 		HotReloadEnabled:          *hotReloadEnabled,
 	}
 

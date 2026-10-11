@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ardenone/seam/internal/limits"
 	"github.com/ardenone/seam/internal/vault"
 )
 
@@ -317,6 +319,11 @@ type ReverseProxy struct {
 	// whole-body scrubbing. Larger and unknown-length bodies use incremental
 	// scrubbing instead. Default: 1 MiB.
 	MaxBufferedResponseBytes int64
+	// MaxRequestBytesCeiling is an absolute inbound-body limit. Route replay
+	// thresholds may be lower; bodies between the two stream without replay.
+	MaxRequestBytesCeiling  int64
+	MaxResponseBytesCeiling int64
+	MaxTimeoutCeiling       time.Duration
 
 	// QuotaTracker is the quota tracker for dispatch-time cost deduction
 	// Phase 13.2: Quota is deducted at dispatch time, not before
@@ -336,6 +343,9 @@ func NewReverseProxy(upstreamURL string) (*ReverseProxy, error) {
 type ReverseProxyConfig struct {
 	MaxReplayableRequestBytes int64
 	MaxBufferedResponseBytes  int64
+	MaxRequestBytesCeiling    int64
+	MaxResponseBytesCeiling   int64
+	MaxTimeoutCeiling         time.Duration
 	// TLSConfig selects the route-specific TLS settings for the upstream
 	// client. It is ignored when Client is supplied.
 	TLSConfig *UpstreamTLSConfig
@@ -360,6 +370,22 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 	if cfg != nil && cfg.MaxBufferedResponseBytes > 0 {
 		maxBufferedResponse = cfg.MaxBufferedResponseBytes
 	}
+	maxRequestCeiling := limits.DefaultMaxRequestBytesCeiling
+	if cfg != nil && cfg.MaxRequestBytesCeiling > 0 {
+		maxRequestCeiling = cfg.MaxRequestBytesCeiling
+	}
+	maxResponseCeiling := limits.DefaultMaxResponseBytesCeiling
+	if cfg != nil && cfg.MaxResponseBytesCeiling > 0 {
+		maxResponseCeiling = cfg.MaxResponseBytesCeiling
+	}
+	maxTimeoutCeiling := limits.DefaultMaxTimeoutCeiling
+	if cfg != nil && cfg.MaxTimeoutCeiling > 0 {
+		maxTimeoutCeiling = cfg.MaxTimeoutCeiling
+	}
+	requestTimeout := upstreamRequestTimeout
+	if maxTimeoutCeiling < requestTimeout {
+		requestTimeout = maxTimeoutCeiling
+	}
 
 	client := defaultUpstreamClient
 	if cfg != nil && cfg.Client != nil {
@@ -379,10 +405,13 @@ func NewReverseProxyWithConfig(upstreamURL string, cfg *ReverseProxyConfig) (*Re
 		Client:                    client,
 		UpstreamURL:               parsedURL,
 		UpstreamHost:              parsedURL.Host,
-		RequestTimeout:            upstreamRequestTimeout,
+		RequestTimeout:            requestTimeout,
 		BufferPool:                newBufferPool(),
 		MaxReplayableRequestBytes: maxReplayable,
 		MaxBufferedResponseBytes:  maxBufferedResponse,
+		MaxRequestBytesCeiling:    maxRequestCeiling,
+		MaxResponseBytesCeiling:   maxResponseCeiling,
+		MaxTimeoutCeiling:         maxTimeoutCeiling,
 	}, nil
 }
 
@@ -391,6 +420,19 @@ func (p *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trackedWriter := &responseWriterTracker{ResponseWriter: w}
 	ctx := r.Context()
 	match := routeMatchFromRequest(r)
+	if match != nil && (match.Route.MaxRequestBytes > p.MaxRequestBytesCeiling ||
+		match.Route.MaxResponseBytes > p.MaxResponseBytesCeiling ||
+		match.Route.Timeout > p.MaxTimeoutCeiling) {
+		NewErrorResponse(ErrCodeConfigError, "Route limit exceeds operator ceiling").Write(trackedWriter, r)
+		return
+	}
+	if p.MaxRequestBytesCeiling > 0 && r.Body != nil && r.Body != http.NoBody {
+		if r.ContentLength > p.MaxRequestBytesCeiling {
+			NewErrorResponse(ErrCodeRequestTooLarge, "Request body exceeds operator ceiling").Write(trackedWriter, r)
+			return
+		}
+		r.Body = http.MaxBytesReader(trackedWriter, r.Body, p.MaxRequestBytesCeiling)
+	}
 	if match != nil && (len(match.Route.injections()) > 0 || len(match.Route.StaticInjections) > 0) {
 		if len(match.Route.injections()) > 0 && isProtocolUpgrade(r) && !match.Route.Unscrubbable {
 			p.handleError(trackedWriter, r, errUnscannableResponse, "refusing credential injection into protocol upgrade")
@@ -464,6 +506,7 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 
 	// Phase 2.5: Wrap request body with replayable tee if present
 	var requestBody = inboundReq.Body
+	var disableTransportReplay bool
 	if inboundReq.Body != nil {
 		// Detect unreplayable conditions (protocol upgrades)
 		if isProtocolUpgrade(inboundReq) {
@@ -476,7 +519,12 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 		} else {
 			// Wrap body with replayable tee
 			// ContentLength of -1 means unknown (chunked or no Content-Length header)
-			replayable := newReplayableBody(inboundReq.Body, inboundReq.ContentLength, p.MaxReplayableRequestBytes)
+			maxReplayable := p.MaxReplayableRequestBytes
+			if match := routeMatchFromRequest(inboundReq); match != nil && match.Route.MaxRequestBytes > 0 {
+				maxReplayable = match.Route.MaxRequestBytes
+			}
+			disableTransportReplay = inboundReq.ContentLength < 0 || inboundReq.ContentLength > maxReplayable
+			replayable := newReplayableBody(inboundReq.Body, inboundReq.ContentLength, maxReplayable)
 			requestBody = replayable
 
 			// Store replayable body in request context for later retrieval by Phase 12/13
@@ -490,6 +538,9 @@ func (p *ReverseProxy) buildUpstreamRequest(ctx context.Context, inboundReq *htt
 		return nil, fmt.Errorf("creating outbound request: %w", err)
 	}
 	copyRequestMetadata(inboundReq, outboundReq)
+	if disableTransportReplay {
+		outboundReq.GetBody = nil
+	}
 	return outboundReq, nil
 }
 
@@ -509,6 +560,9 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	route := r.URL.Path
 
 	timeout := p.RequestTimeout
+	if match := routeMatchFromRequest(r); match != nil && match.Route.Timeout > 0 {
+		timeout = match.Route.Timeout
+	}
 	if timeout <= 0 {
 		timeout = upstreamRequestTimeout
 	}
@@ -527,6 +581,18 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	client := p.Client
 	if client == nil {
 		client = defaultUpstreamClient
+	}
+	if match != nil && match.Route.Timeout > 0 {
+		// The request context owns this route's timeout. Keep the pooled
+		// transport but remove the client's fixed 60-second timeout.
+		routeClient := *client
+		routeClient.Timeout = 0
+		if transport, ok := client.Transport.(*http.Transport); ok && timeout > upstreamRequestTimeout {
+			routeTransport := transport.Clone()
+			routeTransport.ResponseHeaderTimeout = timeout
+			routeClient.Transport = routeTransport
+		}
+		client = &routeClient
 	}
 	if opaqueBodyMode {
 		// http.Client follows redirects by default. For opaque routes, a 3xx is
@@ -664,7 +730,11 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 			}
 			return nil
 		}
-		if err := scrubber.streamResponse(w, upstreamResp, p.MaxBufferedResponseBytes, streamingRoute); err != nil {
+		maxBuffered := p.MaxBufferedResponseBytes
+		if match != nil && match.Route.MaxResponseBytes > 0 {
+			maxBuffered = match.Route.MaxResponseBytes
+		}
+		if err := scrubber.streamResponse(w, upstreamResp, maxBuffered, streamingRoute); err != nil {
 			return fmt.Errorf("scrubbing upstream response: %w", err)
 		}
 		if responseCostBodyReader != nil {
@@ -1244,6 +1314,11 @@ func (p *ReverseProxy) handleError(w http.ResponseWriter, r *http.Request, err e
 
 	code := ErrCodeUpstreamFailed
 	message := "Upstream request failed"
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		code = ErrCodeRequestTooLarge
+		message = "Request body exceeds operator ceiling"
+	}
 	if vault.IsSecretStoreUnavailable(err) {
 		code = ErrCodeServiceUnavailable
 		message = "Secret store unavailable"

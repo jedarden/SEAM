@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ardenone/seam/internal/limits"
 	"github.com/ardenone/seam/internal/watcher"
 )
 
@@ -198,7 +199,15 @@ func (hrm *HotReloadManager) reloadRouteTable() error {
 	if activeTable := hrm.server.routeTableHolder.currentTable(); activeTable != nil {
 		envSnapshot = activeTable.envCredentialSnapshot()
 	}
-	newRouteTable, err := buildRouteTable(hrm.server.specLoader.OpenAPIModel(), envSnapshot)
+	ceilings := limits.Ceilings{}
+	if hrm.server.config != nil {
+		ceilings = limits.Ceilings{
+			RequestBytes:  hrm.server.config.MaxRequestBytesCeiling,
+			ResponseBytes: hrm.server.config.MaxResponseBytesCeiling,
+			Timeout:       hrm.server.config.MaxTimeoutCeiling,
+		}
+	}
+	newRouteTable, err := buildRouteTableWithCeilings(hrm.server.specLoader.OpenAPIModel(), envSnapshot, ceilings)
 	if err != nil {
 		hrm.failCount++
 		return fmt.Errorf("failed to build new route table from re-merged spec: %w", err)

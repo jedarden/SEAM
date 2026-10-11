@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLintDirectoryAcceptsYAMLAndTreatsAbsentManifestAsInert(t *testing.T) {
@@ -139,6 +140,61 @@ func TestLintRejectsUnsupportedBodyMode(t *testing.T) {
 	root := t.TempDir()
 	fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
 		"      responses:\n", "      x-body-mode: raw\n      responses:\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	assertFindingCodes(t, report.Errors, []string{"fragment.schema"})
+}
+
+func TestLintRouteLimitsAtRootAndOperation(t *testing.T) {
+	tests := []struct {
+		name            string
+		rootFields      string
+		operationFields string
+		options         LintOptions
+		wantCodes       []string
+	}{
+		{name: "within default ceilings", rootFields: "x-max-request-bytes: 4194304\nx-max-response-bytes: 2097152\nx-timeout: 90s\n", operationFields: "      x-max-request-bytes: 8388608\n      x-max-response-bytes: 8388608\n      x-timeout: 120s\n"},
+		{name: "root exceeds request ceiling", rootFields: "x-max-request-bytes: 8388609\n", wantCodes: []string{"limit.request-ceiling"}},
+		{name: "operation exceeds response ceiling", operationFields: "      x-max-response-bytes: 8388609\n", wantCodes: []string{"limit.response-ceiling"}},
+		{name: "operation exceeds timeout ceiling", operationFields: "      x-timeout: 121s\n", wantCodes: []string{"limit.timeout-ceiling"}},
+		{name: "custom ceilings permit larger thresholds", rootFields: "x-max-request-bytes: 16777216\nx-max-response-bytes: 16777216\nx-timeout: 180s\n", options: LintOptions{MaxRequestBytesCeiling: 16777216, MaxResponseBytesCeiling: 16777216, MaxTimeoutCeiling: 180 * time.Second}},
+		{name: "zero bytes rejected", rootFields: "x-max-request-bytes: 0\n", wantCodes: []string{"fragment.schema", "limit.invalid"}},
+		{name: "fractional bytes rejected", operationFields: "      x-max-response-bytes: 1.5\n", wantCodes: []string{"fragment.schema", "limit.invalid"}},
+		{name: "zero timeout rejected", operationFields: "      x-timeout: 0s\n", wantCodes: []string{"limit.invalid"}},
+		{name: "composite timeout rejected", operationFields: "      x-timeout: 1m30s\n", wantCodes: []string{"fragment.schema", "limit.invalid"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			fragment := validLintFragment("owner", "v1", "https://api.example.com")
+			fragment = strings.Replace(fragment, "paths:\n", test.rootFields+"paths:\n", 1)
+			fragment = strings.Replace(fragment, "      responses:\n", test.operationFields+"      responses:\n", 1)
+			writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+			options := test.options
+			options.FragmentsDir = root
+			options.SchemaPath = lintTestSchemaPath(t)
+			report, err := LintDirectory(options)
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			if len(test.wantCodes) == 0 {
+				if report.HasErrors() {
+					t.Fatalf("valid limits were rejected: %+v", report.Errors)
+				}
+			} else {
+				assertFindingCodes(t, report.Errors, test.wantCodes)
+			}
+		})
+	}
+}
+
+func TestLintRejectsPathItemLimitPlacement(t *testing.T) {
+	root := t.TempDir()
+	fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+		"  /api:\n", "  /api:\n    x-max-request-bytes: 1024\n", 1)
 	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
 	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
 	if err != nil {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/ardenone/seam/internal/buildinfo"
 	"github.com/ardenone/seam/internal/fanout"
+	"github.com/ardenone/seam/internal/limits"
 	"github.com/ardenone/seam/internal/pluckfallback"
 	"github.com/ardenone/seam/internal/spec"
 	"github.com/ardenone/seam/internal/tailscale"
@@ -138,13 +139,16 @@ type Config struct {
 	CaptureEnabled            bool
 	CorpusDir                 string
 	FragmentsDir              string
-	UpstreamURL               string // Default upstream URL for proxying (Phase 2.0: single upstream)
-	UpstreamCADir             string // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
-	AllowlistFile             string // Path to upstream host allowlist file (optional, for dev mode)
-	VaultBaseDir              string // Base directory for vault path validation (default: "rs-manager/rs-manager/seam/routes")
-	MaxReplayableRequestBytes int64  // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
-	MaxBufferedResponseBytes  int64  // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
-	HotReloadEnabled          bool   // Phase 3.1: Enable file-watch hot reload of route fragments
+	UpstreamURL               string        // Default upstream URL for proxying (Phase 2.0: single upstream)
+	UpstreamCADir             string        // Directory for upstream CA bundles (default: /etc/gateway/upstream-ca, local dev: --upstream-ca-dir)
+	AllowlistFile             string        // Path to upstream host allowlist file (optional, for dev mode)
+	VaultBaseDir              string        // Base directory for vault path validation (default: "rs-manager/rs-manager/seam/routes")
+	MaxReplayableRequestBytes int64         // Phase 2.5: Max inbound request body size to buffer for replay (default 1 MiB, independent knob)
+	MaxBufferedResponseBytes  int64         // Phase 2.6: Max decoded response body to hold for whole-response scrubbing (default 1 MiB, independent knob)
+	MaxRequestBytesCeiling    int64         // Absolute operator-owned inbound request limit and maximum route replay cap.
+	MaxResponseBytesCeiling   int64         // Maximum route response buffering cap.
+	MaxTimeoutCeiling         time.Duration // Maximum route outbound timeout.
+	HotReloadEnabled          bool          // Phase 3.1: Enable file-watch hot reload of route fragments
 
 	// Phase 14: Cloudflare Access JWT validation configuration
 	CloudflareAccessEnabled bool   // Enable Cloudflare Access JWT validation (default: false)
@@ -163,6 +167,7 @@ type Server struct {
 	operatorListener       net.Listener
 	wg                     sync.WaitGroup
 	specLoader             *spec.Loader
+	routeTableErr          error                    // Reject startup if the merged route table exceeds operator ceilings.
 	routeTableHolder       *ThreadSafeTableHolder   // Thread-safe holder for route table (stage 4)
 	brownoutScheduler      *BrownoutScheduler       // x-seam-deprecated brownout window enforcement
 	proxyMap               map[string]*ReverseProxy // Map of upstream URL + TLS identity -> proxy instance (stages 6-11)
@@ -208,8 +213,19 @@ type breakerContext struct {
 
 // New creates a new Server with the given configuration
 func New(cfg *Config) *Server {
+	var ceilingErr error
+	if cfg.MaxRequestBytesCeiling < 0 || cfg.MaxResponseBytesCeiling < 0 || cfg.MaxTimeoutCeiling < 0 {
+		ceilingErr = fmt.Errorf("operator ceilings must be positive")
+	}
+	ceilings := (limits.Ceilings{RequestBytes: cfg.MaxRequestBytesCeiling, ResponseBytes: cfg.MaxResponseBytesCeiling, Timeout: cfg.MaxTimeoutCeiling}).WithDefaults()
+	cfg.MaxRequestBytesCeiling = ceilings.RequestBytes
+	cfg.MaxResponseBytesCeiling = ceilings.ResponseBytes
+	cfg.MaxTimeoutCeiling = ceilings.Timeout
 	if cfg.MaxBufferedResponseBytes <= 0 {
 		cfg.MaxBufferedResponseBytes = DefaultMaxBufferedResponseBytes
+	}
+	if cfg.MaxReplayableRequestBytes > ceilings.RequestBytes || cfg.MaxBufferedResponseBytes > ceilings.ResponseBytes {
+		ceilingErr = fmt.Errorf("global buffer threshold exceeds operator ceiling")
 	}
 	// Initialize the spec loader
 	var specLoader *spec.Loader
@@ -269,12 +285,23 @@ func New(cfg *Config) *Server {
 		log.Printf("Loaded spec from %s", cfg.SpecDir)
 	}
 
+	initialTable, tableErr := buildRouteTableWithCeilings(specLoader.OpenAPIModel(), nil, ceilings)
+	if ceilingErr != nil {
+		tableErr = ceilingErr
+	}
+	if tableErr != nil {
+		// A bad route cannot enter service. Preserve the existing
+		// control-plane-only startup path for an invalid document.
+		log.Printf("Route table refused: %v", tableErr)
+		initialTable = &RouteTable{routes: make([]RouteEntry, 0)}
+	}
 	s := &Server{
 		config:            cfg,
 		callerMux:         http.NewServeMux(),
 		operatorMux:       http.NewServeMux(),
 		specLoader:        specLoader,
-		routeTableHolder:  NewThreadSafeTableHolder(NewRouteTable(specLoader)),
+		routeTableErr:     tableErr,
+		routeTableHolder:  NewThreadSafeTableHolder(initialTable),
 		brownoutScheduler: NewBrownoutScheduler(),
 		proxyMap:          make(map[string]*ReverseProxy),
 		upstreamClientMap: make(map[string]*http.Client),
@@ -1580,6 +1607,9 @@ func exampleFromSchema(value interface{}, components map[string]interface{}, see
 
 // Start begins listening on both ports
 func (s *Server) Start(ctx context.Context) error {
+	if s.routeTableErr != nil {
+		return fmt.Errorf("route table refused: %w", s.routeTableErr)
+	}
 	callerAddr := fmt.Sprintf(":%d", s.config.CallerPort)
 	operatorAddr := fmt.Sprintf(":%d", s.config.OperatorPort)
 
@@ -2196,12 +2226,22 @@ func (s *Server) handleFanOutRequest(w http.ResponseWriter, r *http.Request, rou
 	if s.config != nil && s.config.MaxBufferedResponseBytes > 0 {
 		maxBufferedResponseBytes = s.config.MaxBufferedResponseBytes
 	}
+	if routeMatch.Route.MaxResponseBytes > 0 {
+		maxBufferedResponseBytes = routeMatch.Route.MaxResponseBytes
+	}
 	maxEnvelopeBytes := fanout.MaxFanoutEnvelopeBytes(maxBufferedResponseBytes, len(dispatches))
+	instanceTimeout := 30 * time.Second
+	if routeMatch.Route.Timeout > 0 {
+		instanceTimeout = routeMatch.Route.Timeout
+	}
+	if s.config != nil && s.config.MaxTimeoutCeiling > 0 && instanceTimeout > s.config.MaxTimeoutCeiling {
+		instanceTimeout = s.config.MaxTimeoutCeiling
+	}
 
 	// Create fan-out dispatcher configuration
 	dispatchConfig := &fanout.DispatchConfig{
 		MaxEnvelopeBytes: maxEnvelopeBytes,
-		Timeout:          30 * time.Second,
+		Timeout:          instanceTimeout,
 		ConcurrentLimit:  10,
 	}
 
@@ -2356,15 +2396,24 @@ func (s *Server) getOrCreateProxyWithError(upstreamURL string, tlsConfigs ...*Up
 
 	maxReplayableRequestBytes := int64(0)
 	maxBufferedResponseBytes := int64(0)
+	maxRequestBytesCeiling := int64(0)
+	maxResponseBytesCeiling := int64(0)
+	maxTimeoutCeiling := time.Duration(0)
 	if s.config != nil {
 		maxReplayableRequestBytes = s.config.MaxReplayableRequestBytes
 		maxBufferedResponseBytes = s.config.MaxBufferedResponseBytes
+		maxRequestBytesCeiling = s.config.MaxRequestBytesCeiling
+		maxResponseBytesCeiling = s.config.MaxResponseBytesCeiling
+		maxTimeoutCeiling = s.config.MaxTimeoutCeiling
 	}
 
 	// Create new proxy
 	proxy, err := NewReverseProxyWithConfig(upstreamURL, &ReverseProxyConfig{
 		MaxReplayableRequestBytes: maxReplayableRequestBytes,
 		MaxBufferedResponseBytes:  maxBufferedResponseBytes,
+		MaxRequestBytesCeiling:    maxRequestBytesCeiling,
+		MaxResponseBytesCeiling:   maxResponseBytesCeiling,
+		MaxTimeoutCeiling:         maxTimeoutCeiling,
 		TLSConfig:                 tlsConfig,
 		Client:                    client,
 	})

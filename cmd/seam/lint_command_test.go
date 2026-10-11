@@ -109,6 +109,58 @@ func clearLintEnv(t *testing.T) {
 	t.Setenv("SEAM_FRAGMENTS_DIR", "")
 	t.Setenv("SEAM_SCHEMA_PATH", "")
 	t.Setenv("SEAM_UPSTREAM_ALLOWLIST", "")
+	t.Setenv("SEAM_MAX_REQUEST_BYTES_CEILING", "")
+	t.Setenv("SEAM_MAX_RESPONSE_BYTES_CEILING", "")
+	t.Setenv("SEAM_MAX_TIMEOUT_CEILING", "")
+}
+
+func TestLintCeilingFlagsAndEnvironment(t *testing.T) {
+	clearLintEnv(t)
+	fragment := `x-seam-schema: v1
+x-seam-owner: owner
+x-upstream: https://api.example.com
+x-max-request-bytes: 12582912
+x-max-response-bytes: 12582912
+x-timeout: 180s
+paths:
+  /api:
+    get:
+      responses:
+        "200":
+          description: ok
+`
+	root := writeLintFixtureDir(t, fragment)
+	t.Setenv("SEAM_MAX_REQUEST_BYTES_CEILING", "16777216")
+	t.Setenv("SEAM_MAX_RESPONSE_BYTES_CEILING", "16777216")
+	t.Setenv("SEAM_MAX_TIMEOUT_CEILING", "240s")
+	for _, test := range []struct {
+		name        string
+		args        []string
+		wantCode    int
+		wantFinding string
+	}{
+		{name: "environment permits route", args: []string{root, "--schema", lintCommandTestSchemaPath(t)}, wantCode: 0},
+		{name: "explicit request flag wins", args: []string{root, "--schema", lintCommandTestSchemaPath(t), "--max-request-bytes-ceiling", "8388608"}, wantCode: 1, wantFinding: "limit.request-ceiling"},
+		{name: "explicit response flag wins", args: []string{root, "--schema", lintCommandTestSchemaPath(t), "--max-response-bytes-ceiling", "8388608"}, wantCode: 1, wantFinding: "limit.response-ceiling"},
+		{name: "explicit timeout flag wins", args: []string{root, "--schema", lintCommandTestSchemaPath(t), "--max-timeout-ceiling", "120s"}, wantCode: 1, wantFinding: "limit.timeout-ceiling"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runLintCommand(test.args, &stdout, &stderr)
+			if code != test.wantCode || (test.wantFinding != "" && !strings.Contains(stdout.String(), test.wantFinding)) {
+				t.Fatalf("code=%d stdout=%s stderr=%s; want code=%d finding=%q", code, stdout.String(), stderr.String(), test.wantCode, test.wantFinding)
+			}
+		})
+	}
+}
+
+func TestLintRejectsInvalidOperatorCeiling(t *testing.T) {
+	clearLintEnv(t)
+	t.Setenv("SEAM_MAX_TIMEOUT_CEILING", "not-a-duration")
+	var stdout, stderr bytes.Buffer
+	if code := runLintCommand([]string{"--fragments-dir", t.TempDir()}, &stdout, &stderr); code != 2 {
+		t.Fatalf("code=%d stdout=%s stderr=%s, want config error", code, stdout.String(), stderr.String())
+	}
 }
 
 func writeLintFixtureDir(t *testing.T, fragment string) string {

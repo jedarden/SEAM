@@ -53,6 +53,9 @@
     "x-adapter": { "$ref": "#/$defs/adapter", "$comment": "Fragment-root. Declarative request/response transforms delegating to a live targetVersion. Mutually exclusive with x-upstream/x-upstream-map and every upstream-facing field." },
     "x-unscrubbable": { "$ref": "#/$defs/acknowledged", "$comment": "Allowed at fragment-root OR operation level. Acknowledgement that a route runs unscrubbed (response cannot be scanned for echoed secrets)." },
     "x-streaming": { "type": "boolean", "default": false, "$comment": "Fragment-root default for incremental response delivery. An operation-level value overrides it; streaming routes are never whole-response buffered." },
+    "x-max-request-bytes": { "$ref": "#/$defs/positiveByteLimit", "$comment": "Fragment-root default for the request replay threshold; an operation-level value overrides it. An absolute operator ceiling is enforced by lint and runtime." },
+    "x-max-response-bytes": { "$ref": "#/$defs/positiveByteLimit", "$comment": "Fragment-root default for whole-response buffering; an operation-level value overrides it. An absolute operator ceiling is enforced by lint and runtime." },
+    "x-timeout": { "$ref": "#/$defs/routeTimeout", "$comment": "Fragment-root default for the outbound request timeout; an operation-level value overrides it. Lint and runtime enforce the operator ceiling." },
     "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." },
 
     "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for repeated-identical-request loop protection. Applied to all operations unless overridden at operation level." },
@@ -100,6 +103,8 @@
       "pattern": "^[0-9]+(s|m|h|d)$",
       "$comment": "Closed duration grammar shared by x-quota.window and x-loop-guard.window. No calendar-aligned form (no mo/y). Tumbling window anchored at process start; restart resets it. A value above 168h is a lint WARNING, not a schema failure (validator-side)."
     },
+    "positiveByteLimit": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807, "$comment": "Positive byte count representable as Go int64; operator ceiling is validated outside JSON Schema." },
+    "routeTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|m|h)$", "$comment": "A single-unit Go duration. It must parse to a positive duration no greater than the operator ceiling; lint and runtime enforce those semantic bounds." },
     "scopeString": {
       "type": "string",
       "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(:[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
@@ -524,6 +529,9 @@
     "pathItem": {
       "type": "object",
       "properties": {
+        "x-max-request-bytes": false,
+        "x-max-response-bytes": false,
+        "x-timeout": false,
         "x-upstream-path-template": {
           "type": "string",
           "pattern": "^/",
@@ -552,6 +560,9 @@
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
         "x-streaming": { "type": "boolean", "default": false, "$comment": "Deliver the response incrementally and flush each available event; overrides the fragment-root default." },
+        "x-max-request-bytes": { "$ref": "#/$defs/positiveByteLimit" },
+        "x-max-response-bytes": { "$ref": "#/$defs/positiveByteLimit" },
+        "x-timeout": { "$ref": "#/$defs/routeTimeout" },
         "x-body-mode": { "enum": ["validated", "opaque"], "default": "validated", "$comment": "validated is the default. opaque forwards request-body bytes without schema validation; the operation must not declare a constraining request schema." },
         "x-inject-as": { "$ref": "#/$defs/injectAsListOrObject" },
         "x-inject-static": { "$ref": "#/$defs/staticInjectionListOrObject" },

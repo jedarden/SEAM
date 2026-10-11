@@ -48,6 +48,9 @@ seam serve [flags]
 - `x-inject-as: {kind: oauth-refresh, tokenUrl, clientId, tokenField?}` - the stored secret is an OAuth refresh token; SEAM exchanges it at `tokenUrl` (host must be in the upstream allowlist), caches the result until shortly before expiry, and injects it as `Authorization: Bearer`. `tokenField` defaults to `access_token`. The secret may use any of the field names SEAM already accepts (`value`, `token`, `secret`, `api_key`, `api-key`, `key`).
 - `--max-replayable-request-bytes` (default: `1048576`) - Maximum request body size buffered for replay, in bytes
 - `--max-buffered-response-bytes` (default: `1048576`) - Maximum decoded response body size held for whole-response scrubbing, in bytes (see the note below)
+- `--max-request-bytes-ceiling` (default: `8388608`) - Operator-owned maximum request body size and upper bound for route replay thresholds
+- `--max-response-bytes-ceiling` (default: `8388608`) - Operator-owned upper bound for route whole-response buffering thresholds
+- `--max-timeout-ceiling` (default: `120s`) - Operator-owned upper bound for route outbound timeouts
 
 Credential reads are routed through one internal `CredentialSource` seam. The
 default vault source preserves OpenBao caching, eager invalidation/refetch after
@@ -170,6 +173,46 @@ across upstream read boundaries. A response adapter transform that requires a
 whole body (`wrap` or `unwrap`) is rejected by `seam lint` on a streaming route.
 If the caller disconnects, the upstream request context is cancelled.
 
+### Per-route body thresholds and timeout
+
+A fragment may set `x-max-request-bytes`, `x-max-response-bytes`, and
+`x-timeout` at its root as defaults, then override them on individual
+operations. Byte fields are positive integer byte counts; `x-timeout` is a
+positive single-unit duration such as `250ms`, `30s`, `2m`, or `1h`.
+
+```yaml
+x-max-request-bytes: 4194304
+x-max-response-bytes: 2097152
+x-timeout: 90s
+paths:
+  /v1/chat/completions:
+    post:
+      x-max-request-bytes: 6291456
+      x-streaming: true
+```
+
+`x-max-request-bytes` sets the request replay buffer threshold. Bodies above
+that threshold continue upstream incrementally without a replay copy, so a
+401 cannot be retried with a refreshed credential. Requests above the
+operator's absolute request ceiling are refused with HTTP 413. For an unknown
+Content-Length, SEAM detects the overflow while forwarding, so the upstream
+may receive a prefix before the caller receives 413. The default
+replay threshold remains 1 MiB and the default absolute ceiling is 8 MiB.
+For an over-cap body, the loop guard hashes the raw bytes as they stream; its
+full hash is available only after dispatch, so it records that outcome but
+cannot reject the same large body before sending it upstream.
+`x-max-response-bytes` sets the whole-response scrub buffer threshold;
+responses above it are scrubbed and delivered incrementally. The default
+response buffer threshold remains 1 MiB. `x-timeout` bounds the outbound
+request; the default remains 60 seconds.
+
+The operator sets ceilings with `SEAM_MAX_REQUEST_BYTES_CEILING`,
+`SEAM_MAX_RESPONSE_BYTES_CEILING`, and `SEAM_MAX_TIMEOUT_CEILING` (or their
+matching `--max-*-ceiling` serve flags). Defaults are 8 MiB, 8 MiB, and 120s.
+`seam lint` accepts those same flags and environment variables; a route value
+above a ceiling is an error, and the runtime refuses a merged route table
+that exceeds its deployed ceiling, including on hot reload.
+
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path. The precedence is mounted control &gt; flag &gt; environment variable &gt; default: an explicit flag already beats `SEAM_UPSTREAM_CA_DIR` / `SEAM_UPSTREAM_ALLOWLIST` before the boundary runs, so what gets refused in-cluster is the flag's value.
 
 **Operator-visible failure modes (in-cluster upstream trust).**
@@ -192,7 +235,7 @@ When `--enable-hot-reload` / `SEAM_HOT_RELOAD_ENABLED` is on, the watcher roots 
 
 ### Environment Variables
 
-Every `serve` configuration flag can also be set via an environment variable with the `SEAM_` prefix — the table covers all fifteen flags above:
+Every `serve` configuration flag can also be set via an environment variable with the `SEAM_` prefix — the table covers all eighteen flags above:
 
 | Variable | Flag | Default |
 |---|---|---|
@@ -210,9 +253,12 @@ Every `serve` configuration flag can also be set via an environment variable wit
 | `SEAM_VAULT_BASE_DIR` | `--vault-base-dir` | `rs-manager/rs-manager/seam/routes` |
 | `SEAM_MAX_REPLAYABLE_REQUEST_BYTES` | `--max-replayable-request-bytes` | `1048576` |
 | `SEAM_MAX_BUFFERED_RESPONSE_BYTES` | `--max-buffered-response-bytes` | `1048576` |
+| `SEAM_MAX_REQUEST_BYTES_CEILING` | `--max-request-bytes-ceiling` | `8388608` |
+| `SEAM_MAX_RESPONSE_BYTES_CEILING` | `--max-response-bytes-ceiling` | `8388608` |
+| `SEAM_MAX_TIMEOUT_CEILING` | `--max-timeout-ceiling` | `2m0s` |
 | `SEAM_HOT_RELOAD_ENABLED` | `--enable-hot-reload` | `false` |
 
-The pairing rule is mechanical — `SEAM_` plus the flag name upper-cased with dashes as underscores — and thirteen of the fifteen variables follow it. Two are paired by meaning instead and break the derivation: `SEAM_UPSTREAM_ALLOWLIST` maps to `--allowlist-file` (not `SEAM_ALLOWLIST_FILE`, keeping the allowlist's *upstream* identity in the variable name), and `SEAM_HOT_RELOAD_ENABLED` maps to `--enable-hot-reload` (not `SEAM_ENABLE_HOT_RELOAD`). Where the rule and the table disagree, the table is authoritative.
+The pairing rule is mechanical — `SEAM_` plus the flag name upper-cased with dashes as underscores — and sixteen of the eighteen variables follow it. Two are paired by meaning instead and break the derivation: `SEAM_UPSTREAM_ALLOWLIST` maps to `--allowlist-file` (not `SEAM_ALLOWLIST_FILE`, keeping the allowlist's *upstream* identity in the variable name), and `SEAM_HOT_RELOAD_ENABLED` maps to `--enable-hot-reload` (not `SEAM_ENABLE_HOT_RELOAD`). Where the rule and the table disagree, the table is authoritative.
 
 `--max-buffered-response-bytes` bounds only how much of a response SEAM may hold in memory for whole-body secret scrubbing; it is never a scrubbability limit and never rejects a response. A response whose declared `Content-Length` is at or under the cap is scrubbed whole and returned with its (recomputed) `Content-Length`. A response over the cap — or with no declared length, or whose *decoded* size exceeds the cap even when its encoded size does not — is scrubbed incrementally with bounded memory and streamed to the caller chunked (`Content-Length` removed) with the same status, headers, trailers, and content-encoding; nothing is truncated. A non-positive value falls back to the default. The two size caps are independent knobs: this one governs responses only, `--max-replayable-request-bytes` governs request replay only, and tuning one never moves the other.
 
@@ -224,13 +270,13 @@ A variable set to the **empty string counts as unset**: the flag value survives.
 
 #### Invalid values
 
-- **Integer variables** (`*_PORT`, `*_BYTES`) parse as an optional sign followed by digits. Leading whitespace is skipped and anything after the integer prefix is ignored: `SEAM_CALLER_PORT=8080abc` configures `8080`, and `0x10` configures `0`. A value with **no leading integer** is rejected — the previous environment/default value is kept and a warning is logged. An explicit flag still wins without parsing the environment value. There is no range validation at configuration time: an out-of-range port such as `-5` or `99999` is applied and fails later, when the listener binds.
+- **Legacy integer variables** (`*_PORT`, `SEAM_MAX_REPLAYABLE_REQUEST_BYTES`, `SEAM_MAX_BUFFERED_RESPONSE_BYTES`) parse as an optional sign followed by digits. Leading whitespace is skipped and anything after the integer prefix is ignored: `SEAM_CALLER_PORT=8080abc` configures `8080`, and `0x10` configures `0`. A value with **no leading integer** is rejected — the previous environment/default value is kept and a warning is logged. An explicit flag still wins without parsing the environment value. There is no range validation for those legacy values at configuration time: an out-of-range port such as `-5` or `99999` is applied and fails later, when the listener binds. The new `*_BYTES_CEILING` variables require a strictly parsed positive integer; the timeout ceiling requires a positive Go duration. Invalid serve environment ceiling values keep the default or explicit flag value; invalid `seam lint` ceiling settings produce a configuration error.
 - **Boolean variables** (`SEAM_FRAGMENT_MODE`, `SEAM_CAPTURE_ENABLED`, `SEAM_HOT_RELOAD_ENABLED`) recognize exactly `true` and `1`, lowercase. Any other non-empty value — including `TRUE`, `yes`, `0` and `false` — means **false** when the environment supplies the setting; an explicit flag still wins. `SEAM_HOT_RELOAD_ENABLED` is deliberately asymmetric: only `true`/`1` changes an unset flag, so an environment value can enable hot reload but cannot override an explicit flag.
 - **`SEAM_VAULT_BASE_DIR`** is whitespace-trimmed, fills an omitted flag, and falls back to the shared default when neither names a prefix.
 
 #### lint / diff explicit-flag tracking
 
-`seam lint` and `seam diff` follow the same flag-over-environment rule for `SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST`: the environment fills the corresponding flag only while it is **still at its default**. (Corollary: passing the default value explicitly, e.g. `--fragments-dir ./fragments`, is indistinguishable from omitting the flag.) `seam import` reads no `SEAM_*` configuration.
+`seam lint` and `seam diff` follow the same flag-over-environment rule for `SEAM_FRAGMENTS_DIR`, `SEAM_SCHEMA_PATH` and `SEAM_UPSTREAM_ALLOWLIST`: the environment fills the corresponding flag only while it is **still at its default**. `seam lint` also accepts the three ceiling variables, with explicit ceiling flags taking precedence. (For the older path flags, passing the default value explicitly, e.g. `--fragments-dir ./fragments`, is indistinguishable from omitting the flag.) `seam import` reads no `SEAM_*` configuration.
 
 Other `SEAM_*` variables (`SEAM_OPENBAO_ADDR`, `SEAM_OPENBAO_SA_TOKEN_PATH`, `SEAM_TEST_IDENTITY_MODE`, …) are server-runtime knobs, not CLI configuration.
 

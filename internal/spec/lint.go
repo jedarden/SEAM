@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ardenone/seam/internal/limits"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v3"
 )
@@ -23,8 +25,9 @@ const (
 )
 
 var (
-	apiVersionPattern  = regexp.MustCompile(`^v[1-9][0-9]*$`)
-	guardWindowPattern = regexp.MustCompile(`^([0-9]+)([smhd])$`)
+	apiVersionPattern   = regexp.MustCompile(`^v[1-9][0-9]*$`)
+	guardWindowPattern  = regexp.MustCompile(`^([0-9]+)([smhd])$`)
+	routeTimeoutPattern = regexp.MustCompile(`^[0-9]+(ms|s|m|h)$`)
 
 	reservedExactPaths = map[string]struct{}{
 		"/docs":               {},
@@ -50,9 +53,28 @@ var (
 // before Phase 6a there is no operator manifest to inspect, so host membership
 // is inert. Once a file is supplied, it is authoritative and fail-closed.
 type LintOptions struct {
-	FragmentsDir          string
-	SchemaPath            string
-	UpstreamAllowlistPath string
+	FragmentsDir            string
+	SchemaPath              string
+	UpstreamAllowlistPath   string
+	MaxRequestBytesCeiling  int64
+	MaxResponseBytesCeiling int64
+	MaxTimeoutCeiling       time.Duration
+}
+
+func (o *LintOptions) resolveCeilings() error {
+	if o.MaxRequestBytesCeiling < 0 || o.MaxResponseBytesCeiling < 0 || o.MaxTimeoutCeiling < 0 {
+		return fmt.Errorf("operator ceilings must be positive")
+	}
+	if o.MaxRequestBytesCeiling == 0 {
+		o.MaxRequestBytesCeiling = limits.DefaultMaxRequestBytesCeiling
+	}
+	if o.MaxResponseBytesCeiling == 0 {
+		o.MaxResponseBytesCeiling = limits.DefaultMaxResponseBytesCeiling
+	}
+	if o.MaxTimeoutCeiling == 0 {
+		o.MaxTimeoutCeiling = limits.DefaultMaxTimeoutCeiling
+	}
+	return nil
 }
 
 // LintFinding is one deterministic lint diagnostic. Warnings are surfaced for
@@ -80,6 +102,9 @@ func (r LintReport) HasErrors() bool { return len(r.Errors) != 0 }
 // an unreadable schema) are returned as Go errors; fragment violations are
 // returned in the report so one invocation can show all actionable failures.
 func LintDirectory(options LintOptions) (LintReport, error) {
+	if err := options.resolveCeilings(); err != nil {
+		return LintReport{}, err
+	}
 	if options.FragmentsDir == "" {
 		options.FragmentsDir = defaultLintFragmentsDir
 	}
@@ -109,13 +134,16 @@ func LintDirectory(options LintOptions) (LintReport, error) {
 	if err != nil {
 		return LintReport{}, err
 	}
-	return lintLoadedFragments(files, schema, allowlist), nil
+	return lintLoadedFragments(files, schema, allowlist, options), nil
 }
 
 // LintFiles validates an explicit list of fragment files. This is useful for
 // CI invocations such as `seam lint routes/*/*.yaml`, where the shell expands
 // the changed files before invoking the binary.
 func LintFiles(paths []string, options LintOptions) (LintReport, error) {
+	if err := options.resolveCeilings(); err != nil {
+		return LintReport{}, err
+	}
 	if len(paths) == 0 {
 		return LintReport{}, fmt.Errorf("no fragment files supplied")
 	}
@@ -146,7 +174,7 @@ func LintFiles(paths []string, options LintOptions) (LintReport, error) {
 	if err != nil {
 		return LintReport{}, err
 	}
-	return lintLoadedFragments(files, schema, allowlist), nil
+	return lintLoadedFragments(files, schema, allowlist, options), nil
 }
 
 // LintPaths is an alias for callers that use the command's file-or-directory
@@ -155,7 +183,7 @@ func LintPaths(paths []string, options LintOptions) (LintReport, error) {
 	return LintFiles(paths, options)
 }
 
-func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allowlist *hostAllowlist) LintReport {
+func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allowlist *hostAllowlist, options LintOptions) LintReport {
 
 	report := LintReport{
 		Errors:   make([]LintFinding, 0),
@@ -167,7 +195,7 @@ func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allow
 		owners = append(owners, filepath.Base(filepath.Dir(fragment.file)))
 	}
 	for _, fragment := range files {
-		fragment.validate(&report, schema, allowlist, owners)
+		fragment.validate(&report, schema, allowlist, owners, options)
 	}
 	detectLintCollisions(&report, files)
 	sortLintFindings(&report)
@@ -306,7 +334,7 @@ func normalizeLintValue(value any) (any, error) {
 	}
 }
 
-func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, allowlist *hostAllowlist, owners []string) {
+func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, allowlist *hostAllowlist, owners []string, options LintOptions) {
 	if f.data == nil {
 		f.addError(report, "fragment.parse", "file could not be parsed as a YAML/JSON object")
 		return
@@ -326,6 +354,7 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkTransport(report)
 	f.checkUnscrubbable(report)
 	f.checkBodyMode(report)
+	f.checkRouteLimits(report, options)
 	f.checkRouteMetrics(report)
 	f.checkInjectionNames(report)
 	f.checkPathRewrite(report)
@@ -374,6 +403,70 @@ func (f *lintFragment) checkBodyMode(report *LintReport) {
 				if schema, exists := media["schema"]; exists && schemaHasValidationConstraints(schema) {
 					f.addError(report, "body.opaque-schema", fmt.Sprintf("%s %s declares a constraining request schema while x-body-mode is opaque", strings.ToUpper(method), path))
 				}
+			}
+		}
+	}
+}
+
+// checkRouteLimits applies operator-owned ceilings to fragment defaults and
+// operation overrides. Shape belongs to JSON Schema; this second check keeps
+// lint aligned with the runtime ceiling that a fragment cannot raise.
+func (f *lintFragment) checkRouteLimits(report *LintReport, options LintOptions) {
+	check := func(fields map[string]any, location string) {
+		for _, field := range []struct {
+			name    string
+			ceiling int64
+			code    string
+		}{
+			{"x-max-request-bytes", options.MaxRequestBytesCeiling, "limit.request-ceiling"},
+			{"x-max-response-bytes", options.MaxResponseBytesCeiling, "limit.response-ceiling"},
+		} {
+			raw, present := fields[field.name]
+			if !present {
+				continue
+			}
+			value, err := strconv.ParseInt(fmt.Sprint(raw), 10, 64)
+			if err != nil || value <= 0 {
+				f.addError(report, "limit.invalid", fmt.Sprintf("%s %s must be a positive integer byte count", location, field.name))
+				continue
+			}
+			if value > field.ceiling {
+				f.addError(report, field.code, fmt.Sprintf("%s %s is %d bytes, above operator ceiling %d bytes", location, field.name, value, field.ceiling))
+			}
+		}
+		if raw, present := fields["x-timeout"]; present {
+			value, ok := raw.(string)
+			if !ok || !routeTimeoutPattern.MatchString(value) {
+				f.addError(report, "limit.invalid", fmt.Sprintf("%s x-timeout must be a positive single-unit duration (ms, s, m, or h)", location))
+				return
+			}
+			duration, err := time.ParseDuration(value)
+			if err != nil || duration <= 0 {
+				f.addError(report, "limit.invalid", fmt.Sprintf("%s x-timeout must be a positive duration", location))
+			} else if duration > options.MaxTimeoutCeiling {
+				f.addError(report, "limit.timeout-ceiling", fmt.Sprintf("%s x-timeout %s exceeds operator ceiling %s", location, value, options.MaxTimeoutCeiling))
+			}
+		}
+	}
+	check(f.data, "fragment root")
+	paths, _ := f.data["paths"].(map[string]any)
+	pathNames := make([]string, 0, len(paths))
+	for path := range paths {
+		pathNames = append(pathNames, path)
+	}
+	sort.Strings(pathNames)
+	for _, path := range pathNames {
+		pathItem, _ := paths[path].(map[string]any)
+		methods := make([]string, 0, len(pathItem))
+		for method := range pathItem {
+			if isLintOperationMethod(method) {
+				methods = append(methods, method)
+			}
+		}
+		sort.Strings(methods)
+		for _, method := range methods {
+			if operation, ok := pathItem[method].(map[string]any); ok {
+				check(operation, fmt.Sprintf("%s %s", strings.ToUpper(method), path))
 			}
 		}
 	}

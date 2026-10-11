@@ -22,6 +22,7 @@ const (
 	ErrCodeInvalidVersion    ErrorCode = "invalid_version_parameter"
 	ErrCodeMissingParameter  ErrorCode = "missing_required_parameter"
 	ErrCodeInvalidPayload    ErrorCode = "invalid_payload"
+	ErrCodeRequestTooLarge   ErrorCode = "request_too_large"
 	ErrCodeRouteNotFound     ErrorCode = "route_not_found"
 	ErrCodeValidationFailed  ErrorCode = "validation_failed"
 	ErrCodeQuotaExceeded     ErrorCode = "quota_exceeded"
@@ -73,6 +74,7 @@ var HTTPStatusMapping = map[ErrorCode]int{
 	ErrCodeInvalidVersion:       http.StatusBadRequest,
 	ErrCodeMissingParameter:     http.StatusBadRequest,
 	ErrCodeInvalidPayload:       http.StatusBadRequest,
+	ErrCodeRequestTooLarge:      http.StatusRequestEntityTooLarge,
 	ErrCodeRouteNotFound:        http.StatusNotFound,
 	ErrCodeValidationFailed:     http.StatusBadRequest,
 	ErrCodeQuotaExceeded:        http.StatusTooManyRequests,

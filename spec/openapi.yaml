@@ -49,6 +49,7 @@ components:
             - invalid_version_parameter
             - missing_required_parameter
             - invalid_payload
+            - request_too_large
             - route_not_found
             - validation_failed
             - quota_exceeded

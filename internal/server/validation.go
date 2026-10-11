@@ -16,6 +16,10 @@ func (s *Server) validationMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if s.config != nil && s.config.MaxRequestBytesCeiling > 0 && r.ContentLength > s.config.MaxRequestBytesCeiling {
+			NewErrorResponse(ErrCodeRequestTooLarge, "Request body exceeds operator ceiling").Write(w, r)
+			return
+		}
 
 		// Validate the request against the OpenAPI spec
 		validationErr := s.specLoader.ValidateRequest(r)

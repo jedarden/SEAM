@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -140,19 +141,48 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Compute canonical hash for this request
-		hasher := NewRequestHasher(s.config.MaxReplayableRequestBytes)
+		// Compute canonical hash for this request. A route override changes
+		// the replay boundary and therefore the canonical/raw-body boundary.
+		maxReplayable := int64(DefaultMaxReplayableRequestBytes)
+		if s.config != nil && s.config.MaxReplayableRequestBytes > 0 {
+			maxReplayable = s.config.MaxReplayableRequestBytes
+		}
+		if route.MaxRequestBytes > 0 {
+			maxReplayable = route.MaxRequestBytes
+		}
+		hasher := NewRequestHasher(maxReplayable)
 
 		// Read replayable body if present (up to maxReplayableRequestBytes)
 		var body []byte
+		rawStream := r.Body != nil && r.ContentLength > maxReplayable
 		if r.Body != nil && r.Method != "GET" && r.Method != "HEAD" {
-			var err error
-			body, err = ReadReplayableBody(r, s.config.MaxReplayableRequestBytes)
+			if !rawStream {
+				var overflow bool
+				body, overflow, err = readReplayableBodyWithOverflow(r, maxReplayable)
+				rawStream = overflow
+			}
 			if err != nil {
 				// Log error but continue with empty body
 				log.Printf("[loop-guard] Failed to read request body: %v", err)
 				body = nil
 			}
+		}
+		if rawStream {
+			// The full hash is not known until the upstream has consumed the
+			// stream. Record it for future observations without retaining body
+			// bytes. A pre-dispatch repeat check cannot use an incomplete hash.
+			h := hasher.newBaseHash(r.Method, routeMatch.Route.PathTemplate, routeMatch.PathParams, r.URL.Query())
+			original := r.Body
+			r.Body = &streamingHashBody{Reader: io.TeeReader(original, h), Closer: original}
+			recorder := &loopGuardResponseWriter{ResponseWriter: w}
+			next.ServeHTTP(recorder, r)
+			hash := shortRequestHash(h)
+			if recorder.settledStatus()/100 == 2 {
+				guard.RecordSuccess(hash)
+			} else {
+				guard.RecordFailure(hash)
+			}
+			return
 		}
 
 		// Compute hash
@@ -212,6 +242,11 @@ func (s *Server) LoopGuardMiddleware(next http.Handler) http.Handler {
 			guard.RecordFailure(hash)
 		}
 	})
+}
+
+type streamingHashBody struct {
+	io.Reader
+	io.Closer
 }
 
 // loopGuardResponseWriter captures the status code a request settled on so the

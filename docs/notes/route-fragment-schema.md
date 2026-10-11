@@ -66,6 +66,9 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-adapter` | `adapter` | no | Declarative request/response transforms delegating to `targetVersion`. Mutually exclusive with every upstream-facing field. |
 | `x-unscrubbable` | `acknowledged` | no | Root **or** operation level. Acknowledgement that a route runs unscrubbed. |
 | `x-streaming` | boolean | no | Root default or operation override. Forces incremental response delivery and overlap-window scrubbing; it never whole-response buffers. |
+| `x-max-request-bytes` | positive integer bytes | no | Root default or operation override for request replay buffering. The operator's absolute request ceiling bounds accepted bodies; lint and runtime reject declarations above that ceiling. |
+| `x-max-response-bytes` | positive integer bytes | no | Root default or operation override for whole-response scrub buffering. Larger responses stream; a route cannot raise the operator's buffer ceiling. |
+| `x-timeout` | positive single-unit Go duration (`ms`, `s`, `m`, `h`) | no | Root default or operation override for outbound timeout, bounded by the operator ceiling. |
 | `x-cost-from-response` | `costFromResponse` | no | Root default for usage-based metering. One or more `{pointer, price}` entries (array, `charges`/`pointers` wrapper, or keyed `input`/`output` form). Pointers target the final JSON body or last SSE event; any miss uses the effective flat `x-cost-per-call`. |
 | `x-metrics` | `routeMetrics` | no | Root default for response input/output token counters and latency histograms. Usage pointers target the final JSON body or last SSE event; `model.pointer` targets the request JSON body and only values in `model.allowlist` become labels. All other model values are emitted as `other`. |
 | `x-usage` | `routeMetrics` | no | Readable alias for `x-metrics`; operation-level placement is also supported. |
@@ -90,6 +93,9 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-quota` | `quota` | `{amount, unit, window}`. `amount` is a number >= 0; `unit` is non-empty and must byte-match the effective `x-cost-per-call.unit`; `window` uses the shared duration grammar. Requires `x-cost-per-call` (schema-encoded at operation level). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
 | `x-streaming` | boolean | Operation override for incremental response delivery. A response adapter transform that needs buffering is invalid when this is true. |
+| `x-max-request-bytes` | positive integer bytes | Operation override for the replay threshold, subject to the operator ceiling. |
+| `x-max-response-bytes` | positive integer bytes | Operation override for the whole-response buffer threshold, subject to the operator ceiling. |
+| `x-timeout` | positive single-unit Go duration | Operation override for outbound timeout, subject to the operator ceiling. |
 | `x-requires-approval` | boolean | RESERVED forward-compat. |
 
 ### 3.4 Placement decisions worth stating
@@ -101,6 +107,8 @@ Three fields have placement that is **fixed by a security rule and was not left 
 - **`x-unscrubbable` is allowed at root *and* operation** — a route-level opt-in is needed, but a whole-fragment one is the common case.
 
 The remaining fields' placement follows from their semantics (an upstream target, a vault path, a breaker, a map, a probe, a strip-prefix, an adapter, a fan-out scope, and a deprecation marker are all whole-fragment properties → root; per-route guards → operation; the upstream-path rewrite is stated in the upstream's path terms → path-item).
+
+The body thresholds and outbound timeout use fragment-root defaults and operation overrides only. A path-item declaration of `x-max-request-bytes`, `x-max-response-bytes`, or `x-timeout` is rejected; this prevents a value from taking effect through the generic extension lookup without the same lint ceiling check applied to operation fields.
 
 ---
 

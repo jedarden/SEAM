@@ -54,6 +54,7 @@ func newReplayableBody(source io.ReadCloser, contentLength int64, maxBytes int64
 		rb.exceededLimit = true
 		rb.unreplayable = true
 		rb.bufferComplete = true // No point buffering
+		rb.buffer = nil
 	}
 
 	return rb
@@ -85,6 +86,7 @@ func (rb *replayableBody) Read(p []byte) (n int, err error) {
 				rb.exceededLimit = true
 				rb.unreplayable = true
 				rb.bufferComplete = true
+				rb.buffer = nil // Release the buffered prefix once replay is impossible.
 				// Don't write to buffer - we've already exceeded
 			} else {
 				// Buffer the data for potential replay
@@ -169,7 +171,7 @@ func (rb *replayableBody) Discard() {
 	defer rb.mu.Unlock()
 
 	if rb.buffer != nil {
-		rb.buffer.Reset()
+		rb.buffer = nil
 		rb.bufferComplete = true
 		rb.unreplayable = true // Mark as unreplayable after discard
 	}
@@ -196,4 +198,5 @@ func (rb *replayableBody) MarkUnreplayable() {
 	defer rb.mu.Unlock()
 	rb.unreplayable = true
 	rb.bufferComplete = true
+	rb.buffer = nil
 }

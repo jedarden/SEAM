@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/ardenone/seam/internal/limits"
 	seamspec "github.com/ardenone/seam/internal/spec"
 )
 
@@ -26,6 +29,9 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	fragmentsDir := "./fragments"
 	schemaPath := "./spec/route-fragment-schema.json"
 	allowlistPath := ""
+	maxRequestBytesCeiling := limits.DefaultMaxRequestBytesCeiling
+	maxResponseBytesCeiling := limits.DefaultMaxResponseBytesCeiling
+	maxTimeoutCeiling := limits.DefaultMaxTimeoutCeiling
 	jsonOutput := false
 
 	fs.StringVar(&fragmentsDir, "fragments-dir", fragmentsDir, "Directory containing route fragments")
@@ -36,6 +42,9 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&allowlistPath, "upstream-allowlist-path", allowlistPath, "Alias for -upstream-allowlist")
 	fs.StringVar(&allowlistPath, "allowlist-path", allowlistPath, "Alias for -upstream-allowlist")
 	fs.StringVar(&allowlistPath, "allowlist", allowlistPath, "Alias for -upstream-allowlist")
+	fs.Int64Var(&maxRequestBytesCeiling, "max-request-bytes-ceiling", maxRequestBytesCeiling, "Operator ceiling for x-max-request-bytes")
+	fs.Int64Var(&maxResponseBytesCeiling, "max-response-bytes-ceiling", maxResponseBytesCeiling, "Operator ceiling for x-max-response-bytes")
+	fs.DurationVar(&maxTimeoutCeiling, "max-timeout-ceiling", maxTimeoutCeiling, "Operator ceiling for x-timeout")
 	fs.BoolVar(&jsonOutput, "json", jsonOutput, "Emit a machine-readable JSON report")
 
 	if err := fs.Parse(args); err != nil {
@@ -52,11 +61,47 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	if value := os.Getenv("SEAM_UPSTREAM_ALLOWLIST"); value != "" && allowlistPath == "" {
 		allowlistPath = value
 	}
+	for _, ceiling := range []struct {
+		envVar   string
+		flagName string
+		dest     *int64
+	}{
+		{"SEAM_MAX_REQUEST_BYTES_CEILING", "max-request-bytes-ceiling", &maxRequestBytesCeiling},
+		{"SEAM_MAX_RESPONSE_BYTES_CEILING", "max-response-bytes-ceiling", &maxResponseBytesCeiling},
+	} {
+		if value := os.Getenv(ceiling.envVar); value != "" && !flagWasSet(fs, ceiling.flagName) {
+			parsed, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				_, _ = fmt.Fprintf(stderr, "seam lint: %s must be a positive integer byte count\n", ceiling.envVar)
+				return 2
+			}
+			*ceiling.dest = parsed
+		}
+		if *ceiling.dest <= 0 {
+			_, _ = fmt.Fprintf(stderr, "seam lint: --%s must be positive\n", ceiling.flagName)
+			return 2
+		}
+	}
+	if value := os.Getenv("SEAM_MAX_TIMEOUT_CEILING"); value != "" && !flagWasSet(fs, "max-timeout-ceiling") {
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, "seam lint: SEAM_MAX_TIMEOUT_CEILING must be a Go duration")
+			return 2
+		}
+		maxTimeoutCeiling = parsed
+	}
+	if maxTimeoutCeiling <= 0 {
+		_, _ = fmt.Fprintln(stderr, "seam lint: --max-timeout-ceiling must be positive")
+		return 2
+	}
 
 	options := seamspec.LintOptions{
-		FragmentsDir:          fragmentsDir,
-		SchemaPath:            schemaPath,
-		UpstreamAllowlistPath: allowlistPath,
+		FragmentsDir:            fragmentsDir,
+		SchemaPath:              schemaPath,
+		UpstreamAllowlistPath:   allowlistPath,
+		MaxRequestBytesCeiling:  maxRequestBytesCeiling,
+		MaxResponseBytesCeiling: maxResponseBytesCeiling,
+		MaxTimeoutCeiling:       maxTimeoutCeiling,
 	}
 	var report seamspec.LintReport
 	var err error
@@ -65,9 +110,12 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	} else if len(positional) == 1 {
 		if info, statErr := os.Stat(positional[0]); statErr == nil && info.IsDir() {
 			report, err = seamspec.LintDirectory(seamspec.LintOptions{
-				FragmentsDir:          positional[0],
-				SchemaPath:            schemaPath,
-				UpstreamAllowlistPath: allowlistPath,
+				FragmentsDir:            positional[0],
+				SchemaPath:              schemaPath,
+				UpstreamAllowlistPath:   allowlistPath,
+				MaxRequestBytesCeiling:  maxRequestBytesCeiling,
+				MaxResponseBytesCeiling: maxResponseBytesCeiling,
+				MaxTimeoutCeiling:       maxTimeoutCeiling,
 			})
 		} else {
 			report, err = seamspec.LintFiles(positional, options)
@@ -99,14 +147,17 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 // shell-expanded fragment globs while retaining the standard flag syntax.
 func reorderLintArgs(args []string) []string {
 	valueFlags := map[string]bool{
-		"fragments-dir":           true,
-		"fragments":               true,
-		"schema-path":             true,
-		"schema":                  true,
-		"upstream-allowlist":      true,
-		"upstream-allowlist-path": true,
-		"allowlist-path":          true,
-		"allowlist":               true,
+		"fragments-dir":              true,
+		"fragments":                  true,
+		"schema-path":                true,
+		"schema":                     true,
+		"upstream-allowlist":         true,
+		"upstream-allowlist-path":    true,
+		"allowlist-path":             true,
+		"allowlist":                  true,
+		"max-request-bytes-ceiling":  true,
+		"max-response-bytes-ceiling": true,
+		"max-timeout-ceiling":        true,
 	}
 	flags := make([]string, 0, len(args))
 	positionals := make([]string, 0, len(args))
