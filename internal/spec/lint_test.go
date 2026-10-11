@@ -168,6 +168,64 @@ func TestLintOpaqueBodyModeAcceptsUnconstrainedRequestSchema(t *testing.T) {
 	}
 }
 
+func TestLintOpaqueBodyModeResolvesRequestBodyReferences(t *testing.T) {
+	tests := []struct {
+		name       string
+		bodySchema string
+		wantError  bool
+	}{
+		{name: "constrained schema", bodySchema: "            schema:\n              type: object\n", wantError: true},
+		{name: "unconstrained schema", bodySchema: "            schema: {}\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			fragment := strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+				"paths:\n",
+				"components:\n  requestBodies:\n    OpaqueBody:\n      content:\n        application/json:\n"+test.bodySchema+"paths:\n", 1)
+			fragment = strings.Replace(fragment, "    get:\n", "    post:\n", 1)
+			fragment = strings.Replace(fragment, "      responses:\n",
+				"      x-body-mode: opaque\n"+
+					"      requestBody:\n"+
+					"        $ref: '#/components/requestBodies/OpaqueBody'\n"+
+					"      responses:\n", 1)
+			writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatalf("LintDirectory returned setup error: %v", err)
+			}
+			if test.wantError {
+				assertFindingCodes(t, report.Errors, []string{"body.opaque-schema"})
+			} else if report.HasErrors() {
+				t.Fatalf("unconstrained referenced body schema was rejected: %+v", report.Errors)
+			}
+		})
+	}
+}
+
+func TestLintRejectsStreamingAdapterThatRequiresBuffering(t *testing.T) {
+	root := t.TempDir()
+	fragment := strings.Replace(
+		validLintFragment("owner", "v1", "https://api.example.com"),
+		"x-upstream: https://api.example.com\n",
+		"x-streaming: true\n"+
+			"x-adapter:\n"+
+			"  targetVersion: v1\n"+
+			"  request: []\n"+
+			"  response:\n"+
+			"    - wrap:\n"+
+			"        pointer: /\n"+
+			"        envelope: response\n",
+		1,
+	)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	assertFindingCodes(t, report.Errors, []string{"adapter.streaming-buffering-conflict"})
+}
+
 // TestLintDirectoryUnscrubbableAcknowledgementContract pins the lint half of
 // the x-unscrubbable contract: every acknowledgement draws the human-review
 // warning at whichever level declares it, and an acknowledgement on a fragment

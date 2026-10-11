@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
@@ -97,6 +98,132 @@ func FuzzSecretScrubber(f *testing.F) {
 			t.Fatalf("scrubbed output contains secret at chunk size %d", chunkSize)
 		}
 	})
+}
+
+func TestSecretScrubberStreamingSecretSplitAcrossTwoAndThreeChunks(t *testing.T) {
+	secret := []byte("split-stream-secret")
+	prefix := []byte("data: ")
+	suffix := []byte("\n\n")
+	body := append(append(append([]byte{}, prefix...), secret...), suffix...)
+	want := ScrubBytes(body, secret)
+	for _, test := range []struct {
+		name      string
+		chunkSize int
+	}{
+		{name: "two chunks", chunkSize: len(prefix) + len(secret)/2},
+		{name: "three chunks", chunkSize: len(prefix) + len(secret)/3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var got bytes.Buffer
+			if err := ScrubReader(&got, &fixedChunkReader{data: body, size: test.chunkSize}, secret); err != nil {
+				t.Fatalf("ScrubReader() error = %v", err)
+			}
+			if !bytes.Equal(got.Bytes(), want) {
+				t.Fatalf("scrubbed body = %q, want %q", got.Bytes(), want)
+			}
+			assertNoSecret(t, secret, got.Bytes())
+		})
+	}
+}
+
+func TestStreamingRouteFlushesBeforeUpstreamEOFAndCancelsOnDisconnect(t *testing.T) {
+	secret := []byte("stream-disconnect-secret")
+	upstreamStarted := make(chan struct{})
+	upstreamCanceled := make(chan struct{})
+	releaseUpstream := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: initial event payload\n\n"))
+		w.(http.Flusher).Flush()
+		close(upstreamStarted)
+		select {
+		case <-r.Context().Done():
+			close(upstreamCanceled)
+		case <-releaseUpstream:
+		}
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxy(upstream.URL)
+	if err != nil {
+		t.Fatalf("NewReverseProxy() error = %v", err)
+	}
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		withRouteMatch(r, &RouteMatch{Route: RouteEntry{
+			PathTemplate: "/v1/events", Method: http.MethodGet, APIVersion: "v1",
+			Streaming: true,
+			InjectAs:  &InjectAs{Kind: InjectionHeader, Name: "X-Api-Key"},
+		}}, func(context.Context, RouteEntry) ([]byte, error) { return secret, nil })
+		proxy.ServeHTTP(w, r)
+	}))
+	defer proxyServer.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	response, err := client.Get(proxyServer.URL + "/v1/events")
+	if err != nil {
+		t.Fatalf("GET streaming route: %v", err)
+	}
+	defer response.Body.Close()
+	select {
+	case <-upstreamStarted:
+	case <-time.After(time.Second):
+		t.Fatal("upstream did not start")
+	}
+
+	firstRead := make(chan int, 1)
+	go func() {
+		buffer := make([]byte, 64)
+		n, _ := response.Body.Read(buffer)
+		firstRead <- n
+	}()
+	select {
+	case n := <-firstRead:
+		if n == 0 {
+			t.Fatal("streaming route delivered an empty first read")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("time-to-first-byte was delayed until upstream EOF")
+	}
+
+	_ = response.Body.Close()
+	select {
+	case <-upstreamCanceled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("client disconnect did not cancel upstream request")
+	}
+	close(releaseUpstream)
+}
+
+func TestStreamingRouteForcesIncrementalScrubbingForKnownLength(t *testing.T) {
+	secret := []byte("known-length-stream-secret")
+	body := append([]byte("data: "), secret...)
+	body = append(body, []byte("\n\n")...)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Length", itoa(len(body)))
+		_, _ = w.Write(body)
+	}))
+	defer upstream.Close()
+
+	proxy, err := NewReverseProxyWithConfig(upstream.URL, &ReverseProxyConfig{MaxBufferedResponseBytes: int64(len(body) + 1024)})
+	if err != nil {
+		t.Fatalf("NewReverseProxyWithConfig() error = %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	withRouteMatch(req, &RouteMatch{Route: RouteEntry{
+		PathTemplate: "/", Method: http.MethodGet, APIVersion: "v1", Streaming: true,
+		InjectAs: &InjectAs{Kind: InjectionHeader, Name: "X-Api-Key"},
+	}}, func(context.Context, RouteEntry) ([]byte, error) { return secret, nil })
+	recorder := httptest.NewRecorder()
+	proxy.ServeHTTP(recorder, req)
+	if got := recorder.Header().Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want streaming route to remove it", got)
+	}
+	assertNoSecret(t, secret, recorder.Body.Bytes())
+	if !bytes.Contains(recorder.Body.Bytes(), []byte(RedactedSecret)) {
+		t.Fatalf("streaming body %q lacks redaction marker", recorder.Body.Bytes())
+	}
 }
 
 func TestInjectedResponseScrubsBodyHeadersAndTrailers(t *testing.T) {

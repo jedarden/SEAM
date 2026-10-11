@@ -65,6 +65,7 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-seam-deprecated` | `seamDeprecated` | no | `{since, sunset?, brownout?}` marking every route deprecated. Object, not boolean. |
 | `x-adapter` | `adapter` | no | Declarative request/response transforms delegating to `targetVersion`. Mutually exclusive with every upstream-facing field. |
 | `x-unscrubbable` | `acknowledged` | no | Root **or** operation level. Acknowledgement that a route runs unscrubbed. |
+| `x-streaming` | boolean | no | Root default or operation override. Forces incremental response delivery and overlap-window scrubbing; it never whole-response buffers. |
 | `x-requires-approval` | boolean | no | **RESERVED** (approval-gated routes, accepted but unphased). Declared so the first fragment can carry it without a schema change; not yet enforced. |
 
 ### 3.2 Path-item-level fields
@@ -82,6 +83,7 @@ This boundary is also why `additionalProperties: true` at every level: the schem
 | `x-cost-per-call` | `costPerCall` | `{amount, unit}`. `amount` is a number >= 0; `unit` is a non-empty opaque string such as `credits`, `USD`, or `requests`. SEAM never converts units. |
 | `x-quota` | `quota` | `{amount, unit, window}`. `amount` is a number >= 0; `unit` is non-empty and must byte-match the effective `x-cost-per-call.unit`; `window` uses the shared duration grammar. Requires `x-cost-per-call` (schema-encoded at operation level). |
 | `x-unscrubbable` | `acknowledged` | Operation-level opt-in. |
+| `x-streaming` | boolean | Operation override for incremental response delivery. A response adapter transform that needs buffering is invalid when this is true. |
 | `x-requires-approval` | boolean | RESERVED forward-compat. |
 
 ### 3.4 Placement decisions worth stating

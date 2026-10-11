@@ -508,9 +508,21 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	timeoutCtx, cancel := context.WithTimeout(upstreamReq.Context(), timeout)
 	upstreamReq = upstreamReq.WithContext(timeoutCtx)
 
+	match := routeMatchFromRequest(r)
+	opaqueBodyMode := match != nil && match.Route.BodyMode == "opaque"
 	client := p.Client
 	if client == nil {
 		client = defaultUpstreamClient
+	}
+	if opaqueBodyMode {
+		// http.Client follows redirects by default. For opaque routes, a 3xx is
+		// an upstream response that must be returned to the caller with its
+		// original status and headers, so make this request stop at that hop.
+		opaqueClient := *client
+		opaqueClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		client = &opaqueClient
 	}
 	startTime := time.Now()
 	upstreamResp, err := client.Do(upstreamReq)
@@ -551,8 +563,7 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	match := routeMatchFromRequest(r)
-	opaqueBodyMode := match != nil && match.Route.BodyMode == "opaque"
+	streamingRoute := match != nil && match.Route.Streaming
 	// Validated routes retain the established 401 refresh-and-retry behavior.
 	// Opaque routes preserve provider error responses verbatim instead.
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !opaqueBodyMode && !credentialRetryFromContext(ctx) {
@@ -599,20 +610,23 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 			// emission is the only durable record that it happened.
 			log.Printf("[proxy] x-unscrubbable acknowledgement: serving unscannable response unsanitized for %s %s (status %d, content-type %q)",
 				r.Method, route, upstreamResp.StatusCode, upstreamResp.Header.Get("Content-Type"))
-			if err := scrubber.serveUnscannable(w, upstreamResp); err != nil {
+			if err := scrubber.serveUnscannable(w, upstreamResp, streamingRoute); err != nil {
 				return fmt.Errorf("streaming acknowledged unscannable response: %w", err)
 			}
 			return nil
 		}
-		if err := scrubber.streamResponse(w, upstreamResp, p.MaxBufferedResponseBytes); err != nil {
+		if err := scrubber.streamResponse(w, upstreamResp, p.MaxBufferedResponseBytes, streamingRoute); err != nil {
 			return fmt.Errorf("scrubbing upstream response: %w", err)
 		}
 		return nil
 	}
 
 	copyHeaders(upstreamResp.Header, w.Header())
+	if streamingRoute {
+		w.Header().Del("Content-Length")
+	}
 	w.WriteHeader(upstreamResp.StatusCode)
-	if err := p.streamResponse(w, upstreamResp.Body); err != nil {
+	if err := p.streamResponse(w, upstreamResp.Body, streamingRoute); err != nil {
 		return fmt.Errorf("streaming upstream response: %w", err)
 	}
 	return nil
@@ -1050,7 +1064,10 @@ func joinURLPaths(basePath, requestPath string) string {
 	return strings.TrimRight(basePath, "/") + "/" + strings.TrimLeft(requestPath, "/")
 }
 
-func (p *ReverseProxy) streamResponse(w http.ResponseWriter, body io.Reader) error {
+func (p *ReverseProxy) streamResponse(w http.ResponseWriter, body io.Reader, forceStreaming ...bool) error {
+	if len(forceStreaming) > 0 && forceStreaming[0] {
+		return streamResponseBody(w, body)
+	}
 	if p.BufferPool == nil {
 		p.BufferPool = newBufferPool()
 	}
@@ -1131,6 +1148,18 @@ func (w *responseWriterTracker) Write(body []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 	return w.ResponseWriter.Write(body)
+}
+
+// Flush preserves streaming semantics through the status-tracking wrapper.
+// Without this forwarding method, the scrubber sees only the wrapper and
+// cannot ask net/http to deliver an SSE event to the caller.
+func (w *responseWriterTracker) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // StatusCode returns the status code that was written, or 0 if no header has been written.

@@ -356,7 +356,13 @@ func (f *lintFragment) checkBodyMode(report *LintReport) {
 				continue
 			}
 			requestBody, _ := operation["requestBody"].(map[string]any)
-			content, _ := requestBody["content"].(map[string]any)
+			content, resolvable := opaqueRequestBodyContent(f.data, requestBody)
+			if !resolvable {
+				f.addError(report, "body.opaque-schema", fmt.Sprintf(
+					"%s %s has a requestBody reference that lint cannot resolve while x-body-mode is opaque",
+					strings.ToUpper(method), path))
+				continue
+			}
 			mediaTypes := make([]string, 0, len(content))
 			for mediaType := range content {
 				mediaTypes = append(mediaTypes, mediaType)
@@ -370,6 +376,35 @@ func (f *lintFragment) checkBodyMode(report *LintReport) {
 			}
 		}
 	}
+}
+
+func opaqueRequestBodyContent(document, requestBody map[string]any) (map[string]any, bool) {
+	seen := make(map[string]bool)
+	for requestBody != nil {
+		refValue, hasRef := requestBody["$ref"]
+		if !hasRef {
+			content, _ := requestBody["content"].(map[string]any)
+			return content, true
+		}
+		ref, ok := refValue.(string)
+		const prefix = "#/components/requestBodies/"
+		if !ok || !strings.HasPrefix(ref, prefix) {
+			return nil, false
+		}
+		name := strings.TrimPrefix(ref, prefix)
+		if strings.Contains(name, "/") {
+			return nil, false
+		}
+		name = strings.ReplaceAll(strings.ReplaceAll(name, "~1", "/"), "~0", "~")
+		if seen[name] {
+			return nil, false
+		}
+		seen[name] = true
+		components, _ := document["components"].(map[string]any)
+		requestBodies, _ := components["requestBodies"].(map[string]any)
+		requestBody, _ = requestBodies[name].(map[string]any)
+	}
+	return nil, false
 }
 
 func schemaHasValidationConstraints(value any) bool {
@@ -1679,42 +1714,59 @@ func (f *lintFragment) validateRenameParamTransform(report *LintReport, transfor
 }
 
 // checkAdapterBuffering validates that response transforms requiring buffering
-// are not used on unbufferable (streaming) routes
+// are not used on routes explicitly marked for incremental delivery.
 func (f *lintFragment) checkAdapterBuffering(report *LintReport, adapter map[string]any) {
 	responseTransforms, hasResponse := adapter["response"].([]any)
 	if !hasResponse {
 		return
 	}
 
-	// Check if this route is unbufferable (streaming)
-	// For now, we assume all routes are bufferable unless explicitly marked
-	// In a full implementation, this would check the route's content-type
-	// and response handling configuration
-
-	for i, transform := range responseTransforms {
+	bufferingTransforms := make([]string, 0, len(responseTransforms))
+	for _, transform := range responseTransforms {
 		transformMap, ok := transform.(map[string]any)
 		if !ok {
 			continue
 		}
-
-		// Check for structure-altering transforms that require buffering
-		requiresBuffering := false
-		transformType := ""
-
-		if _, hasWrap := transformMap["wrap"]; hasWrap {
-			requiresBuffering = true
-			transformType = "wrap"
-		} else if _, hasUnwrap := transformMap["unwrap"]; hasUnwrap {
-			// unwrap doesn't inherently require buffering
-			// but may if the response structure changes significantly
+		if _, ok := transformMap["wrap"]; ok {
+			bufferingTransforms = append(bufferingTransforms, "wrap")
 		}
-
-		if requiresBuffering {
-			// TODO: In full implementation, check if route is streaming
-			// For now, emit a warning that buffering will be forced
-			f.addWarning(report, "adapter.buffering-required",
-				fmt.Sprintf("x-adapter.response[%d] uses %s transform which requires buffered response path", i, transformType))
+		if _, ok := transformMap["unwrap"]; ok {
+			bufferingTransforms = append(bufferingTransforms, "unwrap")
 		}
+	}
+	if len(bufferingTransforms) == 0 {
+		return
+	}
+
+	streaming, _ := f.data["x-streaming"].(bool)
+	paths, _ := f.data["paths"].(map[string]any)
+	checkedOperation := false
+	for path, pathValue := range paths {
+		pathItem, _ := pathValue.(map[string]any)
+		for method, operationValue := range pathItem {
+			if !isLintOperationMethod(method) {
+				continue
+			}
+			operation, _ := operationValue.(map[string]any)
+			if operation == nil {
+				continue
+			}
+			operationStreaming := streaming
+			if value, exists := operation["x-streaming"]; exists {
+				operationStreaming, _ = value.(bool)
+			}
+			if !operationStreaming {
+				continue
+			}
+			checkedOperation = true
+			f.addError(report, "adapter.streaming-buffering-conflict", fmt.Sprintf(
+				"%s %s enables x-streaming but x-adapter.response uses %s transform(s) that require whole-response buffering",
+				strings.ToUpper(method), path, strings.Join(bufferingTransforms, ", ")))
+		}
+	}
+	if streaming && !checkedOperation && len(paths) == 0 {
+		f.addError(report, "adapter.streaming-buffering-conflict",
+			fmt.Sprintf("x-streaming enables incremental delivery but x-adapter.response uses %s transform(s) that require whole-response buffering", strings.Join(bufferingTransforms, ", ")))
 	}
 }
 

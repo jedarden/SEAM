@@ -104,6 +104,11 @@ type RouteEntry struct {
 	// OpenAPI schema. Empty preserves the validated default for legacy routes.
 	BodyMode string
 
+	// Streaming requests an incremental response path. It is intentionally
+	// carried per route so providers that emit SSE are never whole-response
+	// buffered, while legacy routes retain their existing buffering behavior.
+	Streaming bool
+
 	// InstanceParam identifies the path binding consumed by an upstream map.
 	// It is removed from the upstream path before any remaining bindings are
 	// substituted.
@@ -623,6 +628,10 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 			if bodyMode != "validated" && bodyMode != "opaque" {
 				return nil, fmt.Errorf("OpenAPI operation %s %s: x-body-mode must be validated or opaque", methodOp.method, path)
 			}
+			streaming, err := extractBoolExtension(methodOp.operation, pathItem, spec, "x-streaming")
+			if err != nil {
+				return nil, fmt.Errorf("OpenAPI operation %s %s: %w", methodOp.method, path, err)
+			}
 
 			// Extract deprecation information (Phase 8.3)
 			deprecated, err := extractDeprecation(methodOp.operation, pathItem, spec)
@@ -644,6 +653,7 @@ func buildRouteTable(spec *v3.Document, envSnapshot *envCredentialSource) (*Rout
 				CredentialFile:        credentialFile,
 				Unscrubbable:          unscrubbable,
 				BodyMode:              bodyMode,
+				Streaming:             streaming,
 				InstanceParam:         instanceParam,
 				UpstreamPathTemplate:  upstreamPathTemplate,
 				Deprecated:            deprecated,
@@ -787,6 +797,18 @@ func extractStringExtension(operation *v3.Operation, pathItem *v3.PathItem, docu
 		return "", fmt.Errorf("%s must be a string", name)
 	}
 	return strings.TrimSpace(stringValue), nil
+}
+
+func extractBoolExtension(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document, name string) (bool, error) {
+	node, ok := firstExtension(operation, pathItem, document, name)
+	if !ok || node == nil {
+		return false, nil
+	}
+	var value bool
+	if err := node.Decode(&value); err != nil {
+		return false, fmt.Errorf("%s must be a boolean: %w", name, err)
+	}
+	return value, nil
 }
 
 func extractInjectAs(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (*InjectAs, []*InjectAs, error) {

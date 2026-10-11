@@ -470,7 +470,7 @@ func copyResponseTrailers(w http.ResponseWriter, trailers http.Header, scrubber 
 // with the upstream's status, headers, and trailers intact and their
 // credential-bearing values still scrubbed. The cap therefore bounds memory,
 // never scrubbability.
-func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Response, maxBuffered int64) error {
+func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Response, maxBuffered int64, forceStreaming ...bool) error {
 	if resp.Body == nil {
 		resp.Body = http.NoBody
 	}
@@ -488,7 +488,8 @@ func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Respon
 	defer func() { _ = closeAll(closers) }()
 
 	copyResponseHeaders(w, resp.Header, s, resp.Trailer)
-	if resp.ContentLength >= 0 && resp.ContentLength <= maxBuffered {
+	streaming := len(forceStreaming) > 0 && forceStreaming[0]
+	if !streaming && resp.ContentLength >= 0 && resp.ContentLength <= maxBuffered {
 		body, readErr := io.ReadAll(io.LimitReader(decoded, maxBuffered+1))
 		if readErr != nil {
 			return fmt.Errorf("reading buffered response: %w", readErr)
@@ -530,15 +531,47 @@ func (s *secretScrubber) streamResponse(w http.ResponseWriter, resp *http.Respon
 	return nil
 }
 
-func (s *secretScrubber) serveUnscannable(w http.ResponseWriter, resp *http.Response) error {
+func (s *secretScrubber) serveUnscannable(w http.ResponseWriter, resp *http.Response, forceStreaming ...bool) error {
 	if resp.Body == nil {
 		resp.Body = http.NoBody
 	}
 	copyResponseHeaders(w, resp.Header, nil, resp.Trailer)
+	streaming := len(forceStreaming) > 0 && forceStreaming[0]
+	if streaming {
+		w.Header().Del("Content-Length")
+	}
 	w.WriteHeader(resp.StatusCode)
-	if _, err := io.Copy(w, resp.Body); err != nil {
+	if streaming {
+		if err := streamResponseBody(w, resp.Body); err != nil {
+			return err
+		}
+	} else if _, err := io.Copy(w, resp.Body); err != nil {
 		return err
 	}
 	copyResponseTrailers(w, resp.Trailer, nil)
 	return nil
+}
+
+// streamResponseBody writes each read as soon as it is available. This is the
+// unredacted counterpart to secretScrubber.stream for acknowledged opaque
+// responses and for credential-free x-streaming routes.
+func streamResponseBody(w http.ResponseWriter, src io.Reader) error {
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			if writeErr := writeAll(w, buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			if flusher, ok := w.(interface{ Flush() }); ok {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
 }

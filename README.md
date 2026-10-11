@@ -149,6 +149,27 @@ public preview route is exposed at `/subq/v1/models` and
 OpenBao read grant for that key. The public preview currently does not accept
 the OpenAI-compatible chat-completions endpoint.
 
+### Streaming provider responses
+
+Mark an operation (or the fragment default) with `x-streaming: true` when the
+provider returns SSE or another incremental response:
+
+```yaml
+x-streaming: true
+paths:
+  /v1/chat/completions:
+    post:
+      x-body-mode: opaque
+      x-streaming: true
+```
+
+Streaming routes send each available event to the caller without buffering the
+whole response. Injected credentials are still scrubbed with a carry-over
+window at least as long as the longest injected value, including values split
+across upstream read boundaries. A response adapter transform that requires a
+whole body (`wrap` or `unwrap`) is rejected by `seam lint` on a streaming route.
+If the caller disconnects, the upstream request context is cancelled.
+
 **In-cluster refusal (upstream trust).** When both `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT` are set, SEAM treats the process as running in-cluster and strips operator-supplied overrides of the two upstream-trust paths: a custom `--upstream-ca-dir` / `SEAM_UPSTREAM_CA_DIR` is refused with a warning and `/etc/gateway/upstream-ca` is used instead, and the allowlist is always the operator-mounted `/etc/gateway/allowlist.yaml` — a supplied `--allowlist-file` / `SEAM_UPSTREAM_ALLOWLIST` can never replace that mounted control inside a pod. The refusal applies to supplied values only; the defaults are exactly those in-cluster paths. Outside a cluster both flags accept any path. The precedence is mounted control &gt; flag &gt; environment variable &gt; default: an explicit flag already beats `SEAM_UPSTREAM_CA_DIR` / `SEAM_UPSTREAM_ALLOWLIST` before the boundary runs, so what gets refused in-cluster is the flag's value.
 
 **Operator-visible failure modes (in-cluster upstream trust).**

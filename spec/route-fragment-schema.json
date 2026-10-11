@@ -52,6 +52,7 @@
     "x-seam-deprecated": { "$ref": "#/$defs/seamDeprecated", "$comment": "Fragment-root object marking every route deprecated. Feeds Deprecation/Sunset headers and the retirement metric." },
     "x-adapter": { "$ref": "#/$defs/adapter", "$comment": "Fragment-root. Declarative request/response transforms delegating to a live targetVersion. Mutually exclusive with x-upstream/x-upstream-map and every upstream-facing field." },
     "x-unscrubbable": { "$ref": "#/$defs/acknowledged", "$comment": "Allowed at fragment-root OR operation level. Acknowledgement that a route runs unscrubbed (response cannot be scanned for echoed secrets)." },
+    "x-streaming": { "type": "boolean", "default": false, "$comment": "Fragment-root default for incremental response delivery. An operation-level value overrides it; streaming routes are never whole-response buffered." },
     "x-requires-approval": { "type": "boolean", "$comment": "RESERVED forward-compat field (docs/notes/approval-gated-routes.md, accepted but unphased). Not yet enforced; declared here so the first real fragment can carry it without a schema change." },
 
     "x-loop-guard": { "$ref": "#/$defs/loopGuard", "$comment": "Fragment-root default for repeated-identical-request loop protection. Applied to all operations unless overridden at operation level." },
@@ -471,6 +472,7 @@
         "x-cost-per-call": { "$ref": "#/$defs/costPerCall" },
         "x-quota": { "$ref": "#/$defs/quota" },
         "x-unscrubbable": { "$ref": "#/$defs/acknowledged" },
+        "x-streaming": { "type": "boolean", "default": false, "$comment": "Deliver the response incrementally and flush each available event; overrides the fragment-root default." },
         "x-body-mode": { "enum": ["validated", "opaque"], "default": "validated", "$comment": "validated is the default. opaque forwards request-body bytes without schema validation; the operation must not declare a constraining request schema." },
         "x-inject-as": { "$ref": "#/$defs/injectAsListOrObject" },
         "x-inject-static": { "$ref": "#/$defs/staticInjectionListOrObject" },
