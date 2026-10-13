@@ -41,6 +41,7 @@ type FragmentLoader struct {
 	quarantined         []*Fragment
 	lastLoadedTimestamp time.Time
 	allowlistEnforcer   *AllowlistEnforcer // Allowlist enforcer for vault-path and upstream-host validation
+	providerProfiles    *ProviderProfiles  // Operator-owned x-provider-profile defaults, resolved at load time
 }
 
 // NewFragmentLoader creates a new fragment loader
@@ -71,6 +72,16 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 	// Set the timestamp when loading starts
 	fl.lastLoadedTimestamp = time.Now()
 
+	// Resolve operator-owned provider profiles once per load. A configured
+	// file that cannot be read or validated fails the whole load — the same
+	// fail-closed posture as the allowlist — rather than silently degrading
+	// every x-provider-profile fragment to its un-defaulted form.
+	profiles, err := ResolveProviderProfiles()
+	if err != nil {
+		return err
+	}
+	fl.providerProfiles = profiles
+
 	if _, err := os.Stat(fragmentsDir); os.IsNotExist(err) {
 		// Directory doesn't exist - not an error, just no fragments
 		log.Printf("[Fragment] Fragments directory does not exist: %s (no fragments to load)", fragmentsDir)
@@ -82,7 +93,7 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 	discoveredCount := 0
 
 	// Walk the directory tree looking for .yaml, .yml and .json files
-	err := filepath.Walk(fragmentsDir, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(fragmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("[Fragment] Error accessing path %s: %v", path, err)
 			return err
@@ -118,6 +129,20 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 			}
 
 			if fragment != nil {
+				// Apply operator-owned profile defaults before the fragment
+				// reaches validation or merge-time propagation, so lint,
+				// quarantine and the route table all observe the same
+				// effective fragment the caller authored. An unknown profile
+				// quarantines the whole fragment, exactly like a reserved-path
+				// declaration.
+				if _, err := ApplyProviderProfile(fragment.ParsedFragment, fl.providerProfiles); err != nil {
+					log.Printf("[Fragment] Quarantining fragment %s: %v", path, err)
+					fragment.QueuedForQuarantine = true
+					fragment.QuarantineReasons = append(fragment.QuarantineReasons, err.Error())
+					fl.quarantined = append(fl.quarantined, fragment)
+					errorCount++
+					return nil
+				}
 				fl.fragments = append(fl.fragments, fragment)
 				loadedCount++
 				log.Printf("[Fragment] Successfully loaded fragment: %s (owner: %s, schema: %s)", path, fragment.Owner, fragment.SchemaVer)
@@ -127,9 +152,9 @@ func (fl *FragmentLoader) LoadDirectory(fragmentsDir string) error {
 		return nil
 	})
 
-	if err != nil {
-		log.Printf("[Fragment] Error walking directory tree: %v", err)
-		return err
+	if walkErr != nil {
+		log.Printf("[Fragment] Error walking directory tree: %v", walkErr)
+		return walkErr
 	}
 
 	log.Printf("[Fragment] Fragment loading complete: %d loaded, %d errors", loadedCount, errorCount)

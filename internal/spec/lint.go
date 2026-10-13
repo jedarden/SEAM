@@ -56,9 +56,22 @@ type LintOptions struct {
 	FragmentsDir            string
 	SchemaPath              string
 	UpstreamAllowlistPath   string
+	ProviderProfilesPath    string
 	MaxRequestBytesCeiling  int64
 	MaxResponseBytesCeiling int64
 	MaxTimeoutCeiling       time.Duration
+}
+
+// resolveLintProviderProfiles resolves the operator-owned profile set the
+// same way the gateway loader does: an explicit path wins, then the
+// SEAM_PROVIDER_PROFILES file, then the compiled-in seed set. A configured
+// file that fails validation is a configuration error, not a per-fragment
+// finding — lint refuses to run against a profile set it cannot trust.
+func resolveLintProviderProfiles(options LintOptions) (*ProviderProfiles, error) {
+	if options.ProviderProfilesPath != "" {
+		return LoadProviderProfilesFile(options.ProviderProfilesPath)
+	}
+	return ResolveProviderProfiles()
 }
 
 func (o *LintOptions) resolveCeilings() error {
@@ -129,12 +142,16 @@ func LintDirectory(options LintOptions) (LintReport, error) {
 	if err != nil {
 		return LintReport{}, err
 	}
+	profiles, err := resolveLintProviderProfiles(options)
+	if err != nil {
+		return LintReport{}, err
+	}
 
 	files, err := readLintFragments(options.FragmentsDir)
 	if err != nil {
 		return LintReport{}, err
 	}
-	return lintLoadedFragments(files, schema, allowlist, options), nil
+	return lintLoadedFragments(files, schema, allowlist, profiles, options), nil
 }
 
 // LintFiles validates an explicit list of fragment files. This is useful for
@@ -158,6 +175,10 @@ func LintFiles(paths []string, options LintOptions) (LintReport, error) {
 	if err != nil {
 		return LintReport{}, err
 	}
+	profiles, err := resolveLintProviderProfiles(options)
+	if err != nil {
+		return LintReport{}, err
+	}
 
 	cleanPaths := append([]string(nil), paths...)
 	sort.Strings(cleanPaths)
@@ -174,7 +195,7 @@ func LintFiles(paths []string, options LintOptions) (LintReport, error) {
 	if err != nil {
 		return LintReport{}, err
 	}
-	return lintLoadedFragments(files, schema, allowlist, options), nil
+	return lintLoadedFragments(files, schema, allowlist, profiles, options), nil
 }
 
 // LintPaths is an alias for callers that use the command's file-or-directory
@@ -183,7 +204,7 @@ func LintPaths(paths []string, options LintOptions) (LintReport, error) {
 	return LintFiles(paths, options)
 }
 
-func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allowlist *hostAllowlist, options LintOptions) LintReport {
+func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allowlist *hostAllowlist, profiles *ProviderProfiles, options LintOptions) LintReport {
 
 	report := LintReport{
 		Errors:   make([]LintFinding, 0),
@@ -195,6 +216,14 @@ func lintLoadedFragments(files []*lintFragment, schema *jsonschema.Schema, allow
 		owners = append(owners, filepath.Base(filepath.Dir(fragment.file)))
 	}
 	for _, fragment := range files {
+		// Fold operator-owned profile defaults in before every check, so the
+		// ownership rule, the both-or-neither rule, ceilings, allowlists and
+		// the opaque-body rule all evaluate the same effective fragment the
+		// gateway will serve. A profile therefore cannot relax a control:
+		// the merged fragment must still pass each one.
+		if _, err := ApplyProviderProfile(fragment.data, profiles); err != nil {
+			fragment.addError(&report, "profile.unknown", err.Error())
+		}
 		fragment.validate(&report, schema, allowlist, owners, options)
 	}
 	detectLintCollisions(&report, files)
@@ -364,6 +393,20 @@ func (f *lintFragment) validate(report *LintReport, schema *jsonschema.Schema, a
 	f.checkAdapter(report)
 }
 
+// effectiveLintBodyMode resolves the body mode an operation runs under: its
+// own declaration first, then the fragment-root default — the level a
+// provider profile stamps. Returns the schema default "validated" when
+// neither declares one.
+func effectiveLintBodyMode(fragment map[string]any, operation map[string]any) string {
+	if mode, ok := operation["x-body-mode"].(string); ok && mode != "" {
+		return mode
+	}
+	if mode, ok := fragment["x-body-mode"].(string); ok && mode != "" {
+		return mode
+	}
+	return "validated"
+}
+
 func (f *lintFragment) checkBodyMode(report *LintReport) {
 	paths, _ := f.data["paths"].(map[string]any)
 	pathNames := make([]string, 0, len(paths))
@@ -382,7 +425,7 @@ func (f *lintFragment) checkBodyMode(report *LintReport) {
 		sort.Strings(methods)
 		for _, method := range methods {
 			operation, _ := pathItem[method].(map[string]any)
-			if operation == nil || operation["x-body-mode"] != "opaque" {
+			if operation == nil || effectiveLintBodyMode(f.data, operation) != "opaque" {
 				continue
 			}
 			requestBody, _ := operation["requestBody"].(map[string]any)

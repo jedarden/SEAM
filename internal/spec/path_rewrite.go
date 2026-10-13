@@ -27,6 +27,18 @@ var internalRouteMetadata = map[string]string{
 	"x-max-request-bytes":     internalRouteMetadataPrefix + "max-request-bytes",
 	"x-max-response-bytes":    internalRouteMetadataPrefix + "max-response-bytes",
 	"x-timeout":               internalRouteMetadataPrefix + "timeout",
+	// The remaining entries are the provider-profile-defaultable fields
+	// (Multi-Provider Credentials §6). They previously existed only at the
+	// operation/path-item level; without propagation a fragment-root value —
+	// in practice the one an inherited x-provider-profile stamps — was
+	// dropped at merge (merge copies only paths and components) and the
+	// route table never saw it. Operation and path-item values still win:
+	// the marker is consulted last by the route-table builder.
+	"x-body-mode":          internalRouteMetadataPrefix + "body-mode",
+	"x-streaming":          internalRouteMetadataPrefix + "streaming",
+	"x-cost-from-response": internalRouteMetadataPrefix + "cost-from-response",
+	"x-inject-static":      internalRouteMetadataPrefix + "inject-static",
+	"x-credential-probe":   internalRouteMetadataPrefix + "credential-probe",
 	// x-required-scope is the fragment-root DEFAULT scope requirement for
 	// every operation on the route; an operation-level x-required-scope
 	// REPLACES it, never merges (route-fragment-schema.md). The route-table

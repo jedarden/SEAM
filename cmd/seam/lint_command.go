@@ -29,6 +29,7 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	fragmentsDir := "./fragments"
 	schemaPath := "./spec/route-fragment-schema.json"
 	allowlistPath := ""
+	providerProfilesPath := ""
 	maxRequestBytesCeiling := limits.DefaultMaxRequestBytesCeiling
 	maxResponseBytesCeiling := limits.DefaultMaxResponseBytesCeiling
 	maxTimeoutCeiling := limits.DefaultMaxTimeoutCeiling
@@ -42,6 +43,7 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&allowlistPath, "upstream-allowlist-path", allowlistPath, "Alias for -upstream-allowlist")
 	fs.StringVar(&allowlistPath, "allowlist-path", allowlistPath, "Alias for -upstream-allowlist")
 	fs.StringVar(&allowlistPath, "allowlist", allowlistPath, "Alias for -upstream-allowlist")
+	fs.StringVar(&providerProfilesPath, "provider-profiles", providerProfilesPath, "Operator-owned provider-profile file (absent uses SEAM_PROVIDER_PROFILES, then the compiled-in seed set)")
 	fs.Int64Var(&maxRequestBytesCeiling, "max-request-bytes-ceiling", maxRequestBytesCeiling, "Operator ceiling for x-max-request-bytes")
 	fs.Int64Var(&maxResponseBytesCeiling, "max-response-bytes-ceiling", maxResponseBytesCeiling, "Operator ceiling for x-max-response-bytes")
 	fs.DurationVar(&maxTimeoutCeiling, "max-timeout-ceiling", maxTimeoutCeiling, "Operator ceiling for x-timeout")
@@ -60,6 +62,9 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	if value := os.Getenv("SEAM_UPSTREAM_ALLOWLIST"); value != "" && allowlistPath == "" {
 		allowlistPath = value
+	}
+	if value := os.Getenv(seamspec.ProviderProfilesEnvVar); value != "" && providerProfilesPath == "" {
+		providerProfilesPath = value
 	}
 	for _, ceiling := range []struct {
 		envVar   string
@@ -99,6 +104,7 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 		FragmentsDir:            fragmentsDir,
 		SchemaPath:              schemaPath,
 		UpstreamAllowlistPath:   allowlistPath,
+		ProviderProfilesPath:    providerProfilesPath,
 		MaxRequestBytesCeiling:  maxRequestBytesCeiling,
 		MaxResponseBytesCeiling: maxResponseBytesCeiling,
 		MaxTimeoutCeiling:       maxTimeoutCeiling,
@@ -113,6 +119,7 @@ func runLintCommand(args []string, stdout, stderr io.Writer) int {
 				FragmentsDir:            positional[0],
 				SchemaPath:              schemaPath,
 				UpstreamAllowlistPath:   allowlistPath,
+				ProviderProfilesPath:    providerProfilesPath,
 				MaxRequestBytesCeiling:  maxRequestBytesCeiling,
 				MaxResponseBytesCeiling: maxResponseBytesCeiling,
 				MaxTimeoutCeiling:       maxTimeoutCeiling,
