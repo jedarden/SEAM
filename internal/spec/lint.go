@@ -565,6 +565,11 @@ func metricsDeclaresModel(value any) bool {
 }
 
 func opaqueRequestBodyContent(document, requestBody map[string]any) (map[string]any, bool) {
+	if requestBody == nil {
+		// An operation that declares no requestBody has no reference to
+		// resolve and no schema to constrain the forwarded bytes.
+		return nil, true
+	}
 	seen := make(map[string]bool)
 	for requestBody != nil {
 		refValue, hasRef := requestBody["$ref"]

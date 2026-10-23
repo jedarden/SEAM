@@ -94,13 +94,14 @@ func TestLintAppliesProfileDefaultsBeforeOperatorControls(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "subq"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The acceptance fragment: profile + upstream + owner, nothing else.
+	// The acceptance fragment: profile + upstream + owner. The profile's
+	// usage-pointer default obliges the flat x-cost-per-call fallback; an
+	// above-ceiling x-max-request-bytes stays an operator-owned refusal.
 	const profileOnly = `x-seam-schema: v1
 x-seam-owner: subq
 x-provider-profile: openai-compatible
 x-upstream: https://api.subq.ai/v1
 x-cost-per-call: {amount: 0.001, unit: USD}
-x-max-request-bytes: 33554432
 paths:
   /chat/completions:
     post:
