@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // CredentialProbeConfig is the x-credential-probe configuration at the fragment root.
@@ -121,12 +121,18 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 		return nil, nil
 	}
 
+	// InjectAs and RequiredScope decode as raw nodes: the plan specifies
+	// injectAs as an object and requiredScope as an array with bare-string
+	// sugar, and neither documented form survives a decode straight into
+	// json.RawMessage / []string (the Phase 10 CRITICAL FAILURE). The
+	// documented forms are normalized by the shared helpers before the
+	// Go-typed handoff below.
 	var raw map[string]struct {
 		URL           string                 `yaml:"url" json:"url"`
 		VaultPath     string                 `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs      json.RawMessage        `yaml:"injectAs" json:"injectAs"`
+		InjectAs      yaml.Node              `yaml:"injectAs" json:"injectAs"`
 		Breaker       map[string]interface{} `yaml:"breaker" json:"breaker"`
-		RequiredScope []string               `yaml:"requiredScope" json:"requiredScope"`
+		RequiredScope yaml.Node              `yaml:"requiredScope" json:"requiredScope"`
 		ProbeInterval string                 `yaml:"probeInterval" json:"probeInterval"` // Phase 12
 	}
 
@@ -139,7 +145,16 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 		if strings.TrimSpace(value.URL) == "" {
 			return nil, fmt.Errorf("x-upstream-map entry %q is missing url", key)
 		}
-		injectAs, injectAsList, err := decodeInjectAsRaw(value.InjectAs)
+		requiredScopes, err := scopeListNode(&value.RequiredScope)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: requiredScope: %w", key, err)
+		}
+		injectNode := value.InjectAs
+		injectRaw, err := injectAsRaw(&injectNode)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
+		}
+		injectAs, injectAsList, err := decodeInjectAsRaw(injectRaw)
 		if err != nil {
 			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
 		}
@@ -170,7 +185,7 @@ func extractUpstreamMapWithProbeIntervals(operation *v3.Operation, pathItem *v3.
 			InjectAs:       injectAs,
 			InjectAsList:   injectAsList,
 			BreakerConfig:  breakerConfig,
-			RequiredScopes: value.RequiredScope,
+			RequiredScopes: requiredScopes,
 			ProbeInterval:  probeInterval,
 		}
 	}

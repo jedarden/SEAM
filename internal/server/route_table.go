@@ -1112,12 +1112,15 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 	if !ok || node == nil {
 		return nil, nil
 	}
+	// InjectAs and RequiredScope decode as raw nodes so the documented forms
+	// (injectAs object, requiredScope array with bare-string sugar) survive —
+	// see upstream_map_decode.go for the Phase 10 failure this closes.
 	var raw map[string]struct {
 		URL           string                 `yaml:"url" json:"url"`
 		VaultPath     string                 `yaml:"vaultPath" json:"vaultPath"`
-		InjectAs      json.RawMessage        `yaml:"injectAs" json:"injectAs"`
+		InjectAs      yaml.Node              `yaml:"injectAs" json:"injectAs"`
 		Breaker       map[string]interface{} `yaml:"breaker" json:"breaker"`
-		RequiredScope []string               `yaml:"requiredScope" json:"requiredScope"`
+		RequiredScope yaml.Node              `yaml:"requiredScope" json:"requiredScope"`
 	}
 	if err := node.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("x-upstream-map must be an object: %w", err)
@@ -1127,7 +1130,16 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 		if strings.TrimSpace(value.URL) == "" {
 			return nil, fmt.Errorf("x-upstream-map entry %q is missing url", key)
 		}
-		injectAs, injectAsList, err := decodeInjectAsRaw(value.InjectAs)
+		requiredScopes, err := scopeListNode(&value.RequiredScope)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: requiredScope: %w", key, err)
+		}
+		injectNode := value.InjectAs
+		injectRaw, err := injectAsRaw(&injectNode)
+		if err != nil {
+			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
+		}
+		injectAs, injectAsList, err := decodeInjectAsRaw(injectRaw)
 		if err != nil {
 			return nil, fmt.Errorf("x-upstream-map entry %q: %w", key, err)
 		}
@@ -1148,7 +1160,7 @@ func extractUpstreamMap(operation *v3.Operation, pathItem *v3.PathItem, document
 			InjectAs:       injectAs,
 			InjectAsList:   injectAsList,
 			BreakerConfig:  breakerConfig,
-			RequiredScopes: value.RequiredScope,
+			RequiredScopes: requiredScopes,
 		}
 	}
 	return result, nil
@@ -2220,27 +2232,62 @@ func (route RouteEntry) GetFanOutInstanceCount() int {
 	return len(route.UpstreamMap)
 }
 
+// extractFanoutScope decodes x-fanout-scope into per-instance scope
+// constraints. The plan documents the fragment-root form as a scope string or
+// array ("refused `_all` under the ordinary stage-5 rules"), which gates every
+// instance; it lands under the reserved `_default` key the fan-out scope check
+// already falls back to. The per-instance object form keeps its two accepted
+// value shapes: a scopes array and a {scopes: [...]} object.
 func extractFanoutScope(operation *v3.Operation, pathItem *v3.PathItem, document *v3.Document) (map[string][]string, error) {
 	node, ok := firstExtension(operation, pathItem, document, "x-fanout-scope")
 	if !ok || node == nil {
 		return nil, nil
 	}
-	var raw map[string]struct {
-		Scopes []string `yaml:"scopes" json:"scopes"`
-	}
-	if err := node.Decode(&raw); err != nil {
-		return nil, fmt.Errorf("x-fanout-scope must be an object: %w", err)
-	}
-	result := make(map[string][]string, len(raw))
-	for instanceID, scopeEntry := range raw {
-		if len(scopeEntry.Scopes) == 0 {
-			return nil, fmt.Errorf("x-fanout-scope entry %q: scopes array cannot be empty", instanceID)
+	switch node.Kind {
+	case yaml.ScalarNode, yaml.SequenceNode:
+		scopes, err := scopeListNode(node)
+		if err != nil {
+			return nil, fmt.Errorf("x-fanout-scope: %w", err)
 		}
-		scopes := make([]string, len(scopeEntry.Scopes))
-		copy(scopes, scopeEntry.Scopes)
-		result[instanceID] = scopes
+		if len(scopes) == 0 {
+			return nil, fmt.Errorf("x-fanout-scope: scope list cannot be empty")
+		}
+		return map[string][]string{"_default": scopes}, nil
+	case yaml.MappingNode:
+		var raw map[string]yaml.Node
+		if err := node.Decode(&raw); err != nil {
+			return nil, fmt.Errorf("x-fanout-scope must be an object: %w", err)
+		}
+		result := make(map[string][]string, len(raw))
+		for instanceID, valueNode := range raw {
+			var scopes []string
+			switch valueNode.Kind {
+			case yaml.SequenceNode:
+				decoded, err := scopeListNode(&valueNode)
+				if err != nil {
+					return nil, fmt.Errorf("x-fanout-scope entry %q: %w", instanceID, err)
+				}
+				scopes = decoded
+			case yaml.MappingNode:
+				var scopeEntry struct {
+					Scopes []string `yaml:"scopes" json:"scopes"`
+				}
+				if err := valueNode.Decode(&scopeEntry); err != nil {
+					return nil, fmt.Errorf("x-fanout-scope entry %q: %w", instanceID, err)
+				}
+				scopes = scopeEntry.Scopes
+			default:
+				return nil, fmt.Errorf("x-fanout-scope entry %q: must be a scope array or {scopes: [...]} object", instanceID)
+			}
+			if len(scopes) == 0 {
+				return nil, fmt.Errorf("x-fanout-scope entry %q: scopes array cannot be empty", instanceID)
+			}
+			result[instanceID] = scopes
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("x-fanout-scope must be a scope string, scope array, or per-instance object")
 	}
-	return result, nil
 }
 
 // extractRequiredScopes extracts the x-required-scope extension from operation.
