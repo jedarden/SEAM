@@ -1,11 +1,20 @@
 # Kubernetes API Proxy Route Fragment
 # Phase 5.2: Nine-cluster x-upstream-map with per-instance credentials
+# (ten entries since 2026-10-23: agent-sandbox added, deployed 2026-10-12)
 # Multi-instance Kubernetes API proxy with observer/admin access patterns
 x-seam-schema: v1
 x-seam-owner: k8s
 x-api-version: v1
 x-instance-param: cluster
 x-upstream-map:
+  agent-sandbox:
+    url: http://traefik-agent-sandbox:8001
+    plaintext: acknowledged
+    vaultPath: seam/routes/k8s/agent-sandbox-observer-token
+    injectAs:
+      kind: bearer
+    probeInterval: 1h
+    requiredScope: k8s-ro:get
   ardenone-cluster:
     url: http://traefik-ardenone-cluster:8001
     plaintext: acknowledged
@@ -87,12 +96,12 @@ info:
   description: |
     Multi-instance Kubernetes API proxy with per-instance credential injection.
 
-    This fragment routes to nine Kubernetes clusters via x-upstream-map:
-    - Eight observer endpoints (read-only, long-lived SA tokens)
+    This fragment routes to ten Kubernetes clusters via x-upstream-map:
+    - Nine observer endpoints (read-only, long-lived SA tokens)
     - One rs-manager admin endpoint (in-cluster Service DNS, ~3-day OIDC token)
 
     Path parameter {cluster} selects the target instance. Reserved names:
-    - _all: Fan-out to all nine instances and merge responses
+    - _all: Fan-out to all ten instances and merge responses
     - _default: Routes to rs-manager-admin (primary admin endpoint)
 
     Observer endpoints use http:// over Tailscale VPN with plaintext acknowledgement.
