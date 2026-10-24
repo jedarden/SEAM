@@ -155,6 +155,10 @@ func TestCaptureLatencyUnderLoad(t *testing.T) {
 
 // TestCaptureLatencyByPayloadSize tests latency with different payload sizes
 func TestCaptureLatencyByPayloadSize(t *testing.T) {
+	if raceEnabled {
+		t.Skip("latency budget is not meaningful under -race: instrumentation overhead dominates and is non-uniform across payload sizes")
+	}
+
 	payloadSizes := []struct {
 		name         string
 		requestSize  int
