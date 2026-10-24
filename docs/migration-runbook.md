@@ -1,7 +1,7 @@
 # SEAM Migration Runbook — Legacy Proxy → SEAM Cutover
 
 **Version:** 1.0
-**Last Updated:** 2026-08-15
+**Last Updated:** 2026-10-24
 **Purpose:** The per-service playbook for cutting a legacy proxy (the ArgoCD
 read-only proxy, the z.ai/GLM and twitterapi.io proxies, the kubectl-proxy
 fleet) over to SEAM with no downtime, validating behavior equivalence before
@@ -510,8 +510,12 @@ bead) — restoring it is then a paste, and the bead is the audit trail.
 ### kubectl-proxy fleet (Phase 5)
 
 - **One parametrized multi-instance fragment**, `x-instance-param: cluster`,
-  declaring `/k8s/{cluster}/…`; the nine-entry upstream map and the
-  per-instance allowlist lines are fixed by the plan (Phase 5).
+  declaring `/k8s/{cluster}/…`; the upstream map (nine entries when this
+  runbook was written; ten since 2026-10-23, when agent-sandbox
+  `traefik-agent-sandbox:8001` joined the fleet) and the per-instance
+  allowlist lines are fixed by the plan (Phase 5). The live width is owned
+  by the plan's named kubectl-proxy target set — reference it rather than
+  restating a count here (amended 2026-10-24, bead `seam-0026e645`).
 - **Corpora are per-cluster** (`corpus/kubectl-proxies/<cluster>/`) —
   equivalence must hold per cluster, because each incumbent proxy is its
   own deployment with its own RBAC. A fleet-wide corpus pass is the
