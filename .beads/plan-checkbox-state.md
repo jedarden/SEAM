@@ -1,308 +1,260 @@
-# SEAM Plan.md Checkbox State Report
-
-**Generated:** 2026-09-02  
-**Source:** `.beads/plan-checkbox-extraction.md`  
-**Plan File:** `docs/plan/plan.md`
-
----
-
-## Executive Summary
-
-| Metric | Count |
-|--------|-------|
-| **Total Checkboxes** | 17 |
-| **Complete [x]** | 6 |
-| **Incomplete [ ]** | 11 |
-| **Completion Rate** | 35.3% |
-
----
-
-## Per-Phase Breakdown
-
-### Complete Phases [x] — 6 total
-
-| Phase | Line | Description |
-|-------|------|-------------|
-| **Phase 6a** | 891 | Deploy SEAM to rs-manager via declarative-config (deployment, ConfigMaps, ServiceAccount, OpenBao login, Tailscale node, probes, metrics) |
-| **Phase 8** | 912 | Version migration tooling (deprecation/sunset headers, adapter schema, version-aware route docs, per-version metrics, /changes diff) |
-| **Phase 9b** | 949 | Fragment authoring convenience (`seam diff` and `seam import --from-url`) |
-| **Phase 11** | 959 | Passive route health (three-state rendering, circuit breaker, structured 503, x-breaker config) |
-| **Phase 13** | 961 | Per-route guards (loop breaker, cost governor with budget tracking, dry-run mode) |
-| **Phase 14** | 962 | Non-tailnet (foreign-worker) ingress authentication (JWT validation, scope mapping, header stripping, default-deny) |
-
----
-
-### Incomplete Phases [ ] — 11 total
-
-| Phase | Line | Status | Blocker Type |
-|-------|------|--------|--------------|
-| **Phase 1a** | 868 | ⚠️ INCOMPLETE | Foundation work — HTTP server, configuration, basic endpoints |
-| **Phase 1b** | 881 | ⚠️ INCOMPLETE | Fragment merge, schema validation, collision detection |
-| **Phase 2** | 882 | ⚠️ INCOMPLETE | Secret injection, OpenBao client, upstream allowlists |
-| **Phase 3** | 888 | ⚠️ INCOMPLETE | ConfigMap-mounted fragments, hot reload (3/6 criteria pass) |
-| **Phase 4** | 889 | ⚠️ INCOMPLETE | z.ai/GLM and twitterapi.io proxy fragments — not mounted, no secrets |
-| **Phase 5** | 890 | ⚠️ INCOMPLETE | kubectl-proxy multi-instance fragment — missing cluster, schema bugs, 6 missing Tailscale Connectors |
-| **Phase 6b** | 896 | 🚫 BLOCKED | Agent cutover — YAML fragments cannot load (binary treats YAML as JSON) |
-| **Phase 7** | 897 | ⚠️ INCOMPLETE | Per-agent tool scoping — NEEDLE-side tsnet identity, scope enforcement |
-| **Phase 9a** | 931 | ❓ NO EVIDENCE | `seam lint` CI gate — evidence file does not exist |
-| **Phase 10** | 950 | 🚫 CRITICAL FAILURE | Multi-instance routes — SEAM crashes on startup (duplicate /whoami route) |
-| **Phase 12** | 960 | ⚠️ CANNOT VERIFY | Credential health sentinel — compilation failure (99 errors), blocked from runtime testing |
-
----
-
-## Detailed Phase Status
-
-### 🔴 Critical Blockers
-
-#### Phase 6b: Agent Cutover
-- **Status:** BLOCKED
-- **Issue:** YAML fragments cannot load — binary treats YAML as JSON
-- **Error:** `invalid character '#' looking for beginning of value`
-- **Impact:** Production fragments (ArgoCD, k8s, test-service) fail; service-by-service cutover cannot proceed
-
-#### Phase 10: Multi-instance Routes
-- **Status:** CRITICAL FAILURE
-- **Issue:** SEAM crashes on startup with duplicate `/whoami` route registration
-- **Impact:** Runtime verification blocked; code-level implementation exists but cannot be exercised
-- **Evidence:** `.beads/phase10-evidence.md`
-
-#### Phase 12: Credential Health Sentinel
-- **Status:** CANNOT VERIFY ACCEPTANCE
-- **Issue:** Code compilation failure (99 errors accumulated since 2026-08-30)
-- **Impact:** Runtime verification requires Kubernetes cluster, OpenBao instance, configured fragments — all blocked by compilation issues
-- **Evidence:** `.beads/phase12-evidence.md`
-
----
-
-### ⚠️ Incomplete Foundation Phases
-
-#### Phase 1a: Gateway Scaffold
-- **Status:** INCOMPLETE
-- **Deliverables:** HTTP server, configuration (env-var/flag knobs), two listener ports (8080 caller-facing, 8081 operator-only), `/docs`, `/openapi.json`, request validation, response headers, health endpoints
-- **Blocks:** All subsequent phases depend on this foundation
-
-#### Phase 1b: Fragment Merge
-- **Status:** INCOMPLETE  
-- **Deliverables:** OpenAPI merge from static directory, schema validation, collision detection, quarantine + `/config/status`, reserved control-plane path rejection, owner disagreement quarantine
-- **Gate:** Discharged (route-fragment schema shipped 2026-08-06)
-
-#### Phase 2: Secret Injection
-- **Status:** INCOMPLETE
-- **Deliverables:** OpenBao Kubernetes auth, vault-path allowlist, upstream-host allowlist, x-vault-path/x-inject-as handling, upstream path computation, strip-then-inject hardening, x-upstream-tls handling, 30-second secret cache, request-body tee (1 MiB default), secret-echo scrubbing, secret-store outage behavior
-- **Dependencies:** Phase 1a, 1b
-
----
-
-### ⚠️ Incomplete Integration Phases
-
-#### Phase 3: ConfigMap-Mounted Route Fragments
-- **Status:** INCOMPLETE (3/6 criteria pass, 2/6 fail, 1/6 blocked)
-- **Issue:** Hot reload flag exists but is NOT enabled in deployment.yaml
-- **Impact:** Fragment lifecycle cannot be verified without hot reload
-- **Note:** Umbrella bead closed prematurely without demonstrating acceptance against running binary
-
-#### Phase 4: Onboard z.ai/GLM and twitterapi.io Proxies
-- **Status:** INCOMPLETE
-- **Issues:**
-  - Fragment YAML files exist but are NOT mounted in deployment
-  - Routes not served
-  - OpenBao secrets do not exist
-  - Credential injection cannot be demonstrated
-- **Significance:** First phase to prove end-to-end credential injection against real credentials
-
-#### Phase 5: Kubectl-Proxy Multi-Instance Fragment
-- **Status:** INCOMPLETE
-- **Issues:**
-  - Missing `iad-native-ads` cluster from both upstream map and allowlist
-  - Schema validation bug prevents fragment loading
-  - YAML parsing bug prevents ANY fragments from loading
-  - Missing 6 Tailscale Connectors
-  - Nine-cluster requirement not met
-- **Requirement:** Each of eight bare-MagicDNS hosts must be added to `seam-upstream-allowlist`
-
----
-
-### ⚠️ Incomplete Advanced Features
-
-#### Phase 7: Per-Agent Tool Scoping
-- **Status:** INCOMPLETE
-- **Issues:**
-  - NEEDLE-side tsnet identity provisioning uses placeholder test mode
-  - Real Tailscale LocalClient WhoIs integration is TODO
-  - No running binary to test acceptance criteria
-  - Scope filtering, 404/403 oracle, per-instance scope enforcement, and operator gating cannot be verified without runtime testing
-- **Deliverables:** Per-worker tsnet identity, x-required-scope tagging, Grant-based enforcement, `/whoami`, `/scopes` endpoints
-
-#### Phase 9a: `seam lint` CI Gate
-- **Status:** NO EVIDENCE
-- **Issue:** Evidence file does not exist (`.beads/phase-verdict-summary.md`)
-- **Deliverables:** CLI validation of fragment schema, collision detection, vault-path allowlist, upstream-host allowlist, reserved control-plane path rejection, x-unscrubbable flagging
-
----
-
-### ✅ Complete Phases
-
-#### Phase 6a: Deploy SEAM to rs-manager
-- **Status:** COMPLETE
-- **Verified:** 8/10 criteria verified PASS (deployment, ConfigMaps, ServiceAccount, OpenBao login, Tailscale node, probes, metrics, ports/base URL)
-- **Manual Verification Required:** 2 criteria (tag-restricted ACL grant, two-listener ACL split)
-
-#### Phase 8: Version Migration Tooling
-- **Status:** VERIFIED COMPLETE
-- **Verified:** All 7 completion criteria PASS (code-level + binary test)
-- **Deliverables:** Deprecation/Sunset headers, adapter schema, version-aware route docs, per-version metrics, /changes diff endpoint, x-adapter validation
-
-#### Phase 9b: Fragment Authoring Convenience
-- **Status:** COMPLETE
-- **Verified:** Both `seam diff` and `seam import --from-url` fully implemented with comprehensive test coverage
-
-#### Phase 11: Passive Route Health
-- **Status:** VERIFIED COMPLETE
-- **Verified:** All 6 completion criteria PASS via code examination and comprehensive test coverage
-- **Deliverables:** Three-state rendering, circuit breaker policy, failure definition, backoff schedule, structured 503, x-breaker configuration
-
-#### Phase 13: Per-Route Guards
-- **Status:** VERIFIED COMPLETE
-- **Verified:** All 3 completion criteria PASS based on code and test inspection
-- **Deliverables:** Loop breaker (429s), cost governor accounting, dry-run mode
-- **Note:** Go compiler unavailable prevented runtime testing, but test coverage validates implementation
-
-#### Phase 14: Non-Tailnet Ingress Authentication
-- **Status:** COMPLETE
-- **Verified:** All 4 completion criteria implemented with comprehensive test coverage (35 tests total)
-- **Rules:**
-  - Rule 1 (JWT validation) ✅ PASS
-  - Rule 2 (scope mapping) ✅ PASS  
-  - Rule 3 (header stripping) ✅ PASS
-  - Rule 4 (default-deny) ✅ PASS
-
----
-
-## Phase Completion Timeline
-
-| Phase | Status | Evidence File | Verification Date |
-|-------|--------|---------------|-------------------|
-| 1a | ⚠️ INCOMPLETE | N/A | N/A |
-| 1b | ⚠️ INCOMPLETE | N/A | N/A |
-| 2 | ⚠️ INCOMPLETE | N/A | N/A |
-| 3 | ⚠️ INCOMPLETE | `.beads/phase3-evidence.md` | 2026-09-01 |
-| 4 | ⚠️ INCOMPLETE | `.beads/phase4-evidence.md` | 2026-09-01 |
-| 5 | ⚠️ INCOMPLETE | `.beads/phase5-evidence.md` | 2026-09-01 |
-| 6a | ✅ COMPLETE | `.beads/phase6a-evidence.md` | 2026-09-01 |
-| 6b | 🚫 BLOCKED | `.beads/phase6b-evidence.md` | 2026-09-01 |
-| 7 | ⚠️ INCOMPLETE | `.beads/phase7-evidence.md` | 2026-09-01 |
-| 8 | ✅ COMPLETE | `.beads/phase8-evidence.md` | 2026-09-01 |
-| 9a | ❓ NO EVIDENCE | `.beads/phase-verdict-summary.md` | 2026-09-01 |
-| 9b | ✅ COMPLETE | `.beads/phase9b-evidence.md` | 2026-09-01 |
-| 10 | 🚫 CRITICAL FAILURE | `.beads/phase10-evidence.md` | 2026-09-01 |
-| 11 | ✅ COMPLETE | `.beads/phase11-evidence.md` | 2026-09-01 |
-| 12 | ⚠️ CANNOT VERIFY | `.beads/phase12-evidence.md` | 2026-09-01 |
-| 13 | ✅ COMPLETE | `.beads/phase13-evidence.md` | 2026-09-01 |
-| 14 | ✅ COMPLETE | `.beads/phase14-evidence.md` | 2026-09-01 |
-
----
-
-## Key Observations
-
-### 1. Foundation Gaps
-The three foundational phases (1a, 1b, 2) are all incomplete, which creates cascading dependencies:
-- No gateway scaffold means no deployment surface
-- No fragment merge means no route table
-- No secret injection means no credential security
-
-### 2. Binary Runtime Issues
-Multiple phases report fundamental problems with the SEAM binary:
-- **YAML parsing:** Binary treats YAML as JSON, breaking all production fragments
-- **Startup crash:** Duplicate `/whoami` route registration prevents Phase 10 testing
-- **Compilation failure:** 99 errors accumulated since 2026-08-30 blocks Phase 12
-
-### 3. Verification Disconnect
-Several phases show evidence of implementation completion but cannot verify at runtime:
-- Phase 11, 13, 14: Comprehensive test coverage validates implementation, but no running binary available for integration testing
-- Phase 6a: 8/10 criteria verified via code inspection, but 2 ACL criteria require manual verification
-
-### 4. Missing Infrastructure
-Several phases require infrastructure that doesn't exist:
-- Phase 3: Hot reload not enabled in deployment
-- Phase 4: OpenBao secrets don't exist
-- Phase 5: 6 Tailscale Connectors missing, one cluster omitted from allowlist
-- Phase 7: Real Tailscale LocalClient WhoIs integration is TODO
-
-### 5. Evidence Gaps
-- Phase 9a: No evidence file exists, status marked "NO EVIDENCE"
-
----
-
-## Recommendations
-
-### Immediate Priorities
-
-1. **Fix YAML parsing** (blocks Phase 6b and all fragment-dependent phases)
-   - Binary currently treats YAML as JSON
-   - Prevents loading of production fragments
-
-2. **Resolve startup crash** (blocks Phase 10)
-   - Duplicate `/whoami` route registration
-   - Prevents runtime verification of multi-instance routes
-
-3. **Address compilation failures** (blocks Phase 12)
-   - 99 errors accumulated since 2026-08-30
-   - Prevents building and testing the binary
-
-### Foundation Work
-
-4. **Complete Phase 1a** (Gateway scaffold)
-   - Foundation for all subsequent phases
-   - Enables deployment surface
-
-5. **Complete Phase 1b** (Fragment merge)
-   - Required for all fragment-based routing
-   - Schema validation and collision detection
-
-6. **Complete Phase 2** (Secret injection)
-   - Required for credential security
-   - Enables OpenBao integration
-
-### Infrastructure Setup
-
-7. **Enable hot reload** (Phase 3)
-   - Currently exists as flag but not enabled in deployment
-   - Required for fragment lifecycle testing
-
-8. **Create OpenBao secrets** (Phase 4)
-   - Required for credential injection testing
-   - Enables end-to-end verification
-
-9. **Add missing Tailscale Connectors** (Phase 5)
-   - 6 connectors missing
-   - Required for multi-cluster kubectl-proxy
-
-### Verification Infrastructure
-
-10. **Establish runtime testing environment**
-    - Multiple phases cannot verify without running binary
-    - Need Kubernetes cluster, OpenBao instance, configured fragments
-
-11. **Create Phase 9a evidence file**
-    - Current status: "NO EVIDENCE"
-    - Need verification of `seam lint` CI gate implementation
-
----
-
-## Conclusion
-
-SEAM plan implementation shows **35.3% completion** (6/17 phases complete). The project faces significant challenges:
-
-- **Foundation work incomplete:** Core phases 1a, 1b, 2 not delivered
-- **Binary runtime issues:** YAML parsing, startup crashes, compilation failures
-- **Infrastructure gaps:** Missing hot reload enablement, OpenBao secrets, Tailscale Connectors
-- **Verification blocked:** No runtime testing environment prevents acceptance testing
-
-**Critical path:** Fix YAML parsing → resolve startup crash → address compilation failures → complete foundation phases → establish infrastructure → enable verification.
-
-Positive indicators:
-- 6 phases show strong implementation with comprehensive test coverage
-- Evidence files exist for all verifiable phases
-- Code-level implementations are thorough and well-tested
-
-The project requires focused attention on foundational binary issues and infrastructure setup before additional feature phases can be meaningfully verified.
+# SEAM plan.md — Checkbox State Extraction
+
+**Generated:** 2026-09-18 10:26 UTC  
+**Source:** `docs/plan/plan.md` @ local HEAD `2b9a753` (checkbox lines identical in working tree and HEAD)  
+**Bead:** seam-7fdee15d — extraction only, no mapping/assessment.  
+Supersedes the 2026-09-02 assessment-style file previously at this path (that version remains in git history).
+
+## Summary
+
+| Metric | Value |
+|---|---|
+| Total checkboxes | 17 |
+| Ticked `[x]` | 6 |
+| Unticked `[ ]` | 11 |
+| Enclosing section | `Implementation Phases` |
+| Plan ship order (line 800) | `1a → 1b → 9a → 2 → 6a → 3 → 4 → 10 → 5 → 11 → 13 → 6b → 7 → 12 → 8 → 9b → 14` |
+
+## Items
+
+### Ticked `[x]` — 6
+
+#### Phase 6a — line 891
+
+- **state:** `[x]` — ticked
+- **line:** 891
+- **phase:** 6a
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 6a: Deploy SEAM to rs-manager via declarative-config — single replica per Version Migration Strategy §1, **the per-service route `configMap` volumes and their `kustomization.yaml`, generated by kustomize `configMapGenerator` with `disableNameSuffixHash: true` so ConfigMap generation is name-stable** (Architecture; the fixed `seam-routes-<svc>` name is what each volume references and what the owner chain and `seam lint` walk — a content-hash suffix would break both), the Kubernetes **ServiceAccount** and its projected SA-token volume plus the **first end-to-end proof that OpenBao Kubernetes auth logs in from inside a real pod** (the *role and policy themselves* are a Phase 2 precondition, moved earlier — see Phase 2), a Tailscale node, the tag-restricted ACL grant in the tailnet policy file (Pre-Phase-7 Trust Boundary), **the Kubernetes liveness and readiness probes wired to `/_seam/healthz` and `/_seam/readyz` on the caller-facing port** (added 2026-07-20 — §1's "readiness-gated rollout" is a promise no manifest kept until this line existed; the endpoints ship in 1a, the probe stanzas that make the gate real ship here, and `terminationGracePeriodSeconds` is set here too, since it is the dominant term in the deploy gap §1 now sizes honestly), and **the metrics scrape config or `ServiceMonitor` pointing VictoriaMetrics at `/_seam/metrics` on the operator port** (Hosting). **SEAM's concrete listener port numbers — caller-facing `8080`, operator `8081` — and its configured caller-facing base URL, from which the merged spec's `servers:` is populated** (Gateway Configuration), are set here: the base URL is the caller port's external address, never the operator port and never an upstream host. The scrape is not a nice-to-have: from Phase 8 the per-route-version counter it collects is the *only* durable substrate for retirement (§2), so an unscraped SEAM makes `seam-retirement-evaluator` unbuildable rather than merely unobservable. **The ACL grant is written against the two-listener split from Phase 1a, not against the node as a whole** (decided 2026-07-20): the caller-facing proxy port is granted to the worker tags, and the operator port carrying `/config/status`, `/health/credentials` and `/health/upstreams` is granted *only* to the operator source set. A single node-wide grant would hand every caller the fleet inventory these two tiers exist to separate, during exactly the Phases 1b-6b window in which no scope check can yet refuse them. **COMPLETE — verified 2026-09-01** (`.beads/phase6a-evidence.md`): 8/10 criteria verified pass (deployment, ConfigMaps, ServiceAccount, OpenBao login, Tailscale node, probes, metrics, ports/base URL); 2 criteria require manual ACL verification (tag-restricted ACL grant, two-listener ACL split).
+```
+
+#### Phase 8 — line 912
+
+- **state:** `[x]` — ticked
+- **line:** 912
+- **phase:** 8
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 8: Version migration tooling — **conditional `Deprecation`/`Sunset` header emission** for fragments marked `x-seam-deprecated` (or per-operation `deprecated: true`): `Deprecation` is emitted from the moment the marker lands, carrying the object's required `since`; `Sunset` is emitted **only** when the author supplied an advisory `sunset`, or once the quiet window has actually opened and the adopted window (fixed under "Retirement workflow" below) resolves to a date — and is **omitted entirely** before then, because retirement here is deliberately dateless and there is no date to emit (Data Models, `x-seam-deprecated`). Plus the `x-adapter` schema and its closed transform vocabulary, the request/response transform executor in the proxy path, `seam lint` validation of adapter blocks, `X-SEAM-API-Version` selection defaulting to the **oldest** still-served version, **the version-aware half of `/docs/route`** — `?version=` as a real selector over live versions (in 1a it accepts only `_unversioned`), the `canonicalVersion` / `deprecated` / `versions[]` fields with a per-entry `docsUrl` for every coexisting version, and the requirement that every SEAM-generated pointer carry `&version=` equal to the version that **actually served that request** rather than the sole version that exists (assigned here 2026-07-20; see Phase 1a, which ships the endpoint itself with `?path=`/`?method=` only) — the per-route-version request-count metric **exported at `/_seam/metrics` on the operator port and scraped into VictoriaMetrics** (Phase 1a ships the endpoint, Phase 6a the scrape config; this phase adds the series and is what makes the store's retention window load-bearing, per §2), and the `/changes?since=<spec-version>` diff endpoint backed by a ring buffer of prior merged specs (see Version Migration Strategy above). Adapters are declarative fragment YAML — **never gateway Go code**, so a contract migration stays a ConfigMap edit. **VERIFIED COMPLETE — verified 2026-09-01** (`.beads/phase8-evidence.md`): all 7 completion criteria verified PASS (code-level verification + binary test; deprecation/sunset headers, adapter schema, version-aware route docs, per-version request count metric, /changes diff endpoint, x-adapter validation); comprehensive test coverage validates implementation correctness.
+```
+
+#### Phase 9b — line 949
+
+- **state:** `[x]` — ticked
+- **line:** 949
+- **phase:** 9b
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 9b: Fragment authoring convenience — `seam diff` (renders the effective merged-spec change a PR would cause) and `seam import --from-url` (bootstraps a fragment from an upstream's own published OpenAPI spec, filtered to selected paths/verbs). Genuinely deferrable: these make fragment authoring pleasant, whereas 9a makes it safe. **COMPLETE — verified 2026-09-01** (`.beads/phase9b-evidence.md`): both `seam diff` and `seam import --from-url` fully implemented with comprehensive test coverage; all completion criteria met.
+```
+
+#### Phase 11 — line 959
+
+- **state:** `[x]` — ticked
+- **line:** 959
+- **phase:** 11
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 11: Passive route health — per-route last-2xx tracking surfaced in `/docs` **in the three-state rendering** (corrected 2026-07-20 — this named the older two-state one, which conflated *no attempt* with *no success* and therefore rendered the fleet's single worst route, called fifty times and failing every one, as "no attempt since last restart", i.e. untested-and-new): **no attempt since restart** → "no attempt since last restart"; **attempted, none successful** → "no success in N attempts since last restart", carrying the **last error** alongside it (free, since the breaker already tracks exactly that value per upstream origin for its structured 503) — this is the state that was previously invisible and the one an operator most needs; **at least one success** → "last succeeded 2m ago", with `source: probe` labeling a success that came from sentinel traffic. The last-success value stays intentionally empty in the first two states rather than carrying a sentinel timestamp. `/health/upstreams` renders the same three states on the same terms. Plus `/health/upstreams` aggregation, and the **per-upstream circuit breaker under the default policy specified in Passive Route Health, which owns it** — the failure definition (transport faults and 5xx only; no 4xx, no 401), the threshold and open duration, the evidence-based half-open rule, the backoff schedule and the derived `Retry-After` are all defined there and deliberately not restated here. This phase builds them, together with the rule that breaker state keys on the **resolved upstream origin** (per `x-upstream-map` entry for a multi-instance route) so one dead cluster opens exactly one breaker. Plus the structured 503 naming the upstream, when it started failing, the last error, and that retry-after — and **`x-breaker`** (Data Models), the fragment-root `{threshold, openSeconds, maxOpenSeconds, enabled}` tuning block with its per-instance `breaker` override, its same-origin conflict resolution (strictest values govern, disagreement named at `/config/status`), and its lint-flagged `enabled: false` opt-out. The breaker is **on by default** — unlike the cost governor and loop breaker, absence of the field is not "no guard". Depends on 1b and 2 (needs real proxied traffic). **VERIFIED COMPLETE — verified 2026-09-01** (`.beads/phase11-evidence.md`): all 6 completion criteria verified PASS via code examination and comprehensive test coverage (three-state rendering, circuit breaker policy, failure definition, backoff schedule, structured 503, x-breaker configuration).
+```
+
+#### Phase 13 — line 961
+
+- **state:** `[x]` — ticked
+- **line:** 961
+- **phase:** 13
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 13: Per-route guards — `x-loop-guard` loop breaker, `x-cost-per-call`/`x-quota` cost governor with `X-SEAM-Budget-Remaining`, `X-SEAM-Dry-Run` validation-only mode. **Both governor fields are object-valued and unit-bearing** — **`x-cost-per-call: {amount, unit}`** and **`x-quota: {amount, unit, window}`** (added to this deliverable list 2026-07-20, because an implementer building the scalar form this line previously implied would ship a governor with no unit and no reset period at all). **The full shape, the unit semantics, the tumbling restart-scoped `window` grammar and the four-field `X-SEAM-Budget-Remaining` format are specified once in Data Models, which owns them, and are deliberately not restated here.** What this phase owes is the *implementation* of all of it, plus enforcement of the two cross-field rules — **unit-match** and **`x-quota` requires `x-cost-per-call`** — as merge-time quarantines. **The loop breaker's `x-loop-guard: {maxRepeats, window}` shape, its success-reset rule (a 2xx on the same hash clears that hash's counter), and the 429's `Retry-After` (seconds until the current window closes) are likewise specified once in Data Models and not restated here** (added 2026-07-20, parallel to the governor deferral above). **The loop breaker's normalized request hash consumes the request-body tee and `maxReplayableRequestBytes` shipped in Phase 2** (recorded 2026-07-20 — the hash is defined over "the canonicalized body", and canonicalizing a body requires buffering it, so this phase would otherwise have inherited a dependency on a mechanism specified only as part of Phase 12, which ships **three ship-order positions later**): within the cap a JSON body is canonicalized (keys sorted, insignificant whitespace removed, RFC 8785-style) before hashing; above it the body is hashed over its streamed bytes without canonicalization, which is strictly coarser and can only make the guard **under**-match, never over-match (Per-Route Guards). This phase adds no buffer of its own and no new configuration knob. **Ships here without waiting for identity** (decided 2026-07-20): pre-Phase-7 the loop breaker keys on (route, request-hash) and `x-quota` is enforced as a single **route-wide** budget — strictly more conservative than per-caller enforcement, never less (see Per-Route Guards). Nothing in this phase enforces per-caller limits, and `X-SEAM-Budget-Remaining` is a fleet-wide fuel gauge, not a reservation, until Phase 7. Depends on 1b **and on Phase 2** (updated 2026-07-20 — this read "1b" alone, which was true while the request-body buffer belonged to no phase; the loop-breaker hash canonicalizes the request body and consumes Phase 2's tee, so the dependency is real even though the ship order already satisfies it). Phase 7 narrows both keys with no fragment change and no change to what thresholds mean. **VERIFIED COMPLETE — verified 2026-09-01** (`.beads/phase13-evidence.md`): all 3 completion criteria demonstrate PASS status based on code and test inspection (loop breaker 429s, cost governor accounting, dry-run mode); comprehensive test coverage provides strong evidence of correct implementation; Go compiler unavailable prevented runtime testing but tests demonstrate implementation correctness.
+```
+
+#### Phase 14 — line 962
+
+- **state:** `[x]` — ticked
+- **line:** 962
+- **phase:** 14
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 14: Non-tailnet (foreign-worker) ingress authentication — **the phase number this plan owed Per-Agent Tool Scoping point 7** (assigned 2026-07-20). That mode is decided in full detail — four non-negotiable security rules — and carries a phasing constraint ("lands as a distinct later phase of its own"), but had **no phase number, no checklist entry and no position in the ship order**, while this plan establishes that phase numbers are stable identifiers referenced from filed beads and states its own principle that "an unassigned deliverable is an unbuilt one". A fully-specified, security-critical auth mode with no phase is exactly that. (Approval-gated routes are also unphased, but are *explicitly acknowledged* as such; point 7 was not.) The deliverables are point 7's four rules, implemented verbatim and none of them per-deployment negotiable: **COMPLETE — verified 2026-09-01** (`.beads/phase14-evidence.md`): all 4 completion criteria implemented with comprehensive test coverage (35 tests total): Rule 1 (JWT validation) ✅ PASS, Rule 2 (scope mapping) ✅ PASS, Rule 3 (header stripping) ✅ PASS, Rule 4 (default-deny) ✅ PASS; static code analysis confirms implementation matches specification; tests cannot execute due to missing Go compiler but test coverage validates implementation.
+```
+
+### Unticked `[ ]` — 11
+
+#### Phase 1a — line 868
+
+- **state:** `[ ]` — unticked
+- **line:** 868
+- **phase:** 1a
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 1a: Gateway scaffold (Go, ADR-001) — HTTP server, configuration (the operator-owned env-var/flag knobs, and the two listener ports — caller-facing `8080`, operator-only `8081` — per Architecture's **Gateway Configuration** subsection), container build, plus `/docs`, `/docs/{route}`, and `/openapi.json` served over a **hand-written whole spec** (no fragment merge yet), request validation with structured error responses, the `X-SEAM-Spec-Version` **and `X-SEAM-API-Version`** response headers (the latter constant at `_unversioned` until Phase 8 — see below), and the **`/_seam/healthz`, `/_seam/readyz` and `/_seam/metrics`** endpoints (see below). Genuinely unblocked today: it needs the language decision (ADR-001) and nothing else. Ships the reserved control-plane namespace as a *routing* rule — and the rule is the **whole control-plane branch, not merely the match** (extended 2026-07-20 — "control-plane paths resolve before any route table" named stage 1 alone and left the branch's other three steps unassigned, while Architecture's "where a control-plane request goes after stage 1" specifies a stage-1 match as a branch rather than an exit): a control-plane hit runs **stage 1 → stage 2 (inbound sanitation) → stage 3 (identity resolution) → control-plane authorization → short-circuit before stage 4**, so no route table is ever consulted and stages 4 and 6-11 never run. 1a owns the *routing* half of that — the branch itself, stages 1-2, and the short-circuit — which is buildable with no identity and no scopes; **stage 3's resolution and the control-plane authorization step are inert until Phase 7, which owns their enforcement**, with the listener-port split below standing in their place until then. Also ships the **two-listener split**: the operator-only surface (`/config/status`, `/health/credentials`, `/health/upstreams`) binds to its own listener port, separate from the caller-facing proxy port (Fragment Toolchain, "who may *call* the control plane"). **The split lands in 1a rather than 6a** (decided 2026-07-20) because it is a property of the binary's own listener wiring, not of the cluster it runs in: Phase 1b ships `/config/status`, the first operator endpoint, so binding the split any later would mean birthing control-plane endpoints on the caller port and re-routing them afterwards — and a port that exists from the first commit is one no phase can forget to create. 6a adds the ACL grant that turns the split into a boundary; 1a only guarantees there are two ports to grant separately.
+```
+
+#### Phase 1b — line 881
+
+- **state:** `[ ]` — unticked
+- **line:** 881
+- **phase:** 1b
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 1b: Fragment merge — OpenAPI merge from a static local directory, per-fragment schema validation, collision detection on the (path, method, `x-api-version`) triple, quarantine + `/config/status`, runtime rejection of fragments declaring a reserved control-plane path (Fragment Toolchain rule 3), and **quarantine of any fragment whose `x-seam-owner` disagrees with the mounted parent directory it was loaded from, or that omits the field entirely** (Architecture; corrected 2026-07-20 from "the basename it was loaded under" — the authoritative binding is the **parent directory**, since a service ships N fragment files into one owner directory and the basename is free-form and load-bearing for nothing). The owner check lands here, with the other merge-time quarantine rules, even though the `x-vault-path` prefix it ultimately guards does not arrive until Phase 2: at 1b the "mounted parent directory" is simply the **containing directory** of the local file, which is enough to prove the mismatch-quarantines-whole-fragment behavior — and to prove it with N files under one directory — before any volume mount or secret exists to get it wrong (the owner check is against the mount, not a projection). **Gated on the route-fragment schema** (bead `seam-e9801fe5`, legacy `bf-2wt` — shipped 2026-08-06 as `spec/route-fragment-schema.json`, gate discharged; this phase's umbrella `seam-1fb37454` is closed) — that schema was the critical path, not the language choice; see ADR-001 Consequences. Still no secret injection or k8s — provable standalone.
+```
+
+#### Phase 2 — line 882
+
+- **state:** `[ ]` — unticked
+- **line:** 882
+- **phase:** 2
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 2: Secret injection — OpenBao client authenticating via **Kubernetes auth** with the `rs-manager/rs-manager/seam/routes/*` path allowlist and per-service co-ownership rule enforced at merge time (Architecture), **the peer `x-upstream` / `x-upstream-map`-entry upstream-host allowlist** — the operator-owned, manifest-sourced set of permitted hosts and suffixes (`*.ts.net`, `*.ardenone.com`, `*.svc.cluster.local` plus explicitly enumerated public hosts), read from SEAM's own Deployment manifest and **never from a fragment**, re-checked by the gateway at merge time on every resolved upstream host with **fragment-wide quarantine** on violation and the offending host named at `/config/status`, IP-literal upstreams rejected outright, and no per-fragment opt-out (Architecture; added to this phase 2026-07-20 — the vault-path allowlist bounds *which secret* a fragment may name and this is the control that bounds *where that secret is sent*, and shipping injection without it means a correctly-filed, correctly-owned fragment can point its own permitted credential at an attacker-controlled host), `x-vault-path`/`x-inject-as` extension handling, **the SEAM-facing-path → upstream-path computation and its two rewrite fields — `x-upstream-path-template` (path-item-level, explicit, and it wins) and `x-upstream-strip-prefix` (fragment-root shorthand)** (added to this phase 2026-07-20 — the four-step rule is Data Models', under `x-upstream`, and it is what makes the *first real forward* land on the upstream's own path rather than on SEAM's: without it a `GET /argocd/api/v1/applications` forwards to `<upstream>/argocd/api/v1/applications` against a proxy that serves `/api/v1/applications`, so every fragment authored in Phase 3 would encode a different guess. Step 2, `{instance}`-segment deletion, has no subject until Phase 10 and lands there; steps 1, 3 and 4 ship here with the forward they make correct), strip-then-inject inbound hardening **of both namespaces SEAM writes into — headers *and* the injected query-parameter names, every occurrence deleted before injection** (Architecture), **`x-upstream-tls` handling** — per-fragment `caBundle` resolved against the manifest-owned `seam-upstream-ca` ConfigMap, `serverName` SNI override, `insecureSkipVerify: acknowledged` and `x-upstream-plaintext: acknowledged` honored and enumerated at `/config/status`, verification against the system trust store as the unconfigurable default — the 30-second secret cache TTL with eager 401 invalidation, **the inbound request-body tee and its `maxReplayableRequestBytes` limit (default 1 MiB)** — the buffer itself, not the retry that consumes it (assigned here 2026-07-20; the mechanism is specified in Credential Health Sentinel and the 401 replay ships in Phase 12). It belongs with inbound request handling, beside the strip-then-inject and cache work already in this phase, and it must precede **both** its consumers rather than one of them: Phase 12 replays the buffered bytes on a 401, and **Phase 13's loop-breaker hash canonicalizes the request body, which cannot be done without buffering it** — and Phase 13 ships at ship-order position 11 against Phase 12's position 14, so leaving the buffer with the sentinel had the earlier consumer inheriting a dependency from three positions later. SEAM tees the body upstream as it streams and discards it as soon as the response status is known; above the cap, and for any body that cannot be replayed at all, the body streams through unbuffered and each consumer degrades exactly as its own section specifies. The limit is **independently configurable** and merely shares a default with `maxBufferedResponseBytes` — tuning one never moves the other. And **secret-echo scrubbing of responses** — buffered scan under the size cap, incremental scan with `len(secret)-1` carry-over overlap for chunked/event-stream bodies, headers and trailers included, and refusal to inject on unscrubbable or protocol-upgraded routes absent `x-unscrubbable: acknowledged` (Credential Health Sentinel). Scrubbing ships **here, with injection** — not with the sentinel — because otherwise the plan's one core guarantee is false for every echoing upstream from Phase 2 until Phase 12. **The secret-store outage behavior ships here too** (added 2026-07-22; specified in Architecture, secret-store outage behavior): the structured `secret-store-unavailable` 503, the no-stale-past-TTL rule, the per-path fetch hold-down, and the 401-refetch-failure degradation — all properties of the same cache and fetch path this phase builds.
+```
+
+#### Phase 3 — line 888
+
+- **state:** `[ ]` — unticked
+- **line:** 888
+- **phase:** 3
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 3: ConfigMap-mounted route fragments — per-service `configMap` volumes (one per service, each mounted whole at `/etc/gateway/routes.d/<svc>/`), in-process file-watch hot reload with atomic route-table swap (see Architecture), first fragment (**pilot: migrate the existing hand-rolled ArgoCD read-only proxy** — unmetered and read-only, so it needs neither the cost governor nor caller auth to be safe, the lowest blast radius available for a first fragment). **The pilot is a pass-through fragment carrying no injection** (GAP 8, decided 2026-07-20): the ArgoCD read-only proxy injects its own read-only bearer token server-side, so the fragment declares neither `x-vault-path` nor `x-inject-as` (a legal pass-through per Data Models) and exercises the fragment/reload/quarantine path, not secret injection — which is first proved end-to-end in Phase 4. **Precondition: the `seam lint` CI gate (9a) is live in declarative-config** — no fragment ships through an ungated path, including this one. **INCOMPLETE — verified 2026-09-01** (`.beads/phase3-evidence.md`): hot reload flag exists but is NOT enabled in deployment.yaml (3/6 criteria pass, 2/6 fail, 1/6 blocked); fragment lifecycle cannot be verified without hot reload; umbrella bead closed prematurely without demonstrating acceptance against a running binary.
+```
+
+#### Phase 4 — line 889
+
+- **state:** `[ ]` — unticked
+- **line:** 889
+- **phase:** 4
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 4: Onboard z.ai/GLM proxy and twitterapi.io proxy fragments (both already reachable from rs-manager — no new Tailscale Connector needed). **This is the phase where credential injection is first proved end-to-end against a real credential** (noted 2026-07-20 — the Phase 3 pilot is a pass-through that injects nothing, so z.ai/GLM and twitterapi.io, which both require an injected secret, are the first fragments to exercise the full `x-vault-path` → `x-inject-as` injection path shipped in Phase 2). Both are metered, so no agent is cut over onto them until Phase 13's cost governor is live (see 6b). **INCOMPLETE — verified 2026-09-01** (`.beads/phase4-evidence.md`): fragment YAML files exist but are NOT mounted in deployment; routes not served; OpenBao secrets do not exist; credential injection cannot be demonstrated.
+```
+
+#### Phase 5 — line 890
+
+- **state:** `[ ]` — unticked
+- **line:** 890
+- **phase:** 5
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 5: Onboard kubectl-proxy endpoints for additional clusters as **one parametrized multi-instance fragment** (requires Phase 10) carrying **`x-instance-param: cluster`** as its designated instance selector (added 2026-07-20 — the fragment declares `/k8s/{cluster}/…` and names `cluster` as the instance parameter, per Data Models, `x-instance-param`), adding a Tailscale Connector per cluster on rs-manager as needed. **Each of the eight bare-MagicDNS `x-upstream-map` hosts must be added to `seam-upstream-allowlist` as its own line** (added 2026-07-20 — `traefik-ardenone-cluster:8001`, `traefik-apexalgo-iad:8001`, `kubectl-proxy-iad-kalshi:8001`, `kubectl-proxy-ord-devimprint:8001`, … match neither `*.ts.net` nor in-cluster Service DNS, so without the enumerated bare-hostname line each would be rejected and quarantine the fragment fleet-wide; rs-manager's own entry is reached over in-cluster Service DNS and is already covered by the `*.svc.cluster.local` suffix — Hosting, Architecture). **The admin-credentialed instances carry a distinct per-instance `requiredScope` from the observer instances** (GAP 4, decided 2026-07-20; Data Models, `x-upstream-map`): the ~3-day `cloudspace-admin` read/write proxies and the long-lived read-only observers hold different privilege levels in the same map, so each entry carries its own `requiredScope`, a caller granted only the observer scope cannot reach an admin-credentialed cluster, and `_all` fans out only across the instances a caller is actually scoped for (enforcement lands in Phase 7). **INCOMPLETE — verified 2026-09-01** (`.beads/phase5-evidence.md`): missing `iad-native-ads` cluster from both upstream map and allowlist; schema validation bug prevents fragment loading; YAML parsing bug prevents ANY fragments from loading; missing 6 Tailscale Connectors; nine-cluster requirement not met.
+```
+
+#### Phase 6b — line 896
+
+- **state:** `[ ]` — unticked
+- **line:** 896
+- **phase:** 6b
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 6b: Agent cutover — cut agents over **service by service** (decided 2026-07-16); as each service's fragment goes live, its hand-written CLAUDE.md proxy prose is deleted in the same change; never a big-bang cutover. The end state flips the default from "here are your prescribed tools" to "here is your tool interface — list the routes and choose from that list": CLAUDE.md eventually carries only the SEAM endpoint pointer. **Gated on the trust-boundary ACL existing and on Phase 13 for any metered route.** The pre-cutover checklist verifies the ACL at **both ports**, not one: that the worker tags reach the caller-facing proxy port, and — the item easiest to skip because nothing fails when it is wrong — that they are **refused** on the operator port, so `/config/status`, `/health/credentials` and `/health/upstreams` are not ambiently readable by every agent being cut over. A permissive operator-port grant is invisible in testing precisely because it only ever *works*. **The checklist additionally verifies that each service's agents retry with backoff over at least a 60-second window** (added 2026-07-20): SEAM is single-replica with `maxSurge: 0`, so a binary deploy is a real gap of **typically 5-30 seconds** and not the "sub-second" one §1 used to claim, and an agent cut over with a one-second retry budget will fail across every SEAM deploy thereafter. This is the cutover's cheapest item to skip and its most expensive to discover later, since the first deploy after cutover is when it surfaces. **BLOCKED — verified 2026-09-01** (`.beads/phase6b-evidence.md`): YAML fragments cannot load — binary treats YAML as JSON, so production fragments (ArgoCD, k8s, test-service) fail with "invalid character '#' looking for beginning of value"; service-by-service cutover cannot proceed.
+```
+
+#### Phase 7 — line 897
+
+- **state:** `[ ]` — unticked
+- **line:** 897
+- **phase:** 7
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 7: Per-agent tool scoping — NEEDLE-side per-worker `tsnet` identity provisioning, `x-required-scope` route tagging, Grant-based scope enforcement at the gateway, plus the self-service surface (`/whoami`, `/scopes` — scope-filtered by default, full taxonomy at `/scopes?all=1` behind the `seam:scopes:read-all` scope, and **both forms derived at request time from two merged sources, not one** (added 2026-07-20): the merged spec's `x-required-scope` declarations, **plus a small built-in set of control-plane scope declarations compiled into the SEAM binary**, each carrying the same fields a fragment-derived one does and labeled `source: builtin`. The built-in set is not an optimization: SEAM's control plane resolves *before* the merged route table (Fragment Toolchain rule 2) and therefore has no `x-required-scope` anywhere in any fragment, so under a fragments-only derivation the two scopes an operator most needs to discover — **`seam:ops:read`** and **`seam:scopes:read-all`**, both landing in this same phase — would be exactly the two `/scopes` could not show. It is scope-filtered on identical terms: a caller holding neither sees neither, and both appear in `/scopes?all=1` — scope-filtered `/openapi.json` + `/docs` + `/docs/{route}`, and 403s naming the missing scope and the Grant snippet that would fix it). Tailnet-native Grant path only; non-tailnet callers are default-denied (Per-Agent Tool Scoping point 7). Depends on 1b, 2, 3 at minimum. **INCOMPLETE — verified 2026-09-01** (`.beads/phase7-evidence.md`): NEEDLE-side `tsnet` identity provisioning uses placeholder test mode; real Tailscale LocalClient WhoIs integration is TODO; no running binary to test acceptance criteria; scope filtering, 404/403 oracle, per-instance scope enforcement, and operator gating cannot be verified without runtime testing.
+```
+
+#### Phase 9a — line 931
+
+- **state:** `[ ]` — unticked
+- **line:** 931
+- **phase:** 9a
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 9a: `seam lint` — the gateway's merge/validation engine packaged as a CLI and wired as a declarative-config CI gate. Validates fragment schema, detects collisions on the (path, method, `x-api-version`) triple, rejects any `x-vault-path` outside the `rs-manager/rs-manager/seam/routes/*` allowlist or violating per-service co-ownership, **rejects any `x-upstream` or `x-upstream-map` entry `url` whose host falls outside the operator-owned upstream-host allowlist**, **rejects any fragment declaring a reserved control-plane path** (Fragment Toolchain rule 3 — the runtime quarantine half ships with 1b; lint is the pre-merge half), and flags every `x-unscrubbable: acknowledged` for human review. **NO EVIDENCE — verified 2026-09-01** (`.beads/phase-verdict-summary.md`): evidence file does not exist.
+```
+
+#### Phase 10 — line 950
+
+- **state:** `[ ]` — unticked
+- **line:** 950
+- **phase:** 10
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 10: Multi-instance routes — the **`x-instance-param`** fragment-root field naming the designated instance-selector path parameter (added 2026-07-20; Data Models — `{instance}` throughout this plan is the generic stand-in for the parameter it names) + object-form `x-upstream-map` resolution over the **full entry key set `{url, vaultPath, injectAs, tls, plaintext, probeInterval, breaker, requiredScope}`** (corrected 2026-07-20 — this listed only `vaultPath`/`injectAs`/`probeInterval`, and this was one of the four disagreeing copies Data Models has since consolidated; the phase that *builds* map resolution carried one of the short ones, which is the worst place for it, since an entry key nobody implements is an inherited default nobody notices). Only `url` is required; the fragment-level `x-vault-path`, `x-inject-as`, `x-upstream-tls`, `x-credential-probe` interval and `x-breaker` are the defaults for any key an entry omits — **except `plaintext`, which is per-entry and never inherited**: a map-bearing fragment acknowledges plaintext with **`plaintext: acknowledged` on each `http://` entry**, a fragment-level `x-upstream-plaintext` alongside a map is a lint error rather than a blanket cover, and an `http://` entry without its own acknowledgement is a hard error (Data Models). **`requiredScope` is a per-entry key too, with no fragment-level default** (GAP 4, decided 2026-07-20): Phase 10 parses and carries it, together with the companion fragment-root `x-fanout-scope`, but per-instance scope *enforcement* — the stage-5 union with the operation-level `x-required-scope`, the `x-fanout-scope` gate on `_all`, and dropping unscoped instances as `scope-withheld` envelope entries — lands with the rest of scope enforcement in **Phase 7**, since it needs the identity Phase 7 first makes real (Data Models, `x-upstream-map`; Multi-Instance Routes). Every entry `url` is bound by the operator-owned upstream-host allowlist, so a wide map cannot smuggle one attacker-controlled instance in among nine legitimate clusters. **CRITICAL FAILURE — verified 2026-09-01** (`.beads/phase10-evidence.md`): SEAM crashes on startup with duplicate `/whoami` route registration; runtime verification blocked; code-level implementation complete for x-instance-param, x-upstream-map, status derivation, and envelope size rule but cannot be exercised without working binary.
+```
+
+#### Phase 12 — line 960
+
+- **state:** `[ ]` — unticked
+- **line:** 960
+- **phase:** 12
+- **section:** Implementation Phases
+- **indent:** 0
+- **text (verbatim):**
+
+```
+Phase 12: Credential health sentinel — `x-credential-probe` background validation loop with per-(fragment, instance) reporting at `/health/credentials`, leader-elected via a Kubernetes `Lease`, and 401-triggered refetch-and-retry-once **over the request-body buffer Phase 2 ships**, plus the **`credential-refresh-not-retried` structured error envelope** for the case that buffer cannot cover (both added to this deliverable list 2026-07-20 — the retry was named here while the mechanism it consumes and the error it emits were named in **no** phase at all, which by this plan's own principle made them unbuilt; the buffer and its `maxReplayableRequestBytes` knob are assigned to **Phase 2**, since Phase 13's loop-breaker hash consumes them three ship-order positions before this phase exists). Within the cap the retry is a genuine replay: the buffered bytes are re-sent with headers re-stripped per the inbound-sanitation rule and the freshly-refetched secret re-injected. Above the cap — and on any body SEAM cannot replay at all, a request-side protocol upgrade or an unbounded chunked stream with no declared length — the cache is **still** invalidated and the secret **still** refetched, so the caller's *next* request succeeds, and SEAM answers with that envelope: the condition named, the upstream's own status and scrubbed body carried, and the plain statement that resending will use the refreshed credential. The self-healing guarantee is therefore conditional, and the point of naming the envelope is that the condition is one the caller can actually detect. **Consumes the Lease `Role`/`RoleBinding` created in Phase 6a** — `get`/`create`/`update` on `coordination.k8s.io` `leases` in SEAM's namespace; this phase adds no RBAC of its own, and if that binding is absent the probe loop fails closed (holds no Lease, probes nothing) rather than probing unelected. Depends on Phase 2 and on 6a for that binding. (Secret-echo scrubbing was moved out of this phase to Phase 2 on 2026-07-20 — see Credential Health Sentinel.) **CANNOT VERIFY ACCEPTANCE — verified 2026-09-01** (`.beads/phase12-evidence.md`): code compilation failure (99 errors accumulated since 2026-08-30); runtime verification requires Kubernetes cluster access, OpenBao instance, configured fragments, running SEAM instance, and upstream services — all blocked by compilation issues; implementation exists but functional verification impossible without build environment and runtime testing.
+```
+
+## Completeness verification
+
+| Check | Result | OK |
+|---|---|---|
+| line-anchored checkbox regex count == extracted count | `17` → `pass` | yes |
+| bracket-pair occurrences anywhere == extracted count (no non-checkbox pairs) | `17` → `pass` | yes |
+| ticked + unticked == total | `17` → `pass` | yes |
+| checkbox line numbers strictly increasing | `` → `pass` | yes |
+| extracted phase IDs == ship-order IDs (plan line 800) | `17 vs 17` → `pass` | yes |
+| every checkbox has a parseable Phase label | `[]` → `pass` | yes |
+| no text contains a code fence (safe verbatim rendering) | `[]` → `pass` | yes |
+| all items in one section: Implementation Phases | `` → `pass` | yes |
+
+**Extracted phase IDs:** 1a, 1b, 2, 3, 4, 5, 6a, 6b, 7, 8, 9a, 9b, 10, 11, 12, 13, 14
+
+**Conclusion:** all checkboxes captured — none missing.
