@@ -382,7 +382,7 @@ Before declaring this complete:
 - Ephemeral keys: https://tailscale.com/kb/1081/auth-keys/
 - NEEDLE tsnet module: `/home/coding/NEEDLE/src/tsnet.rs`
 - Dispatch integration: `/home/coding/NEEDLE/src/dispatch/mod.rs:1168-1200`
-- OpenBao integration: `/home/coding/SEAM/docs/notes/openbao-resource-verification-report.md`
+- OpenBao integration: the archived verification investigation
 
 ## Conclusion
 

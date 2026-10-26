@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Capture k8s corpus for a cluster endpoint
-# Usage: ./capture-k8s-corpus.sh <cluster-name> <source-url>
+# Usage: ./scripts/capture-k8s-corpus.sh <cluster-name> <source-url>
 
 set -e
 

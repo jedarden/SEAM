@@ -44,7 +44,7 @@ All acceptance criteria are met:
 
 ## Test Results
 
-All validation tests pass (verified via `validate_schema.js` and `validate-extension-tests.js`):
+All validation tests pass (verified via the schema-validation test suite and `validate-extension-tests.js`):
 
 ```
 ✅ Valid example accepted
@@ -66,7 +66,7 @@ The following test files verify the x-loop-guard validation rules:
 
 ## Documentation
 
-The validation rules are documented in `validate-summary.md` (lines 122-146).
+The validation rules are documented in the route-fragment schema and validation runner.
 
 ## Status
 

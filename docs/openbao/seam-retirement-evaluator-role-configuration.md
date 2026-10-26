@@ -194,7 +194,7 @@ expectation.
 4. **Secrets:** Neither GitHub token nor VictoriaMetrics credentials exist
 
 ### Why Setup Failed
-According to the comprehensive OpenBao report (OPENBAO_RESOURCES_FINAL_REPORT.md):
+According to the archived OpenBao investigation:
 - All authentication workflows failed with exit code 1
 - ServiceAccount lookup failures prevented setup execution
 - JWT token validation issues
@@ -303,8 +303,6 @@ Once the setup workflow is successfully executed, verify:
 
 ## References
 
-- **Setup Template:** `/home/coding/SEAM/seam-retirement-evaluator-openbao-setup-template.json`
-- **Comprehensive Report:** `/home/coding/SEAM/OPENBAO_RESOURCES_FINAL_REPORT.md`
 - **Workflow Execution Logs:** Multiple failed attempts documented in report
 - **OpenBao Server:** `http://openbao-ardenone.tail1b1987.ts.net:8200`
 

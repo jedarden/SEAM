@@ -26,8 +26,8 @@ The repository and declarative-config files describe the intended role, but they
 
 | Area | Finding | Implication |
 | --- | --- | --- |
-| Kubernetes auth role listing | `kubernetes-auth-roles-list.txt` records that the queried OpenBao server had only `token/` enabled; Kubernetes auth and its role list were absent. | `seam-retirement-evaluator` was not found in that server. |
-| Runtime verification | `openbao-resource-verification-report.md` records that OpenBao was healthy, but the evaluator ServiceAccount was absent from the checked cluster and the role/policy could not be verified without admin access. | Runtime provisioning remains incomplete or unproven. |
+| Kubernetes auth role listing | The investigation recorded that the queried OpenBao server had only `token/` enabled; Kubernetes auth and its role list were absent. | `seam-retirement-evaluator` was not found in that server. |
+| Runtime verification | The investigation recorded that OpenBao was healthy, but the evaluator ServiceAccount was absent from the checked cluster and the role/policy could not be verified without admin access. | Runtime provisioning remains incomplete or unproven. |
 | Desired Kubernetes identity | The authoritative declarative-config ServiceAccount is `seam-retirement-evaluator` in namespace `seam`. | The OpenBao binding must use the exact name and namespace. |
 | Desired role definition | The authoritative workflow writes `auth/kubernetes/role/seam-retirement-evaluator` with policy `seam-retirement-evaluator-policy`, a 24-hour TTL, and a 72-hour maximum TTL. | The role specification is already defined; the missing step is applying it to OpenBao. |
 | Provisioning mechanism | `setup-openbao-resources.yml` documents that the role is created by the Argo WorkflowTemplate, not by an `OpenBaoKubernetesAuthRole` Kubernetes CRD. | Run the supported workflow after its Kubernetes and OpenBao prerequisites are ready. |

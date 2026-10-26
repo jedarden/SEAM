@@ -128,5 +128,26 @@ generated/
 # tools/diffharness/internal/corpus/ Go package, silently dropping
 # corpus_test.go from every commit.
 /corpus/
+
+# Root-level fleet debug and report dumps — keep generated diagnostics out of
+# the repository root without ignoring similarly named project files below it.
+/OPENBAO_RESOURCES_FINAL_REPORT.md
+/evaluator-openbao-read-test-*.json
+/kubernetes-auth-roles-list.txt
+/openbao-*-debug-*.json
+/openbao-provisioning-targets-report.md
+/openbao-read-test-*.json
+/openbao-resource-verification-report.md
+/openbao-test-logs.txt
+/openbao-verification-*.md
+/openbao-workflow-logs-*.md
+/openbao_workflow_logs.txt
+/openbao_workflow_summary.md
+/seam-retirement-evaluator-*-template.json
+/secret-verification-report.md
+/validate-summary.md
+/workflow-execution-report.md
+/workflow-seam-ci-*.json
+
 logs/
 scratch/
