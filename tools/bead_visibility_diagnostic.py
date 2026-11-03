@@ -28,6 +28,34 @@ from typing import Dict, List, Tuple, Optional, Any
 import time
 
 
+def parse_cli_bead_ids(output: str) -> List[str]:
+    """Extract bead IDs from either JSON-array or JSONL CLI output."""
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict):
+        payload = [payload]
+    if isinstance(payload, list):
+        return [
+            bead["id"]
+            for bead in payload
+            if isinstance(bead, dict) and isinstance(bead.get("id"), str)
+        ]
+
+    # Keep compatibility with callers or older bead versions using JSONL.
+    bead_ids = []
+    for line in output.splitlines():
+        try:
+            bead = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(bead, dict) and isinstance(bead.get("id"), str):
+            bead_ids.append(bead["id"])
+    return bead_ids
+
+
 class BeadVisibilityChecker:
     """Checks bead visibility across multiple query strategies."""
 
@@ -72,17 +100,7 @@ class BeadVisibilityChecker:
                 timeout=30
             )
             if result.returncode == 0:
-                # Handle NDJSON output (one JSON object per line)
-                bead_ids = []
-                for line in result.stdout.strip().split('\n'):
-                    if line.strip():
-                        try:
-                            bead = json.loads(line)
-                            if isinstance(bead, dict) and "id" in bead:
-                                bead_ids.append(bead["id"])
-                        except json.JSONDecodeError:
-                            continue
-                return bead_ids
+                return parse_cli_bead_ids(result.stdout)
         except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError) as e:
             self.logger.warning(f"CLI open query failed: {e}")
         return []
@@ -98,17 +116,7 @@ class BeadVisibilityChecker:
                 timeout=30
             )
             if result.returncode == 0:
-                # Handle NDJSON output (one JSON object per line)
-                bead_ids = []
-                for line in result.stdout.strip().split('\n'):
-                    if line.strip():
-                        try:
-                            bead = json.loads(line)
-                            if isinstance(bead, dict) and "id" in bead:
-                                bead_ids.append(bead["id"])
-                        except json.JSONDecodeError:
-                            continue
-                return bead_ids
+                return parse_cli_bead_ids(result.stdout)
         except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError) as e:
             self.logger.warning(f"CLI ready query failed: {e}")
         return []
