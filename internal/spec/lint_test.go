@@ -101,6 +101,25 @@ func TestLintRejectsDuplicateCredentialAndStaticNames(t *testing.T) {
 	assertFindingCodes(t, report.Errors, []string{"injection.duplicate-name"})
 }
 
+func TestLintRejectsInheritedInjectionNameConflict(t *testing.T) {
+	root := t.TempDir()
+	fragment := validLintFragment("owner", "v1", "https://api.example.com")
+	fragment = strings.Replace(fragment, "x-upstream: https://api.example.com\n", "x-upstream: https://api.example.com\n"+
+		"x-vault-path: seam/routes/owner/token\n"+
+		"x-inject-as:\n  kind: header\n  name: X-Provider-Key\n", 1)
+	fragment = strings.Replace(fragment, "    get:\n", "    get:\n"+
+		"      x-inject-static:\n"+
+		"        kind: header\n        name: x-provider-key\n        value: pinned\n", 1)
+	writeLintTestFragment(t, root, "owner", "route.yaml", fragment)
+	report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+	if err != nil {
+		t.Fatalf("LintDirectory returned setup error: %v", err)
+	}
+	if len(report.Errors) != 1 || report.Errors[0].Code != "injection.duplicate-name" {
+		t.Fatalf("inherited injection name conflict: %+v", report.Errors)
+	}
+}
+
 func TestLintAcceptsCompositeInjectionEntriesWithOwnSources(t *testing.T) {
 	root := t.TempDir()
 	fragment := validLintFragment("owner", "v1", "https://api.example.com")

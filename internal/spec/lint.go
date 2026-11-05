@@ -621,7 +621,26 @@ func schemaHasValidationConstraints(value any) bool {
 // injector. Header names share a case-insensitive namespace; query names are
 // exact and case-sensitive, matching the ingress strip rules.
 func (f *lintFragment) checkInjectionNames(report *LintReport) {
-	checkRoute := func(route map[string]any, where string) {
+	firstValue := func(key string, levels ...map[string]any) any {
+		for _, level := range levels {
+			if value, ok := level[key]; ok {
+				return value
+			}
+		}
+		return nil
+	}
+	firstInjectAs := func(levels ...map[string]any) any {
+		for _, level := range levels {
+			if value, ok := level["x-inject-as"]; ok {
+				return value
+			}
+			if value, ok := level["injectAs"]; ok {
+				return value
+			}
+		}
+		return nil
+	}
+	checkRoute := func(injectAsValue, staticValue any, where string) {
 		seenHeaders := make(map[string]string)
 		seenQueries := make(map[string]string)
 		add := func(kind, name, source string) {
@@ -644,10 +663,6 @@ func (f *lintFragment) checkInjectionNames(report *LintReport) {
 			}
 			seen[name] = source
 		}
-		injectAsValue := route["x-inject-as"]
-		if injectAsValue == nil {
-			injectAsValue = route["injectAs"]
-		}
 		for index, entry := range injectionObjects(injectAsValue) {
 			kind, _ := entry["kind"].(string)
 			name, _ := entry["name"].(string)
@@ -656,14 +671,14 @@ func (f *lintFragment) checkInjectionNames(report *LintReport) {
 			}
 			add(kind, name, fmt.Sprintf("x-inject-as[%d]", index))
 		}
-		for index, entry := range injectionObjects(route["x-inject-static"]) {
+		for index, entry := range injectionObjects(staticValue) {
 			kind, _ := entry["kind"].(string)
 			name, _ := entry["name"].(string)
 			add(kind, name, fmt.Sprintf("x-inject-static[%d]", index))
 		}
 	}
 
-	checkRoute(f.data, "fragment route")
+	checkRoute(firstInjectAs(f.data), firstValue("x-inject-static", f.data), "fragment route")
 	paths, _ := f.data["paths"].(map[string]any)
 	for path, pathValue := range paths {
 		pathItem, _ := pathValue.(map[string]any)
@@ -673,7 +688,19 @@ func (f *lintFragment) checkInjectionNames(report *LintReport) {
 			}
 			operation, _ := operationValue.(map[string]any)
 			if operation != nil {
-				checkRoute(operation, fmt.Sprintf("%s %s", strings.ToUpper(method), path))
+				where := fmt.Sprintf("%s %s", strings.ToUpper(method), path)
+				injectAs := firstInjectAs(operation, pathItem, f.data)
+				static := firstValue("x-inject-static", operation, pathItem, f.data)
+				checkRoute(injectAs, static, where)
+				entries, _ := firstValue("x-upstream-map", operation, pathItem, f.data).(map[string]any)
+				for instance, entryValue := range entries {
+					entry, _ := entryValue.(map[string]any)
+					instanceInjectAs := injectAs
+					if override, ok := entry["injectAs"]; ok && override != nil {
+						instanceInjectAs = override
+					}
+					checkRoute(instanceInjectAs, static, fmt.Sprintf("%s x-upstream-map[%q]", where, instance))
+				}
 			}
 		}
 	}
@@ -681,7 +708,7 @@ func (f *lintFragment) checkInjectionNames(report *LintReport) {
 		for instance, entryValue := range entries {
 			entry, _ := entryValue.(map[string]any)
 			if entry != nil {
-				checkRoute(entry, fmt.Sprintf("x-upstream-map[%q]", instance))
+				checkRoute(firstInjectAs(entry), firstValue("x-inject-static", entry), fmt.Sprintf("x-upstream-map[%q]", instance))
 			}
 		}
 	}
