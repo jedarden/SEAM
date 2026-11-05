@@ -314,7 +314,12 @@ func (l *CredentialProbeLoop) probeTarget(ctx context.Context, target *Credentia
 		InjectAsList:     target.InjectAsList,
 	}
 	credentialSource := l.credentialSource
-	if target.CredentialSource == credentialSourceEnv || target.CredentialSource == credentialSourceFile {
+	usesMountedSource := route.CredentialSource == credentialSourceEnv || route.CredentialSource == credentialSourceFile
+	for _, injection := range route.injections() {
+		selected := routeForInjection(route, injection)
+		usesMountedSource = usesMountedSource || selected.CredentialSource == credentialSourceEnv || selected.CredentialSource == credentialSourceFile
+	}
+	if usesMountedSource {
 		credentialSource = routeTableCredentialResolver{table: l.routeTableHolder.currentTable()}
 	}
 	var credValues [][]byte

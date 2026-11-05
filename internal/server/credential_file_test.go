@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -129,6 +131,92 @@ func TestFileCredentialProbeResolvesCurrentProjection(t *testing.T) {
 	probe := registry.Get("file-probe:get", "_default")
 	if probe == nil || probe.Status != CredentialHealthy {
 		t.Fatalf("file credential probe = %+v, want healthy after rotation", probe)
+	}
+}
+
+func TestFileCredentialCompositeProbeResolvesCurrentProjection(t *testing.T) {
+	const name = "SEAM_CRED_TEST_OWNER_API_KEY"
+	const rotated = "composite-probe-rotated-fixture"
+	root := makeCredentialProjection(t, name, "composite-probe-old-fixture", rotated)
+	swapCredentialProjection(t, root, "revision-new")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+rotated {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	table := NewRouteTable(nil)
+	table.SetCredentialSource(newFileCredentialSource(root))
+	registry := NewCredentialProbeRegistry()
+	loop := &CredentialProbeLoop{
+		probeRegistry: registry, routeTableHolder: NewThreadSafeTableHolder(table),
+		credentialSource: &fakeCredentialSource{resolved: []byte("wrong-probe-source-fixture")},
+		httpClient:       upstream.Client(), lastProbeTimes: make(map[string]time.Time),
+	}
+	loop.probeTarget(context.Background(), &CredentialProbeTarget{
+		FragmentID: "composite-probe:get", InstanceID: "_default",
+		ProbeURL: upstream.URL + "/probe", ProbePath: "/probe", ProbeMethod: http.MethodGet,
+		Interval:     time.Minute,
+		InjectAsList: []*InjectAs{{Kind: InjectionBearer, CredentialSource: credentialSourceFile, CredentialFile: name}},
+	}, time.Now())
+	if probe := registry.Get("composite-probe:get", "_default"); probe == nil || probe.Status != CredentialHealthy {
+		t.Fatalf("composite file credential probe = %+v, want healthy", probe)
+	}
+}
+
+func TestFileCredentialComposite401RetryScrubsRotatedValue(t *testing.T) {
+	const (
+		name = "SEAM_CRED_TEST_OWNER_API_KEY"
+		old  = "composite-retry-old-fixture"
+		new  = "composite-retry-new-fixture"
+	)
+	root := makeCredentialProjection(t, name, old, new)
+	var requests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requests.Add(1) == 1 {
+			if got := r.Header.Get("Authorization"); got != "Bearer "+old {
+				t.Errorf("first upstream credential = %q, want old projection", got)
+			}
+			swapCredentialProjection(t, root, "revision-new")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer "+new {
+			t.Errorf("retried upstream credential = %q, want rotated projection", got)
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("X-Echo-Credential", old+" "+new)
+		_, _ = io.WriteString(w, old+" "+new)
+	}))
+	defer upstream.Close()
+
+	table := NewRouteTable(nil)
+	table.SetCredentialSource(newFileCredentialSource(root))
+	route := RouteEntry{
+		PathTemplate: "/test", Method: http.MethodPost,
+		InjectAsList: []*InjectAs{{Kind: InjectionBearer, CredentialSource: credentialSourceFile, CredentialFile: name}},
+	}
+	proxy, err := NewReverseProxyWithConfig(upstream.URL, &ReverseProxyConfig{MaxBufferedResponseBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "http://seam.test/test", strings.NewReader("replayable body"))
+	withRouteMatch(request, &RouteMatch{Route: route}, routeTableCredentialResolver{table: table})
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || requests.Load() != 2 {
+		t.Fatalf("retry response status=%d, upstream requests=%d, body=%q", response.Code, requests.Load(), response.Body.String())
+	}
+	for _, value := range []string{old, new} {
+		if strings.Contains(response.Body.String(), value) || strings.Contains(response.Header().Get("X-Echo-Credential"), value) {
+			t.Fatalf("retry response exposed a credential in body or header")
+		}
+	}
+	if !strings.Contains(response.Body.String(), RedactedSecret) || !strings.Contains(response.Header().Get("X-Echo-Credential"), RedactedSecret) {
+		t.Fatalf("retry response did not scrub body and header: body=%q header=%q", response.Body.String(), response.Header().Get("X-Echo-Credential"))
 	}
 }
 

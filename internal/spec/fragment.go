@@ -363,6 +363,51 @@ func (fl *FragmentLoader) validateFragment(fragment *Fragment, schema *jsonschem
 			return fmt.Errorf("credential_file_ownership_failed: %w", err)
 		}
 	}
+	// Composite injections can select their own source without a root source.
+	// Apply the same owner boundary before merging the whole fragment, including
+	// per-instance overrides; lint alone does not protect the running gateway.
+	validateInjectionOwners := func(value any) error {
+		for _, entry := range injectionObjects(value) {
+			source, _ := entry["source"].(string)
+			envName, _ := entry["credentialEnv"].(string)
+			fileName, _ := entry["credentialFile"].(string)
+			if source == "" {
+				switch {
+				case envName != "":
+					source = "env"
+				case fileName != "":
+					source = "file"
+				}
+			}
+			switch source {
+			case "env":
+				if err := credentialEnvOwnerError(envName, fragment.Owner, owners); err != nil {
+					return fmt.Errorf("credential_env_ownership_failed: %w", err)
+				}
+			case "file":
+				if err := credentialFileOwnerError(fileName, fragment.Owner, owners); err != nil {
+					return fmt.Errorf("credential_file_ownership_failed: %w", err)
+				}
+			}
+		}
+		return nil
+	}
+	if err := validateInjectionOwners(fragment.ParsedFragment["x-inject-as"]); err != nil {
+		return err
+	}
+	if upstreamMap, ok := fragment.ParsedFragment["x-upstream-map"].(map[string]any); ok {
+		instances := make([]string, 0, len(upstreamMap))
+		for instance := range upstreamMap {
+			instances = append(instances, instance)
+		}
+		sort.Strings(instances)
+		for _, instance := range instances {
+			entry, _ := upstreamMap[instance].(map[string]any)
+			if err := validateInjectionOwners(entry["injectAs"]); err != nil {
+				return fmt.Errorf("x-upstream-map[%q]: %w", instance, err)
+			}
+		}
+	}
 
 	// Check for reserved path collisions
 	paths, ok := fragment.ParsedFragment["paths"].(map[string]any)

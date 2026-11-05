@@ -649,7 +649,7 @@ func (p *ReverseProxy) dispatchAndServe(ctx context.Context, w http.ResponseWrit
 	// Opaque routes preserve provider error responses verbatim instead.
 	if upstreamResp.StatusCode == http.StatusUnauthorized && !opaqueBodyMode && !credentialRetryFromContext(ctx) {
 		// Check if this route uses credential injection
-		if match != nil && len(match.Route.injections()) > 0 && (match.Route.CredentialSource == credentialSourceFile || (match.Route.VaultPath != "" && match.Route.CredentialSource != credentialSourceEnv)) {
+		if match != nil && routeHasRefreshableCredentials(match.Route) {
 			// We have credential injection - attempt refresh and retry
 			if retryErr := p.handle401CredentialRefresh(ctx, w, r, upstreamReq, upstreamResp, match); retryErr != nil {
 				// Either successful retry (returned nil) or fatal error
@@ -832,6 +832,29 @@ func (p *ReverseProxy) finalizeResponseCost(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
+func routeHasRefreshableCredentials(route RouteEntry) bool {
+	injections := route.injections()
+	if len(injections) == 0 {
+		return false
+	}
+	for _, injection := range injections {
+		selected := routeForInjection(route, injection)
+		switch selected.CredentialSource {
+		case credentialSourceFile:
+			if selected.CredentialFile == "" {
+				return false
+			}
+		case credentialSourceEnv:
+			return false
+		default:
+			if selected.VaultPath == "" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // handle401CredentialRefresh handles 401 responses with credential refresh and retry logic
 // Phase 12.4: On upstream 401, refetch from the configured source (invalidating
 // the OpenBao cache or reopening a file projection),
@@ -895,6 +918,10 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 	retryReader := io.NopCloser(bytes.NewReader(bufferedBytes))
 	retryURL := upstreamReq.URL.String()
 
+	// The retry response may echo either the old or new value. Attach the new
+	// value before creating the request so dispatch and response scrubbing see
+	// the union through retryReq.Context().
+	ctx = withResponseScrubSecrets(ctx, freshSecrets, match.Route.Unscrubbable)
 	retryReq, err := http.NewRequestWithContext(ctx, r.Method, retryURL, retryReader)
 	if err != nil {
 		log.Printf("[proxy] 401 retry failed creating request for route %s: %v", route, err)
@@ -913,9 +940,6 @@ func (p *ReverseProxy) handle401CredentialRefresh(ctx context.Context, w http.Re
 		log.Printf("[proxy] 401 retry failed injecting static metadata for route %s: %v", route, err)
 		return p.respondWithError(ctx, w, r, ErrCodeInternalServer, "Failed to inject fresh static metadata")
 	}
-
-	// Re-attach response scrubber context
-	ctx = withResponseScrubSecrets(ctx, freshSecrets, match.Route.Unscrubbable)
 
 	// Discard the replayable body buffer after successful retry
 	defer replayable.Discard()

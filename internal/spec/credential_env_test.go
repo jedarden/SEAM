@@ -142,6 +142,58 @@ func TestCredentialFileOwnershipRejectsSpecificSiblingOwner(t *testing.T) {
 	t.Fatalf("lint did not identify the more specific file owner: %+v", lint.Errors)
 }
 
+func TestCredentialFileCompositeOwnershipLintAndLoader(t *testing.T) {
+	const foreign = "SEAM_CRED_OTHER_API_KEY"
+	for _, test := range []struct {
+		name     string
+		fragment string
+	}{
+		{
+			name: "fragment injection list",
+			fragment: strings.Replace(validLintFragment("owner", "v1", "https://api.example.com"),
+				"paths:\n", "x-inject-as:\n  - kind: bearer\n    source: file\n    credentialFile: "+foreign+"\npaths:\n", 1),
+		},
+		{
+			name: "upstream instance injection list",
+			fragment: "x-seam-schema: v1\nx-seam-owner: owner\nx-api-version: v1\n" +
+				"x-instance-param: cluster\nx-upstream-map:\n  alt:\n    url: https://api.example.com\n" +
+				"    injectAs:\n      - kind: bearer\n        source: file\n        credentialFile: " + foreign + "\n" +
+				"paths:\n  /api/{cluster}:\n    get:\n      responses:\n        \"200\":\n          description: ok\n",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeLintTestFragment(t, root, "owner", "route.yaml", test.fragment)
+			report, err := LintDirectory(LintOptions{FragmentsDir: root, SchemaPath: lintTestSchemaPath(t)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, finding := range report.Errors {
+				found = found || finding.Code == "credential.file-owner-mismatch"
+			}
+			if !found {
+				t.Fatalf("lint accepted foreign file reference: %+v", report.Errors)
+			}
+
+			loader, err := NewFragmentLoader()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := loader.LoadDirectory(root); err != nil {
+				t.Fatal(err)
+			}
+			if err := loader.ValidateFragments(lintTestSchemaPath(t)); err != nil {
+				t.Fatal(err)
+			}
+			quarantined := loader.GetQuarantined()
+			if len(quarantined) != 1 || !strings.Contains(strings.Join(quarantined[0].QuarantineReasons, "\n"), "credential_file_ownership_failed") {
+				t.Fatalf("loader accepted foreign file reference: %+v", quarantined)
+			}
+		})
+	}
+}
+
 func TestLintSchemaCredentialSourcePairing(t *testing.T) {
 	base := validLintFragment("owner", "v1", "https://api.example.com")
 	tests := []struct {
