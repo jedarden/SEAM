@@ -211,6 +211,16 @@ func TestCompositeInjectionListUsesDistinctSecrets(t *testing.T) {
 		{Kind: InjectionHeader, Name: "X-Api-Key"},
 		{Kind: InjectionQuery, Name: "org"},
 	}
+	table := &RouteTable{routes: []RouteEntry{{PathTemplate: "/items", Method: http.MethodGet, InjectAsList: injections}}}
+	if err := table.SanitizeRequest(req); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.Header.Get("X-Api-Key"); got != "" {
+		t.Fatalf("caller header survived ingress strip: %q", got)
+	}
+	if got := req.URL.RawQuery; got != "" {
+		t.Fatalf("caller query survived ingress strip: %q", got)
+	}
 	if err := InjectSecrets(req, injections, [][]byte{[]byte("key-REPLACE"), []byte("org-REPLACE")}); err != nil {
 		t.Fatal(err)
 	}
@@ -224,10 +234,12 @@ func TestCompositeInjectionListUsesDistinctSecrets(t *testing.T) {
 
 func TestPerInstanceCompositeInjectAsOverride(t *testing.T) {
 	root := RouteEntry{
+		PathTemplate: "/items/{instance}", Method: http.MethodGet,
 		InjectAsList:  []*InjectAs{{Kind: InjectionHeader, Name: "X-Root-Key"}},
 		InstanceParam: "instance",
 		UpstreamMap: map[string]RouteTarget{
 			"west": {URL: "https://west.example", InjectAsList: []*InjectAs{{Kind: InjectionTemplate, Name: "Authorization", Prefix: "Token "}}},
+			"east": {URL: "https://east.example", InjectAs: &InjectAs{Kind: InjectionHeader, Name: "X-East-Key"}},
 		},
 	}
 	selected := root.effectiveTarget(map[string]string{"instance": "west"})
@@ -236,6 +248,25 @@ func TestPerInstanceCompositeInjectAsOverride(t *testing.T) {
 	}
 	if selected.InjectAs != nil {
 		t.Fatalf("legacy injection field should be cleared for list override: %+v", selected.InjectAs)
+	}
+	east := root.effectiveTarget(map[string]string{"instance": "east"})
+	if got := east.injections(); len(got) != 1 || got[0].Name != "X-East-Key" {
+		t.Fatalf("single-object per-instance override = %+v", got)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/items/east", nil)
+	req.Header.Set("X-Root-Key", "caller-root")
+	req.Header.Set("X-East-Key", "caller-east")
+	if err := (&RouteTable{routes: []RouteEntry{root}}).SanitizeRequest(req); err != nil {
+		t.Fatal(err)
+	}
+	if req.Header.Get("X-Root-Key") != "" || req.Header.Get("X-East-Key") != "" {
+		t.Fatalf("caller headers survived ingress strip: %+v", req.Header)
+	}
+	if err := InjectSecrets(req, east.injections(), [][]byte{[]byte("east-REPLACE")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.Header.Get("X-East-Key"); got != "east-REPLACE" {
+		t.Fatalf("per-instance credential = %q", got)
 	}
 }
 

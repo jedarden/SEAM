@@ -1881,6 +1881,7 @@ func (route RouteEntry) effectiveTarget(pathParams map[string]string) RouteEntry
 	}
 	if target.InjectAs != nil {
 		route.InjectAs = target.InjectAs
+		route.InjectAsList = nil
 	}
 	if target.InjectAsList != nil {
 		route.InjectAs = nil
