@@ -3,16 +3,20 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+const leaseFailureLogEvery = 3
 
 // LeaseLeader manages Kubernetes Lease-based leadership election.
 // Only the leader runs the credential probe loop; without leadership,
@@ -136,6 +140,7 @@ func (l *LeaseLeader) Acquire(ctx context.Context) bool {
 
 	ticker := time.NewTicker(l.retryPeriod)
 	defer ticker.Stop()
+	consecutiveFailures := 0
 
 	for {
 		select {
@@ -144,28 +149,41 @@ func (l *LeaseLeader) Acquire(ctx context.Context) bool {
 		case <-l.stopCh:
 			return false
 		case <-ticker.C:
-			if l.tryAcquireOrRenew(ctx) {
+			acquired, err := l.tryAcquireOrRenew(ctx)
+			if acquired {
 				l.mu.Lock()
 				l.leaderElected = true
 				l.mu.Unlock()
 				return true
+			}
+			if err == nil {
+				// Another holder owning the Lease is an expected election
+				// outcome, not an API failure worth reporting.
+				consecutiveFailures = 0
+				continue
+			}
+			consecutiveFailures++
+			if consecutiveFailures == leaseFailureLogEvery || consecutiveFailures%leaseFailureLogEvery == 0 {
+				log.Printf("[LeaseLeader] leadership acquisition failed after %d consecutive retries: %v", consecutiveFailures, err)
 			}
 		}
 	}
 }
 
 // tryAcquireOrRenew attempts to acquire or renew the lease.
-// Returns true if successful (became leader or renewed successfully).
-func (l *LeaseLeader) tryAcquireOrRenew(ctx context.Context) bool {
+// Returns true if successful (became leader or renewed successfully), and an
+// error when the Kubernetes API could not be used. A false result with a nil
+// error means another elector currently holds the Lease.
+func (l *LeaseLeader) tryAcquireOrRenew(ctx context.Context) (bool, error) {
 	if l == nil || l.client == nil {
-		return false
+		return false, nil
 	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	if l.stopped {
-		return false
+		return false, nil
 	}
 
 	now := metav1.NowMicro()
@@ -193,21 +211,29 @@ func (l *LeaseLeader) tryAcquireOrRenew(ctx context.Context) bool {
 			_, err = l.client.CoordinationV1().Leases(l.leaseNamespace).Update(ctx, existing, metav1.UpdateOptions{})
 			if err == nil {
 				l.heldLease = existing
-				return true
+				return true, nil
 			}
+			return false, fmt.Errorf("update lease %q: %w", l.leaseName, err)
 		}
 		// Someone else holds the lease
-		return false
+		return false, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return false, fmt.Errorf("get lease %q: %w", l.leaseName, err)
 	}
 
 	// Lease doesn't exist - try to create
 	_, err = l.client.CoordinationV1().Leases(l.leaseNamespace).Create(ctx, lease, metav1.CreateOptions{})
 	if err == nil {
 		l.heldLease = lease
-		return true
+		return true, nil
+	}
+	if apierrors.IsAlreadyExists(err) {
+		// Another elector won the create race. Retry on the next tick.
+		return false, nil
 	}
 
-	return false
+	return false, fmt.Errorf("create lease %q: %w", l.leaseName, err)
 }
 
 // Renew periodically renews the lease while leadership is held.
@@ -237,7 +263,11 @@ func (l *LeaseLeader) Renew(ctx context.Context) {
 		case <-l.stopCh:
 			return
 		case <-ticker.C:
-			if !l.tryAcquireOrRenew(ctx) {
+			renewed, err := l.tryAcquireOrRenew(ctx)
+			if !renewed {
+				if err != nil {
+					log.Printf("[LeaseLeader] leadership renewal failed: %v", err)
+				}
 				// Failed to renew - leadership lost
 				l.mu.Lock()
 				l.leaderElected = false
