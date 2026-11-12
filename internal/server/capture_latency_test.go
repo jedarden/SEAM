@@ -136,8 +136,16 @@ func TestCaptureLatencyUnderLoad(t *testing.T) {
 			t.Logf("  Latency p99: %v", p99)
 			t.Logf("  Captured entries: %d", cm.GetEntryCount())
 
-			// Verify p99 latency is within acceptable threshold
-			if p99 > tc.acceptablLatency {
+			// Verify p99 latency is within acceptable threshold. Under
+			// -race the budget is not meaningful -- the same policy
+			// TestCaptureLatencyByPayloadSize applies: instrumentation
+			// overhead dominates and one scheduler stall on a
+			// quota-limited CI runner breaches the p99 threshold with no
+			// capture-path regression (2026-11-12: p99 51.48ms vs 10ms on
+			// iad-ci while the same commit passed locally). The
+			// capture-count checks below stay: they are behavioral, not
+			// budget assertions.
+			if !raceEnabled && p99 > tc.acceptablLatency {
 				t.Errorf("p99 latency %v exceeds acceptable threshold %v", p99, tc.acceptablLatency)
 			}
 
